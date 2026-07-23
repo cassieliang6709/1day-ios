@@ -1,0 +1,25 @@
+.DS_Store
+.claude/
+/package-lock.json
+
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Web dependencies and build output
+node_modules/
+.npm-cache/
+dist/
+
+# Local visual QA artifacts
+tmp-ui-check/
+landing-page/qa-*.png
+landing-page/implementation-*.png
+landing-page/deployed.png
+landing-page/AGENTS.md
+landing-page/design-qa.md
+
+# Generated video proof output
+poc/clips/
+poc/output/
