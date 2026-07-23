@@ -30,7 +30,5 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources: [AISetlogTests]
-    resources:
-      - path: AISetlog/Resources
     dependencies:
       - target: AISetlog

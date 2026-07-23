@@ -94,7 +94,8 @@ poc/                    # Reproducible FFmpeg rendering proof of concept
 
 ## Build and test
 
-Requirements: macOS, Xcode 17 or newer, and iOS 17 or newer.
+Requirements: macOS, an Xcode release with the iOS 17 SDK or newer, and
+XcodeGen.
 
 ```bash
 cd ios
