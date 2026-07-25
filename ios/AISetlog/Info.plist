@@ -37,6 +37,10 @@
 	<string>Capture audio for your daily clip.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Save your finished weekly vlog.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

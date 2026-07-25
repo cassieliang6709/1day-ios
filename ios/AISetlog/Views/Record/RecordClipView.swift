@@ -30,6 +30,8 @@ struct RecordClipView: View {
     @State private var showSavePicker = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
+    @State private var showNotificationPrimer = false
+    @State private var dismissAfterPrimer = false
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -96,6 +98,15 @@ struct RecordClipView: View {
             Task { await recorder.configure() }
         }
         .onDisappear { recorder.teardown() }
+        .sheet(
+            isPresented: $showNotificationPrimer,
+            onDismiss: {
+                if dismissAfterPrimer { dismiss() }
+                dismissAfterPrimer = false
+            }
+        ) {
+            NotificationPrimerView(challenges: store.challenges)
+        }
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = newValue
         }
@@ -225,7 +236,7 @@ struct RecordClipView: View {
                         }
                     } else {
                         onSave(url, trimmedOverlayText)
-                        dismiss()
+                        offerNotificationPrimer(dismissWhenFinished: true)
                     }
                 } label: {
                     Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
@@ -277,6 +288,7 @@ struct RecordClipView: View {
         ringProgress = 0
         overlayText = ""
         showToast(Strings.filedTo(challenge.title))
+        offerNotificationPrimer(dismissWhenFinished: false)
     }
 
     private func targetDay(for challenge: Challenge) -> Int {
@@ -292,6 +304,17 @@ struct RecordClipView: View {
             try? await Task.sleep(for: .seconds(1.9))
             if toast == text { withAnimation { toast = nil } }
         }
+    }
+
+    private func offerNotificationPrimer(dismissWhenFinished: Bool) {
+        guard !NotificationPreferences.primerSeen,
+              !NotificationPreferences.eveningEnabled
+        else {
+            if dismissWhenFinished { dismiss() }
+            return
+        }
+        dismissAfterPrimer = dismissWhenFinished
+        showNotificationPrimer = true
     }
 
     private var unavailableView: some View {
@@ -313,8 +336,10 @@ struct RecordClipView: View {
             Button(Strings.useDemoClip(slotTitle ?? Strings.dayN(day))) {
                 if let demo = Bundle.main.url(forResource: "day\(day)", withExtension: "mp4") {
                     onSave(demo, trimmedOverlayText)
+                    offerNotificationPrimer(dismissWhenFinished: true)
+                } else {
+                    dismiss()
                 }
-                dismiss()
             }
             .buttonStyle(.borderedProminent)
             .tint(myTint)

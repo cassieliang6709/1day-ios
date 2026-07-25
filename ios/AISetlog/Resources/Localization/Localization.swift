@@ -140,6 +140,80 @@ enum Strings {
             : "“System” follows your device language. Templates, moments and menus switch instantly."
     }
 
+    static var notifications: String { lang == .chinese ? "通知" : "Notifications" }
+    static var eveningReminder: String {
+        lang == .chinese ? "晚间拍摄提醒" : "Evening capture reminder"
+    }
+    static var eveningReminderFooter: String {
+        lang == .chinese
+            ? "每天最多一条。当天已经拍完就不会提醒。"
+            : "At most one each day. Completed moments are never reminded."
+    }
+    static var reminderTime: String { lang == .chinese ? "提醒时间" : "Reminder time" }
+    static var friendActivity: String { lang == .chinese ? "好友动态" : "Friend activity" }
+    static var friendActivityFooter: String {
+        lang == .chinese
+            ? "好友上传片段、评论或回应时通知你。相近动态会合并。"
+            : "Get notified for friends’ clips, comments, and reactions. Nearby activity is bundled."
+    }
+    static var showFriendNames: String {
+        lang == .chinese ? "在通知中显示好友名字" : "Show friend names in notifications"
+    }
+    static var sharedRooms: String { lang == .chinese ? "共享挑战" : "Shared challenges" }
+    static var notificationPermissionDenied: String {
+        lang == .chinese
+            ? "系统通知已关闭。请到 iPhone 设置中允许 1Day 通知。"
+            : "Notifications are off in iPhone Settings. Allow notifications for 1Day to use this."
+    }
+    static var openSettings: String { lang == .chinese ? "打开系统设置" : "Open Settings" }
+    static var notificationPrimerTitle: String {
+        lang == .chinese ? "留住今天的 moment？" : "Keep today’s moment?"
+    }
+    static var notificationPrimerBody: String {
+        lang == .chinese
+            ? "每天最多一次，在你选择的时间提醒你。拍完后不会再提醒。"
+            : "Get at most one reminder at your chosen time. Once you record, it stays quiet."
+    }
+    static var notificationPrimerFootnote: String {
+        lang == .chinese
+            ? "你可以随时在“设置”中关闭或改时间。"
+            : "You can turn this off or change the time in Settings anytime."
+    }
+    static var enableEveningReminder: String {
+        lang == .chinese ? "开启晚间提醒" : "Enable evening reminder"
+    }
+    static var recordNow: String { lang == .chinese ? "现在拍摄" : "Record now" }
+    static var remindInOneHour: String {
+        lang == .chinese ? "1 小时后提醒" : "Remind me in 1 hour"
+    }
+    static func eveningOneDayReminder(remaining: Int) -> String {
+        lang == .chinese
+            ? "今天还差 \(remaining) 个 moment，留一个给此刻吧。"
+            : "\(remaining) moment\(remaining == 1 ? "" : "s") left today. Save one for now."
+    }
+    static func roomClipActivity(name: String?, day: Int) -> String {
+        if lang == .chinese {
+            return name.map { "\($0) 刚上传了第 \(day) 天的片段。" }
+                ?? "朋友刚上传了第 \(day) 天的片段。"
+        }
+        return name.map { "\($0) just added their Day \(day) clip." }
+            ?? "A friend just added their Day \(day) clip."
+    }
+    static func roomCommentActivity(name: String?) -> String {
+        if lang == .chinese {
+            return name.map { "\($0) 评论了你们的片段。" } ?? "朋友评论了你们的片段。"
+        }
+        return name.map { "\($0) commented on your shared film." }
+            ?? "A friend commented on your shared film."
+    }
+    static func roomReactionActivity(name: String?) -> String {
+        if lang == .chinese {
+            return name.map { "\($0) 回应了你们的片段。" } ?? "朋友回应了你们的片段。"
+        }
+        return name.map { "\($0) reacted to your shared film." }
+            ?? "A friend reacted to your shared film."
+    }
+
     // MARK: Models
 
     static func dayN(_ day: Int) -> String {

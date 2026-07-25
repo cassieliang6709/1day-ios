@@ -13,7 +13,7 @@ protocol ChallengeRepository {
 /// UserDefaults-backed repository, including the v1 → v2 data migration
 /// (a single id-less challenge with clips loose in clips/).
 final class UserDefaultsChallengeRepository: ChallengeRepository {
-    private static let defaultsKey = "challenges.v2"
+    static let defaultsKey = "challenges.v2"
     private static let legacyKey = "challenge.v1"
     private static let templatesKey = "customTemplates.v1"
 

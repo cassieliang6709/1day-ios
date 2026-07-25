@@ -19,9 +19,15 @@ targets:
         DEVELOPMENT_TEAM: M7BPQ88622
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     entitlements:
       path: AISetlog/AISetlog.entitlements
       properties:
+        aps-environment: $(APS_ENVIRONMENT)
         com.apple.developer.applesignin: [Default]
         com.apple.developer.icloud-container-identifiers:
           - iCloud.com.cassie.AISetlog
@@ -35,6 +41,7 @@ targets:
         NSCameraUsageDescription: "Record your 2-second daily challenge clip."
         NSMicrophoneUsageDescription: "Capture audio for your daily clip."
         NSPhotoLibraryAddUsageDescription: "Save your finished weekly vlog."
+        UIBackgroundModes: [remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         CFBundleURLTypes:
           - CFBundleURLName: com.cassie.oneday.join

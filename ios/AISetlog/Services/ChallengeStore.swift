@@ -7,7 +7,15 @@ import Observation
 @Observable
 final class ChallengeStore {
     var challenges: [Challenge] = [] {
-        didSet { repository.saveChallenges(challenges) }
+        didSet {
+            repository.saveChallenges(challenges)
+            ReminderService.reconcile(for: challenges)
+            let oldRooms = Set(oldValue.compactMap(\.roomCode))
+            let newRooms = Set(challenges.compactMap(\.roomCode))
+            if oldRooms != newRooms {
+                SharedActivityNotificationService.reconcileSubscriptions(for: challenges)
+            }
+        }
     }
 
     var customTemplates: [ChallengeTemplate] = [] {
@@ -69,7 +77,6 @@ final class ChallengeStore {
             momentTitles: momentTitles
         )
         challenges.insert(challenge, at: 0)
-        ReminderService.scheduleReminders(for: challenge)
         return challenge
     }
 
@@ -105,7 +112,6 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName)
         challenges.insert(challenge, at: 0)
-        ReminderService.scheduleReminders(for: challenge)
         return challenge
     }
 
@@ -189,7 +195,6 @@ final class ChallengeStore {
 
     func delete(_ id: UUID) {
         fileStore.deleteClips(challengeID: id)
-        ReminderService.cancelReminders(for: id)
         if let code = challenge(id)?.roomCode {
             // Leaves the room locally; the shared record stays for others.
             roomSync.clearRoom(code)
@@ -210,11 +215,6 @@ final class ChallengeStore {
         challenges[ci].cards[idx].clipFileName = fileName
         challenges[ci].cards[idx].recordedAt = .now
         challenges[ci].cards[idx].overlayText = overlayText
-
-        // Challenge finished → no more "come back tomorrow" nudges.
-        if challenges[ci].isComplete {
-            ReminderService.cancelReminders(for: challengeID)
-        }
 
         // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {

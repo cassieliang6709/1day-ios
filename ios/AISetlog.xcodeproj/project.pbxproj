@@ -28,6 +28,7 @@
 		586AF2600531B99839F3ECEF /* AISetlogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0C91DDF53E65DB3F78D79E /* AISetlogApp.swift */; };
 		5B6DE91ABBC34EFBBD138A5F /* BoardTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92B55A0585DEBADDE34CA337 /* BoardTheme.swift */; };
 		6200BC8E1A76CEA8814D44AF /* day1.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 53B60B7627FE0D5F9B726628 /* day1.mp4 */; };
+		63DB6F142539AA1B767B9953 /* SharedActivityNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72ADE1A2FBF5E0B812B8C66B /* SharedActivityNotificationService.swift */; };
 		67D8CB52089F388B44C725C3 /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3C2A2B0AE72D844F68EB50 /* AccountStore.swift */; };
 		69C7707A02F0831EE4945794 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E746E00C782FC429881A9E0 /* SettingsView.swift */; };
 		6FA312785659F9EF7190F15E /* ClipInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BA18EF86A7555B31D64B1B /* ClipInteraction.swift */; };
@@ -43,6 +44,7 @@
 		8E2482480EEFA919414E9CD1 /* day2.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 51C2B0CFDCC4CAF314DC9A3F /* day2.mp4 */; };
 		93343E5A09C862286ECA9F98 /* day3.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 3F3F2013CDEC4CCAB8F88D82 /* day3.mp4 */; };
 		938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */; };
+		94FA1CA14DC73ADCF0885E26 /* NotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B53FFB838BA4383441088A2 /* NotificationTests.swift */; };
 		9DBC9FAD8C3479BF24BC2D8F /* day7.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = E78E5DAF6F0CBFD026FC6596 /* day7.mp4 */; };
 		9E5E1772F63AD479BD37068F /* HomeSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104829B6EE2E733A47B8BE68 /* HomeSections.swift */; };
 		ABA3F184ED9F5F221FC69467 /* ChallengeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73575490179E30D459EFDBA2 /* ChallengeRepository.swift */; };
@@ -50,11 +52,13 @@
 		B2226293963B94F0DE5E30BD /* MemberChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E29668954C7B76AF34FCD5 /* MemberChip.swift */; };
 		B433A345D45D85E1B641928E /* Identity+Color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357B6A37FBB51AA264F15243 /* Identity+Color.swift */; };
 		B4B8040731E08FEF6E7CE47C /* CloudKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C8EBBAA108E0B6BAD2FF7C /* CloudKitService.swift */; };
+		B8BC2FD3F3ED65CB60949595 /* NotificationPrimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC32E99E37FDF4EC43AC0B0E /* NotificationPrimerView.swift */; };
 		C6B267B599F7D352342E5315 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03F8F9F092CD5354A1197CCB /* Assets.xcassets */; };
 		CDD9BDBE43ED533CDDC8B918 /* HomeCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0097B739046AF160529FCB55 /* HomeCards.swift */; };
 		D0049DC717160AD6A533D366 /* MomentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F553DA583104CE8F17B75EC /* MomentCatalog.swift */; };
 		D3CB195CDE74A66B36954C10 /* DayCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2AE0704E7AD406295107B /* DayCard.swift */; };
 		D4DC4A08FD1EDCECAD0A2A55 /* day4.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = F90C3C82460198330C866D6A /* day4.mp4 */; };
+		D75DD6F852BD4EA33A3E8833 /* NotificationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9F6E9F42EBCF8511F5D31BA /* NotificationCoordinator.swift */; };
 		DCAB52ECA6FD55139B02F699 /* NewChallengeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4220C640EA65EB797B18A21 /* NewChallengeComponents.swift */; };
 		DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5B9A68FF1712B56A2D9A75 /* ProgressRing.swift */; };
 		E4856DCD8401EA9875206061 /* ClipRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9F4DAB25F0BED115C92230 /* ClipRecorder.swift */; };
@@ -79,6 +83,7 @@
 		01BA18EF86A7555B31D64B1B /* ClipInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipInteraction.swift; sourceTree = "<group>"; };
 		03F8F9F092CD5354A1197CCB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		08062D437D1CBE853146D03F /* RecordClipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordClipView.swift; sourceTree = "<group>"; };
+		0B53FFB838BA4383441088A2 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
 		0E0FDF28043B736116C77C99 /* CameraComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraComponents.swift; sourceTree = "<group>"; };
 		104829B6EE2E733A47B8BE68 /* HomeSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSections.swift; sourceTree = "<group>"; };
 		1203805BE113F00D0764E06C /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
@@ -102,6 +107,7 @@
 		69E056AE2D8618A55D4731E1 /* ChallengeBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBoardView.swift; sourceTree = "<group>"; };
 		6E746E00C782FC429881A9E0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		71F4B8537CFE73ED795CBBE3 /* AISetlogTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AISetlogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		72ADE1A2FBF5E0B812B8C66B /* SharedActivityNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedActivityNotificationService.swift; sourceTree = "<group>"; };
 		73575490179E30D459EFDBA2 /* ChallengeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeRepository.swift; sourceTree = "<group>"; };
 		75E73E5C157A0714BD9B0544 /* ClipPreviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPreviewComponents.swift; sourceTree = "<group>"; };
 		7C5B9A68FF1712B56A2D9A75 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
@@ -123,6 +129,7 @@
 		CFCAD9798DDE79B3F928C42A /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		D496FA2FD678B671A1723CCE /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		D84B3F62C6B701FAA556F17C /* ChallengeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeStore.swift; sourceTree = "<group>"; };
+		D9F6E9F42EBCF8511F5D31BA /* NotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCoordinator.swift; sourceTree = "<group>"; };
 		DA520086AD531DD7B14C9812 /* ClipPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPreviewView.swift; sourceTree = "<group>"; };
 		DDFA2FC17353B12549FB3213 /* VideoStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcher.swift; sourceTree = "<group>"; };
 		E2BE138CBEA47AFE2B8D7B81 /* ReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderService.swift; sourceTree = "<group>"; };
@@ -131,6 +138,7 @@
 		E78E5DAF6F0CBFD026FC6596 /* day7.mp4 */ = {isa = PBXFileReference; path = day7.mp4; sourceTree = "<group>"; };
 		EA0E3B6710E2DA89EAD960CF /* DayClip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayClip.swift; sourceTree = "<group>"; };
 		EC0436F8A0067CBBA1A8A6A2 /* day6.mp4 */ = {isa = PBXFileReference; path = day6.mp4; sourceTree = "<group>"; };
+		EC32E99E37FDF4EC43AC0B0E /* NotificationPrimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPrimerView.swift; sourceTree = "<group>"; };
 		ED0592BFDD349E6CE539D48A /* HomeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeComponents.swift; sourceTree = "<group>"; };
 		EE75EB1358ED3CA2E38EE93E /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		EF6D32673A9943272D5463EC /* JoinInviteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinInviteSheet.swift; sourceTree = "<group>"; };
@@ -242,6 +250,7 @@
 		832C888E7AC484BD41ACF325 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				EC32E99E37FDF4EC43AC0B0E /* NotificationPrimerView.swift */,
 				6E746E00C782FC429881A9E0 /* SettingsView.swift */,
 				297FD49D423AAAAF52D8A093 /* SignInView.swift */,
 			);
@@ -314,6 +323,15 @@
 			path = Home;
 			sourceTree = "<group>";
 		};
+		CFF57C0A3E86DD55CB0510E7 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				D9F6E9F42EBCF8511F5D31BA /* NotificationCoordinator.swift */,
+				72ADE1A2FBF5E0B812B8C66B /* SharedActivityNotificationService.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
 		D22351996CE093F077BEC168 /* Board */ = {
 			isa = PBXGroup;
 			children = (
@@ -329,6 +347,7 @@
 			children = (
 				910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */,
 				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
+				0B53FFB838BA4383441088A2 /* NotificationTests.swift */,
 				334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */,
 			);
 			path = AISetlogTests;
@@ -350,6 +369,7 @@
 				E2BE138CBEA47AFE2B8D7B81 /* ReminderService.swift */,
 				3B62E35ED1FD50159E5B0534 /* Cloud */,
 				BE67D6C9A07C07261295C49C /* Media */,
+				CFF57C0A3E86DD55CB0510E7 /* Notifications */,
 				27276296D355D110F529BA5C /* Persistence */,
 			);
 			path = Services;
@@ -488,12 +508,15 @@
 				D0049DC717160AD6A533D366 /* MomentCatalog.swift in Sources */,
 				DCAB52ECA6FD55139B02F699 /* NewChallengeComponents.swift in Sources */,
 				E6EC39065A0E9B1513CC7D40 /* NewChallengeView.swift in Sources */,
+				D75DD6F852BD4EA33A3E8833 /* NotificationCoordinator.swift in Sources */,
+				B8BC2FD3F3ED65CB60949595 /* NotificationPrimerView.swift in Sources */,
 				DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */,
 				7E9B4219C8D6196273ECE291 /* RecordClipView.swift in Sources */,
 				4BF03CC71350B5D34B616932 /* ReminderService.swift in Sources */,
 				1CF9553D522526F39E799665 /* RoomSyncService.swift in Sources */,
 				3AACADA55B944C1F045B2B09 /* RootShellView.swift in Sources */,
 				69C7707A02F0831EE4945794 /* SettingsView.swift in Sources */,
+				63DB6F142539AA1B767B9953 /* SharedActivityNotificationService.swift in Sources */,
 				F5FB6686461ADD69FEE12B09 /* SignInView.swift in Sources */,
 				359934DE9703C561BD773EEA /* Theme.swift in Sources */,
 				563F86A16EC88D4D55B8CB04 /* VideoStitcher.swift in Sources */,
@@ -506,6 +529,7 @@
 			files = (
 				01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */,
 				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,
+				94FA1CA14DC73ADCF0885E26 /* NotificationTests.swift in Sources */,
 				938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -536,6 +560,7 @@
 		66597BADACE264BB790A1ED2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AISetlog/AISetlog.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -693,6 +718,7 @@
 		E814810E8526B4650874FAF9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AISetlog/AISetlog.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

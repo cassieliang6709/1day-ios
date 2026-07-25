@@ -14,6 +14,13 @@ final class AccountStore {
 
     private static let key = "account.v1"
 
+    static var persistedUserID: String? {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let account = try? JSONDecoder().decode(Account.self, from: data)
+        else { return nil }
+        return account.id
+    }
+
     private(set) var account: Account?
     var isSignedIn: Bool { account != nil }
 

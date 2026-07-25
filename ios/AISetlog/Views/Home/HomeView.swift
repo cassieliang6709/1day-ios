@@ -22,6 +22,7 @@ struct HomeView: View {
     /// The hero card's challenge when its record CTA opens the camera
     /// straight into the next unrecorded slot (no detour via the board).
     @State private var recordChallenge: Challenge?
+    @State private var notificationRecordRoute: NotificationRecordRoute?
 
     /// Bound only so a language change re-renders the home screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -91,6 +92,23 @@ struct HomeView: View {
                     }
                 }
             }
+            .fullScreenCover(item: $notificationRecordRoute) { route in
+                if let challenge = store.challenge(route.challengeID) {
+                    let slot = notificationSlot(for: route, challenge: challenge)
+                    RecordClipView(
+                        day: slot,
+                        slotTitle: ChallengePresenter(challenge: challenge).title(forSlot: slot),
+                        clipLength: challenge.resolvedClipLength,
+                        orientation: challenge.resolvedOrientation
+                    ) { url, overlayText in
+                        store.saveClip(
+                            from: url,
+                            day: slot,
+                            challengeID: challenge.id,
+                            overlayText: overlayText)
+                    }
+                }
+            }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showJoin) { joinSheet }
             .sheet(isPresented: Binding(
@@ -110,6 +128,12 @@ struct HomeView: View {
             .navigationDestination(for: UUID.self) { id in
                 ChallengeBoardView(challengeID: id)
             }
+        }
+        .onAppear(perform: openPendingNotificationRoute)
+        .onReceive(NotificationCenter.default.publisher(
+            for: .oneDayNotificationRoutePending
+        )) { _ in
+            openPendingNotificationRoute()
         }
         .onChange(of: pendingJoinCode) { _, code in
             if let code { startJoin(code); pendingJoinCode = nil }
@@ -132,6 +156,29 @@ struct HomeView: View {
             }
         }
         #endif
+    }
+
+    private func openPendingNotificationRoute() {
+        guard let route = NotificationRouteInbox.consume(),
+              let challenge = store.challenge(route.challengeID)
+        else { return }
+        if challenge.isComplete {
+            path = [challenge.id]
+        } else {
+            notificationRecordRoute = route
+        }
+    }
+
+    private func notificationSlot(
+        for route: NotificationRecordRoute,
+        challenge: Challenge
+    ) -> Int {
+        if let card = challenge.cards.first(where: { $0.day == route.day }),
+           card.clipFileName == nil {
+            return card.day
+        }
+        return challenge.cards.first(where: { $0.clipFileName == nil })?.day
+            ?? min(max(route.day, 1), max(challenge.cards.count, 1))
     }
 
     // MARK: - Join flow

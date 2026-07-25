@@ -2,13 +2,17 @@ import SwiftUI
 
 @main
 struct AISetlogApp: App {
+    @UIApplicationDelegateAdaptor(NotificationAppDelegate.self) private var appDelegate
     @State private var account: AccountStore
     @State private var store: ChallengeStore
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let account = AccountStore()
         let store = ChallengeStore()
         store.account = account
+        ReminderService.reconcile(for: store.challenges)
+        SharedActivityNotificationService.reconcileSubscriptions(for: store.challenges)
         _account = State(initialValue: account)
         _store = State(initialValue: store)
     }
@@ -19,6 +23,13 @@ struct AISetlogApp: App {
                 .environment(store)
                 .environment(account)
                 .tint(Color.oneDayBlue)
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+                    ReminderService.reconcile(for: store.challenges)
+                    SharedActivityNotificationService.reconcileSubscriptions(
+                        for: store.challenges)
+                    NotificationPermissionService.registerForRemoteNotificationsIfNeeded()
+                }
         }
     }
 }

@@ -40,8 +40,10 @@ of footage or an evening spent in a video editor.
   title cards, prompt captions, names, dates, reactions, and comments.
 - **Your film, your choice.** Preview the result, adjust its title card, captions,
   and transition length, then save it to Photos or share the MP4.
-- **Local-first.** Solo challenges need no account or custom backend. Seven-day
-  challenges use local notifications to bring you back for the next moment.
+- **Local-first.** Solo challenges need no account or custom backend. An optional,
+  configurable evening reminder sends at most one nudge and skips completed moments.
+- **Quiet shared activity.** Opt-in CloudKit subscriptions summarize nearby friend
+  clips, comments, and reactions without putting comment text in notifications.
 - **English and Simplified Chinese.** Product copy, prompts, templates, and
   permission messaging follow the selected app language.
 
