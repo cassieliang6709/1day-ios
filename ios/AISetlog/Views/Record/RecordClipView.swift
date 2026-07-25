@@ -12,13 +12,19 @@ struct RecordClipView: View {
     let day: Int
     var slotTitle: String?
     var clipLength: Challenge.ClipLength = .tiny
+    /// Free-form mode (the camera tab): no cover to dismiss; after review the
+    /// clip is filed into a chosen plan instead of a fixed day slot.
+    var isFreeform = false
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @State private var recorder = ClipRecorder()
     @State private var ringProgress: CGFloat = 0
     @State private var overlayText = ""
+    @State private var showSavePicker = false
+    @State private var toast: String?
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -32,6 +38,8 @@ struct RecordClipView: View {
 
     private var clipSeconds: Double { clipLength.seconds }
     private var clipSecondsText: String { clipLength.secondsLabel }
+    /// Extra bottom room so the free-form controls clear the floating pill.
+    private var bottomInset: CGFloat { isFreeform ? 76 : 18 }
     private var trimmedOverlayText: String? {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : text
@@ -53,6 +61,20 @@ struct RecordClipView: View {
                 default:
                     cameraView
                 }
+            }
+
+            if let toast {
+                VStack {
+                    Spacer()
+                    Text(toast)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(.black.opacity(0.65), in: Capsule())
+                        .padding(.bottom, 130)
+                }
+                .transition(.opacity)
             }
         }
         .task { await recorder.configure() }
@@ -87,7 +109,7 @@ struct RecordClipView: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 14)
-        .padding(.bottom, 18)
+        .padding(.bottom, bottomInset)
     }
 
     private var recordButton: some View {
@@ -155,10 +177,19 @@ struct RecordClipView: View {
                 .tint(.primary)
 
                 Button {
-                    onSave(url, trimmedOverlayText)
-                    dismiss()
+                    if isFreeform {
+                        if store.challenges.isEmpty {
+                            showToast(Strings.makePlanFirst)
+                        } else {
+                            showSavePicker = true
+                        }
+                    } else {
+                        onSave(url, trimmedOverlayText)
+                        dismiss()
+                    }
                 } label: {
-                    Label(Strings.useClip, systemImage: "checkmark")
+                    Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
+                          systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
@@ -170,7 +201,38 @@ struct RecordClipView: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 14)
-        .padding(.bottom, 18)
+        .padding(.bottom, bottomInset)
+        .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
+            ForEach(store.challenges) { challenge in
+                Button(challenge.title) { file(url, to: challenge) }
+            }
+        }
+    }
+
+    // MARK: - Free-form filing
+
+    /// Free-form: file the clip into a chosen plan's first open slot.
+    private func file(_ url: URL, to challenge: Challenge) {
+        store.saveClip(from: url, day: targetDay(for: challenge), challengeID: challenge.id, overlayText: trimmedOverlayText)
+        recorder.retake()
+        ringProgress = 0
+        overlayText = ""
+        showToast(Strings.filedTo(challenge.title))
+    }
+
+    private func targetDay(for challenge: Challenge) -> Int {
+        if let open = challenge.cards.first(where: { $0.clipFileName == nil })?.day {
+            return open
+        }
+        return min(max(challenge.currentDay, 1), challenge.cards.count)
+    }
+
+    private func showToast(_ text: String) {
+        withAnimation { toast = text }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.9))
+            if toast == text { withAnimation { toast = nil } }
+        }
     }
 
     private var unavailableView: some View {
@@ -219,14 +281,19 @@ struct RecordClipView: View {
 
     private var topBar: some View {
         HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .bold))
-                    .frame(width: 52, height: 52)
-                    .background(.white.opacity(0.92), in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+            if isFreeform {
+                // No cover to dismiss in the tab — keep the layout balanced.
+                Color.clear.frame(width: 52, height: 52)
+            } else {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 20, weight: .bold))
+                        .frame(width: 52, height: 52)
+                        .background(.white.opacity(0.92), in: Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Spacer()
 

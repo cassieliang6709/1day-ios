@@ -18,6 +18,7 @@
 		2AD9583C53C6A55CD773CC0C /* CameraComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0FDF28043B736116C77C99 /* CameraComponents.swift */; };
 		2FF3618880D31EBE758A582E /* BuildTemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 455F39D16DA91C86EB710E8E /* BuildTemplateView.swift */; };
 		359934DE9703C561BD773EEA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B50B39418A708023F95ACFF /* Theme.swift */; };
+		3AACADA55B944C1F045B2B09 /* RootShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316FA8086369996C7A7C9639 /* RootShellView.swift */; };
 		3B49FADD86FE41EAA8AB55FF /* DayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFCAD9798DDE79B3F928C42A /* DayCardView.swift */; };
 		42377E3ABDBC49EB785303E5 /* day5.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = C6D938A715DC8FC39E096E34 /* day5.mp4 */; };
 		54BC59A4D84A8547653AC09A /* ClipPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC7524C5A9AAC7162DDDA87 /* ClipPlayback.swift */; };
@@ -84,6 +85,7 @@
 		1D6A2819331DB63F45967849 /* FinalReelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinalReelView.swift; sourceTree = "<group>"; };
 		27C8EBBAA108E0B6BAD2FF7C /* CloudKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitService.swift; sourceTree = "<group>"; };
 		297FD49D423AAAAF52D8A093 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		316FA8086369996C7A7C9639 /* RootShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootShellView.swift; sourceTree = "<group>"; };
 		334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcherTests.swift; sourceTree = "<group>"; };
 		357B6A37FBB51AA264F15243 /* Identity+Color.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Identity+Color.swift"; sourceTree = "<group>"; };
 		35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSyncService.swift; sourceTree = "<group>"; };
@@ -276,6 +278,7 @@
 		C2B8697C190E6CF21EBE708C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				316FA8086369996C7A7C9639 /* RootShellView.swift */,
 				D22351996CE093F077BEC168 /* Board */,
 				02E3190F490098C9998DADA2 /* Components */,
 				CF4A68EF23314F7D9CC4E98F /* Home */,
@@ -485,6 +488,7 @@
 				DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */,
 				7E9B4219C8D6196273ECE291 /* RecordClipView.swift in Sources */,
 				1CF9553D522526F39E799665 /* RoomSyncService.swift in Sources */,
+				3AACADA55B944C1F045B2B09 /* RootShellView.swift in Sources */,
 				69C7707A02F0831EE4945794 /* SettingsView.swift in Sources */,
 				F5FB6686461ADD69FEE12B09 /* SignInView.swift in Sources */,
 				359934DE9703C561BD773EEA /* Theme.swift in Sources */,
@@ -540,7 +544,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -698,7 +702,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

@@ -29,7 +29,7 @@ struct RootView: View {
     @State private var pendingJoinCode: String?
 
     var body: some View {
-        HomeView(pendingJoinCode: $pendingJoinCode)
+        RootShellView(pendingJoinCode: $pendingJoinCode)
             .onOpenURL { url in
                 guard url.scheme == "oneday", url.host == "join",
                       let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?

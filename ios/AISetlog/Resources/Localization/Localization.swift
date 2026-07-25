@@ -346,6 +346,15 @@ enum Strings {
 
     static var retake: String { lang == .chinese ? "重拍" : "Retake" }
     static var useClip: String { lang == .chinese ? "使用这段" : "Use clip" }
+    static var surfacePlans: String { lang == .chinese ? "计划" : "plans" }
+    static var surfaceCamera: String { lang == .chinese ? "拍摄" : "camera" }
+    static var freeformSlot: String { lang == .chinese ? "自由拍摄" : "Free-form" }
+    static var fileToPlan: String { lang == .chinese ? "存入计划" : "File to a plan" }
+    static var fileThisClipTo: String { lang == .chinese ? "把这段视频存入…" : "File this clip to…" }
+    static var makePlanFirst: String { lang == .chinese ? "先在计划页创建一个计划" : "Make a plan first in Plans" }
+    static func filedTo(_ title: String) -> String {
+        lang == .chinese ? "已存入「\(title)」" : "Filed to “\(title)”"
+    }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static func useDemoClip(_ title: String) -> String {
         lang == .chinese ? "为「\(title)」使用示例片段" : "Use demo clip for \(title)"
@@ -382,13 +391,10 @@ enum Strings {
 
     // MARK: Final reel
 
-    static var layout: String { lang == .chinese ? "布局" : "Layout" }
     static var sequence: String { lang == .chinese ? "顺序" : "Sequence" }
-    static var grid: String { lang == .chinese ? "网格" : "Grid" }
     static var saving: String { lang == .chinese ? "保存中…" : "Saving…" }
     static var saveVideo: String { lang == .chinese ? "保存视频" : "Save video" }
     static var stitchFailed: String { lang == .chinese ? "合成失败" : "Stitching failed" }
-    static var buildingGrid: String { lang == .chinese ? "正在生成网格…" : "Building the grid…" }
     static var stitching: String {
         lang == .chinese ? "正在把你的片段合在一起…" : "Stitching your week together…"
     }
@@ -402,10 +408,6 @@ enum Strings {
     static func footerSequence(_ count: Int, unit: String) -> String {
         if lang == .chinese { return "\(count) 个片段 · 交叉淡入淡出" }
         return "\(count) \(unit)\(count == 1 ? "" : "s") · crossfades"
-    }
-    static func footerGrid(_ count: Int) -> String {
-        if lang == .chinese { return "\(count) 个片段并排循环" }
-        return "\(count) clip\(count == 1 ? "" : "s") looping side by side"
     }
     static func shareFilm(oneDay: Bool) -> String {
         if lang == .chinese { return oneDay ? "分享一日影片" : "分享每周影片" }
@@ -434,7 +436,6 @@ enum Strings {
     static var hardCutsFooter: String {
         lang == .chinese ? "0 = 硬切，日记感更利落。" : "0 = hard cuts for a snappier diary film."
     }
-    static var length: String { lang == .chinese ? "时长" : "Length" }
     static var adjust: String { lang == .chinese ? "调整" : "Adjust" }
 
     // MARK: Build template
