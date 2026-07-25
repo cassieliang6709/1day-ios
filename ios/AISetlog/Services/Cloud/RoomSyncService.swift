@@ -49,18 +49,20 @@ final class RoomSyncService {
         try? await CloudKitService.fetchInteractions(code: code)
     }
 
-    /// Push one of my clips to the room (best-effort), then refresh the cache.
+    /// Push one of my clips to the room. The caller refreshes the complete room
+    /// state after a successful upload so clips and interactions stay in sync.
     @MainActor
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
-                    fileURL: URL, overlayText: String?) async {
+                    fileURL: URL, overlayText: String?) async -> Bool {
         do {
             try await CloudKitService.uploadClip(
                 code: code, day: day, authorID: authorID,
                 authorName: authorName, fileURL: fileURL,
                 overlayText: overlayText)
-            _ = await syncClips(code: code)
+            return true
         } catch {
             print("[room] upload failed: \(error)")
+            return false
         }
     }
 

@@ -77,4 +77,57 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(ChallengePresenter(challenge: make(mode: .sevenDay)).unitNamePlural, Strings.unitNamePlural(oneDay: false))
         XCTAssertEqual(ChallengePresenter(challenge: make(mode: .oneDay)).storyLabel, Strings.storyLabel(oneDay: true))
     }
+    func testLegacyChallengeMigrationSurvivesRelaunch() throws {
+        struct LegacyChallenge: Codable {
+            var title: String
+            var startDate: Date
+            var cards: [DayCard]
+        }
+
+        let suiteName = "ChallengeStateTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let legacy = LegacyChallenge(
+            title: "Migrated week",
+            startDate: .now,
+            cards: [DayCard(day: 1, clipFileName: "day1.mov")])
+        defaults.set(
+            try JSONEncoder().encode(legacy),
+            forKey: "challenge.v1")
+
+        let fileStore = MigrationClipFileStore()
+        let repository = UserDefaultsChallengeRepository(
+            defaults: defaults,
+            fileStore: fileStore)
+
+        let firstLaunch = repository.loadChallenges()
+        let secondLaunch = repository.loadChallenges()
+
+        XCTAssertEqual(firstLaunch.count, 1)
+        XCTAssertEqual(secondLaunch.map(\.id), firstLaunch.map(\.id))
+        XCTAssertEqual(fileStore.migratedFileNames, ["day1.mov"])
+    }
+}
+
+private final class MigrationClipFileStore: ClipFileStore {
+    private(set) var migratedFileNames: [String] = []
+
+    func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String? { nil }
+
+    func clipURL(fileName: String, challengeID: UUID) -> URL {
+        URL(fileURLWithPath: "/tmp").appendingPathComponent(fileName)
+    }
+
+    func deleteClips(challengeID: UUID) {}
+
+    func remoteCacheDir(roomCode: String) -> URL {
+        URL(fileURLWithPath: "/tmp").appendingPathComponent(roomCode)
+    }
+
+    func deleteRemoteCache(roomCode: String) {}
+
+    func migrateLegacyClips(_ fileNames: [String], into challengeID: UUID) {
+        migratedFileNames = fileNames
+    }
 }

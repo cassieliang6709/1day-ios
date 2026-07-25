@@ -65,9 +65,11 @@ final class UserDefaultsChallengeRepository: ChallengeRepository {
 
         let migrated = Challenge(
             id: UUID(), title: old.title, startDate: old.startDate, cards: old.cards)
+        let challenges = [migrated]
         fileStore.migrateLegacyClips(
             old.cards.compactMap(\.clipFileName), into: migrated.id)
+        saveChallenges(challenges)
         defaults.removeObject(forKey: Self.legacyKey)
-        return [migrated]
+        return challenges
     }
 }

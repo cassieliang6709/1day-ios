@@ -220,10 +220,13 @@ final class ChallengeStore {
         if let code = challenges[ci].roomCode, let me = account?.account {
             let dest = fileStore.clipURL(fileName: fileName, challengeID: challengeID)
             Task { @MainActor in
-                await roomSync.uploadClip(
+                if await roomSync.uploadClip(
                     code: code, day: day, authorID: me.id,
                     authorName: me.displayName, fileURL: dest,
-                    overlayText: overlayText)
+                    overlayText: overlayText
+                ) {
+                    await syncRoom(challengeID)
+                }
             }
         }
     }
