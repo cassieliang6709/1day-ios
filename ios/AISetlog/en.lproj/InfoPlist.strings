@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Record your 2-second daily challenge clip.";
+"NSMicrophoneUsageDescription" = "Capture audio for your daily clip.";
+"NSPhotoLibraryAddUsageDescription" = "Save your finished weekly vlog.";

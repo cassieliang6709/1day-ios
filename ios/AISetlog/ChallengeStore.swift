@@ -74,7 +74,7 @@ final class ChallengeStore {
 
     enum RoomError: LocalizedError {
         case notSignedIn
-        var errorDescription: String? { "Sign in with Apple first to record with friends." }
+        var errorDescription: String? { Strings.errorSignInFirst }
     }
 
     /// Create a CloudKit-backed room and mirror it locally.
@@ -138,6 +138,45 @@ final class ChallengeStore {
             remoteClips[code] = clips
         } catch {
             print("[room] sync failed: \(error)")
+        }
+        // Reactions/comments sync independently and degrade to local-only if the
+        // CloudKit index isn't deployed — never let it fail the clip sync above.
+        if let interactions = try? await CloudKitService.fetchInteractions(code: code) {
+            mergeInteractions(interactions, into: id)
+        }
+    }
+
+    /// Fold remote reactions/comments into local cards by day. Remote is the
+    /// source of truth, unioned with my own optimistic writes not yet echoed
+    /// back — so a reaction I just tapped stays visible before the next fetch.
+    @MainActor
+    private func mergeInteractions(
+        _ remote: (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment]),
+        into id: UUID
+    ) {
+        guard let ci = challenges.firstIndex(where: { $0.id == id }) else { return }
+        let myID = account?.account?.id
+        for cardIdx in challenges[ci].cards.indices {
+            let day = challenges[ci].cards[cardIdx].day
+
+            var reactions = remote.reactions
+                .filter { $0.day == day }
+                .map { ClipReaction(emoji: $0.emoji, authorID: $0.authorID, authorName: $0.authorName, createdAt: $0.createdAt) }
+            for mine in challenges[ci].cards[cardIdx].reactions where mine.authorID == myID {
+                if !reactions.contains(where: { $0.id == mine.id }) { reactions.append(mine) }
+            }
+            challenges[ci].cards[cardIdx].reactions = reactions
+
+            var comments = remote.comments
+                .filter { $0.day == day }
+                .compactMap { rc -> ClipComment? in
+                    guard let uuid = UUID(uuidString: rc.id) else { return nil }
+                    return ClipComment(id: uuid, text: rc.text, authorID: rc.authorID, authorName: rc.authorName, createdAt: rc.createdAt)
+                }
+            for mine in challenges[ci].cards[cardIdx].comments where mine.authorID == myID {
+                if !comments.contains(where: { $0.id == mine.id }) { comments.append(mine) }
+            }
+            challenges[ci].cards[cardIdx].comments = comments.sorted { $0.createdAt < $1.createdAt }
         }
     }
 
@@ -207,6 +246,74 @@ final class ChallengeStore {
         return clipsDirectory(for: challengeID).appendingPathComponent(name)
     }
 
+    // MARK: - Reactions & comments (local-first)
+
+    /// The identity a reaction/comment is attributed to. Falls back to a local
+    /// stand-in so solo ("just me") challenges work without Sign in with Apple.
+    var currentAuthor: (id: String, name: String) {
+        if let me = account?.account { return (me.id, me.displayName) }
+        return ("local", "You")
+    }
+
+    /// Toggle one emoji on a day's clip for the current author. Optimistic
+    /// local write; a shared room also mirrors it to CloudKit (best-effort).
+    func toggleReaction(_ emoji: String, day: Int, challengeID: UUID) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+        let me = currentAuthor
+        var reactions = challenges[ci].cards[idx].reactions
+        let nowOn: Bool
+        if let hit = reactions.firstIndex(where: { $0.authorID == me.id && $0.emoji == emoji }) {
+            reactions.remove(at: hit)
+            nowOn = false
+        } else {
+            reactions.append(ClipReaction(emoji: emoji, authorID: me.id, authorName: me.name))
+            nowOn = true
+        }
+        challenges[ci].cards[idx].reactions = reactions
+
+        if let code = challenges[ci].roomCode, let acct = account?.account {
+            Task { @MainActor in
+                try? await CloudKitService.setReaction(
+                    code: code, day: day, authorID: acct.id, authorName: acct.displayName,
+                    emoji: emoji, on: nowOn)
+            }
+        }
+    }
+
+    /// Append a comment to a day's clip. Empty/whitespace-only text is ignored.
+    func addComment(_ text: String, day: Int, challengeID: UUID) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+        let me = currentAuthor
+        let comment = ClipComment(text: trimmed, authorID: me.id, authorName: me.name)
+        challenges[ci].cards[idx].comments.append(comment)
+
+        if let code = challenges[ci].roomCode, let acct = account?.account {
+            Task { @MainActor in
+                try? await CloudKitService.postComment(
+                    code: code, day: day, id: comment.id.uuidString,
+                    text: trimmed, authorID: acct.id, authorName: acct.displayName)
+            }
+        }
+    }
+
+    /// Remove one of the current author's own comments.
+    func deleteComment(_ commentID: UUID, day: Int, challengeID: UUID) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+        let me = currentAuthor
+        challenges[ci].cards[idx].comments.removeAll { $0.id == commentID && $0.authorID == me.id }
+
+        if let code = challenges[ci].roomCode, account?.account != nil {
+            Task { @MainActor in
+                try? await CloudKitService.deleteComment(id: commentID.uuidString)
+            }
+        }
+    }
+
     /// All recorded clips in day order — the stitcher's input. For a shared
     /// room this merges every member's clips (falling back to my local clips
     /// if the room hasn't been synced yet).
@@ -231,7 +338,8 @@ final class ChallengeStore {
                     url: $0,
                     label: challenge.title(forSlot: card.day),
                     overlayText: card.overlayText,
-                    recordedAt: card.recordedAt)
+                    recordedAt: card.recordedAt,
+                    emoji: card.reactions.map(\.emoji))
             }
         }
     }
@@ -254,7 +362,7 @@ final class ChallengeStore {
                     from: demo,
                     day: day,
                     challengeID: challengeID,
-                    overlayText: day == 1 ? "first little proof" : nil)
+                    overlayText: day == 1 ? Strings.demoFirstProof : nil)
             }
         }
     }

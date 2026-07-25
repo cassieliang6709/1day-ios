@@ -17,13 +17,16 @@ struct BuildTemplateView: View {
     @State private var emoji = "🎬"
     @FocusState private var nameFocused: Bool
 
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     private let pool = ChallengeTemplate.promptPool
 
     var body: some View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color.white, Color.setlogMist.opacity(0.85), Color.white],
+                    colors: [Color.white, Color.oneDayMist.opacity(0.85), Color.white],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
@@ -43,9 +46,9 @@ struct BuildTemplateView: View {
                             }
                             .onMove(perform: move)
                         } header: {
-                            Text("YOUR ORDER (\(selected.count))")
+                            Text(Strings.yourOrder(selected.count))
                                 .font(.caption.bold())
-                                .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                                 .kerning(1.2)
                         }
                         .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
@@ -60,9 +63,9 @@ struct BuildTemplateView: View {
                             }
                         }
                     } header: {
-                        Text("PROMPT POOL")
+                        Text(Strings.promptPool)
                             .font(.caption.bold())
-                            .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                            .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                             .kerning(1.2)
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 20, trailing: 20))
@@ -73,14 +76,14 @@ struct BuildTemplateView: View {
                 .scrollContentBackground(.hidden)
                 .sensoryFeedback(.impact(weight: .medium), trigger: selected.count)
             }
-            .navigationTitle("Build your own")
+            .navigationTitle(Strings.buildYourOwn)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button(Strings.save) { save() }
                         .disabled(!canSave)
                         .fontWeight(.bold)
                 }
@@ -106,7 +109,7 @@ struct BuildTemplateView: View {
                 }
             TextField(
                 "", text: $name,
-                prompt: Text("Name your template").foregroundStyle(.secondary.opacity(0.75))
+                prompt: Text(Strings.nameYourTemplate).foregroundStyle(.secondary.opacity(0.75))
             )
             .font(.title3.weight(.semibold))
             .focused($nameFocused)
@@ -115,9 +118,9 @@ struct BuildTemplateView: View {
         .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(Color.setlogBlue.opacity(nameFocused ? 0.38 : 0.13), lineWidth: 1.5)
+                .strokeBorder(Color.oneDayBlue.opacity(nameFocused ? 0.38 : 0.13), lineWidth: 1.5)
         )
-        .shadow(color: Color.setlogBlue.opacity(0.08), radius: 16, y: 8)
+        .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
     }
 
     private func orderRow(index: Int, prompt: String) -> some View {
@@ -126,8 +129,8 @@ struct BuildTemplateView: View {
                 .font(.caption.bold())
                 .foregroundStyle(.white)
                 .frame(width: 22, height: 22)
-                .background(Color.setlogBlue, in: Circle())
-            Text(prompt)
+                .background(Color.oneDayBlue, in: Circle())
+            Text(MomentCatalog.localize(prompt))
                 .font(.subheadline.weight(.semibold))
             Spacer()
             Button {
@@ -142,7 +145,7 @@ struct BuildTemplateView: View {
         .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.setlogBlue.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.oneDayBlue.opacity(0.12), lineWidth: 1)
         )
     }
 
@@ -151,17 +154,17 @@ struct BuildTemplateView: View {
         return Button {
             toggle(prompt)
         } label: {
-            Text(prompt)
+            Text(MomentCatalog.localize(prompt))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? .white : Color.primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
                 .background(
-                    isSelected ? Color.setlogBlue : .white.opacity(0.94),
+                    isSelected ? Color.oneDayBlue : .white.opacity(0.94),
                     in: Capsule()
                 )
                 .overlay(
-                    Capsule().strokeBorder(Color.setlogBlue.opacity(isSelected ? 0 : 0.2), lineWidth: 1.5)
+                    Capsule().strokeBorder(Color.oneDayBlue.opacity(isSelected ? 0 : 0.2), lineWidth: 1.5)
                 )
         }
         .buttonStyle(.plain)
@@ -199,8 +202,8 @@ struct BuildTemplateView: View {
         let trimmedEmoji = emoji.trimmingCharacters(in: .whitespaces)
         let template = ChallengeTemplate(
             emoji: trimmedEmoji.isEmpty ? "🎬" : trimmedEmoji,
-            name: trimmedName,
-            momentTitles: selected,
+            name: LocalizedText(en: trimmedName, zh: trimmedName),
+            momentKeys: selected,
             isCustom: true)
         onSave(template)
         dismiss()

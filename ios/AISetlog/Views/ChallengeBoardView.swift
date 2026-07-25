@@ -1,20 +1,20 @@
 import SwiftUI
 
 private enum BoardTheme {
-    static let primary = Color.setlogBlue
-    static let accent = Color.setlogCyan
-    static let deep = Color.setlogNavy
-    static let tint = Color.setlogSky
-    static let page = Color.setlogMist
+    static let primary = Color.oneDayBlue
+    static let accent = Color.oneDayCyan
+    static let deep = Color.oneDayNavy
+    static let tint = Color.oneDaySky
+    static let page = Color.oneDayMist
     static let card = Color.white.opacity(0.92)
     static let cardStrong = Color.white
-    static let stroke = Color.setlogBlue.opacity(0.12)
+    static let stroke = Color.oneDayBlue.opacity(0.12)
     static let primaryText = Color(red: 0.05, green: 0.12, blue: 0.20)
     static let secondaryText = Color(red: 0.42, green: 0.49, blue: 0.57)
 
     static let background = LinearGradient(
         colors: [
-            Color.setlogMist,
+            Color.oneDayMist,
             Color.white,
             Color(red: 0.88, green: 0.96, blue: 1.0),
         ],
@@ -37,6 +37,9 @@ struct ChallengeBoardView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var sheet: BoardSheet?
     @State private var showFinalReel = false
+
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var challenge: Challenge? { store.challenge(challengeID) }
 
@@ -65,11 +68,11 @@ struct ChallengeBoardView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     #if DEBUG
-                    Button("Fill with demo clips") {
+                    Button(Strings.fillDemoClips) {
                         store.fillWithDemoClips(challengeID: challengeID)
                     }
                     #endif
-                    Button("Delete challenge", role: .destructive) {
+                    Button(Strings.deleteChallenge, role: .destructive) {
                         store.delete(challengeID)
                         dismiss()
                     }
@@ -102,7 +105,8 @@ struct ChallengeBoardView: View {
                         overlayText: card.overlayText,
                         clipLength: challenge?.resolvedClipLength ?? .tiny,
                         url: url,
-                        recordedAt: card.recordedAt
+                        recordedAt: card.recordedAt,
+                        challengeID: challengeID
                     ) {
                         sheet = nil
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
@@ -153,7 +157,7 @@ struct ChallengeBoardView: View {
                             card: card,
                             status: challenge.cardStatus(card),
                             title: challenge.title(forSlot: card.day),
-                            unitName: challenge.unitName,
+                            isOneDay: challenge.isOneDay,
                             clipURL: store.clipURL(for: card, in: challengeID)
                         )
                         .onTapGesture { handleTap(card, challenge: challenge) }
@@ -168,8 +172,10 @@ struct ChallengeBoardView: View {
                     } label: {
                         Label(
                             challenge.isComplete
-                                ? (challenge.isOneDay ? "Create 1-day film" : "Create weekly film")
-                                : "Preview film · \(challenge.recordedCount)/\(challenge.cards.count) \(challenge.unitNamePlural)",
+                                ? Strings.createFilm(oneDay: challenge.isOneDay)
+                                : Strings.previewFilm(
+                                    challenge.recordedCount, challenge.cards.count,
+                                    unitPlural: challenge.unitNamePlural),
                             systemImage: "film.stack.fill"
                         )
                         .font(.headline)
@@ -199,7 +205,7 @@ struct ChallengeBoardView: View {
         let members = store.members(for: challengeID)
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("\(members.count) in this room", systemImage: "person.2.fill")
+                Label(Strings.membersInRoom(members.count), systemImage: "person.2.fill")
                     .font(.subheadline.bold())
                     .foregroundStyle(BoardTheme.primaryText)
                 Spacer()
@@ -220,7 +226,7 @@ struct ChallengeBoardView: View {
                 ShareLink(item: shareText(code: code, challenge: challenge)) {
                     HStack {
                         Image(systemName: "square.and.arrow.up")
-                        Text(challenge.recordedCount > 0 ? "Send today's invite · code " : "Invite friends · code ")
+                        Text(Strings.invitePill(hasClips: challenge.recordedCount > 0))
                             + Text(code).font(.subheadline.bold().monospaced())
                         Spacer()
                     }
@@ -246,10 +252,10 @@ struct ChallengeBoardView: View {
 
     private func shareText(code: String, challenge: Challenge) -> String {
         if challenge.recordedCount > 0 {
-            let first = challenge.title(forSlot: 1)
-            return "I just captured \(first) for “\(challenge.title)” on 1Day. Join my challenge! Code: \(code)\naisetlog://join?code=\(code)"
+            return Strings.shareMessageCaptured(
+                first: challenge.title(forSlot: 1), title: challenge.title, code: code)
         }
-        return "Join my “\(challenge.title)” challenge on 1Day! Code: \(code)\naisetlog://join?code=\(code)"
+        return Strings.shareMessageInvite(title: challenge.title, code: code)
     }
 
     private func progressHeader(_ challenge: Challenge) -> some View {
@@ -261,8 +267,11 @@ struct ChallengeBoardView: View {
                     .font(.headline)
                     .foregroundStyle(BoardTheme.primaryText)
                 Text(challenge.recordedCount == 7
-                    ? "All clips in - time to make the film."
-                    : "\(challenge.recordedCount) of 7 \(challenge.resolvedClipLength.secondsLabel) \(challenge.unitNamePlural) recorded")
+                    ? Strings.allClipsIn
+                    : Strings.recordedProgress(
+                        challenge.recordedCount,
+                        secondsLabel: challenge.resolvedClipLength.secondsLabel,
+                        unitPlural: challenge.unitNamePlural))
                     .font(.subheadline)
                     .foregroundStyle(BoardTheme.secondaryText)
             }
@@ -279,10 +288,10 @@ struct ChallengeBoardView: View {
 
     private func progressTitle(_ challenge: Challenge) -> String {
         if challenge.isOneDay {
-            return challenge.isComplete ? "1-day film complete" : "7 moments in 24 hours"
+            return challenge.isComplete ? Strings.oneDayComplete : Strings.sevenMoments
         }
-        if challenge.isComplete { return "Week complete" }
-        return challenge.currentDay > 7 ? "Week complete" : "Day \(challenge.currentDay) of 7"
+        if challenge.isComplete { return Strings.weekComplete }
+        return challenge.currentDay > 7 ? Strings.weekComplete : Strings.dayOf(challenge.currentDay)
     }
 
     private func handleTap(_ card: DayCard, challenge: Challenge) {
@@ -383,7 +392,7 @@ struct DayCardView: View {
     let card: DayCard
     let status: DayCard.Status
     let title: String
-    let unitName: String
+    let isOneDay: Bool
     let clipURL: URL?
 
     var body: some View {
@@ -401,6 +410,12 @@ struct DayCardView: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .shadow(radius: 3)
                         .padding(8)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if status == .done, !card.reactions.isEmpty {
+                    reactionBadge
+                        .padding(6)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -445,6 +460,26 @@ struct DayCardView: View {
             .animation(.spring(duration: 0.45), value: card.clipFileName)
     }
 
+    /// A small glassy pill in the tile corner: the distinct emoji used plus a
+    /// total count, so the board shows interaction at a glance.
+    private var reactionBadge: some View {
+        let distinct = Array(NSOrderedSet(array: card.reactions.map(\.emoji)).array
+            .compactMap { $0 as? String }.prefix(3))
+        return HStack(spacing: 1) {
+            ForEach(distinct, id: \.self) { Text($0).font(.system(size: 11)) }
+            if card.reactions.count > 1 {
+                Text("\(card.reactions.count)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.leading, 2)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+    }
+
     @ViewBuilder
     private func background(for status: DayCard.Status) -> some View {
         switch status {
@@ -461,7 +496,7 @@ struct DayCardView: View {
         case .missed:
             BoardTheme.card
         case .locked:
-            Color.setlogMist.opacity(0.5)
+            Color.oneDayMist.opacity(0.5)
         }
     }
 
@@ -482,7 +517,7 @@ struct DayCardView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
-                Text("Record")
+                Text(Strings.record)
                     .font(.system(size: 10))
                     .opacity(0.85)
             }
@@ -497,7 +532,7 @@ struct DayCardView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
-                Text("Catch up")
+                Text(Strings.catchUp)
                     .font(.system(size: 10))
                     .foregroundStyle(BoardTheme.secondaryText)
             }
@@ -506,7 +541,7 @@ struct DayCardView: View {
             VStack(spacing: 5) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 20))
-                Text("\(unitName.capitalized) \(card.day)")
+                Text(Strings.lockedSlot(oneDay: isOneDay, day: card.day))
                     .font(.system(size: 13, weight: .bold))
             }
             .foregroundStyle(BoardTheme.secondaryText.opacity(0.72))

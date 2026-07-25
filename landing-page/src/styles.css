@@ -89,6 +89,14 @@ h1 { color: var(--blue); font-size: clamp(64px, 6.2vw, 98px); line-height: .98; 
 .playing .progress i { width: 58%; }
 .movie small { position: absolute; bottom: 12px; left: 28px; right: 28px; color: #fff; display: flex; justify-content: space-between; }
 .final-download { grid-column: 1 / -1; display: flex; justify-content: center; }
+.site-footer { grid-column: 1 / -1; display: flex; justify-content: center; gap: 24px; color: #596579; font-size: 14px; }
+.site-footer a:hover, .legal-copy a { color: var(--blue); }
+.legal-page { min-height: 100vh; background: linear-gradient(180deg, #f7fbff, #fff 260px); }
+.legal-copy { width: min(100% - 40px, 760px); margin: 0 auto; padding: 72px 0 100px; color: #344054; font-size: 17px; line-height: 1.7; }
+.legal-copy h1 { margin: 10px 0 12px; font-size: clamp(46px, 8vw, 72px); }
+.legal-copy h2 { margin: 42px 0 8px; color: var(--ink); font-size: 24px; }
+.legal-copy p { margin: 0 0 18px; }
+.legal-updated { color: #667085; }
 
 @media (max-width: 900px) {
   .shell { width: min(100% - 32px, 720px); }

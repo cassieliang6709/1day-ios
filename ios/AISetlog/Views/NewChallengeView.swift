@@ -23,6 +23,9 @@ struct NewChallengeView: View {
     @State private var litDays = 0
     @FocusState private var goalFocused: Bool
 
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     private var templates: [ChallengeTemplate] {
         let builtins = challengeMode == .oneDay
             ? ChallengeTemplate.oneDayBuiltins
@@ -35,7 +38,7 @@ struct NewChallengeView: View {
             LinearGradient(
                 colors: [
                     Color.white,
-                    Color.setlogMist.opacity(0.85),
+                    Color.oneDayMist.opacity(0.85),
                     Color.white,
                 ],
                 startPoint: .topLeading, endPoint: .bottomTrailing
@@ -75,10 +78,10 @@ struct NewChallengeView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.subheadline.bold())
-                    .foregroundStyle(Color.setlogBlue)
+                    .foregroundStyle(Color.oneDayBlue)
                     .padding(10)
                     .background(.white.opacity(0.94), in: Circle())
-                    .shadow(color: Color.setlogBlue.opacity(0.12), radius: 12, y: 5)
+                    .shadow(color: Color.oneDayBlue.opacity(0.12), radius: 12, y: 5)
             }
             .padding(.trailing, 20)
         }
@@ -110,14 +113,10 @@ struct NewChallengeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(challengeMode == .oneDay
-                ? "What's your\n1-day story?"
-                : "What's your\n7-day story?")
+            Text(Strings.headerTitle(oneDay: challengeMode == .oneDay))
                 .font(.system(size: 38, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.setlogNavy)
-            Text(challengeMode == .oneDay
-                ? "7 moments, \(clipLength.secondsLabel) each. One tiny film tonight."
-                : "\(clipLength.secondsLabel) a day. One film at the end.")
+                .foregroundStyle(Color.oneDayNavy)
+            Text(Strings.headerSubtitle(oneDay: challengeMode == .oneDay, secondsLabel: clipLength.secondsLabel))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -129,12 +128,12 @@ struct NewChallengeView: View {
             ForEach(1...7, id: \.self) { day in
                 ZStack {
                     Circle()
-                        .fill(day <= litDays ? Color.setlogBlue : .white)
+                        .fill(day <= litDays ? Color.oneDayBlue : .white)
                         .frame(width: 34, height: 34)
-                        .overlay(Circle().stroke(Color.setlogBlue.opacity(0.16), lineWidth: 1))
+                        .overlay(Circle().stroke(Color.oneDayBlue.opacity(0.16), lineWidth: 1))
                     Text("\(day)")
                         .font(.footnote.bold())
-                        .foregroundStyle(day <= litDays ? .white : Color.setlogBlue.opacity(0.62))
+                        .foregroundStyle(day <= litDays ? .white : Color.oneDayBlue.opacity(0.62))
                 }
                 .scaleEffect(day == litDays ? 1.12 : 1)
             }
@@ -144,42 +143,44 @@ struct NewChallengeView: View {
     private var goalField: some View {
         TextField(
             "", text: $title,
-            prompt: Text(challengeMode == .oneDay ? "My 1-day story..." : "My 7-day goal...")
+            prompt: Text(Strings.titlePrompt(oneDay: challengeMode == .oneDay))
                 .foregroundStyle(.secondary.opacity(0.75))
         )
         .font(.title3.weight(.semibold))
         .foregroundStyle(.primary)
-        .tint(Color.setlogBlue)
+        .tint(Color.oneDayBlue)
         .focused($goalFocused)
         .padding(18)
         .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(Color.setlogBlue.opacity(goalFocused ? 0.38 : 0.13), lineWidth: 1.5)
+                .strokeBorder(Color.oneDayBlue.opacity(goalFocused ? 0.38 : 0.13), lineWidth: 1.5)
         )
-        .shadow(color: Color.setlogBlue.opacity(0.08), radius: 16, y: 8)
+        .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
         .onChange(of: title) { _, newValue in
             if selectedTemplate.map(fullTitle) != newValue { selectedTemplate = nil }
         }
     }
 
     private func fullTitle(for template: ChallengeTemplate) -> String {
-        challengeMode == .sevenDay ? "7 Days of \(template.name)" : template.name
+        let name = template.displayName
+        guard challengeMode == .sevenDay else { return name }
+        return Strings.fullTitle7Days(name)
     }
 
     private var formatPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("FORMAT")
+            Text(Strings.formatHeader)
                 .font(.caption.bold())
-                .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                 .kerning(1.2)
 
             Picker("Format", selection: $challengeMode) {
-                Text("1-Day").tag(Challenge.Mode.oneDay)
-                Text("7-Day").tag(Challenge.Mode.sevenDay)
+                Text(Strings.modeOneDay).tag(Challenge.Mode.oneDay)
+                Text(Strings.modeSevenDay).tag(Challenge.Mode.sevenDay)
             }
             .pickerStyle(.segmented)
-            .tint(Color.setlogBlue)
+            .tint(Color.oneDayBlue)
             .onChange(of: challengeMode) { _, _ in
                 selectedTemplate = nil
                 title = ""
@@ -191,9 +192,9 @@ struct NewChallengeView: View {
 
     private var clipLengthPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CLIP LENGTH")
+            Text(Strings.clipLengthHeader)
                 .font(.caption.bold())
-                .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                 .kerning(1.2)
 
             HStack(spacing: 10) {
@@ -213,20 +214,20 @@ struct NewChallengeView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                         }
-                        .foregroundStyle(selected ? Color.setlogBlue : Color.primary)
+                        .foregroundStyle(selected ? Color.oneDayBlue : Color.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .background(
-                            selected ? Color.setlogBlue.opacity(0.12) : .white.opacity(0.94),
+                            selected ? Color.oneDayBlue.opacity(0.12) : .white.opacity(0.94),
                             in: RoundedRectangle(cornerRadius: 18)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
                                 .strokeBorder(
-                                    Color.setlogBlue.opacity(selected ? 0.9 : 0.12),
+                                    Color.oneDayBlue.opacity(selected ? 0.9 : 0.12),
                                     lineWidth: selected ? 2 : 1)
                         )
-                        .shadow(color: Color.setlogBlue.opacity(selected ? 0.12 : 0.06), radius: 12, y: 6)
+                        .shadow(color: Color.oneDayBlue.opacity(selected ? 0.12 : 0.06), radius: 12, y: 6)
                     }
                     .buttonStyle(.plain)
                     .sensoryFeedback(.selection, trigger: clipLength)
@@ -241,9 +242,9 @@ struct NewChallengeView: View {
     /// + big type stands in for it).
     private var templateGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(challengeMode == .oneDay ? "PICK TODAY'S SCRIPT" : "OR PICK A VIBE")
+            Text(Strings.pickScriptHeader(oneDay: challengeMode == .oneDay))
                 .font(.caption.bold())
-                .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                 .kerning(1.2)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -273,7 +274,7 @@ struct NewChallengeView: View {
             HStack(spacing: 6) {
                 ForEach(0...templates.count, id: \.self) { index in
                     Circle()
-                        .fill(index == carouselIndex ? Color.setlogBlue : Color.setlogBlue.opacity(0.22))
+                        .fill(index == carouselIndex ? Color.oneDayBlue : Color.oneDayBlue.opacity(0.22))
                         .frame(width: 6, height: 6)
                 }
             }
@@ -282,22 +283,22 @@ struct NewChallengeView: View {
     }
 
     private func templateCard(_ template: ChallengeTemplate) -> some View {
-        let tint = Identity.tint(for: template.name)
+        let tint = Identity.tint(for: template.identityKey)
         let selected = selectedTemplate == template
         return VStack(spacing: 14) {
             Text(template.emoji)
                 .font(.system(size: 52))
-            Text(template.name)
+            Text(template.displayName)
                 .font(.system(size: 24, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
             if let count = template.momentTitles?.count {
-                Text("\(count) moments, \(clipLength.secondsLabel) each")
+                Text(Strings.templateMomentCount(count, secondsLabel: clipLength.secondsLabel))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
             }
             Spacer(minLength: 0)
-            Text(selected ? "Selected" : "Tap to select this script")
+            Text(selected ? Strings.selectedLabel : Strings.tapToSelect)
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 18)
@@ -328,7 +329,7 @@ struct NewChallengeView: View {
                     }
                     store.deleteCustomTemplate(template)
                 } label: {
-                    Label("Delete template", systemImage: "trash")
+                    Label(Strings.deleteTemplate, systemImage: "trash")
                 }
             }
         }
@@ -341,11 +342,11 @@ struct NewChallengeView: View {
             VStack(spacing: 14) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 44))
-                    .foregroundStyle(Color.setlogBlue.opacity(0.7))
-                Text("Build your own")
+                    .foregroundStyle(Color.oneDayBlue.opacity(0.7))
+                Text(Strings.buildYourOwn)
                     .font(.system(size: 22, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.primary)
-                Text("Pick your own prompts")
+                Text(Strings.pickYourPrompts)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -354,7 +355,7 @@ struct NewChallengeView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(Color.setlogBlue.opacity(0.35))
+                    .foregroundStyle(Color.oneDayBlue.opacity(0.35))
             )
         }
         .buttonStyle(.plain)
@@ -362,19 +363,19 @@ struct NewChallengeView: View {
 
     private var audiencePicker: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("WHO'S IN")
+            Text(Strings.whosIn)
                 .font(.caption.bold())
-                .foregroundStyle(Color.setlogBlue.opacity(0.62))
+                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
                 .kerning(1.2)
 
             HStack(spacing: 12) {
                 modeCard(
-                    icon: "person.fill", label: "Just me",
-                    caption: "A private week", selected: !withFriends
+                    icon: "person.fill", label: Strings.justMe,
+                    caption: Strings.privateWeek, selected: !withFriends
                 ) { withFriends = false }
                 modeCard(
-                    icon: "person.2.fill", label: "With friends",
-                    caption: "Room + invite code", selected: withFriends
+                    icon: "person.2.fill", label: Strings.withFriends,
+                    caption: Strings.roomInvite, selected: withFriends
                 ) { withFriends = true }
             }
         }
@@ -394,19 +395,19 @@ struct NewChallengeView: View {
                     .font(.caption)
                     .opacity(0.7)
             }
-            .foregroundStyle(selected ? Color.setlogBlue : Color.primary)
+            .foregroundStyle(selected ? Color.oneDayBlue : Color.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(
-                selected ? Color.setlogBlue.opacity(0.12) : .white.opacity(0.94),
+                selected ? Color.oneDayBlue.opacity(0.12) : .white.opacity(0.94),
                 in: RoundedRectangle(cornerRadius: 18)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(Color.setlogBlue.opacity(selected ? 0.82 : 0.12),
+                    .strokeBorder(Color.oneDayBlue.opacity(selected ? 0.82 : 0.12),
                                   lineWidth: selected ? 2 : 1)
             )
-            .shadow(color: Color.setlogBlue.opacity(selected ? 0.12 : 0.06), radius: 12, y: 6)
+            .shadow(color: Color.oneDayBlue.opacity(selected ? 0.12 : 0.06), radius: 12, y: 6)
         }
         .buttonStyle(.plain)
     }
@@ -425,8 +426,8 @@ struct NewChallengeView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color.setlogBlue, in: RoundedRectangle(cornerRadius: 18))
-            .shadow(color: Color.setlogBlue.opacity(0.24), radius: 12, y: 6)
+            .background(Color.oneDayBlue, in: RoundedRectangle(cornerRadius: 18))
+            .shadow(color: Color.oneDayBlue.opacity(0.24), radius: 12, y: 6)
         }
         .disabled(!canSubmit)
         .animation(.easeOut(duration: 0.2), value: canSubmit)
@@ -441,8 +442,8 @@ struct NewChallengeView: View {
     }
 
     private var startButtonTitle: String {
-        if withFriends { return "Create room" }
-        return challengeMode == .oneDay ? "Start Moment 1" : "Start Day 1"
+        if withFriends { return Strings.createRoom }
+        return challengeMode == .oneDay ? Strings.startMoment1 : Strings.startDay1
     }
 
     // MARK: - Actions
@@ -457,8 +458,8 @@ struct NewChallengeView: View {
                 title: name,
                 mode: challengeMode,
                 clipLength: clipLength,
-                templateName: selectedTemplate?.name,
-                momentTitles: selectedTemplate?.momentTitles)
+                templateName: selectedTemplate?.displayName,
+                momentTitles: selectedTemplate?.momentKeys)
             dismiss()
             onCreate(challenge.id)
         }
@@ -474,8 +475,8 @@ struct NewChallengeView: View {
                     title: title.trimmingCharacters(in: .whitespaces),
                     mode: challengeMode,
                     clipLength: clipLength,
-                    templateName: selectedTemplate?.name,
-                    momentTitles: selectedTemplate?.momentTitles)
+                    templateName: selectedTemplate?.displayName,
+                    momentTitles: selectedTemplate?.momentKeys)
                 dismiss()
                 onCreate(challenge.id)
             } catch {

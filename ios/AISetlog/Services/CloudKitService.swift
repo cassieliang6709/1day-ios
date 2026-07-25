@@ -24,11 +24,11 @@ enum CloudKitService {
         var errorDescription: String? {
             switch self {
             case .notSignedIntoiCloud:
-                return "Sign into iCloud (Settings ▸ your name) to record with friends."
+                return Strings.errorICloud
             case .roomNotFound:
-                return "No room with that code. Double-check it with your friend."
+                return Strings.errorNoRoom
             case .fieldNotQueryable:
-                return "Room isn't set up yet — the CloudKit index is still deploying."
+                return Strings.errorIndexDeploying
             }
         }
     }
@@ -203,5 +203,127 @@ enum CloudKitService {
                 overlayText: record["overlayText"] as? String))
         }
         return clips
+    }
+
+    // MARK: - Reactions & comments (append-only, no merge conflicts)
+
+    struct RemoteReaction {
+        let day: Int
+        let emoji: String
+        let authorID: String
+        let authorName: String
+        let createdAt: Date
+    }
+
+    struct RemoteComment {
+        let id: String          // recordName == the local ClipComment UUID
+        let day: Int
+        let text: String
+        let authorID: String
+        let authorName: String
+        let createdAt: Date
+    }
+
+    /// Deterministic name so re-adding the same emoji is idempotent and a
+    /// toggle-off deletes exactly the same record — never a read-modify-write.
+    private static func reactionRecordName(code: String, authorID: String, day: Int, emoji: String) -> String {
+        "\(code)_\(authorID)_day\(day)_\(emoji.unicodeScalars.map { String($0.value) }.joined(separator: "-"))"
+    }
+
+    /// Add (on) or remove (off) one emoji from a day's clip for one author.
+    static func setReaction(
+        code: String, day: Int, authorID: String, authorName: String,
+        emoji: String, on: Bool
+    ) async throws {
+        try await ensureAccountAvailable()
+        let id = CKRecord.ID(recordName: reactionRecordName(
+            code: code, authorID: authorID, day: day, emoji: emoji))
+        if on {
+            let record = CKRecord(recordType: "Reaction", recordID: id)
+            record["roomCode"] = code as CKRecordValue
+            record["day"] = day as CKRecordValue
+            record["emoji"] = emoji as CKRecordValue
+            record["authorID"] = authorID as CKRecordValue
+            record["authorName"] = authorName as CKRecordValue
+            record["createdAt"] = Date.now as CKRecordValue
+            _ = try await db.save(record)
+        } else {
+            do {
+                try await db.deleteRecord(withID: id)
+            } catch let error as CKError where error.code == .unknownItem {
+                // Already gone — nothing to do.
+            }
+        }
+    }
+
+    /// Post a comment. `id` is the local ClipComment UUID so both sides dedupe.
+    static func postComment(
+        code: String, day: Int, id: String,
+        text: String, authorID: String, authorName: String
+    ) async throws {
+        try await ensureAccountAvailable()
+        let record = CKRecord(recordType: "Comment", recordID: .init(recordName: id))
+        record["roomCode"] = code as CKRecordValue
+        record["day"] = day as CKRecordValue
+        record["text"] = text as CKRecordValue
+        record["authorID"] = authorID as CKRecordValue
+        record["authorName"] = authorName as CKRecordValue
+        record["createdAt"] = Date.now as CKRecordValue
+        _ = try await db.save(record)
+    }
+
+    static func deleteComment(id: String) async throws {
+        try await ensureAccountAvailable()
+        do {
+            try await db.deleteRecord(withID: .init(recordName: id))
+        } catch let error as CKError where error.code == .unknownItem {
+            // Already gone.
+        }
+    }
+
+    /// Fetch all reactions + comments in a room. Returns empties (never throws
+    /// for a missing index) so the caller degrades cleanly to local-only.
+    static func fetchInteractions(code: String) async throws -> (reactions: [RemoteReaction], comments: [RemoteComment]) {
+        try await ensureAccountAvailable()
+        async let reactions = fetchReactions(code: code)
+        async let comments = fetchComments(code: code)
+        return (try await reactions, try await comments)
+    }
+
+    private static func fetchReactions(code: String) async throws -> [RemoteReaction] {
+        let query = CKQuery(recordType: "Reaction", predicate: NSPredicate(format: "roomCode == %@", code))
+        let matched: [(CKRecord.ID, Result<CKRecord, Error>)]
+        do {
+            (matched, _) = try await db.records(matching: query)
+        } catch let error as CKError where error.code == .invalidArguments || error.code == .unknownItem {
+            return [] // type/index not deployed yet — degrade to local-only
+        }
+        return matched.compactMap { try? $0.1.get() }.compactMap { r in
+            guard let emoji = r["emoji"] as? String else { return nil }
+            return RemoteReaction(
+                day: r["day"] as? Int ?? 0, emoji: emoji,
+                authorID: r["authorID"] as? String ?? "",
+                authorName: r["authorName"] as? String ?? "Friend",
+                createdAt: r["createdAt"] as? Date ?? .now)
+        }
+    }
+
+    private static func fetchComments(code: String) async throws -> [RemoteComment] {
+        let query = CKQuery(recordType: "Comment", predicate: NSPredicate(format: "roomCode == %@", code))
+        let matched: [(CKRecord.ID, Result<CKRecord, Error>)]
+        do {
+            (matched, _) = try await db.records(matching: query)
+        } catch let error as CKError where error.code == .invalidArguments || error.code == .unknownItem {
+            return []
+        }
+        return matched.compactMap { try? $0.1.get() }.compactMap { r in
+            guard let text = r["text"] as? String else { return nil }
+            return RemoteComment(
+                id: r.recordID.recordName,
+                day: r["day"] as? Int ?? 0, text: text,
+                authorID: r["authorID"] as? String ?? "",
+                authorName: r["authorName"] as? String ?? "Friend",
+                createdAt: r["createdAt"] as? Date ?? .now)
+        }
     }
 }

@@ -11,18 +11,21 @@ struct SignInView: View {
 
     @State private var errorMessage: String?
 
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     var body: some View {
         VStack(spacing: 22) {
             Spacer()
 
             Image(systemName: "person.2.circle.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(Color.setlogBlue.gradient)
+                .foregroundStyle(Color.oneDayBlue.gradient)
 
             VStack(spacing: 8) {
-                Text("Record together")
+                Text(Strings.recordTogether)
                     .font(.title2.bold())
-                Text("Sign in so friends can see who filmed each clip.\nWe only use your name.")
+                Text(Strings.signInBody)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -52,7 +55,7 @@ struct SignInView: View {
             .signInWithAppleButtonStyle(.black)
             .frame(height: 50)
 
-            Button("Not now") { dismiss() }
+            Button(Strings.notNow) { dismiss() }
                 .font(.subheadline)
                 .padding(.bottom, 8)
         }

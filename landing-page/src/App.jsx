@@ -21,14 +21,56 @@ const moments = [
 
 function AppStoreButton({ compact = false }) {
   return (
-    <a className={`store-button ${compact ? 'compact' : ''}`} href="#download" aria-label="Download One Day on the App Store">
+    <a className={`store-button ${compact ? 'compact' : ''}`} href="#download" aria-label="Download 1Day on the App Store">
       <AppleLogo weight="fill" aria-hidden="true" />
       <span><small>Download on the</small>App Store</span>
     </a>
   );
 }
 
+function PrivacyPolicy() {
+  return (
+    <main className="legal-page">
+      <header className="nav shell">
+        <a href="/" className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a>
+      </header>
+      <article className="legal-copy">
+        <p className="eyebrow">1Day</p>
+        <h1>Privacy Policy</h1>
+        <p className="legal-updated">Effective July 24, 2026</p>
+
+        <h2>Overview</h2>
+        <p>1Day helps you record short video moments and assemble them into a film. Solo challenges stay on your device. Shared challenges use Apple iCloud and require Sign in with Apple.</p>
+
+        <h2>Information we handle</h2>
+        <p>The app may handle the name and stable identifier provided through Sign in with Apple, challenge details, room membership, captions, and video clips you choose to upload to a shared room. Camera, microphone, and photo-library access are used only after you grant permission.</p>
+
+        <h2>How information is used</h2>
+        <p>We use this information only to create and join challenges, identify contributions inside a shared film, synchronize shared clips, render films, and let you save or share the result. 1Day does not use third-party advertising or analytics SDKs and does not sell personal information.</p>
+
+        <h2>Storage and sharing</h2>
+        <p>Solo challenge data and clips are stored locally on your device. Shared-room data and clips are stored in Apple CloudKit. A room code is an invitation, not a password: people who receive it can join that room and access its shared content. Finished films leave the app only when you choose to save or share them.</p>
+
+        <h2>Retention and deletion</h2>
+        <p>You can delete local challenges in the app. To request deletion of account-linked shared-room data, contact us from the email associated with your request. We may retain information when required for security, legal compliance, or resolving abuse.</p>
+
+        <h2>Children</h2>
+        <p>1Day is not directed to children under 13. If you believe a child has provided personal information, contact us so we can remove it.</p>
+
+        <h2>Contact</h2>
+        <p>Questions or deletion requests: <a href="mailto:liangyue3666@gmail.com">liangyue3666@gmail.com</a>.</p>
+
+        <p><a className="text-link" href="/">← Back to 1Day</a></p>
+      </article>
+    </main>
+  );
+}
+
 export function App() {
+  if (window.location.pathname === '/privacy' || window.location.pathname === '/privacy/') {
+    return <PrivacyPolicy />;
+  }
+
   const [selectedDay, setSelectedDay] = useState(dayTypes[0].name);
   const [playing, setPlaying] = useState(false);
   const selectedLabel = useMemo(() => selectedDay.replace('One-Day ', ''), [selectedDay]);
@@ -36,11 +78,11 @@ export function App() {
   return (
     <main>
       <header className="nav shell">
-        <a href="#top" className="brand" aria-label="One Day home"><span className="brand-mark" />One Day</a>
+        <a href="#top" className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a>
         <nav aria-label="Main navigation">
           <a href="#how">How it works</a>
           <a href="#moments">For you</a>
-          <a href="#privacy">Privacy</a>
+          <a href="/privacy">Privacy</a>
         </nav>
         <AppStoreButton compact />
       </header>
@@ -73,10 +115,10 @@ export function App() {
             <a className="text-link" href="#how">Learn how it works <ArrowRight aria-hidden="true" /></a>
           </div>
         </div>
-        <div className="phone-wrap" aria-label="One Day app preview">
+        <div className="phone-wrap" aria-label="1Day app preview">
           <div className="phone">
             <div className="speaker" />
-            <img src="/assets/app-screen.jpg" alt="One Day app screen for choosing a one-day story" />
+            <img src="/assets/app-screen.jpg" alt="1Day app screen for choosing a one-day story" />
           </div>
         </div>
       </section>
@@ -117,6 +159,10 @@ export function App() {
             <small>{playing ? '0:18' : '0:00'} <span>0:45</span></small>
           </button>
           <div className="final-download"><AppStoreButton /></div>
+          <footer className="site-footer">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="mailto:liangyue3666@gmail.com">Support</a>
+          </footer>
         </div>
       </section>
     </main>

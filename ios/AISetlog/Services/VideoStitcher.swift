@@ -54,6 +54,7 @@ enum VideoStitcher {
         let authorName: String?
         let overlayText: String?
         let recordedAt: Date?
+        let emoji: [String]
         /// Kept alive on purpose: AVAssetTrack does NOT retain its parent
         /// asset, and insertTimeRange fails (-12780) on a track whose asset
         /// has been deallocated.
@@ -81,6 +82,7 @@ enum VideoStitcher {
         let authorName: String?
         let overlayText: String?
         let recordedAt: Date?
+        let emoji: [String]
         let cell: CGRect?
         let start: Double
         let end: Double
@@ -91,13 +93,10 @@ enum VideoStitcher {
     static func stitch(clips: [DayClip], options: Options = .default) async throws -> URL {
         guard !clips.isEmpty else { throw StitchError.noClips }
 
-        #if targetEnvironment(simulator)
-        let overlaysSupported = false
-        #else
-        let overlaysSupported = true
+        #if !targetEnvironment(simulator)
+        let drawCaptions = options.showDayCaptions
+        let titleCard = options.titleCard
         #endif
-        let drawCaptions = options.showDayCaptions && overlaysSupported
-        let titleCard = overlaysSupported ? options.titleCard : nil
 
         // ---- Load track info for every clip --------------------------------
         var loaded: [LoadedClip] = []
@@ -116,6 +115,7 @@ enum VideoStitcher {
                 day: clip.day, label: clip.label, authorName: clip.authorName,
                 overlayText: clip.overlayText,
                 recordedAt: clip.recordedAt,
+                emoji: clip.emoji,
                 asset: asset, videoRange: videoRange, videoTrack: video,
                 audioTrack: audio, audioRange: audioRange,
                 naturalSize: naturalSize, preferredTransform: transform))
@@ -127,9 +127,13 @@ enum VideoStitcher {
             width: (firstSize.width / 2).rounded(.down) * 2,
             height: (firstSize.height / 2).rounded(.down) * 2)
 
+        #if targetEnvironment(simulator)
+        let titleOffset = CMTime.zero
+        #else
         let titleOffset = titleCard == nil
             ? CMTime.zero
             : CMTime(seconds: options.titleSeconds, preferredTimescale: 600)
+        #endif
 
         // ---- Build the layout-specific parts --------------------------------
         let composition = AVMutableComposition()
@@ -168,6 +172,7 @@ enum VideoStitcher {
         audioMix.inputParameters = audioParams
 
         // ---- Overlays: title card text + DAY N captions ----------------------
+        #if !targetEnvironment(simulator)
         if titleCard != nil || drawCaptions {
             let videoLayer = CALayer()
             videoLayer.frame = CGRect(origin: .zero, size: renderSize)
@@ -181,14 +186,21 @@ enum VideoStitcher {
                     duration: options.titleSeconds)
             }
             if drawCaptions {
+                // Solo diaries don't need a "who filmed this" avatar — it's
+                // always you. Only the multi-friend room finale earns one.
+                let multiAuthor = Set(
+                    loaded.compactMap { $0.authorName?.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                ).count > 1
                 for caption in captions {
-                    addCaption(caption, to: parentLayer, renderSize: renderSize)
+                    addCaption(caption, to: parentLayer, renderSize: renderSize, showAuthorMark: multiAuthor)
                 }
             }
 
             videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
                 postProcessingAsVideoLayer: videoLayer, in: parentLayer)
         }
+        #endif
 
         // ---- Export ----------------------------------------------------------
         let outURL = FileManager.default.temporaryDirectory
@@ -311,7 +323,7 @@ enum VideoStitcher {
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
                 overlayText: p.clip.overlayText,
-                recordedAt: p.clip.recordedAt, cell: nil,
+                recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, cell: nil,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
         }
@@ -414,7 +426,7 @@ enum VideoStitcher {
             captions.append(CaptionWindow(
                 day: clip.day, label: clip.label, authorName: clip.authorName,
                 overlayText: clip.overlayText,
-                recordedAt: clip.recordedAt, cell: cell,
+                recordedAt: clip.recordedAt, emoji: clip.emoji, cell: cell,
                 start: CMTimeGetSeconds(startAt), end: CMTimeGetSeconds(end)))
         }
 
@@ -538,7 +550,8 @@ enum VideoStitcher {
     /// A rounded "DAY N" pill, full-frame (bottom center) or per grid cell
     /// (bottom left of the cell), visible only during its time window.
     private static func addCaption(
-        _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize
+        _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize,
+        showAuthorMark: Bool
     ) {
         // Size by the cell's SMALLER edge — tall skinny cells (2-person grid)
         // would otherwise get comically large pills.
@@ -612,13 +625,89 @@ enum VideoStitcher {
             to: parentLayer,
             renderSize: renderSize,
             duration: duration,
-            edge: edge)
+            edge: edge,
+            showAuthorMark: showAuthorMark)
         addOverlayText(
             for: caption,
             to: parentLayer,
             renderSize: renderSize,
             duration: duration,
             edge: edge)
+        addEmojiStickers(
+            for: caption,
+            to: parentLayer,
+            renderSize: renderSize,
+            duration: duration,
+            edge: edge)
+    }
+
+    /// Floats the clip's emoji reactions up the left edge — each pops in with a
+    /// little stagger so a reacted-on clip feels alive in the final film.
+    private static func addEmojiStickers(
+        for caption: CaptionWindow,
+        to parentLayer: CALayer,
+        renderSize: CGSize,
+        duration: Double,
+        edge: Double
+    ) {
+        // Distinct emoji, first-seen order, capped so they never crowd the frame.
+        var seen = Set<String>()
+        let emoji = caption.emoji.filter { seen.insert($0).inserted }.prefix(5)
+        guard !emoji.isEmpty else { return }
+
+        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let minEdge = min(target.width, target.height)
+        let size = max(minEdge * 0.11, 26)
+        let spacing = size * 1.15
+        let leftX = target.minX + minEdge * 0.07
+        // CA coords (origin bottom-left): stack upward from the lower third.
+        let baseY = renderSize.height - target.maxY + target.height * 0.28
+
+        for (i, glyph) in emoji.enumerated() {
+            let layer = CATextLayer()
+            layer.string = NSAttributedString(string: glyph, attributes: [
+                .font: UIFont.systemFont(ofSize: size * 0.82),
+            ])
+            layer.alignmentMode = .center
+            layer.contentsScale = 2
+            layer.frame = CGRect(
+                x: leftX,
+                y: baseY + CGFloat(i) * spacing,
+                width: size, height: size)
+
+            // Stagger each pop-in, but keep every glyph inside its clip's window.
+            let stagger = min(Double(i) * 0.12, max(duration - 0.4, 0))
+            let begin = caption.start <= 0
+                ? AVCoreAnimationBeginTimeAtZero + stagger
+                : caption.start + stagger
+            let life = max(duration - stagger, 0.2)
+
+            layer.opacity = 0
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]
+            let e = min(0.18 / life, 0.2)
+            fade.keyTimes = [0, NSNumber(value: e), NSNumber(value: 1 - edge), 1]
+            fade.beginTime = begin
+            fade.duration = life
+            fade.isRemovedOnCompletion = false
+            fade.fillMode = .both
+            layer.add(fade, forKey: "emojiFade")
+
+            let pop = CAKeyframeAnimation(keyPath: "transform.scale")
+            pop.values = [0.2, 1.18, 1.0]
+            pop.keyTimes = [0, 0.6, 1]
+            pop.duration = min(0.35, life)
+            pop.beginTime = begin
+            pop.timingFunctions = [
+                CAMediaTimingFunction(name: .easeOut),
+                CAMediaTimingFunction(name: .easeInEaseOut),
+            ]
+            pop.isRemovedOnCompletion = false
+            pop.fillMode = .both
+            layer.add(pop, forKey: "emojiPop")
+
+            parentLayer.addSublayer(layer)
+        }
     }
 
     private static func addOverlayText(
@@ -680,8 +769,18 @@ enum VideoStitcher {
         to parentLayer: CALayer,
         renderSize: CGSize,
         duration: Double,
-        edge: Double
+        edge: Double,
+        showAuthorMark: Bool
     ) {
+        // Solo diaries: a clean, BeReal-style "date · time" pill — no avatar,
+        // no colored ring, just a quiet timestamp for that real-moment feel.
+        guard showAuthorMark else {
+            addTimestampPill(
+                for: caption, to: parentLayer, renderSize: renderSize,
+                duration: duration, edge: edge)
+            return
+        }
+
         let identityColor = Identity.uiColor(for: caption.authorName)
         let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
         let minEdge = min(target.width, target.height)
@@ -786,6 +885,70 @@ enum VideoStitcher {
         parentLayer.addSublayer(group)
     }
 
+    /// A single quiet capsule — "Jul 24 · 2:30 PM" — pinned to the top-right,
+    /// mirroring the avatar stamp's corner so solo and room films sit alike.
+    private static func addTimestampPill(
+        for caption: CaptionWindow,
+        to parentLayer: CALayer,
+        renderSize: CGSize,
+        duration: Double,
+        edge: Double
+    ) {
+        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let minEdge = min(target.width, target.height)
+
+        let text = "\(formattedStampDateShort(caption.recordedAt))  ·  \(formattedStampTime(caption.recordedAt))"
+        let fontSize = max(minEdge * 0.032, 12)
+        let attributed = NSAttributedString(string: text, attributes: [
+            .font: roundedFont(size: fontSize, weight: .heavy),
+            .foregroundColor: UIColor.white,
+            .kern: fontSize * 0.02,
+        ])
+        let textSize = attributed.size()
+        let padH = fontSize * 0.72
+        let padV = fontSize * 0.42
+        let pillSize = CGSize(width: textSize.width + padH * 2, height: textSize.height + padV * 2)
+        let margin = minEdge * 0.06
+
+        // CA coordinates: origin bottom-left; cells are top-left, so flip y.
+        let origin: CGPoint
+        if let cell = caption.cell {
+            origin = CGPoint(
+                x: cell.maxX - pillSize.width - margin,
+                y: renderSize.height - cell.minY - pillSize.height - margin)
+        } else {
+            origin = CGPoint(
+                x: renderSize.width - pillSize.width - renderSize.width * 0.06,
+                y: renderSize.height - pillSize.height - renderSize.height * 0.06)
+        }
+
+        let pill = CALayer()
+        pill.frame = CGRect(origin: origin, size: pillSize)
+        pill.backgroundColor = UIColor.black.withAlphaComponent(0.32).cgColor
+        pill.cornerRadius = pillSize.height / 2
+
+        let textLayer = CATextLayer()
+        textLayer.string = attributed
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = 2
+        textLayer.frame = CGRect(
+            x: 0, y: (pillSize.height - textSize.height) / 2,
+            width: pillSize.width, height: textSize.height)
+        pill.addSublayer(textLayer)
+
+        pill.opacity = 0
+        let anim = CAKeyframeAnimation(keyPath: "opacity")
+        anim.values = [0, 1, 1, 0]
+        anim.keyTimes = [0, NSNumber(value: edge), NSNumber(value: 1 - edge), 1]
+        anim.beginTime = caption.start <= 0 ? AVCoreAnimationBeginTimeAtZero : caption.start
+        anim.duration = duration
+        anim.isRemovedOnCompletion = false
+        anim.fillMode = .both
+        pill.add(anim, forKey: "timestampWindow")
+
+        parentLayer.addSublayer(pill)
+    }
+
     private static func roundedFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
         let base = UIFont.systemFont(ofSize: size, weight: weight)
         return UIFont(
@@ -796,6 +959,12 @@ enum VideoStitcher {
     private static func formattedStampDate(_ date: Date?) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date ?? .now)
+    }
+
+    private static func formattedStampDateShort(_ date: Date?) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
         return formatter.string(from: date ?? .now)
     }
 

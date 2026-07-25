@@ -20,6 +20,9 @@ struct FinalReelView: View {
     @State private var fadeSeconds = 0.35
     @State private var gridSeconds = 6.0
 
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     init(challenge: Challenge, clips: [DayClip]) {
         self.challenge = challenge
         self.clips = clips
@@ -32,9 +35,9 @@ struct FinalReelView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Picker("Layout", selection: $layout) {
-                Text("Sequence").tag(VideoStitcher.Layout.sequential)
-                Text("Grid").tag(VideoStitcher.Layout.grid)
+            Picker(Strings.layout, selection: $layout) {
+                Text(Strings.sequence).tag(VideoStitcher.Layout.sequential)
+                Text(Strings.grid).tag(VideoStitcher.Layout.grid)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -64,7 +67,7 @@ struct FinalReelView: View {
                                 Button {
                                     Task { await saveVideo(url) }
                                 } label: {
-                                    Label(isSavingVideo ? "Saving…" : "Save video", systemImage: "square.and.arrow.down")
+                                    Label(isSavingVideo ? Strings.saving : Strings.saveVideo, systemImage: "square.and.arrow.down")
                                         .font(.headline)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 6)
@@ -83,7 +86,7 @@ struct FinalReelView: View {
                     }
                 } else if let errorMessage {
                     ContentUnavailableView(
-                        "Stitching failed",
+                        Strings.stitchFailed,
                         systemImage: "exclamationmark.triangle",
                         description: Text(errorMessage)
                     )
@@ -92,10 +95,10 @@ struct FinalReelView: View {
                         ProgressView()
                             .controlSize(.large)
                         Text(layout == .grid
-                            ? "Building the grid…"
-                            : "Stitching your week together…")
+                            ? Strings.buildingGrid
+                            : Strings.stitching)
                             .font(.headline)
-                        Text("Rendered on-device with AVFoundation")
+                        Text(Strings.renderedOnDevice)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -104,7 +107,7 @@ struct FinalReelView: View {
             }
             .padding(.horizontal)
         }
-        .navigationTitle(challenge.isOneDay ? "1-Day Film" : "Weekly Film")
+        .navigationTitle(Strings.filmTitle(oneDay: challenge.isOneDay))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -134,14 +137,14 @@ struct FinalReelView: View {
     private var footerText: String {
         switch layout {
         case .sequential:
-            return "\(clips.count) \(challenge.unitName)\(clips.count == 1 ? "" : "s") · crossfades"
+            return Strings.footerSequence(clips.count, unit: challenge.unitName)
         case .grid:
-            return "\(clips.count) clip\(clips.count == 1 ? "" : "s") looping side by side"
+            return Strings.footerGrid(clips.count)
         }
     }
 
     private var shareButtonTitle: String {
-        challenge.isOneDay ? "Share 1-day film" : "Share weekly film"
+        Strings.shareFilm(oneDay: challenge.isOneDay)
     }
 
     private func render() async {
@@ -181,7 +184,7 @@ struct FinalReelView: View {
 
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else {
-            saveMessage = "Photos access is needed to save the video."
+            saveMessage = Strings.photosDenied
             return
         }
 
@@ -189,9 +192,9 @@ struct FinalReelView: View {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
             }
-            saveMessage = "Saved to Photos."
+            saveMessage = Strings.savedToPhotos
         } catch {
-            saveMessage = "Couldn't save video: \(error.localizedDescription)"
+            saveMessage = Strings.saveFailed(error.localizedDescription)
         }
     }
 
@@ -202,7 +205,9 @@ struct FinalReelView: View {
         if challenge.isOneDay {
             return VideoStitcher.TitleCard(
                 title: challenge.title,
-                subtitle: "1-day film · \(clips.count)/\(challenge.cards.count) \(challenge.resolvedClipLength.secondsLabel) moments")
+                subtitle: Strings.titleCardSubtitleOneDay(
+                    clips.count, challenge.cards.count,
+                    secondsLabel: challenge.resolvedClipLength.secondsLabel))
         }
         return VideoStitcher.TitleCard(
             title: challenge.title,
@@ -219,31 +224,33 @@ private struct AdjustSheet: View {
     let onApply: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    /// Bound only so a language change re-renders the view.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Overlays") {
-                    Toggle("Opening title card", isOn: $includeTitleCard)
-                    Toggle("Day captions", isOn: $includeCaptions)
+                Section(Strings.overlays) {
+                    Toggle(Strings.openingTitleCard, isOn: $includeTitleCard)
+                    Toggle(Strings.dayCaptions, isOn: $includeCaptions)
                 }
                 Section {
                     HStack {
-                        Text("Transition")
+                        Text(Strings.transition)
                         Slider(value: $fadeSeconds, in: 0...0.6, step: 0.05)
-                        Text(fadeSeconds == 0 ? "Cut" : String(format: "%.2fs", fadeSeconds))
+                        Text(fadeSeconds == 0 ? Strings.cut : String(format: "%.2fs", fadeSeconds))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)
                     }
                 } header: {
-                    Text("Sequence")
+                    Text(Strings.sequence)
                 } footer: {
-                    Text("0 = hard cuts for a snappier diary film.")
+                    Text(Strings.hardCutsFooter)
                 }
-                Section("Grid") {
+                Section(Strings.grid) {
                     HStack {
-                        Text("Length")
+                        Text(Strings.length)
                         Slider(value: $gridSeconds, in: 4...12, step: 1)
                         Text("\(Int(gridSeconds))s")
                             .font(.caption.monospacedDigit())
@@ -252,14 +259,14 @@ private struct AdjustSheet: View {
                     }
                 }
             }
-            .navigationTitle("Adjust")
+            .navigationTitle(Strings.adjust)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Apply") {
+                    Button(Strings.apply) {
                         dismiss()
                         onApply()
                     }

@@ -2,6 +2,18 @@ import XCTest
 @testable import AISetlog
 
 final class ChallengeStateTests: XCTestCase {
+    /// Some assertions cover localized fallback strings — pin the app language
+    /// so the result doesn't depend on the test device's locale.
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey)
+        super.tearDown()
+    }
+
     func testDayCardStatesCoverDoneTodayMissedAndLocked() {
         XCTAssertEqual(DayCard(day: 1, clipFileName: "day1.mov").status(currentDay: 2), .done)
         XCTAssertEqual(DayCard(day: 2).status(currentDay: 2), .today)
