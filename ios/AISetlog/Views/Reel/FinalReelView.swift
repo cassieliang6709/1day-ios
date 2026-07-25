@@ -27,7 +27,9 @@ struct FinalReelView: View {
                 if let player, let url = exportURL {
                     VStack(spacing: 16) {
                         VideoPlayer(player: player)
-                            .aspectRatio(9 / 16, contentMode: .fit)
+                            .aspectRatio(
+                                challenge.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16,
+                                contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 20))
 
                         Text(footerText)

@@ -31,6 +31,10 @@ struct ClipPreviewView: View {
     private var comments: [ClipComment] {
         (card?.comments ?? []).sorted { $0.createdAt < $1.createdAt }
     }
+    private var aspectRatio: CGFloat {
+        guard let challengeID else { return 9 / 16 }
+        return store.challenge(challengeID)?.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16
+    }
 
     var body: some View {
         NavigationStack {
@@ -106,7 +110,7 @@ struct ClipPreviewView: View {
                 clipSeconds: clipLength.seconds
             )
         }
-        .aspectRatio(9 / 16, contentMode: .fit)
+        .aspectRatio(aspectRatio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)

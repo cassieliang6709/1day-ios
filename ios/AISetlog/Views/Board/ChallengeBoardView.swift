@@ -60,7 +60,8 @@ struct ChallengeBoardView: View {
                 RecordClipView(
                     day: day,
                     slotTitle: slotTitle(for: day),
-                    clipLength: challenge?.resolvedClipLength ?? .tiny
+                    clipLength: challenge?.resolvedClipLength ?? .tiny,
+                    orientation: challenge?.resolvedOrientation ?? .portrait
                 ) { url, overlayText in
                     store.saveClip(
                         from: url,
@@ -161,7 +162,8 @@ struct ChallengeBoardView: View {
                             status: challenge.cardStatus(card),
                             title: presenter.title(forSlot: card.day),
                             isOneDay: challenge.isOneDay,
-                            clipURL: store.clipURL(for: card, in: challengeID)
+                            clipURL: store.clipURL(for: card, in: challengeID),
+                            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.7
                         )
                         .onTapGesture { handleTap(card, challenge: challenge) }
                     }

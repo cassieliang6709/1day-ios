@@ -6,13 +6,15 @@ struct DayCardView: View {
     let title: String
     let isOneDay: Bool
     let clipURL: URL?
+    /// Cell aspect (width / height) — follows the challenge's locked frame.
+    var aspectRatio: CGFloat = 0.7
 
     var body: some View {
-        // Color.clear fixes the 0.7 cell box. Every piece of content is an
+        // Color.clear fixes the cell box. Every piece of content is an
         // edge-pinned overlay — overlays never resize the base, so nothing can
         // push past the clip frame (the bug the VStack-fill version had).
         Color.clear
-            .aspectRatio(0.7, contentMode: .fit)
+            .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay { background(for: status).clipped() }
             .overlay { centerContent(for: status) }
             .overlay(alignment: .topTrailing) {
