@@ -4,8 +4,8 @@ import SwiftUI
 /// Landing screen: all challenges (active + past), start a new one or join a
 /// friend's room any time.
 ///
-/// Sub-components live in `Home/HomeComponents.swift`; the color palette is
-/// in `Theme.swift`.
+/// Sections live in `Home/HomeSections.swift`, cards in `HomeCards.swift`,
+/// brand/identity bits in `HomeComponents.swift`; the palette is `Theme.swift`.
 struct HomeView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
@@ -30,7 +30,9 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             Group {
                 if store.challenges.isEmpty {
-                    emptyState
+                    HomeEmptyState(
+                        onNewChallenge: { showNewChallenge = true },
+                        onJoin: { joinCode = ""; showJoin = true })
                 } else {
                     challengeList
                 }
@@ -149,19 +151,26 @@ struct HomeView: View {
     private var challengeList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                homeHeader
-                todayHeaderText
+                HomeHeader(
+                    avatarName: account.account?.displayName,
+                    onAvatar: { showSettings = true },
+                    onBell: { showComingSoon = true },
+                    onFriends: { showComingSoon = true },
+                    onNewChallenge: { showNewChallenge = true },
+                    onJoin: { joinCode = ""; showJoin = true })
+                TodayHeader()
 
                 if let hero = nextCaptureChallenge {
                     NextCaptureCard(
                         challenge: hero,
-                        memberNames: store.members(for: hero.id).map { $0.name }
+                        memberNames: store.members(for: hero.id).map { $0.name },
+                        clipURL: latestClipURL(for: hero)
                     ) {
                         path.append(hero.id)
                     }
                     .padding(.horizontal)
                 } else {
-                    homeHero
+                    HomeHero(onStart: { showNewChallenge = true })
                 }
 
                 if !inProgress.isEmpty {
@@ -245,164 +254,10 @@ struct HomeView: View {
             .flatMap { store.clipURL(for: $0, in: challenge.id) }
     }
 
-    /// Avatar + bell + friends + start-new, scrolling with the page content
-    /// (there's no separate nav bar once a challenge exists — see `.toolbar`
-    /// above).
-    private var homeHeader: some View {
-        HStack(spacing: 16) {
-            Button {
-                showSettings = true
-            } label: {
-                AvatarDot(name: account.account?.displayName, size: 44)
-            }
-            .accessibilityLabel(Strings.settings)
-
-            Spacer()
-
-            Button {
-                showComingSoon = true
-            } label: {
-                Image(systemName: "bell")
-                    .font(.title3)
-                    .foregroundStyle(Color.oneDayNavy)
-            }
-
-            Button {
-                showComingSoon = true
-            } label: {
-                Image(systemName: "person.2")
-                    .font(.title3)
-                    .foregroundStyle(Color.oneDayNavy)
-            }
-
-            Menu {
-                Button {
-                    showNewChallenge = true
-                } label: {
-                    Label(Strings.startToday, systemImage: "plus")
-                }
-                Button {
-                    joinCode = ""
-                    showJoin = true
-                } label: {
-                    Label(Strings.enterInviteCode, systemImage: "envelope")
-                }
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.oneDayBlue)
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private var todayHeaderText: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(Strings.todayTitle)
-                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayNavy)
-            Text(Strings.todaySubtitle)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal)
-    }
-
-    /// Fallback hero shown only when every existing challenge is already
-    /// complete — there's no "next capture" to feature, so offer to start one.
-    private var homeHero: some View {
-        VStack(spacing: 18) {
-            OneDayLogoMark()
-                .frame(width: 92, height: 92)
-
-            Text(Strings.startNewFilm)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            BreathingStartButton { showNewChallenge = true }
-        }
-        .padding(.horizontal)
-    }
-
-    private var emptyState: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color.oneDayMist,
-                    Color(red: 0.95, green: 0.99, blue: 1.0),
-                    Color(red: 0.82, green: 0.94, blue: 1.0),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            Circle()
-                .fill(Color.oneDayCyan.opacity(0.18))
-                .frame(width: 260, height: 260)
-                .offset(x: -180, y: -280)
-            Circle()
-                .fill(Color.oneDaySky.opacity(0.18))
-                .frame(width: 260, height: 260)
-                .offset(x: -160, y: 360)
-            Circle()
-                .fill(Color.oneDayBlue.opacity(0.13))
-                .frame(width: 260, height: 260)
-                .offset(x: 170, y: 330)
-
-            VStack(spacing: 26) {
-                Spacer(minLength: 24)
-
-                OneDayLogoMark()
-                    .frame(width: 170, height: 170)
-                    .padding(.bottom, 10)
-
-                VStack(spacing: 10) {
-                    Text("1Day")
-                        .font(.system(size: 58, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
-                    Text(Strings.tagline)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color(red: 0.25, green: 0.31, blue: 0.38))
-                }
-                .multilineTextAlignment(.center)
-
-                Spacer()
-
-                VStack(spacing: 16) {
-                    Button {
-                        showNewChallenge = true
-                    } label: {
-                        Text(Strings.startToday)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 17)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color.oneDayBlue,
-                                        Color.oneDayCyan,
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(Strings.haveInviteCode) {
-                        joinCode = ""
-                        showJoin = true
-                    }
-                    .font(.headline)
-                    .foregroundStyle(Color.oneDayBlue)
-                }
-                .padding(.bottom, 48)
-            }
-            .padding(.horizontal, 34)
-        }
+    /// Most recently recorded clip in the challenge — feeds the hero card's
+    /// large preview.
+    private func latestClipURL(for challenge: Challenge) -> URL? {
+        challenge.cards.last { $0.clipFileName != nil }
+            .flatMap { store.clipURL(for: $0, in: challenge.id) }
     }
 }
