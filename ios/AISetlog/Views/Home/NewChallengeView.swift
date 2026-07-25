@@ -20,7 +20,6 @@ struct NewChallengeView: View {
     @State private var errorText: String?
     @State private var showSignIn = false
     @State private var showBuildTemplate = false
-    @State private var litDays = 0
     @FocusState private var goalFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -50,8 +49,6 @@ struct NewChallengeView: View {
                     NewChallengeHeader(
                         oneDay: challengeMode == .oneDay,
                         secondsLabel: clipLength.secondsLabel)
-                    DayDots(litDays: litDays)
-                        .frame(maxWidth: .infinity)
                     goalField
                     templateDeckSection
                     optionRows
@@ -99,13 +96,6 @@ struct NewChallengeView: View {
                 store.addCustomTemplate(template)
                 selectedTemplate = template
                 title = fullTitle(for: template)
-            }
-        }
-        .onAppear {
-            for day in 1...7 {
-                withAnimation(.spring(duration: 0.5).delay(0.15 * Double(day))) {
-                    litDays = day
-                }
             }
         }
     }
@@ -158,6 +148,13 @@ struct NewChallengeView: View {
     private var optionRows: some View {
         VStack(spacing: 12) {
             FormListRow(
+                icon: "plus",
+                title: Strings.buildYourOwn,
+                subtitle: Strings.pickYourPrompts
+            ) {
+                showBuildTemplate = true
+            }
+            FormListRow(
                 icon: "timer",
                 title: Strings.clipLengthHeader,
                 subtitle: "\(clipLength.secondsLabel) · \(Strings.clipLengthName(clipLength))"
@@ -177,13 +174,6 @@ struct NewChallengeView: View {
                 subtitle: orientation == .portrait ? Strings.orientationPortrait : Strings.orientationLandscape
             ) {
                 orientation = orientation == .portrait ? .landscape : .portrait
-            }
-            FormListRow(
-                icon: "plus",
-                title: Strings.buildYourOwn,
-                subtitle: Strings.pickYourPrompts
-            ) {
-                showBuildTemplate = true
             }
             FormToggleRow(
                 icon: "person.2.fill",

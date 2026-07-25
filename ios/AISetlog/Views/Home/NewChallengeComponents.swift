@@ -26,37 +26,18 @@ struct NewChallengeHeader: View {
                 .font(.system(size: 38, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.oneDayNavy)
                 .multilineTextAlignment(.center)
-            Text(Strings.headerSubtitle(oneDay: oneDay, secondsLabel: secondsLabel))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if !oneDay {
+                Text(Strings.sevenDayHeaderSubtitle(secondsLabel: secondsLabel))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 28)
     }
 }
 
-/// Seven dots that light up one by one on appear — a hint at the 7-day story.
-struct DayDots: View {
-    let litDays: Int
-
-    var body: some View {
-        HStack(spacing: 10) {
-            ForEach(1...7, id: \.self) { day in
-                ZStack {
-                    Circle()
-                        .fill(day <= litDays ? Color.oneDayBlue : .white)
-                        .frame(width: 34, height: 34)
-                        .overlay(Circle().stroke(Color.oneDayBlue.opacity(0.16), lineWidth: 1))
-                    Text("\(day)")
-                        .font(.footnote.bold())
-                        .foregroundStyle(day <= litDays ? .white : Color.oneDayBlue.opacity(0.62))
-                }
-                .scaleEffect(day == litDays ? 1.12 : 1)
-            }
-        }
-    }
-}
 
 // MARK: - Template deck
 

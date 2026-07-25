@@ -256,14 +256,9 @@ enum Strings {
         if lang == .chinese { return oneDay ? "今天的\n一日故事？" : "你的\n七日故事？" }
         return oneDay ? "What's your\n1-day story?" : "What's your\n7-day story?"
     }
-    static func headerSubtitle(oneDay: Bool, secondsLabel: String) -> String {
-        if lang == .chinese {
-            return oneDay
-                ? "7 个 moment，每个 \(secondsLabel)。今晚剪成一部小短片。"
-                : "每天 \(secondsLabel)，七天后合成一部片子。"
-        }
-        return oneDay
-            ? "7 moments, \(secondsLabel) each. One tiny film tonight."
+    static func sevenDayHeaderSubtitle(secondsLabel: String) -> String {
+        lang == .chinese
+            ? "每天 \(secondsLabel)，七天后合成一部片子。"
             : "\(secondsLabel) a day. One film at the end."
     }
     static func titlePrompt(oneDay: Bool) -> String {
