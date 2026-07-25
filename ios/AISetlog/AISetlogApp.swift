@@ -18,20 +18,20 @@ struct AISetlogApp: App {
             RootView()
                 .environment(store)
                 .environment(account)
-                .tint(Color.setlogBlue)
+                .tint(Color.oneDayBlue)
         }
     }
 }
 
 struct RootView: View {
     @Environment(ChallengeStore.self) private var store
-    /// Join code parsed from an `aisetlog://join?code=XXXXXX` deep link.
+    /// Join code parsed from an `oneday://join?code=XXXXXX` deep link.
     @State private var pendingJoinCode: String?
 
     var body: some View {
         HomeView(pendingJoinCode: $pendingJoinCode)
             .onOpenURL { url in
-                guard url.scheme == "aisetlog", url.host == "join",
+                guard url.scheme == "oneday", url.host == "join",
                       let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                           .queryItems?.first(where: { $0.name == "code" })?.value
                 else { return }

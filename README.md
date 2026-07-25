@@ -25,7 +25,7 @@ on-device into a finished vertical film.
 - Renders sequential films with crossfades or multi-participant grid films
 - Burns in title cards, moment labels, creator identity, captions, dates, and times
 - Saves finished MP4 videos to Photos or shares them through the iOS share sheet
-- Opens shared challenges from `aisetlog://join?code=XXXXXX` deep links
+- Opens shared challenges from `oneday://join?code=XXXXXX` deep links
 
 ## Architecture
 

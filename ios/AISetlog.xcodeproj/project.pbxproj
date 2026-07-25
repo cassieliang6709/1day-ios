@@ -10,13 +10,21 @@
 		01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */; };
 		09A89F223F22B41A32946F26 /* NewChallengeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0AEA5758FCB87FF9117472D /* NewChallengeView.swift */; };
 		17BC08D2DD693224E3085583 /* ClipPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9457E11893DF9540381D0A9F /* ClipPreviewView.swift */; };
+		1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1203805BE113F00D0764E06C /* LocalizationTests.swift */; };
 		289AC9BDBC161D8365178B4A /* ChallengeBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96124087BE1810B0FDAAA2B /* ChallengeBoardView.swift */; };
+		2A2DD3C2BA7A8D6CEFD71489 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = C8D1086383EEF6A0070567C4 /* InfoPlist.strings */; };
+		2FCB68E66495A0260DB8F93E /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD46F3B162FADAEEDB3CA984 /* Theme.swift */; };
 		42377E3ABDBC49EB785303E5 /* day5.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = C6D938A715DC8FC39E096E34 /* day5.mp4 */; };
+		4374FE172641FC38197ECCB0 /* CameraComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0542619CCD7D0F36FFC64C3F /* CameraComponents.swift */; };
 		474BA91C0AB2D73B012AE7D5 /* AISetlogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5749F8E38699F3FDCE557607 /* AISetlogApp.swift */; };
+		5D1873E8C3591215889DA5A0 /* ClipRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97107F0AE38858739C7747E /* ClipRecorder.swift */; };
 		6200BC8E1A76CEA8814D44AF /* day1.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 53B60B7627FE0D5F9B726628 /* day1.mp4 */; };
 		67D8CB52089F388B44C725C3 /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3C2A2B0AE72D844F68EB50 /* AccountStore.swift */; };
+		700479A35C1FE677F1F1E305 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625D170194F63F0A71CA346A /* SettingsView.swift */; };
 		71A82885D88FA5986393577A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D52C12A4FE56A046CFD5B31 /* HomeView.swift */; };
+		758908C136A85AD09167568B /* HomeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0592BFDD349E6CE539D48A /* HomeComponents.swift */; };
 		87DD4795CEA90D57CDB9ED92 /* day6.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = EC0436F8A0067CBBA1A8A6A2 /* day6.mp4 */; };
+		8B9E04E8C73290D22B9CC9C1 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = E08983269FED9131FCBAF761 /* Localization.swift */; };
 		8E2482480EEFA919414E9CD1 /* day2.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 51C2B0CFDCC4CAF314DC9A3F /* day2.mp4 */; };
 		918EF14AA2109BF51B01B20F /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449DBBF703935EBE648EA51B /* SignInView.swift */; };
 		93343E5A09C862286ECA9F98 /* day3.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 3F3F2013CDEC4CCAB8F88D82 /* day3.mp4 */; };
@@ -45,7 +53,9 @@
 
 /* Begin PBXFileReference section */
 		03F8F9F092CD5354A1197CCB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0542619CCD7D0F36FFC64C3F /* CameraComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraComponents.swift; sourceTree = "<group>"; };
 		0D52C12A4FE56A046CFD5B31 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		1203805BE113F00D0764E06C /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		1C3C2A2B0AE72D844F68EB50 /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 		334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcherTests.swift; sourceTree = "<group>"; };
 		3841AB553EFC3E5A459CED3F /* FinalReelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinalReelView.swift; sourceTree = "<group>"; };
@@ -56,6 +66,7 @@
 		5276B699CA06586366605748 /* AISetlog.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AISetlog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53B60B7627FE0D5F9B726628 /* day1.mp4 */ = {isa = PBXFileReference; path = day1.mp4; sourceTree = "<group>"; };
 		5749F8E38699F3FDCE557607 /* AISetlogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISetlogApp.swift; sourceTree = "<group>"; };
+		625D170194F63F0A71CA346A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		71F4B8537CFE73ED795CBBE3 /* AISetlogTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AISetlogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		82347B01BF70E4340ED46F40 /* RecordClipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordClipView.swift; sourceTree = "<group>"; };
 		910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeStateTests.swift; sourceTree = "<group>"; };
@@ -66,15 +77,30 @@
 		A271B654CEB03BD1223DEA29 /* BuildTemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildTemplateView.swift; sourceTree = "<group>"; };
 		ABD3F8C72DEDB406EC7E9902 /* CloudKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitService.swift; sourceTree = "<group>"; };
 		B11E5006AF576CB6CAE663B6 /* AISetlog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AISetlog.entitlements; sourceTree = "<group>"; };
+		BD46F3B162FADAEEDB3CA984 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		C6D938A715DC8FC39E096E34 /* day5.mp4 */ = {isa = PBXFileReference; path = day5.mp4; sourceTree = "<group>"; };
 		C96124087BE1810B0FDAAA2B /* ChallengeBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBoardView.swift; sourceTree = "<group>"; };
+		C97107F0AE38858739C7747E /* ClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipRecorder.swift; sourceTree = "<group>"; };
+		D496FA2FD678B671A1723CCE /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		E08983269FED9131FCBAF761 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		E5705E42B10C9FF7234A2E15 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		E78E5DAF6F0CBFD026FC6596 /* day7.mp4 */ = {isa = PBXFileReference; path = day7.mp4; sourceTree = "<group>"; };
 		EC0436F8A0067CBBA1A8A6A2 /* day6.mp4 */ = {isa = PBXFileReference; path = day6.mp4; sourceTree = "<group>"; };
+		ED0592BFDD349E6CE539D48A /* HomeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeComponents.swift; sourceTree = "<group>"; };
 		F0AEA5758FCB87FF9117472D /* NewChallengeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewChallengeView.swift; sourceTree = "<group>"; };
 		F90C3C82460198330C866D6A /* day4.mp4 */ = {isa = PBXFileReference; path = day4.mp4; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		3E0067929532CBCD519FE8B3 /* Recording */ = {
+			isa = PBXGroup;
+			children = (
+				0542619CCD7D0F36FFC64C3F /* CameraComponents.swift */,
+				C97107F0AE38858739C7747E /* ClipRecorder.swift */,
+			);
+			path = Recording;
+			sourceTree = "<group>";
+		};
 		45849943267E0B2C9DC38D4E /* AISetlog */ = {
 			isa = PBXGroup;
 			children = (
@@ -83,7 +109,9 @@
 				03F8F9F092CD5354A1197CCB /* Assets.xcassets */,
 				A11202C14CD22BF280ACA486 /* ChallengeStore.swift */,
 				9E5B8E1D0D51CCFB998478B4 /* Info.plist */,
+				E08983269FED9131FCBAF761 /* Localization.swift */,
 				9FEFD01919D5E0E7E27223AA /* Models.swift */,
+				C8D1086383EEF6A0070567C4 /* InfoPlist.strings */,
 				6B53F23E6339C2A7A53C1C01 /* Resources */,
 				FAA687E5722F0C0796BFAB2F /* Services */,
 				C2B8697C190E6CF21EBE708C /* Views */,
@@ -133,15 +161,28 @@
 				0D52C12A4FE56A046CFD5B31 /* HomeView.swift */,
 				F0AEA5758FCB87FF9117472D /* NewChallengeView.swift */,
 				82347B01BF70E4340ED46F40 /* RecordClipView.swift */,
+				625D170194F63F0A71CA346A /* SettingsView.swift */,
 				449DBBF703935EBE648EA51B /* SignInView.swift */,
+				BD46F3B162FADAEEDB3CA984 /* Theme.swift */,
+				CF4A68EF23314F7D9CC4E98F /* Home */,
+				3E0067929532CBCD519FE8B3 /* Recording */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		CF4A68EF23314F7D9CC4E98F /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				ED0592BFDD349E6CE539D48A /* HomeComponents.swift */,
+			);
+			path = Home;
 			sourceTree = "<group>";
 		};
 		DB7D40B1B5F3E73168A04D44 /* AISetlogTests */ = {
 			isa = PBXGroup;
 			children = (
 				910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */,
+				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
 				334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */,
 			);
 			path = AISetlogTests;
@@ -205,6 +246,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					8D75B5404776D2624BE354D4 = {
+						DevelopmentTeam = M7BPQ88622;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 890525F6D7F51FC08F80B800 /* Build configuration list for PBXProject "AISetlog" */;
@@ -213,6 +258,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 92B50AF78FB38492FA1F9291;
 			minimizedProjectReferenceProxies = 1;
@@ -233,6 +279,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C6B267B599F7D352342E5315 /* Assets.xcassets in Resources */,
+				2A2DD3C2BA7A8D6CEFD71489 /* InfoPlist.strings in Resources */,
 				6200BC8E1A76CEA8814D44AF /* day1.mp4 in Resources */,
 				8E2482480EEFA919414E9CD1 /* day2.mp4 in Resources */,
 				93343E5A09C862286ECA9F98 /* day3.mp4 in Resources */,
@@ -253,16 +300,22 @@
 				474BA91C0AB2D73B012AE7D5 /* AISetlogApp.swift in Sources */,
 				67D8CB52089F388B44C725C3 /* AccountStore.swift in Sources */,
 				D74E06FD0FC842CD3202327F /* BuildTemplateView.swift in Sources */,
+				4374FE172641FC38197ECCB0 /* CameraComponents.swift in Sources */,
 				289AC9BDBC161D8365178B4A /* ChallengeBoardView.swift in Sources */,
 				EED13464AD10B448ED89004D /* ChallengeStore.swift in Sources */,
 				17BC08D2DD693224E3085583 /* ClipPreviewView.swift in Sources */,
+				5D1873E8C3591215889DA5A0 /* ClipRecorder.swift in Sources */,
 				D2D9FD4CA9021DA5E72B3815 /* CloudKitService.swift in Sources */,
 				BE53869FD5A1DA08DB7B5066 /* FinalReelView.swift in Sources */,
+				758908C136A85AD09167568B /* HomeComponents.swift in Sources */,
 				71A82885D88FA5986393577A /* HomeView.swift in Sources */,
+				8B9E04E8C73290D22B9CC9C1 /* Localization.swift in Sources */,
 				B59785AECE41A7C97A2DCC54 /* Models.swift in Sources */,
 				09A89F223F22B41A32946F26 /* NewChallengeView.swift in Sources */,
 				DFA2721D25876D0987B8A989 /* RecordClipView.swift in Sources */,
+				700479A35C1FE677F1F1E305 /* SettingsView.swift in Sources */,
 				918EF14AA2109BF51B01B20F /* SignInView.swift in Sources */,
+				2FCB68E66495A0260DB8F93E /* Theme.swift in Sources */,
 				F77353956ECB775420F09AC4 /* VideoStitcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -272,6 +325,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */,
+				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,
 				938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -286,6 +340,18 @@
 		};
 /* End PBXTargetDependency section */
 
+/* Begin PBXVariantGroup section */
+		C8D1086383EEF6A0070567C4 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				E5705E42B10C9FF7234A2E15 /* en */,
+				D496FA2FD678B671A1723CCE /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		66597BADACE264BB790A1ED2 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -293,6 +359,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AISetlog/AISetlog.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = M7BPQ88622;
 				INFOPLIST_FILE = AISetlog/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -300,6 +368,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
+				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -447,6 +516,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AISetlog/AISetlog.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = M7BPQ88622;
 				INFOPLIST_FILE = AISetlog/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -454,6 +525,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
+				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
