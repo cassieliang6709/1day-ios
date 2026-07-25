@@ -1,8 +1,8 @@
 import SwiftUI
-import AVFoundation
 
 /// Looping playback of a single day's clip, with emoji reactions, a comment
-/// thread, and the option to re-record.
+/// thread, and the option to re-record. Social UI lives in
+/// `ClipPreviewComponents.swift`; this file owns state and store calls.
 struct ClipPreviewView: View {
     let day: Int
     var slotTitle: String?
@@ -17,8 +17,6 @@ struct ClipPreviewView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
-    @State private var draftComment = ""
-    @FocusState private var commentFocused: Bool
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -43,7 +41,11 @@ struct ClipPreviewView: View {
                         .frame(maxWidth: .infinity)
 
                     if challengeID != nil {
-                        reactionBar
+                        ReactionBar(reactions: reactions, myID: myID) { emoji in
+                            if let challengeID {
+                                store.toggleReaction(emoji, day: day, challengeID: challengeID)
+                            }
+                        }
                     }
 
                     if let recordedAt {
@@ -53,7 +55,11 @@ struct ClipPreviewView: View {
                     }
 
                     if challengeID != nil {
-                        commentsSection
+                        CommentsSection(comments: comments, myID: myID) { comment in
+                            if let challengeID {
+                                store.deleteComment(comment.id, day: day, challengeID: challengeID)
+                            }
+                        }
                     }
 
                     Button {
@@ -76,7 +82,13 @@ struct ClipPreviewView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if challengeID != nil { commentInput }
+                if challengeID != nil {
+                    CommentInputBar { text in
+                        if let challengeID {
+                            store.addComment(text, day: day, challengeID: challengeID)
+                        }
+                    }
+                }
             }
         }
     }
@@ -99,212 +111,6 @@ struct ClipPreviewView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Identity.tint(for: authorName), lineWidth: 3)
-        }
-    }
-
-    // MARK: - Reactions
-
-    private var reactionBar: some View {
-        HStack(spacing: 8) {
-            ForEach(ClipReaction.palette, id: \.self) { emoji in
-                let count = reactions.filter { $0.emoji == emoji }.count
-                let mine = reactions.contains { $0.emoji == emoji && $0.authorID == myID }
-                Button {
-                    if let challengeID {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            store.toggleReaction(emoji, day: day, challengeID: challengeID)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(emoji).font(.system(size: 18))
-                        if count > 0 {
-                            Text("\(count)")
-                                .font(.caption.bold())
-                                .foregroundStyle(mine ? Color.oneDayBlue : .secondary)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule().fill(mine ? Color.oneDaySky.opacity(0.5) : Color.gray.opacity(0.12)))
-                    .overlay(
-                        Capsule().strokeBorder(
-                            mine ? Color.oneDayBlue.opacity(0.6) : .clear, lineWidth: 1.5))
-                }
-                .buttonStyle(.plain)
-                .sensoryFeedback(.impact(weight: .light), trigger: mine)
-            }
-        }
-    }
-
-    // MARK: - Comments
-
-    private var commentsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(comments.isEmpty ? Strings.comments : Strings.commentsCount(comments.count))
-                .font(.subheadline.bold())
-                .foregroundStyle(.secondary)
-
-            if comments.isEmpty {
-                Text(Strings.firstComment)
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                ForEach(comments) { comment in
-                    CommentRow(comment: comment, isMine: comment.authorID == myID) {
-                        if let challengeID {
-                            store.deleteComment(comment.id, day: day, challengeID: challengeID)
-                        }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var commentInput: some View {
-        HStack(spacing: 10) {
-            TextField(Strings.addComment, text: $draftComment, axis: .vertical)
-                .lineLimit(1...4)
-                .focused($commentFocused)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(Capsule().fill(Color.gray.opacity(0.14)))
-                .onSubmit(send)
-
-            Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(canSend ? Color.oneDayBlue : Color.gray.opacity(0.4))
-            }
-            .disabled(!canSend)
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.bar)
-    }
-
-    private var canSend: Bool {
-        !draftComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func send() {
-        guard canSend, let challengeID else { return }
-        store.addComment(draftComment, day: day, challengeID: challengeID)
-        draftComment = ""
-        commentFocused = false
-    }
-}
-
-private struct CommentRow: View {
-    let comment: ClipComment
-    let isMine: Bool
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(Identity.initial(for: comment.authorName))
-                .font(.caption2.bold())
-                .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(Identity.tint(for: comment.authorName).gradient, in: Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(comment.authorName)
-                        .font(.footnote.bold())
-                    Text(comment.createdAt, format: .relative(presentation: .numeric))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                Text(comment.text)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contextMenu {
-            if isMine {
-                Button(Strings.delete, systemImage: "trash", role: .destructive, action: onDelete)
-            }
-        }
-    }
-}
-
-/// Endlessly looping muted-free playback of one clip. Fills its frame like
-/// the live camera preview does (`.resizeAspectFill`) — SwiftUI's `VideoPlayer`
-/// aspect-*fits* by default, which is what was letterboxing recorded clips
-/// with black bars whenever the footage didn't exactly match the frame.
-struct LoopingClipPlayer: View {
-    let url: URL
-
-    var body: some View {
-        LoopingPlayerLayerView(url: url)
-    }
-}
-
-private struct LoopingPlayerLayerView: UIViewRepresentable {
-    let url: URL
-
-    final class PlayerView: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-    }
-
-    final class Coordinator {
-        var looper: AVPlayerLooper?
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> PlayerView {
-        let view = PlayerView()
-        view.playerLayer.videoGravity = .resizeAspectFill
-        let queuePlayer = AVQueuePlayer()
-        context.coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(url: url))
-        view.playerLayer.player = queuePlayer
-        queuePlayer.play()
-        return view
-    }
-
-    func updateUIView(_ uiView: PlayerView, context: Context) {}
-
-    static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
-        uiView.playerLayer.player?.pause()
-    }
-}
-
-/// First-frame thumbnail of a clip, loaded off the main thread.
-struct ClipThumbnail: View {
-    let url: URL
-    /// Changing this value (e.g. recordedAt) forces a reload after re-recording.
-    var refreshToken: Date?
-
-    @State private var image: UIImage?
-
-    var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Color(.systemGray5)
-            }
-        }
-        .task(id: refreshToken) {
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 600, height: 600)
-            let time = CMTime(seconds: 0.1, preferredTimescale: 600)
-            if let cgImage = try? await generator.image(at: time).image {
-                image = UIImage(cgImage: cgImage)
-            }
         }
     }
 }
