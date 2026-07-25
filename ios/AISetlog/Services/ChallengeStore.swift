@@ -1,40 +1,40 @@
 import Foundation
 import Observation
 
+/// Holds challenge state in memory and orchestrates the services around it:
+/// persistence (ChallengeRepository), clip files (ClipFileStore), and room
+/// sync (RoomSyncService). Contains no I/O of its own beyond delegating.
 @Observable
 final class ChallengeStore {
-    private static let defaultsKey = "challenges.v2"
-    private static let legacyKey = "challenge.v1"
-    private static let templatesKey = "customTemplates.v1"
-
     var challenges: [Challenge] = [] {
-        didSet { persist() }
+        didSet { repository.saveChallenges(challenges) }
     }
 
     var customTemplates: [ChallengeTemplate] = [] {
-        didSet { persistTemplates() }
+        didSet { repository.saveTemplates(customTemplates) }
     }
 
     /// Set once at app launch so shared rooms can attribute + upload clips.
     var account: AccountStore?
 
-    /// Clips fetched from CloudKit per room code (all members). Transient.
-    private(set) var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
-    /// Room codes currently being synced (drives a spinner in the board).
-    private(set) var syncing: Set<String> = []
+    /// CloudKit room sync (remote clip cache + syncing spinners live there).
+    let roomSync: RoomSyncService
 
-    init() {
-        if let data = UserDefaults.standard.data(forKey: Self.defaultsKey),
-           let saved = try? JSONDecoder().decode([Challenge].self, from: data) {
-            challenges = saved
-        } else {
-            migrateLegacyIfNeeded()
-        }
-        if let data = UserDefaults.standard.data(forKey: Self.templatesKey),
-           let saved = try? JSONDecoder().decode([ChallengeTemplate].self, from: data) {
-            customTemplates = saved
-        }
+    private let repository: ChallengeRepository
+    private let fileStore: ClipFileStore
+
+    init(repository: ChallengeRepository? = nil,
+         fileStore: ClipFileStore = DiskClipFileStore(),
+         roomSync: RoomSyncService? = nil) {
+        self.fileStore = fileStore
+        self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
+        self.roomSync = roomSync ?? RoomSyncService(fileStore: fileStore)
+        challenges = self.repository.loadChallenges()
+        customTemplates = self.repository.loadTemplates()
     }
+
+    /// Room codes currently being synced (drives a spinner in the board).
+    var syncing: Set<String> { roomSync.syncing }
 
     func challenge(_ id: UUID) -> Challenge? {
         challenges.first { $0.id == id }
@@ -126,22 +126,13 @@ final class ChallengeStore {
         return challenge
     }
 
-    /// Pull every member's clips for a room into the local cache.
+    /// Pull every member's clips for a room into the local cache, then fold
+    /// remote reactions/comments into the local cards.
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
-        syncing.insert(code)
-        defer { syncing.remove(code) }
-        do {
-            let clips = try await CloudKitService.fetchClips(
-                code: code, into: remoteCacheDir(for: code))
-            remoteClips[code] = clips
-        } catch {
-            print("[room] sync failed: \(error)")
-        }
-        // Reactions/comments sync independently and degrade to local-only if the
-        // CloudKit index isn't deployed — never let it fail the clip sync above.
-        if let interactions = try? await CloudKitService.fetchInteractions(code: code) {
+        _ = await roomSync.syncClips(code: code)
+        if let interactions = await roomSync.fetchInteractions(code: code) {
             mergeInteractions(interactions, into: id)
         }
     }
@@ -184,17 +175,16 @@ final class ChallengeStore {
     func members(for challengeID: UUID) -> [(id: String, name: String)] {
         guard let challenge = challenge(challengeID), let code = challenge.roomCode else { return [] }
         var seen: [String: String] = [:]
-        for clip in remoteClips[code] ?? [] { seen[clip.authorID] = clip.authorName }
+        for clip in roomSync.remoteClips[code] ?? [] { seen[clip.authorID] = clip.authorName }
         if let me = account?.account { seen[me.id] = me.displayName }
         return seen.map { ($0.key, $0.value) }.sorted { $0.name < $1.name }
     }
 
     func delete(_ id: UUID) {
-        try? FileManager.default.removeItem(at: clipsDirectory(for: id))
+        fileStore.deleteClips(challengeID: id)
         if let code = challenge(id)?.roomCode {
             // Leaves the room locally; the shared record stays for others.
-            try? FileManager.default.removeItem(at: remoteCacheDir(for: code))
-            remoteClips[code] = nil
+            roomSync.clearRoom(code)
         }
         challenges.removeAll { $0.id == id }
     }
@@ -207,43 +197,27 @@ final class ChallengeStore {
         overlayText: String? = nil
     ) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
-        let dir = clipsDirectory(for: challengeID)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        // Re-recording may switch container formats (demo .mp4 vs camera .mov)
-        for ext in ["mov", "mp4"] {
-            try? FileManager.default.removeItem(at: dir.appendingPathComponent("day\(day).\(ext)"))
-        }
-        let dest = dir.appendingPathComponent("day\(day).\(tempURL.pathExtension)")
-        do {
-            try FileManager.default.copyItem(at: tempURL, to: dest)
-        } catch {
-            return
-        }
+        guard let fileName = fileStore.storeClip(from: tempURL, day: day, challengeID: challengeID) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
-        challenges[ci].cards[idx].clipFileName = dest.lastPathComponent
+        challenges[ci].cards[idx].clipFileName = fileName
         challenges[ci].cards[idx].recordedAt = .now
         challenges[ci].cards[idx].overlayText = overlayText
 
         // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {
-            let challengeID = challenges[ci].id
+            let dest = fileStore.clipURL(fileName: fileName, challengeID: challengeID)
             Task { @MainActor in
-                do {
-                    try await CloudKitService.uploadClip(
-                        code: code, day: day, authorID: me.id,
-                        authorName: me.displayName, fileURL: dest,
-                        overlayText: overlayText)
-                    await syncRoom(challengeID)
-                } catch {
-                    print("[room] upload failed: \(error)")
-                }
+                await roomSync.uploadClip(
+                    code: code, day: day, authorID: me.id,
+                    authorName: me.displayName, fileURL: dest,
+                    overlayText: overlayText)
             }
         }
     }
 
     func clipURL(for card: DayCard, in challengeID: UUID) -> URL? {
         guard let name = card.clipFileName else { return nil }
-        return clipsDirectory(for: challengeID).appendingPathComponent(name)
+        return fileStore.clipURL(fileName: name, challengeID: challengeID)
     }
 
     // MARK: - Reactions & comments (local-first)
@@ -274,7 +248,7 @@ final class ChallengeStore {
 
         if let code = challenges[ci].roomCode, let acct = account?.account {
             Task { @MainActor in
-                try? await CloudKitService.setReaction(
+                await roomSync.setReaction(
                     code: code, day: day, authorID: acct.id, authorName: acct.displayName,
                     emoji: emoji, on: nowOn)
             }
@@ -293,7 +267,7 @@ final class ChallengeStore {
 
         if let code = challenges[ci].roomCode, let acct = account?.account {
             Task { @MainActor in
-                try? await CloudKitService.postComment(
+                await roomSync.postComment(
                     code: code, day: day, id: comment.id.uuidString,
                     text: trimmed, authorID: acct.id, authorName: acct.displayName)
             }
@@ -307,9 +281,9 @@ final class ChallengeStore {
         let me = currentAuthor
         challenges[ci].cards[idx].comments.removeAll { $0.id == commentID && $0.authorID == me.id }
 
-        if let code = challenges[ci].roomCode, account?.account != nil {
+        if challenges[ci].roomCode != nil, account?.account != nil {
             Task { @MainActor in
-                try? await CloudKitService.deleteComment(id: commentID.uuidString)
+                await roomSync.deleteComment(id: commentID.uuidString)
             }
         }
     }
@@ -319,7 +293,8 @@ final class ChallengeStore {
     /// if the room hasn't been synced yet).
     func recordedClips(for challengeID: UUID) -> [DayClip] {
         guard let challenge = challenge(challengeID) else { return [] }
-        if let code = challenge.roomCode, let remote = remoteClips[code], !remote.isEmpty {
+        if let code = challenge.roomCode,
+           let remote = roomSync.remoteClips[code], !remote.isEmpty {
             return remote
                 .sorted { ($0.day, $0.authorName) < ($1.day, $1.authorName) }
                 .map {
@@ -367,57 +342,4 @@ final class ChallengeStore {
         }
     }
     #endif
-
-    // MARK: - Storage
-
-    private var clipsRoot: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("clips", isDirectory: true)
-    }
-
-    private func clipsDirectory(for id: UUID) -> URL {
-        clipsRoot.appendingPathComponent(id.uuidString, isDirectory: true)
-    }
-
-    /// Where downloaded remote (friends') clips for a room are cached.
-    private func remoteCacheDir(for code: String) -> URL {
-        clipsRoot.appendingPathComponent("room_\(code)", isDirectory: true)
-    }
-
-    private func persist() {
-        if let data = try? JSONEncoder().encode(challenges) {
-            UserDefaults.standard.set(data, forKey: Self.defaultsKey)
-        }
-    }
-
-    private func persistTemplates() {
-        if let data = try? JSONEncoder().encode(customTemplates) {
-            UserDefaults.standard.set(data, forKey: Self.templatesKey)
-        }
-    }
-
-    /// v1 stored a single challenge without an id, clips directly in clips/.
-    private func migrateLegacyIfNeeded() {
-        struct LegacyChallenge: Codable {
-            var title: String
-            var startDate: Date
-            var cards: [DayCard]
-        }
-        guard let data = UserDefaults.standard.data(forKey: Self.legacyKey),
-              let old = try? JSONDecoder().decode(LegacyChallenge.self, from: data)
-        else { return }
-
-        let migrated = Challenge(
-            id: UUID(), title: old.title, startDate: old.startDate, cards: old.cards)
-        let newDir = clipsDirectory(for: migrated.id)
-        try? FileManager.default.createDirectory(at: newDir, withIntermediateDirectories: true)
-        for card in old.cards {
-            guard let name = card.clipFileName else { continue }
-            let oldURL = clipsRoot.appendingPathComponent(name)
-            try? FileManager.default.moveItem(
-                at: oldURL, to: newDir.appendingPathComponent(name))
-        }
-        challenges = [migrated]
-        UserDefaults.standard.removeObject(forKey: Self.legacyKey)
-    }
 }

@@ -41,5 +41,8 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources: [AISetlogTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: AISetlog
