@@ -311,13 +311,18 @@ final class ChallengeStore {
            let remote = roomSync.remoteClips[code], !remote.isEmpty {
             return remote
                 .sorted { ($0.day, $0.authorName) < ($1.day, $1.authorName) }
-                .map {
-                    DayClip(
-                        day: $0.day, url: $0.localURL, authorName: $0.authorName,
-                        label: presenter.title(forSlot: $0.day),
-                        overlayText: $0.overlayText,
-                        recordedAt: $0.recordedAt,
-                        key: $0.id)
+                .map { clip in
+                    // Remote clip files don't carry interactions; fold in the
+                    // local card's reactions/comments for that day.
+                    let card = challenge.cards.first { c in c.day == clip.day }
+                    return DayClip(
+                        day: clip.day, url: clip.localURL, authorName: clip.authorName,
+                        label: presenter.title(forSlot: clip.day),
+                        overlayText: clip.overlayText,
+                        recordedAt: clip.recordedAt,
+                        emoji: card?.reactions.map(\.emoji) ?? [],
+                        comments: card.map(Self.commentLines(for:)) ?? [],
+                        key: clip.id)
                 }
         }
         return challenge.cards.compactMap { card in
@@ -328,9 +333,18 @@ final class ChallengeStore {
                     label: presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
                     recordedAt: card.recordedAt,
-                    emoji: card.reactions.map(\.emoji))
+                    emoji: card.reactions.map(\.emoji),
+                    comments: Self.commentLines(for: card))
             }
         }
+    }
+
+    /// "Mia: this is great" lines, oldest first — the stitcher caps how many
+    /// make it onto the frame.
+    private static func commentLines(for card: DayCard) -> [String] {
+        card.comments
+            .sorted { $0.createdAt < $1.createdAt }
+            .map { "\($0.authorName): \($0.text)" }
     }
 
     /// Card count for a new challenge: matches a custom moment list's length,

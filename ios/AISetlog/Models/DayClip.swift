@@ -13,6 +13,8 @@ struct DayClip: Identifiable {
     var recordedAt: Date?
     /// Emoji to float onto this clip in the final film (from its reactions).
     var emoji: [String]
+    /// "name: text" comments to bubble up in the final film.
+    var comments: [String]
 
     init(
         day: Int,
@@ -22,6 +24,7 @@ struct DayClip: Identifiable {
         overlayText: String? = nil,
         recordedAt: Date? = nil,
         emoji: [String] = [],
+        comments: [String] = [],
         key: String? = nil
     ) {
         self.day = day
@@ -31,6 +34,7 @@ struct DayClip: Identifiable {
         self.overlayText = overlayText
         self.recordedAt = recordedAt
         self.emoji = emoji
+        self.comments = comments
         self.id = key ?? "day\(day)"
     }
 }

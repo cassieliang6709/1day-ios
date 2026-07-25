@@ -46,6 +46,7 @@ enum VideoStitcher {
         let overlayText: String?
         let recordedAt: Date?
         let emoji: [String]
+        let comments: [String]
         /// Kept alive on purpose: AVAssetTrack does NOT retain its parent
         /// asset, and insertTimeRange fails (-12780) on a track whose asset
         /// has been deallocated.
@@ -73,6 +74,7 @@ enum VideoStitcher {
         let overlayText: String?
         let recordedAt: Date?
         let emoji: [String]
+        let comments: [String]
         let start: Double
         let end: Double
     }
@@ -104,7 +106,7 @@ enum VideoStitcher {
                 day: clip.day, label: clip.label, authorName: clip.authorName,
                 overlayText: clip.overlayText,
                 recordedAt: clip.recordedAt,
-                emoji: clip.emoji,
+                emoji: clip.emoji, comments: clip.comments,
                 asset: asset, videoRange: videoRange, videoTrack: video,
                 audioTrack: audio, audioRange: audioRange,
                 naturalSize: naturalSize, preferredTransform: transform))
@@ -305,7 +307,7 @@ enum VideoStitcher {
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
                 overlayText: p.clip.overlayText,
-                recordedAt: p.clip.recordedAt, emoji: p.clip.emoji,
+                recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
         }
@@ -525,6 +527,12 @@ enum VideoStitcher {
             renderSize: renderSize,
             duration: duration,
             edge: edge)
+        addCommentBubbles(
+            for: caption,
+            to: parentLayer,
+            renderSize: renderSize,
+            duration: duration,
+            edge: edge)
     }
 
     /// Floats the clip's emoji reactions up the left edge — each pops in with a
@@ -593,6 +601,83 @@ enum VideoStitcher {
             layer.add(pop, forKey: "emojiPop")
 
             parentLayer.addSublayer(layer)
+        }
+    }
+
+    /// The latest few comments rise as little bubbles above the watermark —
+    /// the friends' voices become part of the film, not just the app.
+    private static func addCommentBubbles(
+        for caption: CaptionWindow,
+        to parentLayer: CALayer,
+        renderSize: CGSize,
+        duration: Double,
+        edge: Double
+    ) {
+        let lines = Array(caption.comments.suffix(3))
+        guard !lines.isEmpty else { return }
+
+        let minEdge = min(renderSize.width, renderSize.height)
+        let fontSize = max(minEdge * 0.026, 11)
+        let padH = fontSize * 0.8
+        let padV = fontSize * 0.45
+        let spacing = fontSize * 0.5
+        let leftX = renderSize.width * 0.045
+        let maxWidth = renderSize.width * 0.62
+
+        // CA coordinates: origin bottom-left. Stack upward from just above
+        // the watermark line.
+        var y = renderSize.height * 0.028 + fontSize * 1.6
+
+        for (i, line) in lines.enumerated() {
+            var size = fontSize
+            var attributed: NSAttributedString
+            repeat {
+                attributed = NSAttributedString(string: line, attributes: [
+                    .font: roundedFont(size: size, weight: .semibold),
+                    .foregroundColor: UIColor.white,
+                ])
+                if attributed.size().width + padH * 2 <= maxWidth { break }
+                size *= 0.92
+            } while size > 8
+            let textSize = attributed.size()
+            let bubbleSize = CGSize(
+                width: textSize.width + padH * 2,
+                height: textSize.height + padV * 2)
+
+            let bubble = CALayer()
+            bubble.frame = CGRect(x: leftX, y: y, width: bubbleSize.width, height: bubbleSize.height)
+            bubble.backgroundColor = UIColor.black.withAlphaComponent(0.38).cgColor
+            bubble.cornerRadius = bubbleSize.height / 2
+
+            let text = CATextLayer()
+            text.string = attributed
+            text.alignmentMode = .center
+            text.contentsScale = 2
+            text.frame = CGRect(
+                x: 0, y: (bubbleSize.height - textSize.height) / 2,
+                width: bubbleSize.width, height: textSize.height)
+            bubble.addSublayer(text)
+
+            // Stagger each bubble's rise, keeping it inside the clip's window.
+            let stagger = min(Double(i) * 0.25, max(duration - 0.5, 0))
+            let begin = caption.start <= 0
+                ? AVCoreAnimationBeginTimeAtZero + stagger
+                : caption.start + stagger
+            let life = max(duration - stagger, 0.2)
+
+            bubble.opacity = 0
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]
+            let e = min(0.18 / life, 0.2)
+            fade.keyTimes = [0, NSNumber(value: e), NSNumber(value: 1 - edge), 1]
+            fade.beginTime = begin
+            fade.duration = life
+            fade.isRemovedOnCompletion = false
+            fade.fillMode = .both
+            bubble.add(fade, forKey: "commentFade")
+
+            parentLayer.addSublayer(bubble)
+            y += bubbleSize.height + spacing
         }
     }
 
