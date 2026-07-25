@@ -24,6 +24,15 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      - name: Verify layer boundaries
+        # Models must stay UI-agnostic: no localized display strings in there
+        # (presentation text belongs to ChallengePresenter / the view layer).
+        run: |
+          if grep -rn "Strings\." AISetlog/Models/; then
+            echo "::error::Models layer references Strings — move display text to ChallengePresenter"
+            exit 1
+          fi
+
       - name: Run tests
         run: |
           xcodebuild test \
