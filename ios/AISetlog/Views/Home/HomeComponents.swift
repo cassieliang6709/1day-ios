@@ -38,36 +38,6 @@ struct OneDayLogoMark: View {
     }
 }
 
-/// The "Start today" button with a slow breathing glow, so the home screen's
-/// single most important action has some life to it.
-struct BreathingStartButton: View {
-    let action: () -> Void
-    @State private var breathe = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(Strings.startToday)
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Color.oneDayBlue, Color.oneDayCyan],
-                        startPoint: .leading, endPoint: .trailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-                )
-                .shadow(color: Color.oneDayBlue.opacity(breathe ? 0.45 : 0.16), radius: breathe ? 22 : 8, y: 6)
-        }
-        .buttonStyle(.plain)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
-                breathe = true
-            }
-        }
-    }
-}
 
 /// A small colored initials circle for a person's identity — reuses
 /// `Identity` so the color always matches `MemberChip` elsewhere in the app.

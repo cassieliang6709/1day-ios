@@ -12,7 +12,9 @@ struct FilmStripCard: View {
     var refreshToken: Date? = nil
 
     private var dateStamp: String {
-        challenge.startDate.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits))
+        challenge.startDate.formatted(
+            .dateTime.year().month(.twoDigits).day(.twoDigits)
+                .locale(AppLanguage.effective.locale))
     }
 
     var body: some View {
@@ -65,7 +67,6 @@ struct NextCaptureCard: View {
     let clipURL: URL?
     /// Re-records reuse the same file name — this busts the cached first frame.
     var refreshToken: Date? = nil
-    let onRecord: () -> Void
 
     private var nextSlot: Int { min(challenge.recordedCount + 1, max(challenge.cards.count, 1)) }
     private var momentTitle: String { ChallengePresenter(challenge: challenge).title(forSlot: nextSlot) }
@@ -106,29 +107,6 @@ struct NextCaptureCard: View {
                 }
             }
 
-            Button(action: onRecord) {
-                Label(
-                    Strings.recordSlot(
-                        oneDay: challenge.isOneDay,
-                        index: nextSlot,
-                        secondsLabel: challenge.resolvedClipLength.secondsLabel
-                    ),
-                    systemImage: "video.fill"
-                )
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color.oneDayBlue, Color.oneDayCyan],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: Capsule()
-                )
-            }
-            .buttonStyle(.plain)
         }
         .padding(18)
         .background(.background, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -171,7 +149,9 @@ struct ChallengeRow: View {
     }
 
     private var statusText: String {
-        let fmt = Date.FormatStyle().month(.abbreviated).day()
+        let fmt = Date.FormatStyle()
+            .month(.abbreviated).day()
+            .locale(AppLanguage.effective.locale)
         let range = "\(challenge.startDate.formatted(fmt)) – \((Calendar.current.date(byAdding: .day, value: 6, to: challenge.startDate) ?? challenge.startDate).formatted(fmt))"
         if challenge.isOneDay {
             if challenge.isComplete {

@@ -22,6 +22,26 @@ final class VideoStitcherTests: XCTestCase {
         XCTAssertGreaterThan(try fileSize(output), 0)
     }
 
+    func testFriendsTogetherPlaysSameDayClipsSimultaneously() async throws {
+        let source = try XCTUnwrap(
+            Bundle.main.url(forResource: "day1", withExtension: "mp4"))
+        let clips = [
+            DayClip(day: 1, url: source, authorName: "A"),
+            DayClip(day: 1, url: source, authorName: "B"),
+        ]
+        var options = VideoStitcher.Options()
+        options.layout = .friendsTogether
+        options.showDayCaptions = false
+
+        let output = try await VideoStitcher.stitch(clips: clips, options: options)
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let sourceDuration = try await AVURLAsset(url: source).load(.duration).seconds
+        let outputDuration = try await AVURLAsset(url: output).load(.duration).seconds
+        XCTAssertEqual(outputDuration, sourceDuration, accuracy: 0.15)
+        XCTAssertGreaterThan(try fileSize(output), 0)
+    }
+
     func testStitchRejectsEmptyInput() async {
         do {
             _ = try await VideoStitcher.stitch(clips: [])

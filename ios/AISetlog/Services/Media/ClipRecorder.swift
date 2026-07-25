@@ -112,10 +112,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         applyOrientation()
     }
 
-    /// Lock both the recorded file and the preview to the chosen orientation.
-    /// RotationCoordinator accounts for the active camera's native mounting;
-    /// this matters in Simulator, whose external Mac camera is already upright
-    /// and was previously rotated sideways by the hard-coded 90° angle.
+    /// Physical iPhone cameras are mounted in landscape, so portrait capture
+    /// requires a 90° connection rotation. External cameras (used by the
+    /// Simulator) have no fixed mounting and must use RotationCoordinator.
     private func applyOrientation() {
         guard let device = videoInput?.device else { return }
         let coordinator = AVCaptureDevice.RotationCoordinator(
@@ -123,21 +122,32 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             previewLayer: previewLayer)
         rotationCoordinator = coordinator
 
-        let captureAngle = orientation == .portrait
-            ? coordinator.videoRotationAngleForHorizonLevelCapture
-            : 0
+        let captureAngle = Self.rotationAngle(
+            orientation: orientation,
+            devicePosition: device.position,
+            coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
         if let connection = movieOutput.connection(with: .video),
            connection.isVideoRotationAngleSupported(captureAngle) {
             connection.videoRotationAngle = captureAngle
         }
 
-        let previewAngle = orientation == .portrait
-            ? coordinator.videoRotationAngleForHorizonLevelPreview
-            : 0
+        let previewAngle = Self.rotationAngle(
+            orientation: orientation,
+            devicePosition: device.position,
+            coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelPreview)
         if let connection = previewLayer?.connection,
            connection.isVideoRotationAngleSupported(previewAngle) {
             connection.videoRotationAngle = previewAngle
         }
+    }
+
+    static func rotationAngle(
+        orientation: Challenge.Orientation,
+        devicePosition: AVCaptureDevice.Position,
+        coordinatedAngle: CGFloat
+    ) -> CGFloat {
+        guard orientation == .portrait else { return 0 }
+        return devicePosition == .unspecified ? coordinatedAngle : 90
     }
 
     func flipCamera() {

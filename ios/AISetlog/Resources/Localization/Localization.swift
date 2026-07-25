@@ -50,6 +50,10 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
     /// Convenience for the common device-locale case.
     var resolved: AppLanguage { resolved() }
 
+    /// Locale used by date/time formatters and SwiftUI controls when the app
+    /// language is explicitly overridden in Settings.
+    var locale: Locale { Locale(identifier: resolved.localeCode) }
+
     /// The concrete language the app should render in right now.
     static var effective: AppLanguage {
         let stored = UserDefaults.standard.string(forKey: storageKey)
@@ -136,8 +140,8 @@ enum Strings {
     static var systemLanguage: String { lang == .chinese ? "跟随系统" : "System" }
     static var languageFootnote: String {
         lang == .chinese
-            ? "“跟随系统”会使用设备语言。模板、moment 和菜单会立即切换。"
-            : "“System” follows your device language. Templates, moments and menus switch instantly."
+            ? "“跟随系统”会使用设备语言。模板、拍摄提示和菜单会立即切换。"
+            : "“System” follows your device language. Templates, prompts, and menus switch instantly."
     }
 
     static var notifications: String { lang == .chinese ? "通知" : "Notifications" }
@@ -167,7 +171,7 @@ enum Strings {
     }
     static var openSettings: String { lang == .chinese ? "打开系统设置" : "Open Settings" }
     static var notificationPrimerTitle: String {
-        lang == .chinese ? "留住今天的 moment？" : "Keep today’s moment?"
+        lang == .chinese ? "留住今天的瞬间？" : "Keep today’s moment?"
     }
     static var notificationPrimerBody: String {
         lang == .chinese
@@ -188,7 +192,7 @@ enum Strings {
     }
     static func eveningOneDayReminder(remaining: Int) -> String {
         lang == .chinese
-            ? "今天还差 \(remaining) 个 moment，留一个给此刻吧。"
+            ? "今天还差 \(remaining) 个瞬间，留一个给此刻吧。"
             : "\(remaining) moment\(remaining == 1 ? "" : "s") left today. Save one for now."
     }
     static func roomClipActivity(name: String?, day: Int) -> String {
@@ -219,14 +223,17 @@ enum Strings {
     static func dayN(_ day: Int) -> String {
         lang == .chinese ? "第 \(day) 天" : "Day \(day)"
     }
+    static func seconds(_ value: Int) -> String {
+        lang == .chinese ? "\(value) 秒" : "\(value)s"
+    }
 
     static func unitName(oneDay: Bool) -> String {
-        if lang == .chinese { return oneDay ? "个 moment" : "天" }
+        if lang == .chinese { return oneDay ? "个瞬间" : "天" }
         return oneDay ? "moment" : "day"
     }
 
     static func unitNamePlural(oneDay: Bool) -> String {
-        if lang == .chinese { return oneDay ? "个 moment" : "天" }
+        if lang == .chinese { return oneDay ? "个瞬间" : "天" }
         return oneDay ? "moments" : "days"
     }
 
@@ -269,15 +276,43 @@ enum Strings {
     }
     static var startNewFilm: String { lang == .chinese ? "开始一部新影片？" : "Start a new film?" }
     static var tagline: String {
-        lang == .chinese ? "7 个瞬间，一支小 vlog。" : "7 moments. One tiny vlog."
+        lang == .chinese ? "7 个瞬间，一支小短片。" : "7 moments. One tiny vlog."
     }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
-    static var firstRunPrompt: String {
-        lang == .chinese ? "想记录什么样的一天？" : "What kind of day do you want to remember?"
+    static var onboardingSkip: String { lang == .chinese ? "跳过" : "Skip" }
+    static var onboardingNext: String { lang == .chinese ? "下一步" : "Next" }
+    static func onboardingPage(_ page: Int, total: Int) -> String {
+        lang == .chinese ? "\(page) / \(total)" : "\(page) of \(total)"
     }
-    static var makeMyOwn: String { lang == .chinese ? "自己定制" : "Make my own" }
-    static func momentsCount(_ count: Int) -> String {
-        lang == .chinese ? "\(count) 个瞬间" : "\(count) moments"
+    static var onboardingCaptureTitle: String {
+        lang == .chinese ? "先留住一个小瞬间" : "Capture one small moment"
+    }
+    static var onboardingCaptureBody: String {
+        lang == .chinese
+            ? "不用拍一整天。两秒钟，就够记住当下。"
+            : "You do not need to film all day. Two seconds is enough to hold onto this moment."
+    }
+    static var onboardingFilmTitle: String {
+        lang == .chinese ? "七个瞬间，自动成为一部影片" : "Seven moments become one film"
+    }
+    static var onboardingFilmBody: String {
+        lang == .chinese
+            ? "1Day 会在设备端按顺序合成片段，不需要你剪辑。"
+            : "1Day assembles every clip in order, on your device. No editing required."
+    }
+    static var onboardingTogetherTitle: String {
+        lang == .chinese ? "自己记录，也可以和朋友一起" : "Keep it yours—or share it"
+    }
+    static var onboardingTogetherBody: String {
+        lang == .chinese
+            ? "个人故事只保存在设备上；共享故事通过 iCloud 邀请你信任的人。"
+            : "Solo stories stay on your device. Shared stories use iCloud with people you invite."
+    }
+    static var createFirstStory: String {
+        lang == .chinese ? "创建我的第一个故事" : "Create my first story"
+    }
+    static var startAnotherStory: String {
+        lang == .chinese ? "开始一个新故事" : "Start a new story"
     }
     static var inviteHint: String {
         lang == .chinese ? "向朋友要 6 位邀请码。" : "Ask your friend for the 6-character code."
@@ -292,7 +327,7 @@ enum Strings {
     }
     static func oneDayProgress(_ recorded: Int, secondsLabel: String) -> String {
         lang == .chinese
-            ? "\(recorded)/7 个 \(secondsLabel) moment · 24 小时影片"
+            ? "\(recorded)/7 个瞬间 · 每段 \(secondsLabel) · 24 小时影片"
             : "\(recorded)/7 \(secondsLabel) moments · 24-hour film"
     }
     static func friendsRange(_ count: Int, _ range: String) -> String {
@@ -349,7 +384,7 @@ enum Strings {
     }
     static func templateMomentCount(_ count: Int, secondsLabel: String) -> String {
         lang == .chinese
-            ? "\(count) 个 moment，每个 \(secondsLabel)"
+            ? "\(count) 个瞬间，每个 \(secondsLabel)"
             : "\(count) moments, \(secondsLabel) each"
     }
     static var selectedLabel: String { lang == .chinese ? "已选" : "Selected" }
@@ -359,7 +394,7 @@ enum Strings {
     static var deleteTemplate: String { lang == .chinese ? "删除模板" : "Delete template" }
     static var buildYourOwn: String { lang == .chinese ? "自己搭一个" : "Build your own" }
     static var pickYourPrompts: String {
-        lang == .chinese ? "挑你自己的 moment" : "Pick your own prompts"
+        lang == .chinese ? "挑选拍摄提示" : "Pick your own prompts"
     }
     static var whosIn: String { lang == .chinese ? "谁参与" : "WHO'S IN" }
     static var justMe: String { lang == .chinese ? "只有我" : "Just me" }
@@ -367,7 +402,7 @@ enum Strings {
     static var withFriends: String { lang == .chinese ? "和朋友一起" : "With friends" }
     static var roomInvite: String { lang == .chinese ? "房间 + 邀请码" : "Room + invite code" }
     static var createRoom: String { lang == .chinese ? "创建房间" : "Create room" }
-    static var startMoment1: String { lang == .chinese ? "开始 Moment 1" : "Start Moment 1" }
+    static var startMoment1: String { lang == .chinese ? "开始第 1 个瞬间" : "Start Moment 1" }
     static var startDay1: String { lang == .chinese ? "开始第 1 天" : "Start Day 1" }
 
     // MARK: Board
@@ -382,8 +417,15 @@ enum Strings {
             ? "预览影片 · \(recorded)/\(total) \(unitPlural)"
             : "Preview film · \(recorded)/\(total) \(unitPlural)"
     }
+    static func previewSharedFilm(_ clips: Int) -> String {
+        lang == .chinese ? "预览共同影片 · \(clips) 个片段" : "Preview shared film · \(clips) clips"
+    }
     static func membersInRoom(_ count: Int) -> String {
         lang == .chinese ? "房间里有 \(count) 人" : "\(count) in this room"
+    }
+    static var friend: String { lang == .chinese ? "朋友" : "Friend" }
+    static func sharedClips(_ count: Int) -> String {
+        lang == .chinese ? "共同片段 · \(count)" : "Shared clips · \(count)"
     }
     static func invitePill(hasClips: Bool) -> String {
         if lang == .chinese { return hasClips ? "发送今日邀请 · 邀请码 " : "邀请朋友 · 邀请码 " }
@@ -418,7 +460,7 @@ enum Strings {
     static var record: String { lang == .chinese ? "拍摄" : "Record" }
     static var catchUp: String { lang == .chinese ? "补拍" : "Catch up" }
     static func lockedSlot(oneDay: Bool, day: Int) -> String {
-        if lang == .chinese { return oneDay ? "第 \(day) 个 moment" : "第 \(day) 天" }
+        if lang == .chinese { return oneDay ? "第 \(day) 个瞬间" : "第 \(day) 天" }
         return oneDay ? "Moment \(day)" : "Day \(day)"
     }
 
@@ -426,8 +468,8 @@ enum Strings {
 
     static var retake: String { lang == .chinese ? "重拍" : "Retake" }
     static var useClip: String { lang == .chinese ? "使用这段" : "Use clip" }
-    static var surfacePlans: String { lang == .chinese ? "计划" : "plans" }
-    static var surfaceCamera: String { lang == .chinese ? "拍摄" : "camera" }
+    static var surfacePlans: String { lang == .chinese ? "计划" : "Plans" }
+    static var surfaceCamera: String { lang == .chinese ? "拍摄" : "Camera" }
     static var freeformSlot: String { lang == .chinese ? "自由拍摄" : "Free-form" }
     static var fileToPlan: String { lang == .chinese ? "存入计划" : "File to a plan" }
     static var fileThisClipTo: String { lang == .chinese ? "把这段视频存入…" : "File this clip to…" }
@@ -440,6 +482,7 @@ enum Strings {
     static var orientationPortrait: String { lang == .chinese ? "竖屏" : "Portrait" }
     static var orientationLandscape: String { lang == .chinese ? "横屏" : "Landscape" }
     static var switchOrientation: String { lang == .chinese ? "切换横竖屏" : "Switch orientation" }
+    static var flipCamera: String { lang == .chinese ? "切换前后摄像头" : "Flip camera" }
     static func noMatchingPlan(landscape: Bool) -> String {
         let kind = landscape
             ? (lang == .chinese ? "横屏" : "landscape")
@@ -453,8 +496,8 @@ enum Strings {
     }
     static var openingCamera: String { lang == .chinese ? "正在打开相机" : "Opening camera" }
     static func captureState(recording: Bool, secondsLabel: String) -> String {
-        if lang == .chinese { return recording ? "\(secondsLabel) 拍摄中" : "轻点拍摄" }
-        return recording ? "\(secondsLabel) capture" : "tap to capture"
+        if lang == .chinese { return recording ? "拍摄中 · \(secondsLabel)" : "轻点拍摄" }
+        return recording ? "Recording · \(secondsLabel)" : "Tap to capture"
     }
     static var capturedLabel: String { lang == .chinese ? "已拍摄" : "CAPTURED" }
     static func momentN(_ day: Int) -> String {
@@ -498,7 +541,7 @@ enum Strings {
         lang == .chinese ? "正在把你的片段合在一起…" : "Stitching your week together…"
     }
     static var renderedOnDevice: String {
-        lang == .chinese ? "使用 AVFoundation 在设备端渲染" : "Rendered on-device with AVFoundation"
+        lang == .chinese ? "正在设备上生成影片" : "Rendering on this device"
     }
     static func filmTitle(oneDay: Bool) -> String {
         if lang == .chinese { return oneDay ? "一日影片" : "每周影片" }
@@ -521,7 +564,7 @@ enum Strings {
     }
     static func titleCardSubtitleOneDay(_ recorded: Int, _ total: Int, secondsLabel: String) -> String {
         lang == .chinese
-            ? "一日影片 · \(recorded)/\(total) 个 \(secondsLabel) moment"
+            ? "一日影片 · \(recorded)/\(total) 个瞬间 · 每段 \(secondsLabel)"
             : "1-day film · \(recorded)/\(total) \(secondsLabel) moments"
     }
 

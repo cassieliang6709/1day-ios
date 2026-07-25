@@ -39,11 +39,7 @@ struct Challenge: Codable, Identifiable {
         }
 
         var secondsLabel: String {
-            switch self {
-            case .tiny: "2s"
-            case .story: "5s"
-            case .scene: "10s"
-            }
+            Strings.seconds(Int(seconds))
         }
 
     }

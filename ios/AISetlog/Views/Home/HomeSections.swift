@@ -37,52 +37,28 @@ struct HomeHeader: View {
     }
 }
 
-/// "Today" title + subtitle under the header, with a prominent Start-today
-/// pill on the right (it used to hide inside the header's + menu).
+/// Informational home heading. The single primary action now lives in the
+/// fixed bottom dock instead of competing with the hero card.
 struct TodayHeader: View {
-    let onStart: () -> Void
-
     var body: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Strings.todayTitle)
-                    .font(.system(size: 34, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.oneDayNavy)
-                Text(Strings.todaySubtitle)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button(action: onStart) {
-                Label(Strings.startToday, systemImage: "plus")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.oneDayBlue, Color.oneDayCyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: Capsule()
-                    )
-            }
-            .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Strings.todayTitle)
+                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.oneDayNavy)
+            Text(Strings.todaySubtitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
     }
 }
 
-/// Fallback hero shown only when every existing challenge is already
-/// complete — there's no "next capture" to feature, so offer to start one.
+/// Fallback hero shown when there is no active challenge. The fixed bottom
+/// dock owns the action, so this view only establishes the empty-state mood.
 struct HomeHero: View {
-    let onStart: () -> Void
-
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             OneDayLogoMark()
                 .frame(width: 92, height: 92)
 
@@ -90,98 +66,7 @@ struct HomeHero: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
-            BreathingStartButton(action: onStart)
         }
         .padding(.horizontal)
-    }
-}
-
-/// First-launch screen: the template deck IS the onboarding. One tap on a
-/// template creates the challenge and drops the user straight into the board —
-/// no slides, no forms. A quiet custom/join row sits at the bottom.
-struct HomeEmptyState: View {
-    let onTemplate: (ChallengeTemplate) -> Void
-    let onNewChallenge: () -> Void
-    let onJoin: () -> Void
-
-    /// Bound only so a language change re-renders the template names.
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-    ]
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color.oneDayMist,
-                    Color(red: 0.95, green: 0.99, blue: 1.0),
-                    Color(red: 0.82, green: 0.94, blue: 1.0),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            Circle()
-                .fill(Color.oneDayCyan.opacity(0.18))
-                .frame(width: 260, height: 260)
-                .offset(x: -180, y: -280)
-            Circle()
-                .fill(Color.oneDayBlue.opacity(0.13))
-                .frame(width: 260, height: 260)
-                .offset(x: 170, y: 330)
-
-            VStack(spacing: 22) {
-                VStack(spacing: 8) {
-                    Text("1Day")
-                        .font(.system(size: 40, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
-                    Text(Strings.firstRunPrompt)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color(red: 0.25, green: 0.31, blue: 0.38))
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 28)
-
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(ChallengeTemplate.oneDayBuiltins) { template in
-                        Button {
-                            onTemplate(template)
-                        } label: {
-                            VStack(spacing: 8) {
-                                Text(template.emoji)
-                                    .font(.system(size: 34))
-                                Text(template.displayName)
-                                    .font(.headline)
-                                    .foregroundStyle(Color.oneDayNavy)
-                                Text(Strings.momentsCount(template.momentKeys?.count ?? 0))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                            .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 20) {
-                    Button(Strings.makeMyOwn, action: onNewChallenge)
-                    Button(Strings.haveInviteCode, action: onJoin)
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.oneDayBlue)
-                .padding(.bottom, 24)
-            }
-            .padding(.horizontal, 24)
-        }
     }
 }

@@ -10,6 +10,8 @@ struct HomeView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @Binding var pendingJoinCode: String?
+    @Binding var launchAction: HomeLaunchAction?
+    let featuredChallengeID: UUID?
 
     @State private var path: [UUID] = []
     @State private var showNewChallenge = false
@@ -32,41 +34,10 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if store.challenges.isEmpty {
-                    HomeEmptyState(
-                        onTemplate: { template in
-                            let challenge = store.create(
-                                title: template.displayName,
-                                mode: .oneDay,
-                                templateName: template.name.en,
-                                momentTitles: template.momentKeys)
-                            path.append(challenge.id)
-                        },
-                        onNewChallenge: { showNewChallenge = true },
-                        onJoin: { joinCode = ""; showJoin = true })
-                } else {
-                    challengeList
-                }
-            }
-            .background(Color(red: 0.93, green: 0.96, blue: 0.99))
-            .navigationTitle("")
-            .toolbar {
-                // The populated home screen has its own in-content header
-                // (avatar/bell/friends/plus); only the empty state — which has
-                // no other chrome — needs the settings gear up here.
-                if store.challenges.isEmpty {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape").font(.title3)
-                        }
-                        .accessibilityLabel(Strings.settings)
-                    }
-                }
-            }
-            .toolbar(store.challenges.isEmpty ? .visible : .hidden, for: .navigationBar)
+            challengeList
+                .background(Color(red: 0.93, green: 0.96, blue: 0.99))
+                .navigationTitle("")
+                .toolbar(.hidden, for: .navigationBar)
             .alert(Strings.comingSoon, isPresented: $showComingSoon) {
                 Button(Strings.ok, role: .cancel) {}
             }
@@ -78,7 +49,8 @@ struct HomeView: View {
                 RecordClipView(
                     day: slot,
                     slotTitle: ChallengePresenter(challenge: challenge).title(forSlot: slot),
-                    clipLength: challenge.resolvedClipLength
+                    clipLength: challenge.resolvedClipLength,
+                    orientation: challenge.resolvedOrientation,
                 ) { url, overlayText in
                     store.saveClip(
                         from: url,
@@ -129,14 +101,21 @@ struct HomeView: View {
                 ChallengeBoardView(challengeID: id)
             }
         }
-        .onAppear(perform: openPendingNotificationRoute)
+        .onAppear {
+            openPendingNotificationRoute()
+            consumePendingJoinCode()
+            consumeLaunchAction()
+        }
         .onReceive(NotificationCenter.default.publisher(
             for: .oneDayNotificationRoutePending
         )) { _ in
             openPendingNotificationRoute()
         }
-        .onChange(of: pendingJoinCode) { _, code in
-            if let code { startJoin(code); pendingJoinCode = nil }
+        .onChange(of: pendingJoinCode) { _, _ in
+            consumePendingJoinCode()
+        }
+        .onChange(of: launchAction) { _, _ in
+            consumeLaunchAction()
         }
         #if DEBUG
         .onAppear {
@@ -156,6 +135,26 @@ struct HomeView: View {
             }
         }
         #endif
+    }
+
+    private func consumePendingJoinCode() {
+        guard let code = pendingJoinCode else { return }
+        pendingJoinCode = nil
+        startJoin(code)
+    }
+
+    private func consumeLaunchAction() {
+        guard let action = launchAction else { return }
+        launchAction = nil
+        switch action {
+        case .newStory:
+            showNewChallenge = true
+        case .join:
+            joinCode = ""
+            showJoin = true
+        case .record(let id):
+            recordChallenge = store.challenge(id)
+        }
     }
 
     private func openPendingNotificationRoute() {
@@ -219,11 +218,6 @@ struct HomeView: View {
     private var inProgress: [Challenge] { store.challenges.filter { !$0.isComplete } }
     private var history: [Challenge] { store.challenges.filter { $0.isComplete } }
 
-    /// The active challenge with the fewest recordings still shown first —
-    /// that's the one whose next moment is most overdue.
-    private var nextCaptureChallenge: Challenge? {
-        inProgress.filter { !$0.cards.isEmpty }.min { $0.recordedCount < $1.recordedCount }
-    }
 
     private var challengeList: some View {
         ScrollView {
@@ -233,20 +227,18 @@ struct HomeView: View {
                     onAvatar: { showSettings = true },
                     onBell: { showComingSoon = true },
                     onJoin: { joinCode = ""; showJoin = true })
-                TodayHeader(onStart: { showNewChallenge = true })
+                TodayHeader()
 
-                if let hero = nextCaptureChallenge {
+                if let id = featuredChallengeID,
+                   let hero = store.challenge(id) {
                     NextCaptureCard(
                         challenge: hero,
                         memberNames: store.members(for: hero.id).map { $0.name },
                         clipURL: latestClipURL(for: hero),
-                        refreshToken: latestRecordedAt(for: hero)
-                    ) {
-                        recordChallenge = hero
-                    }
-                    .padding(.horizontal)
+                        refreshToken: latestRecordedAt(for: hero))
+                        .padding(.horizontal)
                 } else {
-                    HomeHero(onStart: { showNewChallenge = true })
+                    HomeHero()
                 }
 
                 if !inProgress.isEmpty {

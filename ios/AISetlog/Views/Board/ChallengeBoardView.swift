@@ -144,12 +144,19 @@ struct ChallengeBoardView: View {
 
     private func board(for challenge: Challenge) -> some View {
         let presenter = ChallengePresenter(challenge: challenge)
+        let sharedClips = challenge.isShared
+            ? store.recordedClips(for: challengeID)
+            : []
         return ScrollView {
             VStack(spacing: 20) {
                 progressHeader(challenge)
 
                 if challenge.isShared {
                     rosterHeader(challenge)
+                }
+
+                if !sharedClips.isEmpty {
+                    sharedClipsGrid(sharedClips, challenge: challenge)
                 }
 
                 LazyVGrid(
@@ -171,16 +178,18 @@ struct ChallengeBoardView: View {
 
                 // Show for a shared room as soon as anyone has contributed, so a
                 // freshly-joined member can watch before recording their own.
-                if challenge.recordedCount > 0 || !store.recordedClips(for: challengeID).isEmpty {
+                if challenge.recordedCount > 0 || !sharedClips.isEmpty {
                     Button {
                         showFinalReel = true
                     } label: {
                         Label(
                             challenge.isComplete
                                 ? Strings.createFilm(oneDay: challenge.isOneDay)
-                                : Strings.previewFilm(
-                                    challenge.recordedCount, challenge.cards.count,
-                                    unitPlural: presenter.unitNamePlural),
+                                : challenge.isShared
+                                    ? Strings.previewSharedFilm(sharedClips.count)
+                                    : Strings.previewFilm(
+                                        challenge.recordedCount, challenge.cards.count,
+                                        unitPlural: presenter.unitNamePlural),
                             systemImage: "film.stack.fill"
                         )
                         .font(.headline)
@@ -201,8 +210,69 @@ struct ChallengeBoardView: View {
             if challenge.isShared { await store.syncRoom(challengeID) }
         }
         .task(id: challengeID) {
-            if challenge.isShared { await store.syncRoom(challengeID) }
+            guard challenge.isShared else { return }
+            while !Task.isCancelled {
+                await store.syncRoom(challengeID)
+                do {
+                    try await Task.sleep(for: .seconds(10))
+                } catch {
+                    break
+                }
+            }
         }
+    }
+
+    private func sharedClipsGrid(
+        _ clips: [DayClip],
+        challenge: Challenge
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                Strings.sharedClips(clips.count),
+                systemImage: "rectangle.split.2x1.fill")
+                .font(.headline)
+                .foregroundStyle(BoardTheme.primaryText)
+
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 8),
+                    count: min(2, max(clips.count, 1))),
+                spacing: 8
+            ) {
+                ForEach(clips) { clip in
+                    ZStack(alignment: .bottomLeading) {
+                        ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.72)],
+                            startPoint: .top,
+                            endPoint: .bottom)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(clip.authorName ?? Strings.friend)
+                                .font(.caption.bold())
+                            Text(
+                                ChallengePresenter(challenge: challenge)
+                                    .title(forSlot: clip.day))
+                                .font(.caption2)
+                                .opacity(0.86)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(10)
+                    }
+                    .aspectRatio(
+                        challenge.resolvedOrientation == .landscape ? 1.43 : 0.7,
+                        contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                    .onTapGesture { showFinalReel = true }
+                }
+            }
+        }
+        .padding(16)
+        .background(BoardTheme.card, in: RoundedRectangle(cornerRadius: 20))
     }
 
     /// Member chips + a "share code" pill for a shared room.
@@ -219,6 +289,11 @@ struct ChallengeBoardView: View {
                         .controlSize(.small)
                         .tint(BoardTheme.primary)
                 }
+            }
+            if let syncError = store.syncError(for: challengeID) {
+                Label(syncError, systemImage: "icloud.slash")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {

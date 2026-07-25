@@ -66,6 +66,7 @@
 		E6EC39065A0E9B1513CC7D40 /* NewChallengeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B7D1B8E687819213696BB /* NewChallengeView.swift */; };
 		E890890209424E337E127B55 /* Identity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30BF702896AFF766E6DC46 /* Identity.swift */; };
 		F5FB6686461ADD69FEE12B09 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297FD49D423AAAAF52D8A093 /* SignInView.swift */; };
+		FDC932372082D8FE3812C671 /* FirstRunOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36EA115329B574E896C71EC /* FirstRunOnboardingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,6 +119,7 @@
 		9A9F4DAB25F0BED115C92230 /* ClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipRecorder.swift; sourceTree = "<group>"; };
 		9B50B39418A708023F95ACFF /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		9E5B8E1D0D51CCFB998478B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A36EA115329B574E896C71EC /* FirstRunOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunOnboardingView.swift; sourceTree = "<group>"; };
 		A4220C640EA65EB797B18A21 /* NewChallengeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewChallengeComponents.swift; sourceTree = "<group>"; };
 		B11E5006AF576CB6CAE663B6 /* AISetlog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AISetlog.entitlements; sourceTree = "<group>"; };
 		B1A2AE0704E7AD406295107B /* DayCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCard.swift; sourceTree = "<group>"; };
@@ -312,6 +314,7 @@
 			isa = PBXGroup;
 			children = (
 				455F39D16DA91C86EB710E8E /* BuildTemplateView.swift */,
+				A36EA115329B574E896C71EC /* FirstRunOnboardingView.swift */,
 				0097B739046AF160529FCB55 /* HomeCards.swift */,
 				ED0592BFDD349E6CE539D48A /* HomeComponents.swift */,
 				104829B6EE2E733A47B8BE68 /* HomeSections.swift */,
@@ -496,6 +499,7 @@
 				3B49FADD86FE41EAA8AB55FF /* DayCardView.swift in Sources */,
 				1F37BFE90A0883A53F0CF4BE /* DayClip.swift in Sources */,
 				73568613DFD35A04E218A647 /* FinalReelView.swift in Sources */,
+				FDC932372082D8FE3812C671 /* FirstRunOnboardingView.swift in Sources */,
 				CDD9BDBE43ED533CDDC8B918 /* HomeCards.swift in Sources */,
 				758908C136A85AD09167568B /* HomeComponents.swift in Sources */,
 				9E5E1772F63AD479BD37068F /* HomeSections.swift in Sources */,

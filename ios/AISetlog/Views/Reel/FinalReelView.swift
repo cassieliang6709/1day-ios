@@ -165,6 +165,7 @@ struct FinalReelView: View {
             var options = VideoStitcher.Options()
             options.crossfadeSeconds = fadeSeconds
             options.showDayCaptions = includeCaptions
+            options.layout = challenge.isShared ? .friendsTogether : .sequential
             options.titleCard = includeTitleCard ? titleCard : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             guard requestedRevision == renderRevision else {
@@ -210,7 +211,9 @@ struct FinalReelView: View {
     private var titleCard: VideoStitcher.TitleCard {
         let start = challenge.startDate
         let end = Calendar.current.date(byAdding: .day, value: 6, to: start) ?? start
-        let fmt = Date.FormatStyle().month(.abbreviated).day()
+        let fmt = Date.FormatStyle()
+            .month(.abbreviated).day()
+            .locale(appLanguage.resolved.locale)
         if challenge.isOneDay {
             return VideoStitcher.TitleCard(
                 title: challenge.title,

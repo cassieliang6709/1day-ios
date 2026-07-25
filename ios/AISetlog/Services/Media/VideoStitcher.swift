@@ -12,6 +12,13 @@ import UIKit
 /// the simulator's software render path, so they are device-only.
 enum VideoStitcher {
 
+    enum Layout {
+        case sequential
+        /// Shared-room clips are grouped by moment, with every friend shown
+        /// simultaneously before advancing to the next moment.
+        case friendsTogether
+    }
+
     struct TitleCard {
         let title: String
         let subtitle: String
@@ -20,6 +27,7 @@ enum VideoStitcher {
     struct Options {
         var crossfadeSeconds: Double = 0.35
         var showDayCaptions = true
+        var layout: Layout = .sequential
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
         static let `default` = Options()
@@ -132,10 +140,18 @@ enum VideoStitcher {
         var audioParams: [AVMutableAudioMixInputParameters] = []
         var captions: [CaptionWindow] = []
 
-        try buildSequential(
-            loaded: loaded, into: composition, renderSize: renderSize,
-            crossfadeSeconds: options.crossfadeSeconds, startAt: titleOffset,
-            instructions: &instructions, audioParams: &audioParams, captions: &captions)
+        switch options.layout {
+        case .sequential:
+            try buildSequential(
+                loaded: loaded, into: composition, renderSize: renderSize,
+                crossfadeSeconds: options.crossfadeSeconds, startAt: titleOffset,
+                instructions: &instructions, audioParams: &audioParams, captions: &captions)
+        case .friendsTogether:
+            try buildFriendsTogether(
+                loaded: loaded, into: composition, renderSize: renderSize,
+                startAt: titleOffset, instructions: &instructions,
+                audioParams: &audioParams, captions: &captions)
+        }
 
         // ---- Title card: a source-less black segment up front ---------------
         if titleOffset > .zero {
@@ -331,6 +347,110 @@ enum VideoStitcher {
             }
         }
         audioParams.append(contentsOf: params)
+    }
+
+    // MARK: - Shared-room layout
+
+    /// Plays each moment once, placing every friend's contribution for that
+    /// moment side by side. Shorter takes loop until the longest take ends.
+    private static func buildFriendsTogether(
+        loaded: [LoadedClip],
+        into composition: AVMutableComposition,
+        renderSize: CGSize,
+        startAt: CMTime,
+        instructions: inout [AVMutableVideoCompositionInstruction],
+        audioParams: inout [AVMutableAudioMixInputParameters],
+        captions: inout [CaptionWindow]
+    ) throws {
+        let groups = Dictionary(grouping: loaded, by: \.day)
+            .sorted { $0.key < $1.key }
+        var cursor = startAt
+
+        for (day, clips) in groups {
+            guard let groupDuration = clips.map(\.duration).max(),
+                  groupDuration > .zero else { continue }
+            let end = CMTimeAdd(cursor, groupDuration)
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: cursor, end: end)
+            instruction.backgroundColor = UIColor.black.cgColor
+            var layers: [AVMutableVideoCompositionLayerInstruction] = []
+
+            let columns = Int(ceil(sqrt(Double(clips.count))))
+            let rows = Int(ceil(Double(clips.count) / Double(columns)))
+            let cellSize = CGSize(
+                width: renderSize.width / CGFloat(columns),
+                height: renderSize.height / CGFloat(rows))
+            let gap = renderSize.width * 0.004
+            let volume = max(Float(0.15), Float(0.8) / Float(clips.count))
+
+            for (index, clip) in clips.enumerated() {
+                guard let videoTrack = composition.addMutableTrack(
+                    withMediaType: .video,
+                    preferredTrackID: kCMPersistentTrackID_Invalid)
+                else { throw StitchError.compositionFailed }
+
+                var clipCursor = cursor
+                while clipCursor < end {
+                    let duration = CMTimeMinimum(
+                        clip.videoRange.duration,
+                        CMTimeSubtract(end, clipCursor))
+                    try videoTrack.insertTimeRange(
+                        CMTimeRange(start: clip.videoRange.start, duration: duration),
+                        of: clip.videoTrack,
+                        at: clipCursor)
+                    clipCursor = CMTimeAdd(clipCursor, duration)
+                }
+
+                let row = index / columns
+                let column = index % columns
+                let cell = CGRect(
+                    x: CGFloat(column) * cellSize.width,
+                    y: CGFloat(row) * cellSize.height,
+                    width: cellSize.width,
+                    height: cellSize.height)
+                    .insetBy(dx: gap, dy: gap)
+                let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+                let (transform, crop) = cellTransform(for: clip, into: cell)
+                layer.setTransform(transform, at: cursor)
+                layer.setCropRectangle(crop, at: cursor)
+                layers.append(layer)
+
+                if let audio = clip.audioTrack,
+                   let audioTrack = composition.addMutableTrack(
+                       withMediaType: .audio,
+                       preferredTrackID: kCMPersistentTrackID_Invalid) {
+                    var audioCursor = cursor
+                    while audioCursor < end {
+                        let duration = CMTimeMinimum(
+                            clip.audioRange.duration,
+                            CMTimeSubtract(end, audioCursor))
+                        guard duration > .zero else { break }
+                        try audioTrack.insertTimeRange(
+                            CMTimeRange(start: clip.audioRange.start, duration: duration),
+                            of: audio,
+                            at: audioCursor)
+                        audioCursor = CMTimeAdd(audioCursor, duration)
+                    }
+                    let params = AVMutableAudioMixInputParameters(track: audioTrack)
+                    params.setVolume(volume, at: cursor)
+                    audioParams.append(params)
+                }
+            }
+
+            instruction.layerInstructions = layers
+            instructions.append(instruction)
+            captions.append(CaptionWindow(
+                day: day,
+                label: clips.first?.label,
+                authorName: nil,
+                overlayText: nil,
+                recordedAt: clips.compactMap(\.recordedAt).max(),
+                emoji: clips.flatMap(\.emoji),
+                comments: clips.flatMap(\.comments),
+                start: CMTimeGetSeconds(cursor),
+                end: CMTimeGetSeconds(end)))
+            cursor = end
+        }
     }
 
     // MARK: - Geometry
@@ -934,18 +1054,21 @@ enum VideoStitcher {
 
     private static func formattedStampDate(_ date: Date?) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effective.locale
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date ?? .now)
     }
 
     private static func formattedStampDateShort(_ date: Date?) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effective.locale
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date ?? .now)
     }
 
     private static func formattedStampTime(_ date: Date?) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effective.locale
         formatter.timeStyle = .short
         formatter.dateStyle = .none
         return formatter.string(from: date ?? .now)

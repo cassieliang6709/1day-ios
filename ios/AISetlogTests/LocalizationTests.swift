@@ -65,6 +65,25 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(Strings.dayN(3), "Day 3")
     }
 
+    func testForcedLanguageUsesMatchingLocaleAndPureCopy() throws {
+        let date = try XCTUnwrap(
+            Calendar(identifier: .gregorian).date(
+                from: DateComponents(year: 2026, month: 1, day: 5)))
+        let style = Date.FormatStyle().month(.abbreviated).day()
+
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertTrue(date.formatted(style.locale(AppLanguage.effective.locale)).contains("月"))
+        XCTAssertEqual(Strings.notificationPrimerTitle, "留住今天的瞬间？")
+        XCTAssertEqual(Strings.createFirstStory, "创建我的第一个故事")
+        XCTAssertEqual(Strings.unitName(oneDay: true), "个瞬间")
+
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertTrue(date.formatted(style.locale(AppLanguage.effective.locale)).contains("Jan"))
+        XCTAssertEqual(Strings.notificationPrimerTitle, "Keep today’s moment?")
+        XCTAssertEqual(Strings.createFirstStory, "Create my first story")
+        XCTAssertEqual(Strings.surfaceCamera, "Camera")
+    }
+
     // MARK: MomentCatalog
 
     func testMomentCatalogResolvesKeysAndLegacyDisplayStrings() {

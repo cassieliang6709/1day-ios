@@ -44,6 +44,12 @@ struct ClipPreviewView: View {
     /// Prefer the live card's caption so edits show immediately; fall back to
     /// the value passed in (used when there's no challenge context).
     private var liveOverlayText: String? { card?.overlayText ?? overlayText }
+    private var localizedMomentTitle: String {
+        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
+    }
+    private var displayLocale: Locale {
+        Locale(identifier: appLanguage.resolved.localeCode)
+    }
 
     var body: some View {
         NavigationStack {
@@ -62,7 +68,15 @@ struct ClipPreviewView: View {
                     }
 
                     if let recordedAt {
-                        Text(Strings.capturedAt(recordedAt.formatted(date: .abbreviated, time: .shortened)))
+                        Text(Strings.capturedAt(recordedAt.formatted(
+                            .dateTime
+                                .year()
+                                .month(.abbreviated)
+                                .day()
+                                .hour()
+                                .minute()
+                                .locale(displayLocale)
+                        )))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -87,7 +101,7 @@ struct ClipPreviewView: View {
                 .padding()
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(slotTitle ?? Strings.dayN(day))
+            .navigationTitle(localizedMomentTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -111,7 +125,7 @@ struct ClipPreviewView: View {
             LoopingClipPlayer(url: url, refreshToken: recordedAt)
             MomentStampOverlay(
                 name: authorName,
-                momentTitle: slotTitle ?? Strings.dayN(day),
+                momentTitle: localizedMomentTitle,
                 day: day,
                 mode: .review,
                 timestamp: recordedAt,

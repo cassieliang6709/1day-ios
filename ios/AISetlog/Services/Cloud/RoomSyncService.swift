@@ -10,6 +10,9 @@ final class RoomSyncService {
     private(set) var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
     /// Room codes currently being synced (drives a spinner in the board).
     private(set) var syncing: Set<String> = []
+    /// Last CloudKit failure per room. Kept visible instead of silently
+    /// presenting an empty room when the production schema is unavailable.
+    private(set) var lastError: [String: String] = [:]
 
     private let fileStore: ClipFileStore
 
@@ -24,6 +27,7 @@ final class RoomSyncService {
     func clearRoom(_ code: String) {
         fileStore.deleteRemoteCache(roomCode: code)
         remoteClips[code] = nil
+        lastError[code] = nil
     }
 
     /// Pull every member's clips for a room into the local cache. Interaction
@@ -36,9 +40,11 @@ final class RoomSyncService {
             let clips = try await CloudKitService.fetchClips(
                 code: code, into: fileStore.remoteCacheDir(roomCode: code))
             remoteClips[code] = clips
+            lastError[code] = nil
             return clips
         } catch {
             print("[room] sync failed: \(error)")
+            lastError[code] = error.localizedDescription
             return nil
         }
     }
@@ -59,9 +65,11 @@ final class RoomSyncService {
                 code: code, day: day, authorID: authorID,
                 authorName: authorName, fileURL: fileURL,
                 overlayText: overlayText)
+            lastError[code] = nil
             return true
         } catch {
             print("[room] upload failed: \(error)")
+            lastError[code] = error.localizedDescription
             return false
         }
     }

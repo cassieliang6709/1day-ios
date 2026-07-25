@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import AISetlog
 
 final class ChallengeStateTests: XCTestCase {
@@ -108,6 +109,36 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(secondLaunch.map(\.id), firstLaunch.map(\.id))
         XCTAssertEqual(fileStore.migratedFileNames, ["day1.mov"])
     }
+    func testPhysicalIPhonePortraitCaptureUsesNinetyDegrees() {
+        XCTAssertEqual(
+            ClipRecorder.rotationAngle(
+                orientation: .portrait,
+                devicePosition: .back,
+                coordinatedAngle: 0),
+            90)
+        XCTAssertEqual(
+            ClipRecorder.rotationAngle(
+                orientation: .portrait,
+                devicePosition: .front,
+                coordinatedAngle: 270),
+            90)
+    }
+
+    func testExternalCameraUsesCoordinatorAndLandscapeStaysUnrotated() {
+        XCTAssertEqual(
+            ClipRecorder.rotationAngle(
+                orientation: .portrait,
+                devicePosition: .unspecified,
+                coordinatedAngle: 270),
+            270)
+        XCTAssertEqual(
+            ClipRecorder.rotationAngle(
+                orientation: .landscape,
+                devicePosition: .back,
+                coordinatedAngle: 90),
+            0)
+    }
+
 }
 
 private final class MigrationClipFileStore: ClipFileStore {

@@ -46,13 +46,16 @@ struct RecordClipView: View {
     private var clipSeconds: Double { clipLength.seconds }
     private var clipSecondsText: String { clipLength.secondsLabel }
     /// Extra bottom room so the free-form controls clear the floating pill.
-    private var bottomInset: CGFloat { isFreeform ? 76 : 18 }
+    private var bottomInset: CGFloat { isFreeform ? 68 : 8 }
     private var effectiveOrientation: Challenge.Orientation {
         isFreeform ? freeformOrientation : orientation
     }
     private var trimmedOverlayText: String? {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : text
+    }
+    private var localizedMomentTitle: String {
+        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
     }
 
     var body: some View {
@@ -118,15 +121,16 @@ struct RecordClipView: View {
         }
     }
 
+
     // MARK: - Camera
 
     private var cameraView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 10) {
             topBar
 
             CameraShell(
                 name: myName,
-                momentTitle: slotTitle ?? Strings.dayN(day),
+                momentTitle: localizedMomentTitle,
                 day: day,
                 mode: recorder.state == .recording ? .recording : .live,
                 timestamp: recorder.recordedAt,
@@ -136,11 +140,12 @@ struct RecordClipView: View {
             ) {
                 CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
             }
+            .layoutPriority(1)
 
             bottomControls
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
         .padding(.bottom, bottomInset)
     }
 
@@ -150,27 +155,27 @@ struct RecordClipView: View {
         } label: {
             ZStack {
                 Circle()
-                    .stroke(.white.opacity(0.35), lineWidth: 5)
-                    .frame(width: 84, height: 84)
+                    .stroke(.white.opacity(0.35), lineWidth: 4)
+                    .frame(width: 68, height: 68)
                 Circle()
                     .fill(myTint)
-                    .frame(width: 66, height: 66)
+                    .frame(width: 52, height: 52)
             }
         }
     }
 
-    /// While recording: a big countdown ring (tap to stop early) flanked by
-    /// decorative waveform bars.
+    /// While recording: a compact countdown row that leaves the camera frame
+    /// large enough on short devices such as iPhone SE.
     private var recordingControls: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 18) {
-                WaveformBars(tint: myTint)
-                countdownRing
-                WaveformBars(tint: myTint)
-            }
+        HStack(spacing: 12) {
+            WaveformBars(tint: myTint)
+            countdownRing
             Text(Strings.tapToStop)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
         }
     }
 
@@ -180,18 +185,18 @@ struct RecordClipView: View {
         } label: {
             ZStack {
                 Circle()
-                    .stroke(Color(.systemGray5), lineWidth: 5)
-                    .frame(width: 84, height: 84)
+                    .stroke(Color(.systemGray5), lineWidth: 4)
+                    .frame(width: 68, height: 68)
                 Circle()
                     .trim(from: 0, to: ringProgress)
-                    .stroke(myTint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .stroke(myTint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .frame(width: 84, height: 84)
+                    .frame(width: 68, height: 68)
                 TimelineView(.periodic(from: .now, by: 0.1)) { context in
                     let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
                     let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
                     Text("\(remaining)")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(.system(size: 28, weight: .black, design: .rounded))
                         .foregroundStyle(myTint)
                         .monospacedDigit()
                 }
@@ -202,12 +207,12 @@ struct RecordClipView: View {
     // MARK: - Review (Use / Retake)
 
     private func reviewView(_ url: URL) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 10) {
             topBar
 
             CameraShell(
                 name: myName,
-                momentTitle: slotTitle ?? Strings.dayN(day),
+                momentTitle: localizedMomentTitle,
                 day: day,
                 mode: .review,
                 timestamp: recorder.recordedAt,
@@ -222,8 +227,9 @@ struct RecordClipView: View {
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
                 }
             }
+            .layoutPriority(1)
 
-            VStack(spacing: 10) {
+            HStack(spacing: 10) {
                 Button {
                     if isFreeform {
                         let matches = filingCandidates
@@ -241,10 +247,12 @@ struct RecordClipView: View {
                 } label: {
                     Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
                           systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
-                        .font(.headline)
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 14)
                         .background(myTint, in: Capsule())
                 }
                 .buttonStyle(.plain)
@@ -254,17 +262,19 @@ struct RecordClipView: View {
                     ringProgress = 0
                 } label: {
                     Label(Strings.retake, systemImage: "arrow.counterclockwise")
-                        .font(.headline)
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 14)
                         .background(Color(.systemGray6), in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
         .padding(.bottom, bottomInset)
         .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
             ForEach(filingCandidates) { challenge in
@@ -333,7 +343,7 @@ struct RecordClipView: View {
             .tint(myTint)
             #if DEBUG
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
-            Button(Strings.useDemoClip(slotTitle ?? Strings.dayN(day))) {
+            Button(Strings.useDemoClip(localizedMomentTitle)) {
                 if let demo = Bundle.main.url(forResource: "day\(day)", withExtension: "mp4") {
                     onSave(demo, trimmedOverlayText)
                     offerNotificationPrimer(dismissWhenFinished: true)
@@ -377,12 +387,12 @@ struct RecordClipView: View {
                     freeformOrientation = freeformOrientation == .portrait ? .landscape : .portrait
                 } label: {
                     Image(systemName: "rectangle.portrait")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .rotationEffect(freeformOrientation == .landscape ? .degrees(90) : .zero)
                         .foregroundStyle(.black.opacity(0.78))
-                        .frame(width: 52, height: 52)
+                        .frame(width: 44, height: 44)
                         .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Strings.switchOrientation)
@@ -391,56 +401,64 @@ struct RecordClipView: View {
             } else {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 20, weight: .bold))
-                        .frame(width: 52, height: 52)
+                        .font(.system(size: 18, weight: .bold))
+                        .frame(width: 44, height: 44)
                         .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Text("1DAY")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(myTint)
-                Text(slotTitle ?? Strings.dayN(day))
-                    .font(.caption.weight(.semibold))
+                Text(localizedMomentTitle)
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
+            .frame(maxWidth: 170)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button { recorder.flipCamera() } label: {
                 Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
-                    .font(.system(size: 20, weight: .bold))
-                    .frame(width: 52, height: 52)
+                    .font(.system(size: 18, weight: .bold))
+                    .frame(width: 44, height: 44)
                     .background(.white.opacity(0.92), in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(Strings.flipCamera)
             .disabled(recorder.state != .ready || recorder.clipURL != nil)
             .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
         }
     }
 
     private var bottomControls: some View {
-        VStack(spacing: 12) {
+        Group {
             if recorder.state == .recording {
                 recordingControls
             } else {
-                VStack(spacing: 10) {
+                HStack(spacing: 14) {
                     recordButton
                     Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+                    Spacer(minLength: 0)
                 }
             }
         }
-        .padding(14)
-        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 32))
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 28))
     }
 }
 

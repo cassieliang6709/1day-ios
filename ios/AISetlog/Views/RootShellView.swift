@@ -3,8 +3,16 @@ import SwiftUI
 /// The app's two surfaces — your plans feed and the free-form camera — swapped
 /// by a small floating pill instead of a full tab bar. The plans surface stays
 /// mounted so switching never loses its navigation stack.
+enum HomeLaunchAction: Equatable {
+    case newStory
+    case join
+    case record(UUID)
+}
+
 struct RootShellView: View {
+    @Environment(ChallengeStore.self) private var store
     @Binding var pendingJoinCode: String?
+    @Binding var launchAction: HomeLaunchAction?
 
     enum Surface: Hashable { case plans, camera }
     @State private var surface: Surface = .plans
@@ -12,9 +20,21 @@ struct RootShellView: View {
     /// Bound only so a language change re-renders the pill labels.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
+    private var featuredChallenge: Challenge? {
+        store.challenges
+            .filter { !$0.isComplete && !$0.cards.isEmpty }
+            .min { $0.recordedCount < $1.recordedCount }
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            HomeView(pendingJoinCode: $pendingJoinCode)
+            HomeView(
+                pendingJoinCode: $pendingJoinCode,
+                launchAction: $launchAction,
+                featuredChallengeID: featuredChallenge?.id)
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: surface == .plans ? 132 : 66)
+                }
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
 
@@ -23,9 +43,56 @@ struct RootShellView: View {
                 CameraTabView()
             }
 
-            SurfacePill(surface: $surface)
-                .padding(.bottom, 4)
+            VStack(spacing: 10) {
+                if surface == .plans {
+                    primaryActionButton
+                }
+                SurfacePill(surface: $surface)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 4)
         }
+    }
+
+    private var primaryActionTitle: String {
+        guard let challenge = featuredChallenge else {
+            return store.challenges.isEmpty
+                ? Strings.createFirstStory
+                : Strings.startAnotherStory
+        }
+        let slot = min(challenge.recordedCount + 1, max(challenge.cards.count, 1))
+        return Strings.recordSlot(
+            oneDay: challenge.isOneDay,
+            index: slot,
+            secondsLabel: challenge.resolvedClipLength.secondsLabel)
+    }
+
+    private var primaryActionIcon: String {
+        featuredChallenge == nil ? "plus" : "video.fill"
+    }
+
+    private var primaryActionButton: some View {
+        Button {
+            if let id = featuredChallenge?.id {
+                launchAction = .record(id)
+            } else {
+                launchAction = .newStory
+            }
+        } label: {
+            Label(primaryActionTitle, systemImage: primaryActionIcon)
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    LinearGradient(
+                        colors: [Color.oneDayBlue, Color.oneDayCyan],
+                        startPoint: .leading,
+                        endPoint: .trailing),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .shadow(color: Color.oneDayBlue.opacity(0.22), radius: 16, y: 7)
+        }
+        .buttonStyle(.plain)
     }
 }
 

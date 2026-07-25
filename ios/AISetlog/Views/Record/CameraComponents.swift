@@ -75,14 +75,30 @@ struct MomentStampOverlay: View {
     var overlayText: String?
     var clipSeconds: Double = 2
 
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     private var stampDate: Date { timestamp ?? .now }
+    private var stampLocale: Locale {
+        Locale(identifier: appLanguage.resolved.localeCode)
+    }
 
     private var dateText: String {
-        stampDate.formatted(.dateTime.month(.abbreviated).day().year())
+        stampDate.formatted(
+            .dateTime
+                .year()
+                .month(.abbreviated)
+                .day()
+                .locale(stampLocale)
+        )
     }
 
     private var timeText: String {
-        stampDate.formatted(date: .omitted, time: .shortened)
+        stampDate.formatted(
+            .dateTime
+                .hour()
+                .minute()
+                .locale(stampLocale)
+        )
     }
 
     private var modeText: String {
@@ -92,6 +108,9 @@ struct MomentStampOverlay: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
+            let scale = min(max(min(size.width / 360, size.height / 570), 0.62), 1)
+            let edgeInset = max(16, 28 * scale)
+
             ZStack {
                 LinearGradient(
                     colors: [.black.opacity(0.22), .clear, .black.opacity(0.34)],
@@ -100,72 +119,80 @@ struct MomentStampOverlay: View {
                 )
 
                 VStack {
-                    HStack(alignment: .top) {
-                        BrandStamp()
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 4) {
+                    HStack(alignment: .top, spacing: 8 * scale) {
+                        BrandStamp(scale: scale)
+                        Spacer(minLength: 6 * scale)
+                        VStack(alignment: .trailing, spacing: 4 * scale) {
                             Text(dateText)
-                                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                .font(.system(size: 14 * scale, weight: .heavy, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.68)
+                                .allowsTightening(true)
                             Text(timeText)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .font(.system(size: 22 * scale, weight: .black, design: .rounded))
                                 .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.68)
+                                .allowsTightening(true)
                         }
                         .foregroundStyle(.white)
                     }
-                    .padding(28)
+                    .padding(edgeInset)
 
-                    Spacer()
+                    Spacer(minLength: 8 * scale)
 
                     HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 9) {
+                        VStack(alignment: .leading, spacing: 9 * scale) {
                             if let name, !name.isEmpty {
-                                NameChip(name: name)
+                                NameChip(name: name, scale: scale)
                             }
                             Text(momentTitle)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .font(.system(size: 22 * scale, weight: .black, design: .rounded))
                                 .foregroundStyle(.white)
                                 .lineLimit(2)
-                                .minimumScaleFactor(0.72)
+                                .minimumScaleFactor(0.62)
+                                .allowsTightening(true)
                             Text(Strings.momentN(day))
-                                .font(.caption.weight(.black))
+                                .font(.system(size: 12 * scale, weight: .black, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.78))
-                            HStack(spacing: 7) {
+                                .lineLimit(1)
+                            HStack(spacing: 7 * scale) {
                                 Capsule()
                                     .fill(.white.opacity(0.42))
-                                    .frame(width: 34, height: 5)
+                                    .frame(width: 34 * scale, height: max(3, 5 * scale))
                                 Capsule()
                                     .fill(.white)
-                                    .frame(width: 46, height: 5)
+                                    .frame(width: 46 * scale, height: max(3, 5 * scale))
                                 Capsule()
                                     .fill(.white.opacity(0.42))
-                                    .frame(width: 34, height: 5)
+                                    .frame(width: 34 * scale, height: max(3, 5 * scale))
                             }
                         }
 
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
-                    .padding(28)
+                    .padding(edgeInset)
                 }
 
                 if mode == .recording {
                     Text(modeText)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(.system(size: 13 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 12 * scale)
+                        .padding(.vertical, 7 * scale)
                         .background(.red, in: Capsule())
                         .position(x: size.width * 0.5, y: size.height * 0.5)
                 }
 
                 if let overlayText, !overlayText.isEmpty {
                     Text(overlayText)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: 22 * scale, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.78)
-                        .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
-                        .padding(.horizontal, 38)
+                        .minimumScaleFactor(0.68)
+                        .shadow(color: .black.opacity(0.28), radius: 5 * scale, y: 2 * scale)
+                        .padding(.horizontal, 38 * scale)
                         .position(x: size.width * 0.5, y: size.height * 0.43)
                 }
             }
@@ -178,41 +205,50 @@ struct MomentStampOverlay: View {
 /// moment title in the live preview.
 struct NameChip: View {
     let name: String
+    var scale: CGFloat = 1
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 6 * scale) {
             Image(systemName: "pencil")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11 * scale, weight: .bold))
             Text(name)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12 * scale)
+        .padding(.vertical, 7 * scale)
         .background(.black.opacity(0.22), in: Capsule())
         .overlay(
             Capsule()
-                .strokeBorder(.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+                .strokeBorder(
+                    .white.opacity(0.85),
+                    style: StrokeStyle(lineWidth: max(0.8, 1.2 * scale), dash: [5 * scale, 4 * scale])
+                )
         )
     }
 }
 
 struct BrandStamp: View {
-    var body: some View {
-        HStack(spacing: 9) {
-            Text("1D")
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.black)
-                .frame(width: 42, height: 42)
-                .background(.white, in: Circle())
-                .overlay(Circle().stroke(Color.oneDayBlue, lineWidth: 3))
+    var scale: CGFloat = 1
 
-            VStack(alignment: .leading, spacing: 1) {
+    var body: some View {
+        HStack(spacing: 9 * scale) {
+            Text("1D")
+                .font(.system(size: 16 * scale, weight: .black, design: .rounded))
+                .foregroundStyle(.black)
+                .frame(width: 42 * scale, height: 42 * scale)
+                .background(.white, in: Circle())
+                .overlay(Circle().stroke(Color.oneDayBlue, lineWidth: max(2, 3 * scale)))
+
+            VStack(alignment: .leading, spacing: max(1, scale)) {
                 Text("1DAY")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(.system(size: 15 * scale, weight: .black, design: .rounded))
                 Text(Strings.dailyFilm)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.system(size: 10 * scale, weight: .bold, design: .rounded))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
                     .opacity(0.8)
             }
             .foregroundStyle(.white)
@@ -228,6 +264,8 @@ struct CaptionOverlayEditor: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let scale = min(max(min(proxy.size.width / 360, proxy.size.height / 570), 0.62), 1)
+
             TextField(
                 "",
                 text: $text,
@@ -235,7 +273,7 @@ struct CaptionOverlayEditor: View {
                     .foregroundStyle(.white.opacity(isFocused.wrappedValue ? 0.32 : 0.42)),
                 axis: .vertical
             )
-            .font(.system(size: 22, weight: .bold, design: .rounded))
+            .font(.system(size: 22 * scale, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
             .tint(Color.oneDayCyan)
@@ -245,10 +283,10 @@ struct CaptionOverlayEditor: View {
             .focused(isFocused)
             .textFieldStyle(.plain)
             .lineLimit(1...2)
-            .minimumScaleFactor(0.78)
-            .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
-            .padding(.horizontal, 14)
-            .frame(width: proxy.size.width * 0.68, height: 82)
+            .minimumScaleFactor(0.68)
+            .shadow(color: .black.opacity(0.28), radius: 5 * scale, y: 2 * scale)
+            .padding(.horizontal, 14 * scale)
+            .frame(width: proxy.size.width * 0.76, height: 82 * scale)
             .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.43)
             .onChange(of: text) { _, newValue in
                 if newValue.count > 40 {
@@ -275,7 +313,7 @@ struct CaptionEditor: View {
             TextField(
                 "",
                 text: $text,
-                prompt: Text("Write on this moment")
+                prompt: Text(Strings.writeOnMoment)
                     .foregroundStyle(.secondary)
             )
             .font(.subheadline.weight(.semibold))

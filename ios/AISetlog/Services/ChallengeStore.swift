@@ -44,6 +44,11 @@ final class ChallengeStore {
     /// Room codes currently being synced (drives a spinner in the board).
     var syncing: Set<String> { roomSync.syncing }
 
+    func syncError(for challengeID: UUID) -> String? {
+        guard let code = challenge(challengeID)?.roomCode else { return nil }
+        return roomSync.lastError[code]
+    }
+
     func challenge(_ id: UUID) -> Challenge? {
         challenges.first { $0.id == id }
     }
@@ -147,6 +152,17 @@ final class ChallengeStore {
         _ = await roomSync.syncClips(code: code)
         if let interactions = await roomSync.fetchInteractions(code: code) {
             mergeInteractions(interactions, into: id)
+        }
+    }
+
+    /// Refreshes every locally joined room when the app becomes active.
+    /// Board views also poll while visible so two friends recording at the
+    /// same time see each other's clips without manual pull-to-refresh.
+    @MainActor
+    func syncSharedRooms() async {
+        let ids = challenges.filter(\.isShared).map(\.id)
+        for id in ids {
+            await syncRoom(id)
         }
     }
 
