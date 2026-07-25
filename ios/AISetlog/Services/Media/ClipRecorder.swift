@@ -10,12 +10,15 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
     enum State { case idle, ready, recording, unavailable }
 
     let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
     private let movieOutput = AVCaptureMovieFileOutput()
     private var videoInput: AVCaptureDeviceInput?
     private var position: AVCaptureDevice.Position = .front
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
+    private var isConfigured = false
     /// Recording orientation — locks both the output file and the preview to
     /// upright portrait or landscape. The UI never rotates (the app stays
     /// portrait-locked), only the captured video's frame.
@@ -49,39 +52,53 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         }
         _ = await AVCaptureDevice.requestAccess(for: .audio)
 
-        session.beginConfiguration()
-        session.sessionPreset = .high
+        let configured = await withCheckedContinuation { continuation in
+            sessionQueue.async { [self] in
+                // SwiftUI can preserve this recorder while swapping the clip
+                // preview for the re-record screen. Reuse the existing graph
+                // instead of trying to add its inputs and output a second time.
+                if isConfigured {
+                    if !session.isRunning { session.startRunning() }
+                    continuation.resume(returning: true)
+                    return
+                }
 
-        guard
-            let camera = camera(for: position),
-            let input = try? AVCaptureDeviceInput(device: camera),
-            session.canAddInput(input)
-        else {
-            session.commitConfiguration()
+                session.beginConfiguration()
+                session.sessionPreset = .high
+
+                guard
+                    let camera = camera(for: position),
+                    let input = try? AVCaptureDeviceInput(device: camera),
+                    session.canAddInput(input),
+                    session.canAddOutput(movieOutput)
+                else {
+                    session.commitConfiguration()
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                session.addInput(input)
+                videoInput = input
+
+                if let mic = AVCaptureDevice.default(for: .audio),
+                   let audioInput = try? AVCaptureDeviceInput(device: mic),
+                   session.canAddInput(audioInput) {
+                    session.addInput(audioInput)
+                }
+
+                session.addOutput(movieOutput)
+                session.commitConfiguration()
+                isConfigured = true
+                session.startRunning()
+                continuation.resume(returning: true)
+            }
+        }
+
+        guard configured else {
             state = .unavailable
             return
         }
-        session.addInput(input)
-        videoInput = input
-
-        if let mic = AVCaptureDevice.default(for: .audio),
-           let audioInput = try? AVCaptureDeviceInput(device: mic),
-           session.canAddInput(audioInput) {
-            session.addInput(audioInput)
-        }
-
-        guard session.canAddOutput(movieOutput) else {
-            session.commitConfiguration()
-            state = .unavailable
-            return
-        }
-        session.addOutput(movieOutput)
-        session.commitConfiguration()
-
         applyOrientation()
-
-        let session = self.session
-        Task.detached { session.startRunning() }
         state = .ready
     }
 
@@ -94,17 +111,31 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         applyOrientation()
     }
 
-    /// Lock both the recorded file and the preview to the chosen orientation,
-    /// so front and back cameras behave identically (no orientation guessing).
+    /// Lock both the recorded file and the preview to the chosen orientation.
+    /// RotationCoordinator accounts for the active camera's native mounting;
+    /// this matters in Simulator, whose external Mac camera is already upright
+    /// and was previously rotated sideways by the hard-coded 90° angle.
     private func applyOrientation() {
-        let angle: CGFloat = orientation == .landscape ? 0 : 90 // degrees
+        guard let device = videoInput?.device else { return }
+        let coordinator = AVCaptureDevice.RotationCoordinator(
+            device: device,
+            previewLayer: previewLayer)
+        rotationCoordinator = coordinator
+
+        let captureAngle = orientation == .portrait
+            ? coordinator.videoRotationAngleForHorizonLevelCapture
+            : 0
         if let connection = movieOutput.connection(with: .video),
-           connection.isVideoRotationAngleSupported(angle) {
-            connection.videoRotationAngle = angle
+           connection.isVideoRotationAngleSupported(captureAngle) {
+            connection.videoRotationAngle = captureAngle
         }
+
+        let previewAngle = orientation == .portrait
+            ? coordinator.videoRotationAngleForHorizonLevelPreview
+            : 0
         if let connection = previewLayer?.connection,
-           connection.isVideoRotationAngleSupported(angle) {
-            connection.videoRotationAngle = angle
+           connection.isVideoRotationAngleSupported(previewAngle) {
+            connection.videoRotationAngle = previewAngle
         }
     }
 
@@ -153,9 +184,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
     }
 
     func teardown() {
-        if session.isRunning {
-            let session = self.session
-            Task.detached { session.stopRunning() }
+        let session = self.session
+        sessionQueue.async {
+            if session.isRunning { session.stopRunning() }
         }
     }
 
