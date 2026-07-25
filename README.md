@@ -1,101 +1,178 @@
 # 1Day
 
-**Capture seven tiny moments. Get one film worth keeping.**
+**Capture the moments that usually disappear. Turn them into a film worth keeping.**
 
-1Day is a native iOS app for solo and shared video challenges. A participant
-records 2–10 second clips across a day or a week; the app assembles them
-on-device into a finished vertical film.
+1Day is a native iOS video diary for solo and shared challenges. Record a few
+seconds at a time—across one day or seven—and the app turns those clips into a
+finished film, entirely on-device.
 
 <p align="center">
-  <img src="docs/assets/new-challenge.png" width="280" alt="1Day challenge creation screen">
+  <img src="docs/assets/new-challenge.png" width="280" alt="Create a challenge in 1Day">
   &nbsp;&nbsp;
-  <img src="docs/assets/demo.gif" width="280" alt="Seven short clips stitched into one film">
+  <img src="docs/assets/demo.gif" width="280" alt="Seven short clips becoming one film">
 </p>
 
-> The GIF shows the deterministic seven-clip rendering proof of concept. The
-> production iOS renderer uses AVFoundation and is covered by integration tests.
+> The animation shows the original deterministic rendering proof of concept.
+> The iOS app now records and renders with AVFoundation.
 
-## What it does
+## The idea
 
-- Records front- or rear-camera clips with audio through `AVCaptureSession`
-- Supports one-day stories and seven-day challenges with 2, 5, or 10 second clips
-- Creates solo challenges or CloudKit-backed rooms joined with a six-character code
-- Authenticates shared-room participants with Sign in with Apple
-- Replaces re-recorded clips deterministically instead of creating duplicates
-- Renders sequential films with crossfades or multi-participant grid films
-- Burns in title cards, moment labels, creator identity, captions, dates, and times
-- Saves finished MP4 videos to Photos or shares them through the iOS share sheet
-- Opens shared challenges from `oneday://join?code=XXXXXX` deep links
+Most days are remembered through a few small moments, not one long recording.
+1Day gives each moment a prompt, keeps every clip intentionally short, and does
+the editing at the end. The result is a personal film without a camera roll full
+of footage or an evening spent in a video editor.
 
-## Architecture
+## Product highlights
+
+- **One day or seven.** Capture several moments today, or return for one clip a
+  day over a week.
+- **Guided or personal.** Start from bilingual built-in templates or build a
+  custom sequence of prompts.
+- **Short by design.** Choose 2, 5, or 10-second clips and lock the challenge to
+  portrait or landscape.
+- **Made with friends.** Create a CloudKit room, invite people with a six-character
+  code, and collect everyone’s clips in one shared story.
+- **More than a clip feed.** Friends can leave emoji reactions and comments;
+  those interactions can appear in the final film.
+- **A real camera workflow.** Switch between front and rear cameras, review a
+  take, add overlay text, or re-record the same moment.
+- **Automatic editing.** AVFoundation assembles clips with audio, crossfades,
+  title cards, prompt captions, names, dates, reactions, and comments.
+- **Your film, your choice.** Preview the result, adjust its title card, captions,
+  and transition length, then save it to Photos or share the MP4.
+- **Local-first.** Solo challenges need no account or custom backend. Seven-day
+  challenges use local notifications to bring you back for the next moment.
+- **English and Simplified Chinese.** Product copy, prompts, templates, and
+  permission messaging follow the selected app language.
+
+## How it works
 
 ```mermaid
 flowchart LR
-    UI["SwiftUI views"] --> Store["ChallengeStore"]
-    Camera["AVCaptureSession"] --> Files["Local clip storage"]
-    Store --> Defaults["UserDefaults metadata"]
-    Store --> Files
-    Auth["Sign in with Apple"] --> Store
-    Store <--> Cloud["CloudKit public database"]
-    Cloud --> Cache["Downloaded asset cache"]
-    Files --> Renderer["VideoStitcher"]
-    Cache --> Renderer
-    Renderer --> AVF["AVMutableComposition<br/>AVVideoComposition<br/>AVAudioMix"]
-    AVF --> MP4["Shareable MP4"]
-    MP4 --> Photos["Photos / ShareLink"]
+    Create["Choose a template<br/>or build your own"] --> Record["Record 2–10s clips"]
+    Record --> Review["Review, caption,<br/>react, and comment"]
+    Review --> Render["Render on-device<br/>with AVFoundation"]
+    Render --> Keep["Save to Photos<br/>or share an MP4"]
+
+    Room["CloudKit room"] <--> Review
 ```
 
-The app keeps local challenge metadata separate from video files. Shared rooms
-store room metadata and clip assets in CloudKit; downloaded assets are cached
-locally before entering the same renderer used by solo challenges.
+## Engineering
 
-## Engineering decisions
+### On-device media pipeline
 
-### Render on-device
+`VideoStitcher` loads and normalizes each asset, preserves camera transforms,
+builds alternating composition tracks, mixes audio through crossfades, and adds
+Core Animation overlays through `AVVideoCompositionCoreAnimationTool`. Export
+produces a shareable MP4 without sending personal footage to a render server.
 
-AVFoundation keeps personal video off a custom server, removes a render-service
-dependency, and works offline after shared clips are downloaded. The tradeoff is
-device-specific media behavior and more careful handling of track transforms,
-audio ranges, and simulator limitations.
+The tradeoff: device media behavior is less predictable than a centralized
+renderer. The implementation explicitly handles orientation, track lifetimes,
+audio ranges, empty input, and simulator limitations.
 
-### Deterministic CloudKit record IDs
+### Local-first service boundaries
 
-A shared clip uses `room + participant + slot` as its record identity. Re-recording
-updates the same record, making replacement idempotent and avoiding duplicate
-clips. This is simpler than maintaining a separate version graph, but it
-intentionally preserves only the latest take.
+`ChallengeStore` owns observable app state but delegates storage and I/O:
 
-### Direct room lookup
+```mermaid
+flowchart TD
+    Views["SwiftUI views"] --> Store["ChallengeStore"]
+    Store --> Repo["ChallengeRepository<br/>challenge metadata"]
+    Store --> Files["ClipFileStore<br/>local media"]
+    Store --> Sync["RoomSyncService"]
+    Sync --> Cloud["CloudKit public database"]
+    Store --> Reminder["ReminderService<br/>local notifications"]
+    Files --> Stitcher["VideoStitcher"]
+    Cloud --> Cache["Downloaded clip cache"]
+    Cache --> Stitcher
+    Stitcher --> Film["MP4 → Photos / ShareLink"]
+```
 
-The six-character room code is also the CloudKit `Room` record name. Joining is
-a direct record fetch instead of a query. Codes are convenient to share, though
-they are invitations—not security secrets.
+This keeps the core flow usable offline and isolates persistence, collaboration,
+notifications, capture, and rendering behind focused components.
 
-### Local-first state
+### Idempotent collaboration
 
-Solo challenges work without an account. Shared rooms add Sign in with Apple and
-CloudKit only when needed. This reduces onboarding friction, while requiring a
-clear merge boundary between local clips and the downloaded room cache.
+A shared clip’s CloudKit record ID is derived from `room + participant + slot`.
+Re-recording updates the same record instead of creating a duplicate. The room
+code is also the `Room` record name, so joining is a direct record fetch rather
+than a query. Codes are convenient invitations, not security secrets.
 
-## Project layout
+### Backward-compatible state
+
+Saved challenges use stable prompt keys and version-tolerant decoding. Legacy
+English or Chinese prompt strings, older challenge defaults, and the original
+single-challenge storage shape are migrated or resolved without discarding a
+user’s clips.
+
+## Tech stack
+
+| Area | Implementation |
+| --- | --- |
+| App | Swift 5.9, SwiftUI, Observation, iOS 17+ |
+| Capture | AVFoundation (`AVCaptureSession`, `AVCaptureMovieFileOutput`) |
+| Rendering | AVMutableComposition, AVVideoComposition, AVAudioMix, Core Animation |
+| Collaboration | CloudKit public database, Sign in with Apple, deep links |
+| Persistence | Codable metadata in UserDefaults, media on disk |
+| Notifications | UserNotifications |
+| Website | React 19, Vite 6 |
+| Project generation | XcodeGen |
+| Tests | XCTest with real MP4 export fixtures |
+
+## Repository layout
 
 ```text
 ios/
 ├── AISetlog/
-│   ├── Services/       # CloudKit, account, and video rendering
-│   ├── Views/          # SwiftUI product flow and camera
-│   ├── ChallengeStore.swift
-│   └── Models.swift
-├── AISetlogTests/      # State tests and real video-export integration tests
-└── project.yml         # XcodeGen project definition
-landing-page/           # Vite/React marketing page
-poc/                    # Reproducible FFmpeg rendering proof of concept
+│   ├── App/               # App entry point and lifecycle
+│   ├── Models/            # Challenges, cards, clips, templates, interactions
+│   ├── Presentation/      # Localized presentation logic
+│   ├── Resources/         # Theme, localization, and media fixtures
+│   ├── Services/
+│   │   ├── Cloud/         # CloudKit records and room synchronization
+│   │   ├── Media/         # Camera capture and AVFoundation renderer
+│   │   └── Persistence/   # Metadata repository and clip file store
+│   └── Views/             # Home, board, recorder, reel, and settings
+├── AISetlogTests/          # State, localization, migration, and export tests
+└── project.yml             # XcodeGen project definition
+landing-page/               # React/Vite product site
+poc/                        # Reproducible FFmpeg rendering proof of concept
+docs/                       # Beta protocol and README assets
 ```
 
-## Build and test
+## Run the iOS app
 
-Requirements: macOS, an Xcode release with the iOS 17 SDK or newer, and
-XcodeGen.
+### Requirements
+
+- macOS with Xcode and the iOS 17 SDK or newer
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+
+```bash
+cd ios
+xcodegen generate --spec project.yml
+open AISetlog.xcodeproj
+```
+
+Select the `AISetlog` scheme and run it on an iPhone or iOS Simulator. The
+simulator can exercise the product flow and export fixtures; camera behavior and
+Core Animation render overlays should be verified on a physical device.
+
+Shared rooms additionally require:
+
+- an Apple Developer team
+- the `iCloud.com.cassie.AISetlog` CloudKit container
+- matching CloudKit and Sign in with Apple entitlements
+- a device signed in to iCloud
+
+## Run the landing page
+
+```bash
+cd landing-page
+npm install
+npm run dev
+```
+
+## Test
 
 ```bash
 cd ios
@@ -107,20 +184,16 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-The test suite verifies challenge completion and card-state transitions, custom
-moment labels, empty renderer input, sequential crossfade export, and grid export
-duration. The renderer tests load real MP4 assets and assert that AVFoundation
-produces playable, non-empty output.
+The suite covers challenge and card state, one-day behavior, localized prompt
+resolution, legacy data decoding, empty renderer input, and playable
+AVFoundation MP4 export with real media fixtures.
 
-CloudKit collaboration and Sign in with Apple require an Apple developer team,
-the `iCloud.com.cassie.AISetlog` container, and the matching entitlements.
+## Project status
 
-## Beta status
-
-This is currently an **independent iOS project**, not an App Store launch. A
-5–10-person beta protocol and an empty, privacy-safe results template are in
+1Day is an independent iOS project in private beta, not an App Store release.
+The testing protocol and privacy-safe results template live in
 [docs/BETA_TESTING.md](docs/BETA_TESTING.md). No adoption or completion metrics
-will be claimed until those sessions have happened.
+are claimed before those sessions take place.
 
 ## License
 
