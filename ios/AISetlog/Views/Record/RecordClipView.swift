@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import AVFoundation
 
 /// In-app recorder: live camera only (no library uploads — that's the rule
 /// of the game), locked to the challenge's clip length and auto-stops.
@@ -87,6 +88,12 @@ struct RecordClipView: View {
         .task {
             recorder.orientation = effectiveOrientation
             await recorder.configure()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: AVCaptureDevice.wasConnectedNotification
+        )) { _ in
+            guard recorder.state == .unavailable else { return }
+            Task { await recorder.configure() }
         }
         .onDisappear { recorder.teardown() }
         .onChange(of: effectiveOrientation) { _, newValue in
@@ -296,6 +303,11 @@ struct RecordClipView: View {
                 .foregroundStyle(.secondary)
             Text(Strings.cameraUnavailable)
                 .font(.headline)
+            Button(Strings.retryCamera) {
+                Task { await recorder.configure() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(myTint)
             #if DEBUG
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
             Button(Strings.useDemoClip(slotTitle ?? Strings.dayN(day))) {
@@ -339,9 +351,10 @@ struct RecordClipView: View {
                 Button {
                     freeformOrientation = freeformOrientation == .portrait ? .landscape : .portrait
                 } label: {
-                    Image(systemName: freeformOrientation == .portrait
-                        ? "rectangle.portrait.rotate" : "rectangle.rotate")
+                    Image(systemName: "rectangle.portrait")
                         .font(.system(size: 20, weight: .bold))
+                        .rotationEffect(freeformOrientation == .landscape ? .degrees(90) : .zero)
+                        .foregroundStyle(.black.opacity(0.78))
                         .frame(width: 52, height: 52)
                         .background(.white.opacity(0.92), in: Circle())
                         .shadow(color: .black.opacity(0.08), radius: 10, y: 5)

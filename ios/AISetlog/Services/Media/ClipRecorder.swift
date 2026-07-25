@@ -6,11 +6,11 @@ import Observation
 /// Wraps an `AVCaptureSession` for single-take clip capture: live preview,
 /// fixed-duration recording (the challenge's clip length), retake, teardown.
 @Observable
-final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
+final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unchecked Sendable {
     enum State { case idle, ready, recording, unavailable }
 
     let session = AVCaptureSession()
-    private let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
+    private static let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
     private let movieOutput = AVCaptureMovieFileOutput()
     private var videoInput: AVCaptureDeviceInput?
     private var position: AVCaptureDevice.Position = .front
@@ -50,16 +50,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
             state = .unavailable
             return
         }
-        _ = await AVCaptureDevice.requestAccess(for: .audio)
+        let hasAudioAccess = await AVCaptureDevice.requestAccess(for: .audio)
 
         let configured = await withCheckedContinuation { continuation in
-            sessionQueue.async { [self] in
+            Self.sessionQueue.async { [self] in
                 // SwiftUI can preserve this recorder while swapping the clip
                 // preview for the re-record screen. Reuse the existing graph
                 // instead of trying to add its inputs and output a second time.
                 if isConfigured {
                     if !session.isRunning { session.startRunning() }
-                    continuation.resume(returning: true)
+                    continuation.resume(returning: session.isRunning)
                     return
                 }
 
@@ -80,7 +80,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
                 session.addInput(input)
                 videoInput = input
 
-                if let mic = AVCaptureDevice.default(for: .audio),
+                if hasAudioAccess,
+                   let mic = AVCaptureDevice.default(for: .audio),
                    let audioInput = try? AVCaptureDeviceInput(device: mic),
                    session.canAddInput(audioInput) {
                     session.addInput(audioInput)
@@ -90,7 +91,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
                 session.commitConfiguration()
                 isConfigured = true
                 session.startRunning()
-                continuation.resume(returning: true)
+                continuation.resume(returning: session.isRunning)
             }
         }
 
@@ -159,21 +160,39 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func startRecording(seconds: Double) {
         guard state == .ready else { return }
-        // The output stops itself at the limit — this enforces the challenge's
-        // chosen clip length without adding another decision during recording.
-        movieOutput.maxRecordedDuration = CMTime(seconds: seconds, preferredTimescale: 600)
+
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("clip_\(UUID().uuidString).mov")
         recordedAt = .now
-        movieOutput.startRecording(to: url, recordingDelegate: self)
         state = .recording
+
+        // Keep capture operations serialized with session startup/teardown.
+        // A re-record can arrive while the previous session is still releasing
+        // the camera; restart here before asking the movie output to record.
+        Self.sessionQueue.async { [self] in
+            if !session.isRunning { session.startRunning() }
+            guard session.isRunning else {
+                Task { @MainActor in
+                    self.recordedAt = nil
+                    self.state = .unavailable
+                }
+                return
+            }
+
+            movieOutput.maxRecordedDuration = CMTime(
+                seconds: seconds,
+                preferredTimescale: 600)
+            movieOutput.startRecording(to: url, recordingDelegate: self)
+        }
     }
 
     /// Stop early (the "tap to stop" countdown ring) — the delegate fires
     /// exactly as if the max-duration limit had been hit.
     func stopRecording() {
         guard state == .recording else { return }
-        movieOutput.stopRecording()
+        Self.sessionQueue.async { [movieOutput] in
+            if movieOutput.isRecording { movieOutput.stopRecording() }
+        }
     }
 
     /// Back to live preview after reviewing a take.
@@ -185,7 +204,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func teardown() {
         let session = self.session
-        sessionQueue.async {
+        Self.sessionQueue.async {
             if session.isRunning { session.stopRunning() }
         }
     }
@@ -196,10 +215,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         from connections: [AVCaptureConnection],
         error: Error?
     ) {
-        // Hitting maxRecordedDuration surfaces as an "error" whose userInfo
-        // says the recording finished successfully — treat it as success.
+        let finishedSuccessfully = error == nil
+            || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
+
         Task { @MainActor in
-            self.clipURL = outputFileURL
+            if finishedSuccessfully {
+                self.clipURL = outputFileURL
+            } else {
+                try? FileManager.default.removeItem(at: outputFileURL)
+                self.recordedAt = nil
+            }
             self.state = .ready
         }
     }

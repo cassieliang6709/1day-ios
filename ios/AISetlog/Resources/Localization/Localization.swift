@@ -378,6 +378,7 @@ enum Strings {
         return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
     }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
+    static var retryCamera: String { lang == .chinese ? "重新打开相机" : "Try camera again" }
     static func useDemoClip(_ title: String) -> String {
         lang == .chinese ? "为「\(title)」使用示例片段" : "Use demo clip for \(title)"
     }
