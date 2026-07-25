@@ -220,6 +220,46 @@ struct BrandStamp: View {
     }
 }
 
+/// On-video center caption editor: the text sits exactly where it will be
+/// burned into the exported film, so what you type is what ships.
+struct CaptionOverlayEditor: View {
+    @Binding var text: String
+    var isFocused: FocusState<Bool>.Binding
+
+    var body: some View {
+        GeometryReader { proxy in
+            TextField(
+                "",
+                text: $text,
+                prompt: Text(Strings.addCaption)
+                    .foregroundStyle(.white.opacity(isFocused.wrappedValue ? 0.32 : 0.42)),
+                axis: .vertical
+            )
+            .font(.system(size: 22, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .tint(Color.oneDayCyan)
+            .textInputAutocapitalization(.sentences)
+            .autocorrectionDisabled()
+            .submitLabel(.done)
+            .focused(isFocused)
+            .textFieldStyle(.plain)
+            .lineLimit(1...2)
+            .minimumScaleFactor(0.78)
+            .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
+            .padding(.horizontal, 14)
+            .frame(width: proxy.size.width * 0.68, height: 82)
+            .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.43)
+            .onChange(of: text) { _, newValue in
+                if newValue.count > 40 {
+                    text = String(newValue.prefix(40))
+                }
+            }
+        }
+        .allowsHitTesting(true)
+    }
+}
+
 struct CaptionEditor: View {
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding

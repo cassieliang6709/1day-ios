@@ -193,14 +193,17 @@ struct RecordClipView: View {
                 day: day,
                 mode: .review,
                 timestamp: recorder.recordedAt,
-                overlayText: trimmedOverlayText,
+                overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
-                LoopingClipPlayer(url: url)
+                ZStack {
+                    LoopingClipPlayer(url: url)
+                    // The caption is typed right where it lands in the film —
+                    // center of the frame, not in a bar below the video.
+                    CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
+                }
             }
-
-            captionBar
 
             VStack(spacing: 10) {
                 Button {
@@ -250,40 +253,6 @@ struct RecordClipView: View {
                 Button(challenge.title) { file(url, to: challenge) }
             }
         }
-    }
-
-    /// Caption sits below the video (not burned into the frame until save).
-    private var captionBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "bubble.left")
-                .font(.headline)
-                .foregroundStyle(Color.oneDayBlue)
-
-            TextField(
-                "",
-                text: $overlayText,
-                prompt: Text(Strings.addCaption).foregroundStyle(.secondary)
-            )
-            .font(.subheadline.weight(.semibold))
-            .textInputAutocapitalization(.sentences)
-            .submitLabel(.done)
-            .focused($overlayTextFocused)
-            .onChange(of: overlayText) { _, newValue in
-                if newValue.count > 40 { overlayText = String(newValue.prefix(40)) }
-            }
-
-            Image(systemName: "pencil")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.oneDayBlue.opacity(overlayTextFocused ? 0.38 : 0.13), lineWidth: 1.5)
-        )
-        .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
     }
 
     // MARK: - Free-form filing

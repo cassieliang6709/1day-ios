@@ -233,6 +233,16 @@ final class ChallengeStore {
         return fileStore.clipURL(fileName: name, challengeID: challengeID)
     }
 
+    /// Edit a clip's center caption after the fact (from the preview). Local
+    /// only for now — room sync of caption edits rides the next clip upload.
+    func updateOverlayText(_ text: String?, day: Int, challengeID: UUID) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
+        else { return }
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        challenges[ci].cards[idx].overlayText = trimmed?.isEmpty == true ? nil : trimmed
+    }
+
     // MARK: - Reactions & comments (local-first)
 
     /// The identity a reaction/comment is attributed to. Falls back to a local

@@ -18,6 +18,12 @@ struct ClipPreviewView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
 
+    /// Center caption editing, right on the video — same gesture as at
+    /// record time. Saved to the card on submit/focus-out.
+    @State private var captionDraft = ""
+    @State private var editingCaption = false
+    @FocusState private var captionFocused: Bool
+
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -35,6 +41,9 @@ struct ClipPreviewView: View {
         guard let challengeID else { return 9 / 16 }
         return store.challenge(challengeID)?.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16
     }
+    /// Prefer the live card's caption so edits show immediately; fall back to
+    /// the value passed in (used when there's no challenge context).
+    private var liveOverlayText: String? { card?.overlayText ?? overlayText }
 
     var body: some View {
         NavigationStack {
@@ -106,9 +115,38 @@ struct ClipPreviewView: View {
                 day: day,
                 mode: .review,
                 timestamp: recordedAt,
-                overlayText: overlayText,
+                overlayText: editingCaption ? nil : liveOverlayText,
                 clipSeconds: clipLength.seconds
             )
+
+            if challengeID != nil {
+                if editingCaption {
+                    CaptionOverlayEditor(text: $captionDraft, isFocused: $captionFocused)
+                } else {
+                    // Tap the center to add/edit the caption — same spot it
+                    // appears in the final film, so what you see is what ships.
+                    Button {
+                        captionDraft = liveOverlayText ?? ""
+                        editingCaption = true
+                        captionFocused = true
+                    } label: {
+                        if let text = liveOverlayText, !text.isEmpty {
+                            // Invisible hit target over the existing text.
+                            Color.clear
+                                .contentShape(Rectangle())
+                        } else {
+                            Label(Strings.addCaption, systemImage: "text.badge.plus")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(.black.opacity(0.35), in: Capsule())
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
         }
         .aspectRatio(aspectRatio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -116,5 +154,15 @@ struct ClipPreviewView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Identity.tint(for: authorName), lineWidth: 3)
         }
+        .onChange(of: captionFocused) { _, focused in
+            if !focused, editingCaption { saveCaption() }
+        }
+        .onSubmit { captionFocused = false }
+    }
+
+    private func saveCaption() {
+        editingCaption = false
+        guard let challengeID else { return }
+        store.updateOverlayText(captionDraft, day: day, challengeID: challengeID)
     }
 }
