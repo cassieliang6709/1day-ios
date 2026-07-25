@@ -18,6 +18,7 @@ struct HomeView: View {
     @State private var joinCode = ""
     @State private var joining = false
     @State private var errorText: String?
+    @State private var showComingSoon = false
 
     /// Bound only so a language change re-renders the home screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -37,33 +38,23 @@ struct HomeView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape").font(.title3)
-                    }
-                    .accessibilityLabel(Strings.settings)
-                }
-                if !store.challenges.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button {
-                                showNewChallenge = true
-                            } label: {
-                                Label(Strings.startToday, systemImage: "plus")
-                            }
-                            Button {
-                                joinCode = ""
-                                showJoin = true
-                            } label: {
-                                Label(Strings.enterInviteCode, systemImage: "envelope")
-                            }
+                // The populated home screen has its own in-content header
+                // (avatar/bell/friends/plus); only the empty state — which has
+                // no other chrome — needs the settings gear up here.
+                if store.challenges.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showSettings = true
                         } label: {
-                            Image(systemName: "plus.circle.fill").font(.title3)
+                            Image(systemName: "gearshape").font(.title3)
                         }
+                        .accessibilityLabel(Strings.settings)
                     }
                 }
+            }
+            .toolbar(store.challenges.isEmpty ? .visible : .hidden, for: .navigationBar)
+            .alert(Strings.comingSoon, isPresented: $showComingSoon) {
+                Button(Strings.ok, role: .cancel) {}
             }
             .fullScreenCover(isPresented: $showNewChallenge) {
                 NewChallengeView { id in path.append(id) }
@@ -149,26 +140,56 @@ struct HomeView: View {
     private var inProgress: [Challenge] { store.challenges.filter { !$0.isComplete } }
     private var history: [Challenge] { store.challenges.filter { $0.isComplete } }
 
+    /// The active challenge with the fewest recordings still shown first —
+    /// that's the one whose next moment is most overdue.
+    private var nextCaptureChallenge: Challenge? {
+        inProgress.filter { !$0.cards.isEmpty }.min { $0.recordedCount < $1.recordedCount }
+    }
+
     private var challengeList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                homeHero
+                homeHeader
+                todayHeaderText
+
+                if let hero = nextCaptureChallenge {
+                    NextCaptureCard(
+                        challenge: hero,
+                        memberNames: store.members(for: hero.id).map { $0.name }
+                    ) {
+                        path.append(hero.id)
+                    }
+                    .padding(.horizontal)
+                } else {
+                    homeHero
+                }
 
                 if !inProgress.isEmpty {
-                    VStack(spacing: 12) {
-                        ForEach(inProgress) { challenge in
-                            Button {
-                                path.append(challenge.id)
-                            } label: {
-                                ChallengeRow(challenge: challenge, memberCount: store.members(for: challenge.id).count)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button(challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge, role: .destructive) {
-                                    store.delete(challenge.id)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(Strings.activeStories)
+                            .font(.title3.bold())
+                            .foregroundStyle(Color.oneDayNavy)
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(inProgress.enumerated()), id: \.element.id) { index, challenge in
+                                Button {
+                                    path.append(challenge.id)
+                                } label: {
+                                    ChallengeRow(challenge: challenge, memberCount: store.members(for: challenge.id).count)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge, role: .destructive) {
+                                        store.delete(challenge.id)
+                                    }
+                                }
+                                if index < inProgress.count - 1 {
+                                    Divider().padding(.leading, 86)
                                 }
                             }
                         }
+                        .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
                     }
                     .padding(.horizontal)
                 }
@@ -216,25 +237,83 @@ struct HomeView: View {
             .flatMap { store.clipURL(for: $0, in: challenge.id) }
     }
 
+    /// Avatar + bell + friends + start-new, scrolling with the page content
+    /// (there's no separate nav bar once a challenge exists — see `.toolbar`
+    /// above).
+    private var homeHeader: some View {
+        HStack(spacing: 16) {
+            Button {
+                showSettings = true
+            } label: {
+                AvatarDot(name: account.account?.displayName, size: 44)
+            }
+            .accessibilityLabel(Strings.settings)
+
+            Spacer()
+
+            Button {
+                showComingSoon = true
+            } label: {
+                Image(systemName: "bell")
+                    .font(.title3)
+                    .foregroundStyle(Color.oneDayNavy)
+            }
+
+            Button {
+                showComingSoon = true
+            } label: {
+                Image(systemName: "person.2")
+                    .font(.title3)
+                    .foregroundStyle(Color.oneDayNavy)
+            }
+
+            Menu {
+                Button {
+                    showNewChallenge = true
+                } label: {
+                    Label(Strings.startToday, systemImage: "plus")
+                }
+                Button {
+                    joinCode = ""
+                    showJoin = true
+                } label: {
+                    Label(Strings.enterInviteCode, systemImage: "envelope")
+                }
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.oneDayBlue)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var todayHeaderText: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Strings.todayTitle)
+                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.oneDayNavy)
+            Text(Strings.todaySubtitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
+    }
+
+    /// Fallback hero shown only when every existing challenge is already
+    /// complete — there's no "next capture" to feature, so offer to start one.
     private var homeHero: some View {
         VStack(spacing: 18) {
             OneDayLogoMark()
                 .frame(width: 92, height: 92)
 
-            VStack(spacing: 6) {
-                Text(Strings.todayIs(Date.now.formatted(.dateTime.month(.abbreviated).day())))
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.oneDayNavy)
-                Text(Strings.startNewFilm)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .multilineTextAlignment(.center)
+            Text(Strings.startNewFilm)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             BreathingStartButton { showNewChallenge = true }
         }
-        .padding(.top, 24)
-        .padding(.bottom, 14)
         .padding(.horizontal)
     }
 

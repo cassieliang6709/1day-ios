@@ -272,6 +272,138 @@ struct FilmStripCard: View {
     }
 }
 
+/// A small colored initials circle for a person's identity — reuses
+/// `Identity` so the color always matches `MemberChip` elsewhere in the app.
+struct AvatarDot: View {
+    let name: String?
+    var size: CGFloat = 34
+
+    var body: some View {
+        Text(Identity.initial(for: name))
+            .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(Identity.tint(for: name).gradient, in: Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+    }
+}
+
+/// The "+N" overflow bubble at the end of an `AvatarStack`.
+private struct AvatarOverflowDot: View {
+    let count: Int
+    var size: CGFloat = 34
+
+    var body: some View {
+        Text("+\(count)")
+            .font(.system(size: size * 0.34, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.oneDayNavy)
+            .frame(width: size, height: size)
+            .background(Color.oneDayMist, in: Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+    }
+}
+
+/// Overlapping identity circles for a room's members, capped with a "+N" bubble.
+struct AvatarStack: View {
+    let names: [String]
+    var maxShown: Int = 3
+
+    var body: some View {
+        HStack(spacing: -10) {
+            ForEach(Array(names.prefix(maxShown).enumerated()), id: \.offset) { _, name in
+                AvatarDot(name: name)
+            }
+            if names.count > maxShown {
+                AvatarOverflowDot(count: names.count - maxShown)
+            }
+        }
+    }
+}
+
+/// The home screen's hero card — the next unrecorded moment in the most
+/// pressing active challenge, with a one-tap way into the camera for it.
+struct NextCaptureCard: View {
+    let challenge: Challenge
+    let memberNames: [String]
+    let onRecord: () -> Void
+
+    private var nextSlot: Int { min(challenge.recordedCount + 1, max(challenge.cards.count, 1)) }
+    private var momentTitle: String { challenge.title(forSlot: nextSlot) }
+    private var momentIcon: String {
+        MomentCatalog.icon(for: challenge.momentTitles?[safe: nextSlot - 1])
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 16) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.oneDaySky, Color.oneDayBlue],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 92, height: 132)
+                    .overlay(
+                        Image(systemName: momentIcon)
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                    )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(Strings.nextCapture)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.oneDayBlue)
+
+                    Text(momentTitle)
+                        .font(.system(size: 24, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.oneDayNavy)
+                        .lineLimit(2)
+
+                    Text(Strings.slotOfTotal(oneDay: challenge.isOneDay, index: nextSlot, total: challenge.cards.count))
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.oneDayBlue)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.oneDayMist, in: Capsule())
+
+                    if memberNames.count > 1 {
+                        AvatarStack(names: memberNames)
+                            .padding(.top, 2)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+
+            Button(action: onRecord) {
+                Label(Strings.recordSeconds(challenge.resolvedClipLength.secondsLabel), systemImage: "video.fill")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.oneDayBlue, Color.oneDayCyan],
+                            startPoint: .leading, endPoint: .trailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(18)
+        .background(.background, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .shadow(color: .black.opacity(0.07), radius: 18, y: 8)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 struct ChallengeRow: View {
     let challenge: Challenge
     var memberCount: Int = 0
@@ -302,7 +434,7 @@ struct ChallengeRow: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18))
+        .contentShape(Rectangle())
     }
 
     private var statusText: String {

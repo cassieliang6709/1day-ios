@@ -223,6 +223,20 @@ enum Strings {
     static func dayOfRange(_ day: Int, _ range: String) -> String {
         lang == .chinese ? "第 \(day) 天，共 7 天 · \(range)" : "Day \(day) of 7 · \(range)"
     }
+    static var todayTitle: String { lang == .chinese ? "今天" : "Today" }
+    static var todaySubtitle: String {
+        lang == .chinese ? "记录两秒，拼出你的一天。" : "Capture two seconds. Build your day."
+    }
+    static var nextCapture: String { lang == .chinese ? "下一个瞬间" : "Next capture" }
+    static func slotOfTotal(oneDay: Bool, index: Int, total: Int) -> String {
+        if lang == .chinese { return oneDay ? "第 \(index) 个瞬间，共 \(total) 个" : "第 \(index) 天，共 \(total) 天" }
+        return oneDay ? "Moment \(index) of \(total)" : "Day \(index) of \(total)"
+    }
+    static func recordSeconds(_ secondsLabel: String) -> String {
+        lang == .chinese ? "拍摄 \(secondsLabel)" : "Record \(secondsLabel)"
+    }
+    static var activeStories: String { lang == .chinese ? "进行中的故事" : "Active stories" }
+    static var comingSoon: String { lang == .chinese ? "即将上线" : "Coming soon" }
 
     // MARK: New challenge
 
