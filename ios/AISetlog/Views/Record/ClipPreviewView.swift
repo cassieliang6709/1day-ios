@@ -108,7 +108,7 @@ struct ClipPreviewView: View {
 
     private var clip: some View {
         ZStack {
-            LoopingClipPlayer(url: url)
+            LoopingClipPlayer(url: url, refreshToken: recordedAt)
             MomentStampOverlay(
                 name: authorName,
                 momentTitle: slotTitle ?? Strings.dayN(day),

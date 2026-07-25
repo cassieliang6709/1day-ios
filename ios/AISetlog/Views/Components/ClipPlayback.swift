@@ -7,9 +7,14 @@ import AVFoundation
 /// with black bars whenever the footage didn't exactly match the frame.
 struct LoopingClipPlayer: View {
     let url: URL
+    /// Bump this (e.g. the card's `recordedAt`) when the file at `url` gets
+    /// overwritten in place — a re-record reuses the same file name, which
+    /// AVPlayer can't notice on its own.
+    var refreshToken: Date? = nil
 
     var body: some View {
         LoopingPlayerLayerView(url: url)
+            .id(refreshToken)
     }
 }
 
@@ -23,6 +28,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
 
     final class Coordinator {
         var looper: AVPlayerLooper?
+        var loadedURL: URL?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -30,6 +36,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     func makeUIView(context: Context) -> PlayerView {
         let view = PlayerView()
         view.playerLayer.videoGravity = .resizeAspectFill
+        context.coordinator.loadedURL = url
         let queuePlayer = AVQueuePlayer()
         context.coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(url: url))
         view.playerLayer.player = queuePlayer
@@ -37,7 +44,16 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: PlayerView, context: Context) {}
+    func updateUIView(_ uiView: PlayerView, context: Context) {
+        // SwiftUI reuses the UIView when only the URL changed (same view
+        // identity) — rebuild the player or the old clip keeps looping.
+        guard context.coordinator.loadedURL != url else { return }
+        context.coordinator.loadedURL = url
+        let queuePlayer = AVQueuePlayer()
+        context.coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(url: url))
+        uiView.playerLayer.player = queuePlayer
+        queuePlayer.play()
+    }
 
     static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
         uiView.playerLayer.player?.pause()

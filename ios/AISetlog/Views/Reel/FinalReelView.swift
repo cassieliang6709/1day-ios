@@ -108,7 +108,7 @@ struct FinalReelView: View {
             }
             .presentationDetents([.medium])
         }
-        .task { await render() }
+        .task(id: renderRevision) { await render(force: true) }
         .onDisappear { player?.pause() }
     }
 
@@ -122,23 +122,59 @@ struct FinalReelView: View {
         Strings.shareFilm(oneDay: challenge.isOneDay)
     }
 
-    private func render() async {
+    /// The exported film is derived data. Re-recording intentionally reuses
+    /// the same file URL, so the clip URL alone cannot invalidate the render.
+    /// Include every field burned into the film, especially `recordedAt`.
+    private var renderRevision: [RenderRevision] {
+        clips.map(RenderRevision.init)
+    }
+
+    private struct RenderRevision: Equatable {
+        let id: String
+        let url: URL
+        let authorName: String?
+        let label: String?
+        let overlayText: String?
+        let recordedAt: Date?
+        let emoji: [String]
+        let comments: [String]
+
+        init(_ clip: DayClip) {
+            id = clip.id
+            url = clip.url
+            authorName = clip.authorName
+            label = clip.label
+            overlayText = clip.overlayText
+            recordedAt = clip.recordedAt
+            emoji = clip.emoji
+            comments = clip.comments
+        }
+    }
+
+    private func render(force: Bool = false) async {
+        let requestedRevision = renderRevision
         errorMessage = nil
-        if let cached = exportURL {
+        if !force, let cached = exportURL {
             play(cached)
             return
         }
         player?.pause()
         player = nil
+        exportURL = nil
         do {
             var options = VideoStitcher.Options()
             options.crossfadeSeconds = fadeSeconds
             options.showDayCaptions = includeCaptions
             options.titleCard = includeTitleCard ? titleCard : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
+            guard requestedRevision == renderRevision else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
             exportURL = url
             play(url)
         } catch {
+            guard requestedRevision == renderRevision else { return }
             print("[stitch] failed: \(error)")
             errorMessage = error.localizedDescription
         }

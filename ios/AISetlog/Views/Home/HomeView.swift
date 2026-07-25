@@ -192,7 +192,8 @@ struct HomeView: View {
                     NextCaptureCard(
                         challenge: hero,
                         memberNames: store.members(for: hero.id).map { $0.name },
-                        clipURL: latestClipURL(for: hero)
+                        clipURL: latestClipURL(for: hero),
+                        refreshToken: latestRecordedAt(for: hero)
                     ) {
                         recordChallenge = hero
                     }
@@ -255,7 +256,8 @@ struct HomeView: View {
                                     } label: {
                                         FilmStripCard(
                                             challenge: challenge,
-                                            clipURL: firstClipURL(for: challenge))
+                                            clipURL: firstClipURL(for: challenge),
+                                            refreshToken: firstRecordedAt(for: challenge))
                                     }
                                     .buttonStyle(.plain)
                                     .contextMenu {
@@ -287,5 +289,15 @@ struct HomeView: View {
     private func latestClipURL(for challenge: Challenge) -> URL? {
         challenge.cards.last { $0.clipFileName != nil }
             .flatMap { store.clipURL(for: $0, in: challenge.id) }
+    }
+
+    /// Thumbnail refresh tokens — re-records reuse the same file name, so the
+    /// cached first frame needs the card's recordedAt to notice the change.
+    private func firstRecordedAt(for challenge: Challenge) -> Date? {
+        challenge.cards.first { $0.clipFileName != nil }?.recordedAt
+    }
+
+    private func latestRecordedAt(for challenge: Challenge) -> Date? {
+        challenge.cards.last { $0.clipFileName != nil }?.recordedAt
     }
 }

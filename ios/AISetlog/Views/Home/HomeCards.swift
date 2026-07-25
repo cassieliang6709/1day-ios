@@ -8,6 +8,8 @@ import SwiftUI
 struct FilmStripCard: View {
     let challenge: Challenge
     let clipURL: URL?
+    /// Re-records reuse the same file name — this busts the cached first frame.
+    var refreshToken: Date? = nil
 
     private var dateStamp: String {
         challenge.startDate.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits))
@@ -16,7 +18,7 @@ struct FilmStripCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             if let clipURL {
-                ClipThumbnail(url: clipURL)
+                ClipThumbnail(url: clipURL, refreshToken: refreshToken)
                     .scaledToFill()
             } else {
                 Color(.systemGray5)
@@ -61,6 +63,8 @@ struct NextCaptureCard: View {
     /// The most recently recorded clip in this challenge — previewed large at
     /// the top of the card when it exists.
     let clipURL: URL?
+    /// Re-records reuse the same file name — this busts the cached first frame.
+    var refreshToken: Date? = nil
     let onRecord: () -> Void
 
     private var nextSlot: Int { min(challenge.recordedCount + 1, max(challenge.cards.count, 1)) }
@@ -73,7 +77,7 @@ struct NextCaptureCard: View {
         VStack(alignment: .leading, spacing: 16) {
             Group {
                 if let clipURL {
-                    ClipThumbnail(url: clipURL)
+                    ClipThumbnail(url: clipURL, refreshToken: refreshToken)
                 } else {
                     LinearGradient(
                         colors: [Color.oneDaySky, Color.oneDayBlue],

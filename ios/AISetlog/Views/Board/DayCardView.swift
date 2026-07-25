@@ -100,8 +100,9 @@ struct DayCardView: View {
         case .done:
             if let clipURL {
                 // A live loop instead of a static frame — the board reads as
-                // "footage in hand" the moment a slot is filled.
-                LoopingClipPlayer(url: clipURL)
+                // "footage in hand" the moment a slot is filled. recordedAt
+                // rebuilds the player when a re-record overwrites the file.
+                LoopingClipPlayer(url: clipURL, refreshToken: card.recordedAt)
             } else {
                 Color(.systemGray5)
             }
