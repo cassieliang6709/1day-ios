@@ -23,3 +23,6 @@ landing-page/design-qa.md
 # Generated video proof output
 poc/clips/
 poc/output/
+
+# Xcode local build output
+ios/build/
