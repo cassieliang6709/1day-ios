@@ -48,6 +48,7 @@
 		D02F1B898BF9C35F9C7913F7 /* ChallengePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71DAFCC6E8FD3A038F19598 /* ChallengePresenter.swift */; };
 		D3CB195CDE74A66B36954C10 /* DayCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2AE0704E7AD406295107B /* DayCard.swift */; };
 		D4DC4A08FD1EDCECAD0A2A55 /* day4.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = F90C3C82460198330C866D6A /* day4.mp4 */; };
+		DCAB52ECA6FD55139B02F699 /* NewChallengeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4220C640EA65EB797B18A21 /* NewChallengeComponents.swift */; };
 		DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5B9A68FF1712B56A2D9A75 /* ProgressRing.swift */; };
 		E4856DCD8401EA9875206061 /* ClipRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9F4DAB25F0BED115C92230 /* ClipRecorder.swift */; };
 		E538DFC3DB8E4704C64ED6FF /* ChallengeTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5162510745E644A4CBC5388F /* ChallengeTemplate.swift */; };
@@ -99,6 +100,7 @@
 		9A9F4DAB25F0BED115C92230 /* ClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipRecorder.swift; sourceTree = "<group>"; };
 		9B50B39418A708023F95ACFF /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		9E5B8E1D0D51CCFB998478B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A4220C640EA65EB797B18A21 /* NewChallengeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewChallengeComponents.swift; sourceTree = "<group>"; };
 		B11E5006AF576CB6CAE663B6 /* AISetlog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AISetlog.entitlements; sourceTree = "<group>"; };
 		B1A2AE0704E7AD406295107B /* DayCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCard.swift; sourceTree = "<group>"; };
 		BDA1F65CA23519EB89DE7F32 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -294,6 +296,7 @@
 				455F39D16DA91C86EB710E8E /* BuildTemplateView.swift */,
 				ED0592BFDD349E6CE539D48A /* HomeComponents.swift */,
 				BDA1F65CA23519EB89DE7F32 /* HomeView.swift */,
+				A4220C640EA65EB797B18A21 /* NewChallengeComponents.swift */,
 				E43B7D1B8E687819213696BB /* NewChallengeView.swift */,
 			);
 			path = Home;
@@ -457,6 +460,7 @@
 				8D1A5A68DF6BA0461E980BF1 /* Localization.swift in Sources */,
 				B2226293963B94F0DE5E30BD /* MemberChip.swift in Sources */,
 				D0049DC717160AD6A533D366 /* MomentCatalog.swift in Sources */,
+				DCAB52ECA6FD55139B02F699 /* NewChallengeComponents.swift in Sources */,
 				E6EC39065A0E9B1513CC7D40 /* NewChallengeView.swift in Sources */,
 				DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */,
 				7E9B4219C8D6196273ECE291 /* RecordClipView.swift in Sources */,
@@ -516,7 +520,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.Push\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -674,7 +678,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.Push\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.CloudKit\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.Push\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
