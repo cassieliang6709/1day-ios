@@ -57,9 +57,24 @@ final class ChallengeStateTests: XCTestCase {
             cards: [DayCard(day: 1), DayCard(day: 2)],
             momentTitles: ["Setup", "Solved bit"]
         )
+        let presenter = ChallengePresenter(challenge: challenge)
 
-        XCTAssertEqual(challenge.title(forSlot: 1), "Setup")
-        XCTAssertEqual(challenge.title(forSlot: 2), "Solved bit")
-        XCTAssertEqual(challenge.title(forSlot: 3), "Day 3")
+        XCTAssertEqual(challenge.momentValue(forSlot: 1), "Setup")
+        XCTAssertNil(challenge.momentValue(forSlot: 3))
+        XCTAssertEqual(presenter.title(forSlot: 1), "Setup")
+        XCTAssertEqual(presenter.title(forSlot: 2), "Solved bit")
+        XCTAssertEqual(presenter.title(forSlot: 3), "Day 3")
+    }
+
+    func testPresenterUnitNamesFollowMode() {
+        func make(mode: Challenge.Mode) -> Challenge {
+            Challenge(
+                id: UUID(), title: "t", startDate: .now,
+                cards: [DayCard(day: 1)], mode: mode)
+        }
+
+        XCTAssertEqual(ChallengePresenter(challenge: make(mode: .oneDay)).unitName, Strings.unitName(oneDay: true))
+        XCTAssertEqual(ChallengePresenter(challenge: make(mode: .sevenDay)).unitNamePlural, Strings.unitNamePlural(oneDay: false))
+        XCTAssertEqual(ChallengePresenter(challenge: make(mode: .oneDay)).storyLabel, Strings.storyLabel(oneDay: true))
     }
 }

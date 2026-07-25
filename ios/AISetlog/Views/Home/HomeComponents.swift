@@ -328,9 +328,8 @@ struct NextCaptureCard: View {
     let onRecord: () -> Void
 
     private var nextSlot: Int { min(challenge.recordedCount + 1, max(challenge.cards.count, 1)) }
-    private var momentTitle: String { challenge.title(forSlot: nextSlot) }
-    private var momentIcon: String {
-        MomentCatalog.icon(for: challenge.momentTitles?[safe: nextSlot - 1])
+    private var momentTitle: String { ChallengePresenter(challenge: challenge).title(forSlot: nextSlot) }
+    private var momentIcon: String {        MomentCatalog.icon(for: challenge.momentTitles?[safe: nextSlot - 1])
     }
 
     var body: some View {
@@ -382,13 +381,7 @@ struct NextCaptureCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.oneDayBlue, Color.oneDayCyan],
-                            startPoint: .leading, endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    )
+                    .background(Color.oneDayBlue, in: Capsule())
             }
             .buttonStyle(.plain)
         }

@@ -41,9 +41,11 @@
 		ABA3F184ED9F5F221FC69467 /* ChallengeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73575490179E30D459EFDBA2 /* ChallengeRepository.swift */; };
 		B1D076EB4830B7B50BEC6B47 /* ClipPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA520086AD531DD7B14C9812 /* ClipPreviewView.swift */; };
 		B2226293963B94F0DE5E30BD /* MemberChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E29668954C7B76AF34FCD5 /* MemberChip.swift */; };
+		B433A345D45D85E1B641928E /* Identity+Color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357B6A37FBB51AA264F15243 /* Identity+Color.swift */; };
 		B4B8040731E08FEF6E7CE47C /* CloudKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C8EBBAA108E0B6BAD2FF7C /* CloudKitService.swift */; };
 		C6B267B599F7D352342E5315 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03F8F9F092CD5354A1197CCB /* Assets.xcassets */; };
 		D0049DC717160AD6A533D366 /* MomentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F553DA583104CE8F17B75EC /* MomentCatalog.swift */; };
+		D02F1B898BF9C35F9C7913F7 /* ChallengePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71DAFCC6E8FD3A038F19598 /* ChallengePresenter.swift */; };
 		D3CB195CDE74A66B36954C10 /* DayCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2AE0704E7AD406295107B /* DayCard.swift */; };
 		D4DC4A08FD1EDCECAD0A2A55 /* day4.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = F90C3C82460198330C866D6A /* day4.mp4 */; };
 		DDA69B1DB0F5875459629744 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5B9A68FF1712B56A2D9A75 /* ProgressRing.swift */; };
@@ -75,6 +77,7 @@
 		27C8EBBAA108E0B6BAD2FF7C /* CloudKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitService.swift; sourceTree = "<group>"; };
 		297FD49D423AAAAF52D8A093 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcherTests.swift; sourceTree = "<group>"; };
+		357B6A37FBB51AA264F15243 /* Identity+Color.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Identity+Color.swift"; sourceTree = "<group>"; };
 		35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSyncService.swift; sourceTree = "<group>"; };
 		3B166E63A2BA6F620F69321D /* ClipFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipFileStore.swift; sourceTree = "<group>"; };
 		3B30BF702896AFF766E6DC46 /* Identity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Identity.swift; sourceTree = "<group>"; };
@@ -104,6 +107,7 @@
 		C9E29668954C7B76AF34FCD5 /* MemberChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberChip.swift; sourceTree = "<group>"; };
 		CFCAD9798DDE79B3F928C42A /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		D496FA2FD678B671A1723CCE /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		D71DAFCC6E8FD3A038F19598 /* ChallengePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengePresenter.swift; sourceTree = "<group>"; };
 		D84B3F62C6B701FAA556F17C /* ChallengeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeStore.swift; sourceTree = "<group>"; };
 		DA520086AD531DD7B14C9812 /* ClipPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPreviewView.swift; sourceTree = "<group>"; };
 		DDFA2FC17353B12549FB3213 /* VideoStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcher.swift; sourceTree = "<group>"; };
@@ -121,6 +125,7 @@
 		02E3190F490098C9998DADA2 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				357B6A37FBB51AA264F15243 /* Identity+Color.swift */,
 				C9E29668954C7B76AF34FCD5 /* MemberChip.swift */,
 				7C5B9A68FF1712B56A2D9A75 /* ProgressRing.swift */,
 			);
@@ -150,6 +155,14 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		316E0CE12BAB56BA8AA8A145 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				D71DAFCC6E8FD3A038F19598 /* ChallengePresenter.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
 		3B62E35ED1FD50159E5B0534 /* Cloud */ = {
 			isa = PBXGroup;
 			children = (
@@ -170,6 +183,7 @@
 				306DDE87B1D242AC400659F9 /* Models */,
 				6B53F23E6339C2A7A53C1C01 /* Resources */,
 				FAA687E5722F0C0796BFAB2F /* Services */,
+				316E0CE12BAB56BA8AA8A145 /* ViewModels */,
 				C2B8697C190E6CF21EBE708C /* Views */,
 			);
 			path = AISetlog;
@@ -423,6 +437,7 @@
 				2AD9583C53C6A55CD773CC0C /* CameraComponents.swift in Sources */,
 				7E8BEF849C579E4C2BA064A7 /* Challenge.swift in Sources */,
 				0BCA9426FC225C3B529479F1 /* ChallengeBoardView.swift in Sources */,
+				D02F1B898BF9C35F9C7913F7 /* ChallengePresenter.swift in Sources */,
 				ABA3F184ED9F5F221FC69467 /* ChallengeRepository.swift in Sources */,
 				72BB38409A834950DC0B8376 /* ChallengeStore.swift in Sources */,
 				E538DFC3DB8E4704C64ED6FF /* ChallengeTemplate.swift in Sources */,
@@ -437,6 +452,7 @@
 				73568613DFD35A04E218A647 /* FinalReelView.swift in Sources */,
 				758908C136A85AD09167568B /* HomeComponents.swift in Sources */,
 				554B8091DA77140C881769E6 /* HomeView.swift in Sources */,
+				B433A345D45D85E1B641928E /* Identity+Color.swift in Sources */,
 				E890890209424E337E127B55 /* Identity.swift in Sources */,
 				8D1A5A68DF6BA0461E980BF1 /* Localization.swift in Sources */,
 				B2226293963B94F0DE5E30BD /* MemberChip.swift in Sources */,
@@ -500,7 +516,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1, \"com.apple.Push\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.Push\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -658,7 +674,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cassie.AISetlog;
 				SDKROOT = iphoneos;
-				SYSTEM_CAPABILITIES = "[\"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1, \"com.apple.Push\": 1]";
+				SYSTEM_CAPABILITIES = "[\"com.apple.Push\": 1, \"com.apple.SignInWithApple\": 1, \"com.apple.CloudKit\": 1]";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

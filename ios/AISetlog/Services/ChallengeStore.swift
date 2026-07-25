@@ -293,6 +293,7 @@ final class ChallengeStore {
     /// if the room hasn't been synced yet).
     func recordedClips(for challengeID: UUID) -> [DayClip] {
         guard let challenge = challenge(challengeID) else { return [] }
+        let presenter = ChallengePresenter(challenge: challenge)
         if let code = challenge.roomCode,
            let remote = roomSync.remoteClips[code], !remote.isEmpty {
             return remote
@@ -300,7 +301,7 @@ final class ChallengeStore {
                 .map {
                     DayClip(
                         day: $0.day, url: $0.localURL, authorName: $0.authorName,
-                        label: challenge.title(forSlot: $0.day),
+                        label: presenter.title(forSlot: $0.day),
                         overlayText: $0.overlayText,
                         recordedAt: $0.recordedAt,
                         key: $0.id)
@@ -311,7 +312,7 @@ final class ChallengeStore {
                 DayClip(
                     day: card.day,
                     url: $0,
-                    label: challenge.title(forSlot: card.day),
+                    label: presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
                     recordedAt: card.recordedAt,
                     emoji: card.reactions.map(\.emoji))

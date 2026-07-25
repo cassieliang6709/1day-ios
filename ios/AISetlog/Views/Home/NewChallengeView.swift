@@ -206,9 +206,9 @@ struct NewChallengeView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(length.secondsLabel)
                                 .font(.title3.bold())
-                            Text(length.displayName)
+                            Text(Strings.clipLengthName(length))
                                 .font(.subheadline.bold())
-                            Text(length.caption)
+                            Text(Strings.clipLengthCaption(length))
                                 .font(.caption2.weight(.semibold))
                                 .opacity(0.68)
                                 .lineLimit(1)

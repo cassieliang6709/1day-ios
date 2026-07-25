@@ -236,6 +236,7 @@ enum Strings {
         lang == .chinese ? "拍摄 \(secondsLabel)" : "Record \(secondsLabel)"
     }
     static var activeStories: String { lang == .chinese ? "进行中的故事" : "Active stories" }
+    static var seeAll: String { lang == .chinese ? "查看全部" : "See all" }
     static var comingSoon: String { lang == .chinese ? "即将上线" : "Coming soon" }
 
     // MARK: New challenge

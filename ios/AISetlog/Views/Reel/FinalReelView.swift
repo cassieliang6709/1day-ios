@@ -134,10 +134,12 @@ struct FinalReelView: View {
         .onDisappear { player?.pause() }
     }
 
+    private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
+
     private var footerText: String {
         switch layout {
         case .sequential:
-            return Strings.footerSequence(clips.count, unit: challenge.unitName)
+            return Strings.footerSequence(clips.count, unit: presenter.unitName)
         case .grid:
             return Strings.footerGrid(clips.count)
         }

@@ -29,3 +29,6 @@ ios/build/
 
 # Teammate/worktree build output
 build-teammate/
+
+# Repo-root xcodebuild output
+/build/

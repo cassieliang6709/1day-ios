@@ -57,7 +57,7 @@ struct ChallengeBoardView: View {
             case .record(let day):
                 RecordClipView(
                     day: day,
-                    slotTitle: challenge?.title(forSlot: day),
+                    slotTitle: slotTitle(for: day),
                     clipLength: challenge?.resolvedClipLength ?? .tiny
                 ) { url, overlayText in
                     store.saveClip(
@@ -71,7 +71,7 @@ struct ChallengeBoardView: View {
                    let url = store.clipURL(for: card, in: challengeID) {
                     ClipPreviewView(
                         day: day,
-                        slotTitle: challenge?.title(forSlot: day),
+                        slotTitle: slotTitle(for: day),
                         authorName: account.account?.displayName,
                         overlayText: card.overlayText,
                         clipLength: challenge?.resolvedClipLength ?? .tiny,
@@ -110,8 +110,13 @@ struct ChallengeBoardView: View {
 
     // MARK: - Board
 
+    private func slotTitle(for day: Int) -> String? {
+        challenge.map { ChallengePresenter(challenge: $0).title(forSlot: day) }
+    }
+
     private func board(for challenge: Challenge) -> some View {
-        ScrollView {
+        let presenter = ChallengePresenter(challenge: challenge)
+        return ScrollView {
             VStack(spacing: 20) {
                 progressHeader(challenge)
 
@@ -127,7 +132,7 @@ struct ChallengeBoardView: View {
                         DayCardView(
                             card: card,
                             status: challenge.cardStatus(card),
-                            title: challenge.title(forSlot: card.day),
+                            title: presenter.title(forSlot: card.day),
                             isOneDay: challenge.isOneDay,
                             clipURL: store.clipURL(for: card, in: challengeID)
                         )
@@ -146,7 +151,7 @@ struct ChallengeBoardView: View {
                                 ? Strings.createFilm(oneDay: challenge.isOneDay)
                                 : Strings.previewFilm(
                                     challenge.recordedCount, challenge.cards.count,
-                                    unitPlural: challenge.unitNamePlural),
+                                    unitPlural: presenter.unitNamePlural),
                             systemImage: "film.stack.fill"
                         )
                         .font(.headline)
@@ -224,13 +229,15 @@ struct ChallengeBoardView: View {
     private func shareText(code: String, challenge: Challenge) -> String {
         if challenge.recordedCount > 0 {
             return Strings.shareMessageCaptured(
-                first: challenge.title(forSlot: 1), title: challenge.title, code: code)
+                first: ChallengePresenter(challenge: challenge).title(forSlot: 1),
+                title: challenge.title, code: code)
         }
         return Strings.shareMessageInvite(title: challenge.title, code: code)
     }
 
     private func progressHeader(_ challenge: Challenge) -> some View {
-        HStack(spacing: 16) {
+        let presenter = ChallengePresenter(challenge: challenge)
+        return HStack(spacing: 16) {
             ProgressRing(recorded: challenge.recordedCount, total: challenge.cards.count)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -242,7 +249,7 @@ struct ChallengeBoardView: View {
                     : Strings.recordedProgress(
                         challenge.recordedCount,
                         secondsLabel: challenge.resolvedClipLength.secondsLabel,
-                        unitPlural: challenge.unitNamePlural))
+                        unitPlural: presenter.unitNamePlural))
                     .font(.subheadline)
                     .foregroundStyle(BoardTheme.secondaryText)
             }

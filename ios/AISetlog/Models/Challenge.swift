@@ -29,13 +29,6 @@ struct Challenge: Codable, Identifiable {
             }
         }
 
-        var displayName: String {
-            Strings.clipLengthName(self)
-        }
-
-        var caption: String {
-            Strings.clipLengthCaption(self)
-        }
     }
 
     let id: UUID
@@ -84,18 +77,14 @@ struct Challenge: Codable, Identifiable {
     var recordedCount: Int { cards.filter { $0.clipFileName != nil }.count }
     var isComplete: Bool { recordedCount == cards.count }
 
-    var unitName: String { Strings.unitName(oneDay: isOneDay) }
-    var unitNamePlural: String { Strings.unitNamePlural(oneDay: isOneDay) }
-    var storyLabel: String { Strings.storyLabel(oneDay: isOneDay) }
-
-    /// The prompt shown for a slot, localized. Stored `momentTitles` hold stable
-    /// moment *keys* now, but legacy saved challenges/rooms may hold raw display
-    /// strings — `MomentCatalog.localize` resolves all three (key, en, zh).
-    func title(forSlot slot: Int) -> String {
-        if let momentTitles, momentTitles.indices.contains(slot - 1) {
-            return MomentCatalog.localize(momentTitles[slot - 1])
+    /// The raw stored value for a slot's prompt — a stable moment *key* for new
+    /// challenges, or a legacy raw display string from older saves. Localization
+    /// and fallback labels are presentation concerns (see `ChallengePresenter`).
+    func momentValue(forSlot slot: Int) -> String? {
+        guard let momentTitles, momentTitles.indices.contains(slot - 1) else {
+            return nil
         }
-        return Strings.dayN(slot)
+        return momentTitles[slot - 1]
     }
 
     func cardStatus(_ card: DayCard) -> DayCard.Status {

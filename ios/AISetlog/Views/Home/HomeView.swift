@@ -35,7 +35,7 @@ struct HomeView: View {
                     challengeList
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color(red: 0.93, green: 0.96, blue: 0.99))
             .navigationTitle("")
             .toolbar {
                 // The populated home screen has its own in-content header
@@ -166,9 +166,17 @@ struct HomeView: View {
 
                 if !inProgress.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(Strings.activeStories)
-                            .font(.title3.bold())
-                            .foregroundStyle(Color.oneDayNavy)
+                        HStack {
+                            Text(Strings.activeStories)
+                                .font(.title3.bold())
+                                .foregroundStyle(Color.oneDayNavy)
+                            Spacer()
+                            Button(Strings.seeAll) {
+                                showComingSoon = true
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.oneDayBlue)
+                        }
 
                         VStack(spacing: 0) {
                             ForEach(Array(inProgress.enumerated()), id: \.element.id) { index, challenge in
