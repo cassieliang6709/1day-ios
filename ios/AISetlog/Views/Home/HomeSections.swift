@@ -3,14 +3,12 @@ import SwiftUI
 /// Whole-screen sections of `HomeView`, parameterized by closures so the view
 /// itself keeps all navigation/sheet state.
 
-/// Avatar + bell + friends + start-new, scrolling with the page content
+/// Avatar + bell + join-by-code, scrolling with the page content
 /// (there's no separate nav bar once a challenge exists).
 struct HomeHeader: View {
     let avatarName: String?
     let onAvatar: () -> Void
     let onBell: () -> Void
-    let onFriends: () -> Void
-    let onNewChallenge: () -> Void
     let onJoin: () -> Void
 
     var body: some View {
@@ -28,39 +26,51 @@ struct HomeHeader: View {
                     .foregroundStyle(Color.oneDayNavy)
             }
 
-            Button(action: onFriends) {
-                Image(systemName: "person.2")
-                    .font(.title3)
-                    .foregroundStyle(Color.oneDayNavy)
-            }
-
-            Menu {
-                Button(action: onNewChallenge) {
-                    Label(Strings.startToday, systemImage: "plus")
-                }
-                Button(action: onJoin) {
-                    Label(Strings.enterInviteCode, systemImage: "envelope")
-                }
-            } label: {
+            Button(action: onJoin) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title3)
                     .foregroundStyle(Color.oneDayBlue)
             }
+            .accessibilityLabel(Strings.enterInviteCode)
         }
         .padding(.horizontal)
     }
 }
 
-/// "Today" title + subtitle under the header.
+/// "Today" title + subtitle under the header, with a prominent Start-today
+/// pill on the right (it used to hide inside the header's + menu).
 struct TodayHeader: View {
+    let onStart: () -> Void
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(Strings.todayTitle)
-                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayNavy)
-            Text(Strings.todaySubtitle)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(Strings.todayTitle)
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.oneDayNavy)
+                Text(Strings.todaySubtitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(action: onStart) {
+                Label(Strings.startToday, systemImage: "plus")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.oneDayBlue, Color.oneDayCyan],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: Capsule()
+                    )
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal)
     }

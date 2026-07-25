@@ -232,8 +232,12 @@ enum Strings {
         if lang == .chinese { return oneDay ? "第 \(index) 个瞬间，共 \(total) 个" : "第 \(index) 天，共 \(total) 天" }
         return oneDay ? "Moment \(index) of \(total)" : "Day \(index) of \(total)"
     }
-    static func recordSeconds(_ secondsLabel: String) -> String {
-        lang == .chinese ? "拍摄 \(secondsLabel)" : "Record \(secondsLabel)"
+    /// The hero card's single CTA: which slot + how long, in one button.
+    static func recordSlot(oneDay: Bool, index: Int, secondsLabel: String) -> String {
+        if lang == .chinese {
+            return oneDay ? "记录第 \(index) 个瞬间 · \(secondsLabel)" : "记录第 \(index) 天 · \(secondsLabel)"
+        }
+        return oneDay ? "Record moment \(index) · \(secondsLabel)" : "Record Day \(index) · \(secondsLabel)"
     }
     static var activeStories: String { lang == .chinese ? "进行中的故事" : "Active stories" }
     static var seeAll: String { lang == .chinese ? "查看全部" : "See all" }

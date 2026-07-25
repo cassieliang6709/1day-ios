@@ -103,12 +103,26 @@ struct NextCaptureCard: View {
             }
 
             Button(action: onRecord) {
-                Label(Strings.recordSeconds(challenge.resolvedClipLength.secondsLabel), systemImage: "video.fill")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.oneDayBlue, in: Capsule())
+                Label(
+                    Strings.recordSlot(
+                        oneDay: challenge.isOneDay,
+                        index: nextSlot,
+                        secondsLabel: challenge.resolvedClipLength.secondsLabel
+                    ),
+                    systemImage: "video.fill"
+                )
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [Color.oneDayBlue, Color.oneDayCyan],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: Capsule()
+                )
             }
             .buttonStyle(.plain)
         }

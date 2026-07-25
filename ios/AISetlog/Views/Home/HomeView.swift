@@ -19,6 +19,9 @@ struct HomeView: View {
     @State private var joining = false
     @State private var errorText: String?
     @State private var showComingSoon = false
+    /// The hero card's challenge when its record CTA opens the camera
+    /// straight into the next unrecorded slot (no detour via the board).
+    @State private var recordChallenge: Challenge?
 
     /// Bound only so a language change re-renders the home screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -60,6 +63,20 @@ struct HomeView: View {
             }
             .fullScreenCover(isPresented: $showNewChallenge) {
                 NewChallengeView { id in path.append(id) }
+            }
+            .fullScreenCover(item: $recordChallenge) { challenge in
+                let slot = min(challenge.recordedCount + 1, max(challenge.cards.count, 1))
+                RecordClipView(
+                    day: slot,
+                    slotTitle: ChallengePresenter(challenge: challenge).title(forSlot: slot),
+                    clipLength: challenge.resolvedClipLength
+                ) { url, overlayText in
+                    store.saveClip(
+                        from: url,
+                        day: slot,
+                        challengeID: challenge.id,
+                        overlayText: overlayText)
+                }
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showJoin) { joinSheet }
@@ -155,10 +172,8 @@ struct HomeView: View {
                     avatarName: account.account?.displayName,
                     onAvatar: { showSettings = true },
                     onBell: { showComingSoon = true },
-                    onFriends: { showComingSoon = true },
-                    onNewChallenge: { showNewChallenge = true },
                     onJoin: { joinCode = ""; showJoin = true })
-                TodayHeader()
+                TodayHeader(onStart: { showNewChallenge = true })
 
                 if let hero = nextCaptureChallenge {
                     NextCaptureCard(
@@ -166,7 +181,7 @@ struct HomeView: View {
                         memberNames: store.members(for: hero.id).map { $0.name },
                         clipURL: latestClipURL(for: hero)
                     ) {
-                        path.append(hero.id)
+                        recordChallenge = hero
                     }
                     .padding(.horizontal)
                 } else {
