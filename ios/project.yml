@@ -19,12 +19,14 @@ targets:
         DEVELOPMENT_TEAM: M7BPQ88622
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
-        SYSTEM_CAPABILITIES:
-          com.apple.CloudKit: 1
-          com.apple.SignInWithApple: 1
-          com.apple.Push: 1
     entitlements:
       path: AISetlog/AISetlog.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.cassie.AISetlog
+        com.apple.developer.icloud-services:
+          - CloudKit
     info:
       path: AISetlog/Info.plist
       properties:
