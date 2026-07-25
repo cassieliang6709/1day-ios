@@ -1,41 +1,94 @@
 import { useMemo, useState } from 'react';
-import { AppleLogo, ArrowRight, LockKey, Play } from '@phosphor-icons/react';
+import {
+  ArrowRight,
+  Camera,
+  Check,
+  FilmStrip,
+  LockKey,
+  Play,
+  Sparkle,
+  UsersThree,
+} from '@phosphor-icons/react';
+
+const betaEmail = 'mailto:liangyue3666@gmail.com?subject=1Day%20private%20beta';
 
 const dayTypes = [
-  { name: 'Sunday Reset', image: '/assets/morning.jpg' },
-  { name: 'Study Lock-in', image: '/assets/focus.jpg' },
-  { name: 'Room Reset', image: '/assets/morning.jpg' },
-  { name: 'One-Day Glow Up', image: '/assets/walk.jpg' },
-  { name: 'Friend Day', image: '/assets/friends.jpg' },
+  { name: 'Sunday Reset', short: 'Reset', image: '/assets/morning.jpg' },
+  { name: 'Study Lock-in', short: 'Focus', image: '/assets/focus.jpg' },
+  { name: 'Room Reset', short: 'Refresh', image: '/assets/morning.jpg' },
+  { name: 'One-Day Glow Up', short: 'Glow up', image: '/assets/walk.jpg' },
+  { name: 'Friend Day', short: 'Together', image: '/assets/friends.jpg' },
 ];
 
 const moments = [
-  { time: '8:30 AM', title: 'Morning reset', note: 'Coffee, sunlight, set the tone.', image: '/assets/morning.jpg' },
-  { time: '10:15 AM', title: 'Deep work', note: 'Focus block. No distractions.', image: '/assets/focus.jpg' },
-  { time: '1:00 PM', title: 'Step outside', note: 'Walk, breathe, clear your head.', image: '/assets/walk.jpg' },
-  { time: '2:30 PM', title: 'Refuel', note: 'Pause for what keeps you going.', image: '/assets/morning.jpg', position: 'left' },
-  { time: '6:15 PM', title: 'Sunset pause', note: 'Notice the view. Be here.', image: '/assets/walk.jpg', position: 'right' },
-  { time: '8:00 PM', title: 'Time together', note: 'People > plans. Make it count.', image: '/assets/friends.jpg' },
-  { time: '10:45 PM', title: 'Night wrap', note: 'One last thought. End with calm.', image: '/assets/morning.jpg', position: 'right' },
+  { time: '8:30', title: 'Set the tone', image: '/assets/morning.jpg' },
+  { time: '10:15', title: 'Find your focus', image: '/assets/focus.jpg' },
+  { time: '12:40', title: 'Notice the little things', image: '/assets/walk.jpg' },
+  { time: '2:30', title: 'Pause and refuel', image: '/assets/morning.jpg' },
+  { time: '5:20', title: 'Step outside', image: '/assets/walk.jpg' },
+  { time: '8:00', title: 'Keep your people close', image: '/assets/friends.jpg' },
+  { time: '10:45', title: 'Close the day', image: '/assets/morning.jpg' },
 ];
 
-function AppStoreButton({ compact = false }) {
+const steps = [
+  {
+    number: '01',
+    icon: Sparkle,
+    title: 'Pick a story',
+    copy: 'Choose a one-day or seven-day challenge, then make it yours.',
+  },
+  {
+    number: '02',
+    icon: Camera,
+    title: 'Live it, clip by clip',
+    copy: 'Gentle prompts bring you back for a few seconds at a time.',
+  },
+  {
+    number: '03',
+    icon: FilmStrip,
+    title: 'Watch the day come together',
+    copy: '1Day turns the clips into a finished film—no editing timeline required.',
+  },
+];
+
+function BetaButton({ compact = false, light = false }) {
   return (
-    <a className={`store-button ${compact ? 'compact' : ''}`} href="#download" aria-label="Download 1Day on the App Store">
-      <AppleLogo weight="fill" aria-hidden="true" />
-      <span><small>Download on the</small>App Store</span>
+    <a className={`beta-button${compact ? ' compact' : ''}${light ? ' light' : ''}`} href={betaEmail}>
+      <span>{compact ? 'Join beta' : 'Join the private beta'}</span>
+      <ArrowRight weight="bold" aria-hidden="true" />
     </a>
+  );
+}
+
+function Brand() {
+  return (
+    <a href="/#top" className="brand" aria-label="1Day home">
+      <span className="brand-mark" aria-hidden="true"><i>1</i></span>
+      <span>1Day</span>
+    </a>
+  );
+}
+
+function SiteHeader() {
+  return (
+    <header className="site-nav shell">
+      <Brand />
+      <nav aria-label="Main navigation">
+        <a href="#how">How it works</a>
+        <a href="#together">With friends</a>
+        <a href="/privacy">Privacy</a>
+      </nav>
+      <BetaButton compact />
+    </header>
   );
 }
 
 function PrivacyPolicy() {
   return (
     <main className="legal-page">
-      <header className="nav shell">
-        <a href="/" className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a>
-      </header>
+      <header className="site-nav shell"><Brand /></header>
       <article className="legal-copy">
-        <p className="eyebrow">1Day</p>
+        <p className="kicker">The small print</p>
         <h1>Privacy Policy</h1>
         <p className="legal-updated">Effective July 24, 2026</p>
 
@@ -59,37 +112,61 @@ function PrivacyPolicy() {
 
         <h2>Contact</h2>
         <p>Questions or deletion requests: <a href="mailto:liangyue3666@gmail.com">liangyue3666@gmail.com</a>.</p>
-
-        <p><a className="text-link" href="/">← Back to 1Day</a></p>
+        <p><a className="inline-link" href="/">← Back to 1Day</a></p>
       </article>
     </main>
   );
 }
 
-export function App() {
-  if (window.location.pathname === '/privacy' || window.location.pathname === '/privacy/') {
-    return <PrivacyPolicy />;
-  }
-
+function Hero() {
   const [selectedDay, setSelectedDay] = useState(dayTypes[0].name);
-  const [playing, setPlaying] = useState(false);
-  const selectedLabel = useMemo(() => selectedDay.replace('One-Day ', ''), [selectedDay]);
+  const selected = useMemo(
+    () => dayTypes.find((day) => day.name === selectedDay) ?? dayTypes[0],
+    [selectedDay],
+  );
 
   return (
-    <main>
-      <header className="nav shell">
-        <a href="#top" className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a>
-        <nav aria-label="Main navigation">
-          <a href="#how">How it works</a>
-          <a href="#moments">For you</a>
-          <a href="/privacy">Privacy</a>
-        </nav>
-        <AppStoreButton compact />
-      </header>
+    <>
+      <section id="top" className="hero shell">
+        <div className="hero-copy">
+          <p className="kicker"><span /> Private iOS beta</p>
+          <h1>A whole day,<br /><em>worth replaying.</em></h1>
+          <p className="hero-lede">Seven tiny check-ins. One finished film. Keep the moments that would otherwise disappear.</p>
+          <div className="hero-actions">
+            <BetaButton />
+            <a className="inline-link" href="#how">See how it works <ArrowRight aria-hidden="true" /></a>
+          </div>
+          <ul className="hero-facts" aria-label="Product highlights">
+            <li><Check weight="bold" /> No editing required</li>
+            <li><Check weight="bold" /> Local-first</li>
+            <li><Check weight="bold" /> Made for iPhone</li>
+          </ul>
+        </div>
 
-      <section id="top" className="chooser shell" aria-labelledby="chooser-title">
-        <h2 id="chooser-title">What kind of day is it?</h2>
-        <div className="day-options" role="list">
+        <div className="hero-visual" aria-label="1Day app preview">
+          <div className="visual-orbit orbit-one" />
+          <div className="visual-orbit orbit-two" />
+          <div className="phone">
+            <div className="speaker" />
+            <img src="/assets/app-screen.jpg" alt="1Day screen for choosing a one-day video story" />
+          </div>
+          <div className="floating-card floating-top">
+            <span className="mini-photo"><img src={selected.image} alt="" /></span>
+            <span><small>Today’s story</small>{selected.name}</span>
+          </div>
+          <div className="floating-card floating-bottom">
+            <span className="pulse-dot" />
+            <span><small>Moment 4 of 7</small>Just five seconds</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="story-picker shell" aria-labelledby="story-picker-title">
+        <div>
+          <p className="kicker">Make it yours</p>
+          <h2 id="story-picker-title">What kind of day is today?</h2>
+        </div>
+        <div className="day-options" role="list" aria-label="Story ideas">
           {dayTypes.map((day) => (
             <button
               type="button"
@@ -99,72 +176,137 @@ export function App() {
               aria-pressed={selectedDay === day.name}
             >
               <img src={day.image} alt="" />
-              {day.name}
+              <span><small>{day.short}</small>{day.name}</span>
             </button>
           ))}
         </div>
       </section>
+    </>
+  );
+}
 
-      <section className="hero shell">
-        <div className="hero-copy">
-          <p className="eyebrow">Your {selectedLabel.toLowerCase()} story</p>
-          <h1>Make today<br />a tiny movie.</h1>
-          <p className="lede">Seven moments. 24 hours.<br />Capture what matters, beautifully.</p>
-          <div className="hero-actions">
-            <AppStoreButton />
-            <a className="text-link" href="#how">Learn how it works <ArrowRight aria-hidden="true" /></a>
-          </div>
-        </div>
-        <div className="phone-wrap" aria-label="1Day app preview">
-          <div className="phone">
-            <div className="speaker" />
-            <img src="/assets/app-screen.jpg" alt="1Day app screen for choosing a one-day story" />
-          </div>
-        </div>
-      </section>
-
-      <section id="how" className="timeline shell" aria-labelledby="timeline-title">
-        <div className="timeline-heading">
-          <p className="eyebrow">One gentle day</p>
-          <h2 id="timeline-title">Seven moments, then a movie.</h2>
-          <p>We nudge you at the right moments. You just live them.</p>
-        </div>
-        <div id="moments" className="moment-grid">
-          {moments.map((moment, index) => (
-            <article className="moment" key={moment.time}>
-              <div className="moment-number">{index + 1}</div>
-              <p className="moment-time">{moment.time}</p>
+function MomentRibbon() {
+  return (
+    <section className="moments-section" aria-labelledby="moments-title">
+      <div className="section-heading shell">
+        <p className="kicker">A little, throughout the day</p>
+        <h2 id="moments-title">Don’t film everything.<br />Remember the right things.</h2>
+        <p>Each prompt asks for only a few seconds, so the camera never takes over the day.</p>
+      </div>
+      <div className="moment-ribbon">
+        {moments.map((moment, index) => (
+          <article className="moment-card" key={moment.time}>
+            <img src={moment.image} alt="" />
+            <div className="moment-overlay" />
+            <span className="moment-count">{String(index + 1).padStart(2, '0')}</span>
+            <div>
+              <p>{moment.time}</p>
               <h3>{moment.title}</h3>
-              <p>{moment.note}</p>
-              <img src={moment.image} style={{ objectPosition: moment.position || 'center' }} alt={`${moment.title} captured as part of a one-day story`} />
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="download" className="night-section">
-        <div className="night-inner shell">
-          <div className="night-copy">
-            <p className="eyebrow">Tonight</p>
-            <h2>Your night.<br />One tiny movie.</h2>
-            <p>We stitch your seven moments into a beautiful vlog—ready to watch, save, or share.</p>
-            <p id="privacy" className="privacy"><LockKey weight="bold" aria-hidden="true" /> Private by default. Only you decide what to share.</p>
-          </div>
-          <button className={`movie ${playing ? 'playing' : ''}`} type="button" onClick={() => setPlaying(!playing)} aria-label={playing ? 'Pause sample movie' : 'Play sample movie'}>
-            <div className="filmstrip">
-              {['morning.jpg', 'focus.jpg', 'walk.jpg', 'friends.jpg', 'morning.jpg'].map((src, i) => <img key={`${src}-${i}`} src={`/assets/${src}`} alt="" />)}
             </div>
-            <span className="play"><Play weight="fill" aria-hidden="true" /></span>
-            <span className="progress"><i /></span>
-            <small>{playing ? '0:18' : '0:00'} <span>0:45</span></small>
-          </button>
-          <div className="final-download"><AppStoreButton /></div>
-          <footer className="site-footer">
-            <a href="/privacy">Privacy Policy</a>
-            <a href="mailto:liangyue3666@gmail.com">Support</a>
-          </footer>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <section id="how" className="how-section shell" aria-labelledby="how-title">
+      <div className="section-heading left">
+        <p className="kicker">Simple on purpose</p>
+        <h2 id="how-title">You live the story.<br />1Day does the editing.</h2>
+      </div>
+      <div className="step-grid">
+        {steps.map(({ number, icon: Icon, title, copy }) => (
+          <article className="step-card" key={number}>
+            <div className="step-top"><span>{number}</span><Icon aria-hidden="true" /></div>
+            <h3>{title}</h3>
+            <p>{copy}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TogetherSection() {
+  return (
+    <section id="together" className="together-section">
+      <div className="together-inner shell">
+        <div className="together-art" aria-hidden="true">
+          <div className="friend-photo photo-one"><img src="/assets/friends.jpg" alt="" /></div>
+          <div className="friend-photo photo-two"><img src="/assets/walk.jpg" alt="" /></div>
+          <div className="room-code"><UsersThree weight="fill" /><span><small>Shared room</small>DAY 7K2</span></div>
         </div>
-      </section>
+        <div className="together-copy">
+          <p className="kicker">Better together</p>
+          <h2>One story.<br />Everyone’s angle.</h2>
+          <p>Invite friends with a room code, collect each person’s clips, and turn the day into one shared film.</p>
+          <ul>
+            <li><Check weight="bold" /> No custom account for solo stories</li>
+            <li><Check weight="bold" /> Shared clips sync through iCloud</li>
+            <li><Check weight="bold" /> You choose when to save or share</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Finale() {
+  const [playing, setPlaying] = useState(false);
+
+  return (
+    <section id="beta" className="finale">
+      <div className="finale-inner shell">
+        <div className="finale-copy">
+          <p className="kicker">By bedtime</p>
+          <h2>Today,<br />in 45 seconds.</h2>
+          <p>No loose clips. No editing backlog. Just a tiny film ready to keep.</p>
+          <BetaButton light />
+          <p className="privacy-note"><LockKey weight="bold" /> Solo stories stay on your device.</p>
+        </div>
+        <button
+          className={`movie-card${playing ? ' playing' : ''}`}
+          type="button"
+          onClick={() => setPlaying((value) => !value)}
+          aria-label={playing ? 'Pause sample film preview' : 'Play sample film preview'}
+        >
+          <div className="movie-images">
+            {['morning.jpg', 'focus.jpg', 'walk.jpg', 'friends.jpg'].map((src) => (
+              <img key={src} src={`/assets/${src}`} alt="" />
+            ))}
+          </div>
+          <span className="movie-shade" />
+          <span className="play-button"><Play weight="fill" /></span>
+          <span className="movie-meta"><i><b>{playing ? 'Playing' : 'Your 1Day'}</b><small>Sunday reset · 0:45</small></i><em>{playing ? '0:18' : '0:00'}</em></span>
+          <span className="progress-track"><i /></span>
+        </button>
+      </div>
+      <footer className="site-footer shell">
+        <Brand />
+        <p>Small moments. One film worth keeping.</p>
+        <div><a href="/privacy">Privacy</a><a href="mailto:liangyue3666@gmail.com">Support</a></div>
+      </footer>
+    </section>
+  );
+}
+
+function HomePage() {
+  return (
+    <main>
+      <SiteHeader />
+      <Hero />
+      <MomentRibbon />
+      <HowItWorks />
+      <TogetherSection />
+      <Finale />
     </main>
   );
+}
+
+export function App() {
+  const isPrivacyPage = window.location.pathname === '/privacy' || window.location.pathname === '/privacy/';
+  return isPrivacyPage ? <PrivacyPolicy /> : <HomePage />;
 }
