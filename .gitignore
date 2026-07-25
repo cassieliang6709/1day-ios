@@ -26,3 +26,6 @@ poc/output/
 
 # Xcode local build output
 ios/build/
+
+# Teammate/worktree build output
+build-teammate/
