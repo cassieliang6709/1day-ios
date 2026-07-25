@@ -57,6 +57,7 @@ enum CloudKitService {
         let ownerName: String
         let mode: Challenge.Mode
         let clipLength: Challenge.ClipLength
+        let orientation: Challenge.Orientation
         let templateName: String?
         let momentTitles: [String]?
     }
@@ -67,6 +68,7 @@ enum CloudKitService {
         ownerName: String,
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
+        orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> RemoteRoom {
@@ -81,6 +83,7 @@ enum CloudKitService {
             record["ownerName"] = ownerName as CKRecordValue
             record["mode"] = mode.rawValue as CKRecordValue
             record["clipLength"] = clipLength.rawValue as CKRecordValue
+            record["orientation"] = orientation.rawValue as CKRecordValue
             if let templateName { record["templateName"] = templateName as CKRecordValue }
             if let momentTitles { record["momentTitles"] = momentTitles.joined(separator: "\n") as CKRecordValue }
             do {
@@ -112,6 +115,7 @@ enum CloudKitService {
             ownerName: r["ownerName"] as? String ?? "Friend",
             mode: Challenge.Mode(rawValue: r["mode"] as? String ?? "") ?? .sevenDay,
             clipLength: Challenge.ClipLength(rawValue: r["clipLength"] as? String ?? "") ?? .tiny,
+            orientation: Challenge.Orientation(rawValue: r["orientation"] as? String ?? "") ?? .portrait,
             templateName: r["templateName"] as? String,
             momentTitles: (r["momentTitles"] as? String)?
                 .split(separator: "\n", omittingEmptySubsequences: false)

@@ -152,9 +152,9 @@ enum VideoStitcher {
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = audioParams
 
-        // ---- Overlays: title card text + DAY N captions ----------------------
+        // ---- Overlays: title card text + DAY N captions + watermark ---------
         #if !targetEnvironment(simulator)
-        if titleCard != nil || drawCaptions {
+        do {
             let videoLayer = CALayer()
             videoLayer.frame = CGRect(origin: .zero, size: renderSize)
             let parentLayer = CALayer()
@@ -177,6 +177,7 @@ enum VideoStitcher {
                     addCaption(caption, to: parentLayer, renderSize: renderSize, showAuthorMark: multiAuthor)
                 }
             }
+            addWatermark(to: parentLayer, renderSize: renderSize)
 
             videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
                 postProcessingAsVideoLayer: videoLayer, in: parentLayer)
@@ -816,6 +817,27 @@ enum VideoStitcher {
         pill.add(anim, forKey: "timestampWindow")
 
         parentLayer.addSublayer(pill)
+    }
+
+    /// A tiny "made with 1Day" tag in the bottom-left corner, present for the
+    /// whole film — every shared vlog quietly advertises where it came from.
+    private static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
+        let fontSize = max(renderSize.height * 0.016, 11)
+        let attributed = NSAttributedString(string: "made with 1Day", attributes: [
+            .font: roundedFont(size: fontSize, weight: .semibold),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.55),
+            .kern: fontSize * 0.04,
+        ])
+        let textSize = attributed.size()
+        let layer = CATextLayer()
+        layer.string = attributed
+        layer.contentsScale = 2
+        // CA coordinates: origin bottom-left.
+        layer.frame = CGRect(
+            x: renderSize.width * 0.045,
+            y: renderSize.height * 0.028,
+            width: textSize.width, height: textSize.height)
+        parentLayer.addSublayer(layer)
     }
 
     private static func roundedFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {

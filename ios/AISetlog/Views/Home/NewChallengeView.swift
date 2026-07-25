@@ -14,6 +14,7 @@ struct NewChallengeView: View {
     @State private var selectedTemplate: ChallengeTemplate?
     @State private var challengeMode: Challenge.Mode = .oneDay
     @State private var clipLength: Challenge.ClipLength = .tiny
+    @State private var orientation: Challenge.Orientation = .portrait
     @State private var withFriends = false
     @State private var creating = false
     @State private var errorText: String?
@@ -171,6 +172,13 @@ struct NewChallengeView: View {
                 toggleMode()
             }
             FormListRow(
+                icon: orientation == .portrait ? "rectangle.portrait" : "rectangle",
+                title: Strings.orientationHeader,
+                subtitle: orientation == .portrait ? Strings.orientationPortrait : Strings.orientationLandscape
+            ) {
+                orientation = orientation == .portrait ? .landscape : .portrait
+            }
+            FormListRow(
                 icon: "plus",
                 title: Strings.buildYourOwn,
                 subtitle: Strings.pickYourPrompts
@@ -237,6 +245,7 @@ struct NewChallengeView: View {
                 title: name,
                 mode: challengeMode,
                 clipLength: clipLength,
+                orientation: orientation,
                 templateName: selectedTemplate?.displayName,
                 momentTitles: selectedTemplate?.momentKeys)
             dismiss()
@@ -254,6 +263,7 @@ struct NewChallengeView: View {
                     title: title.trimmingCharacters(in: .whitespaces),
                     mode: challengeMode,
                     clipLength: clipLength,
+                    orientation: orientation,
                     templateName: selectedTemplate?.displayName,
                     momentTitles: selectedTemplate?.momentKeys)
                 dismiss()

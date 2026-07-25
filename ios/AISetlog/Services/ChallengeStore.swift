@@ -53,6 +53,7 @@ final class ChallengeStore {
         title: String,
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
+        orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) -> Challenge {
@@ -63,10 +64,12 @@ final class ChallengeStore {
             cards: (1...cardCount(for: momentTitles)).map { DayCard(day: $0) },
             mode: mode,
             clipLength: clipLength,
+            orientation: orientation,
             templateName: templateName,
             momentTitles: momentTitles
         )
         challenges.insert(challenge, at: 0)
+        ReminderService.scheduleReminders(for: challenge)
         return challenge
     }
 
@@ -84,22 +87,25 @@ final class ChallengeStore {
         title: String,
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
+        orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> Challenge {
         guard let me = account?.account else { throw RoomError.notSignedIn }
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
-            mode: mode, clipLength: clipLength,
+            mode: mode, clipLength: clipLength, orientation: orientation,
             templateName: templateName, momentTitles: momentTitles)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
+            orientation: room.orientation,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName)
         challenges.insert(challenge, at: 0)
+        ReminderService.scheduleReminders(for: challenge)
         return challenge
     }
 
@@ -118,6 +124,7 @@ final class ChallengeStore {
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
+            orientation: room.orientation,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName)
@@ -182,6 +189,7 @@ final class ChallengeStore {
 
     func delete(_ id: UUID) {
         fileStore.deleteClips(challengeID: id)
+        ReminderService.cancelReminders(for: id)
         if let code = challenge(id)?.roomCode {
             // Leaves the room locally; the shared record stays for others.
             roomSync.clearRoom(code)
@@ -202,6 +210,11 @@ final class ChallengeStore {
         challenges[ci].cards[idx].clipFileName = fileName
         challenges[ci].cards[idx].recordedAt = .now
         challenges[ci].cards[idx].overlayText = overlayText
+
+        // Challenge finished → no more "come back tomorrow" nudges.
+        if challenges[ci].isComplete {
+            ReminderService.cancelReminders(for: challengeID)
+        }
 
         // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {

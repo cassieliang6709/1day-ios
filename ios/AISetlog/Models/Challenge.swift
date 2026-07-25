@@ -6,6 +6,23 @@ struct Challenge: Codable, Identifiable {
         case oneDay
     }
 
+    /// Recording frame orientation, locked per challenge so every clip in a
+    /// film shares one aspect and the stitcher never mixes frames.
+    enum Orientation: String, Codable, CaseIterable, Identifiable {
+        case portrait
+        case landscape
+
+        var id: String { rawValue }
+
+        /// Aspect (width / height) of the camera shell, board cards, preview.
+        var aspectRatio: CGFloat {
+            switch self {
+            case .portrait: 9 / 14.3
+            case .landscape: 14.3 / 9
+            }
+        }
+    }
+
     enum ClipLength: String, Codable, CaseIterable, Identifiable {
         case tiny
         case story
@@ -39,6 +56,8 @@ struct Challenge: Codable, Identifiable {
     var mode: Mode? = nil
     /// nil means an older saved challenge; keep it on the original tiny clip.
     var clipLength: ClipLength? = nil
+    /// nil means an older saved challenge; those are all portrait.
+    var orientation: Orientation? = nil
     var templateName: String? = nil
     var momentTitles: [String]? = nil
 
@@ -51,6 +70,7 @@ struct Challenge: Codable, Identifiable {
     var isShared: Bool { roomCode != nil }
     var resolvedMode: Mode { mode ?? .sevenDay }
     var resolvedClipLength: ClipLength { clipLength ?? .tiny }
+    var resolvedOrientation: Orientation { orientation ?? .portrait }
     var isOneDay: Bool { resolvedMode == .oneDay }
 
     /// 1-based index of "today" within the challenge (day 1 = startDate).

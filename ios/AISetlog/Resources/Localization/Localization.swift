@@ -198,6 +198,13 @@ enum Strings {
         lang == .chinese ? "7 个瞬间，一支小 vlog。" : "7 moments. One tiny vlog."
     }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
+    static var firstRunPrompt: String {
+        lang == .chinese ? "想记录什么样的一天？" : "What kind of day do you want to remember?"
+    }
+    static var makeMyOwn: String { lang == .chinese ? "自己定制" : "Make my own" }
+    static func momentsCount(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 个瞬间" : "\(count) moments"
+    }
     static var inviteHint: String {
         lang == .chinese ? "向朋友要 6 位邀请码。" : "Ask your friend for the 6-character code."
     }
@@ -359,6 +366,17 @@ enum Strings {
     static func filedTo(_ title: String) -> String {
         lang == .chinese ? "已存入「\(title)」" : "Filed to “\(title)”"
     }
+    static var tapToStop: String { lang == .chinese ? "点按停止" : "Tap to stop" }
+    static var orientationHeader: String { lang == .chinese ? "画幅" : "Orientation" }
+    static var orientationPortrait: String { lang == .chinese ? "竖屏" : "Portrait" }
+    static var orientationLandscape: String { lang == .chinese ? "横屏" : "Landscape" }
+    static var switchOrientation: String { lang == .chinese ? "切换横竖屏" : "Switch orientation" }
+    static func noMatchingPlan(landscape: Bool) -> String {
+        let kind = landscape
+            ? (lang == .chinese ? "横屏" : "landscape")
+            : (lang == .chinese ? "竖屏" : "portrait")
+        return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
+    }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static func useDemoClip(_ title: String) -> String {
         lang == .chinese ? "为「\(title)」使用示例片段" : "Use demo clip for \(title)"
@@ -399,6 +417,13 @@ enum Strings {
     static var saving: String { lang == .chinese ? "保存中…" : "Saving…" }
     static var saveVideo: String { lang == .chinese ? "保存视频" : "Save video" }
     static var stitchFailed: String { lang == .chinese ? "合成失败" : "Stitching failed" }
+    static var yourFilmIsHere: String { lang == .chinese ? "你的影片来了" : "Your film is here" }
+    static func reminderBody(_ day: Int) -> String {
+        lang == .chinese ? "第 \(day) 天到了，来记录今天的瞬间" : "Day \(day) is here — capture today's moment"
+    }
+    static func reminderBodyWithPrompt(_ day: Int, _ prompt: String) -> String {
+        lang == .chinese ? "第 \(day) 天 · \(prompt) — 来记录今天" : "Day \(day) · \(prompt) — time to capture it"
+    }
     static var stitching: String {
         lang == .chinese ? "正在把你的片段合在一起…" : "Stitching your week together…"
     }

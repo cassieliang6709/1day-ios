@@ -34,6 +34,14 @@ struct HomeView: View {
             Group {
                 if store.challenges.isEmpty {
                     HomeEmptyState(
+                        onTemplate: { template in
+                            let challenge = store.create(
+                                title: template.displayName,
+                                mode: .oneDay,
+                                templateName: template.name.en,
+                                momentTitles: template.momentKeys)
+                            path.append(challenge.id)
+                        },
                         onNewChallenge: { showNewChallenge = true },
                         onJoin: { joinCode = ""; showJoin = true })
                 } else {
@@ -76,6 +84,11 @@ struct HomeView: View {
                         day: slot,
                         challengeID: challenge.id,
                         overlayText: overlayText)
+                    // Just finished the last slot from the hero CTA? Land on
+                    // the board so the film moment is one glance away.
+                    if store.challenge(challenge.id)?.isComplete == true {
+                        path.append(challenge.id)
+                    }
                 }
             }
             .sheet(isPresented: $showSettings) { SettingsView() }

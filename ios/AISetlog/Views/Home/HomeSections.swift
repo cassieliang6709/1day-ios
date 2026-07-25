@@ -97,10 +97,21 @@ struct HomeHero: View {
     }
 }
 
-/// First-launch screen: big logo, tagline, start / join-by-code.
+/// First-launch screen: the template deck IS the onboarding. One tap on a
+/// template creates the challenge and drops the user straight into the board —
+/// no slides, no forms. A quiet custom/join row sits at the bottom.
 struct HomeEmptyState: View {
+    let onTemplate: (ChallengeTemplate) -> Void
     let onNewChallenge: () -> Void
     let onJoin: () -> Void
+
+    /// Bound only so a language change re-renders the template names.
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+    ]
 
     var body: some View {
         ZStack {
@@ -120,61 +131,57 @@ struct HomeEmptyState: View {
                 .frame(width: 260, height: 260)
                 .offset(x: -180, y: -280)
             Circle()
-                .fill(Color.oneDaySky.opacity(0.18))
-                .frame(width: 260, height: 260)
-                .offset(x: -160, y: 360)
-            Circle()
                 .fill(Color.oneDayBlue.opacity(0.13))
                 .frame(width: 260, height: 260)
                 .offset(x: 170, y: 330)
 
-            VStack(spacing: 26) {
-                Spacer(minLength: 24)
-
-                OneDayLogoMark()
-                    .frame(width: 170, height: 170)
-                    .padding(.bottom, 10)
-
-                VStack(spacing: 10) {
+            VStack(spacing: 22) {
+                VStack(spacing: 8) {
                     Text("1Day")
-                        .font(.system(size: 58, weight: .black, design: .rounded))
+                        .font(.system(size: 40, weight: .black, design: .rounded))
                         .foregroundStyle(Color.oneDayBlue)
-                    Text(Strings.tagline)
+                    Text(Strings.firstRunPrompt)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Color(red: 0.25, green: 0.31, blue: 0.38))
+                        .multilineTextAlignment(.center)
                 }
-                .multilineTextAlignment(.center)
+                .padding(.top, 28)
 
-                Spacer()
-
-                VStack(spacing: 16) {
-                    Button(action: onNewChallenge) {
-                        Text(Strings.startToday)
-                            .font(.headline)
-                            .foregroundStyle(.white)
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(ChallengeTemplate.oneDayBuiltins) { template in
+                        Button {
+                            onTemplate(template)
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(template.emoji)
+                                    .font(.system(size: 34))
+                                Text(template.displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(Color.oneDayNavy)
+                                Text(Strings.momentsCount(template.momentKeys?.count ?? 0))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 17)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color.oneDayBlue,
-                                        Color.oneDayCyan,
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            )
+                            .padding(.vertical, 20)
+                            .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-
-                    Button(Strings.haveInviteCode, action: onJoin)
-                        .font(.headline)
-                        .foregroundStyle(Color.oneDayBlue)
                 }
-                .padding(.bottom, 48)
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 20) {
+                    Button(Strings.makeMyOwn, action: onNewChallenge)
+                    Button(Strings.haveInviteCode, action: onJoin)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.oneDayBlue)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 34)
+            .padding(.horizontal, 24)
         }
     }
 }

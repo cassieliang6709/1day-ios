@@ -14,6 +14,15 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
     private var videoInput: AVCaptureDeviceInput?
     private var position: AVCaptureDevice.Position = .front
 
+    private weak var previewLayer: AVCaptureVideoPreviewLayer?
+
+    /// Recording orientation — locks both the output file and the preview to
+    /// upright portrait or landscape. The UI never rotates (the app stays
+    /// portrait-locked), only the captured video's frame.
+    var orientation: Challenge.Orientation = .portrait {
+        didSet { applyOrientation() }
+    }
+
     private(set) var state: State = .idle
     private(set) var clipURL: URL?
     private(set) var recordedAt: Date?
@@ -69,9 +78,34 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         session.addOutput(movieOutput)
         session.commitConfiguration()
 
+        applyOrientation()
+
         let session = self.session
         Task.detached { session.startRunning() }
         state = .ready
+    }
+
+    // MARK: - Orientation
+
+    /// Called by `CameraPreview` once its layer exists so the preview's
+    /// rotation can be managed here alongside the recorded file's.
+    func attachPreview(_ layer: AVCaptureVideoPreviewLayer) {
+        previewLayer = layer
+        applyOrientation()
+    }
+
+    /// Lock both the recorded file and the preview to the chosen orientation,
+    /// so front and back cameras behave identically (no orientation guessing).
+    private func applyOrientation() {
+        let angle: CGFloat = orientation == .landscape ? 0 : 90 // degrees
+        if let connection = movieOutput.connection(with: .video),
+           connection.isVideoRotationAngleSupported(angle) {
+            connection.videoRotationAngle = angle
+        }
+        if let connection = previewLayer?.connection,
+           connection.isVideoRotationAngleSupported(angle) {
+            connection.videoRotationAngle = angle
+        }
     }
 
     func flipCamera() {
@@ -85,6 +119,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
             session.addInput(input)
             videoInput = input
             position = newPosition
+            applyOrientation()
         } else if let videoInput, session.canAddInput(videoInput) {
             session.addInput(videoInput) // revert
         }
@@ -101,6 +136,13 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         recordedAt = .now
         movieOutput.startRecording(to: url, recordingDelegate: self)
         state = .recording
+    }
+
+    /// Stop early (the "tap to stop" countdown ring) — the delegate fires
+    /// exactly as if the max-duration limit had been hit.
+    func stopRecording() {
+        guard state == .recording else { return }
+        movieOutput.stopRecording()
     }
 
     /// Back to live preview after reviewing a take.
@@ -134,6 +176,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
 
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
+    var onLayer: (AVCaptureVideoPreviewLayer) -> Void = { _ in }
 
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
@@ -144,6 +187,7 @@ struct CameraPreview: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        onLayer(view.previewLayer)
         return view
     }
 

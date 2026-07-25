@@ -27,6 +27,8 @@ struct CameraShell<Content: View>: View {
     let timestamp: Date?
     let overlayText: String?
     let clipSeconds: Double
+    /// nil = the classic portrait frame; set for landscape challenges.
+    var aspectRatio: CGFloat? = nil
     @ViewBuilder var content: Content
 
     private var tint: Color { Identity.tint(for: name) }
@@ -54,7 +56,7 @@ struct CameraShell<Content: View>: View {
             }
             .shadow(color: tint.opacity(0.35), radius: 18, y: 8)
         }
-        .aspectRatio(9 / 14.3, contentMode: .fit)
+        .aspectRatio(aspectRatio ?? 9 / 14.3, contentMode: .fit)
     }
 }
 
@@ -116,6 +118,9 @@ struct MomentStampOverlay: View {
 
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 9) {
+                            if let name, !name.isEmpty {
+                                NameChip(name: name)
+                            }
                             Text(momentTitle)
                                 .font(.system(size: 22, weight: .black, design: .rounded))
                                 .foregroundStyle(.white)
@@ -138,9 +143,6 @@ struct MomentStampOverlay: View {
                         }
 
                         Spacer()
-
-                        StampBadge(name: name)
-                            .frame(width: min(size.width * 0.29, 124), height: min(size.width * 0.29, 124))
                     }
                     .padding(28)
                 }
@@ -172,6 +174,30 @@ struct MomentStampOverlay: View {
     }
 }
 
+/// Whose clip this is — a small dashed pill with a pencil, sitting above the
+/// moment title in the live preview.
+struct NameChip: View {
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "pencil")
+                .font(.system(size: 11, weight: .bold))
+            Text(name)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.22), in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+        )
+    }
+}
+
 struct BrandStamp: View {
     var body: some View {
         HStack(spacing: 9) {
@@ -191,64 +217,6 @@ struct BrandStamp: View {
             }
             .foregroundStyle(.white)
         }
-    }
-}
-
-/// Whose clip this is, burned into the corner of both the live preview and
-/// the final export (`VideoStitcher.addStampDecor` mirrors this look).
-struct StampBadge: View {
-    let name: String?
-
-    private var tint: Color { Identity.tint(for: name) }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
-            Circle()
-                .stroke(tint, lineWidth: 5)
-            Text(Identity.initial(for: name))
-                .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(tint)
-        }
-    }
-}
-
-struct CaptionOverlayEditor: View {
-    @Binding var text: String
-    var isFocused: FocusState<Bool>.Binding
-
-    var body: some View {
-        GeometryReader { proxy in
-            TextField(
-                "",
-                text: $text,
-                prompt: Text(Strings.addCaption)
-                    .foregroundStyle(.white.opacity(isFocused.wrappedValue ? 0.32 : 0.42)),
-                axis: .vertical
-            )
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .multilineTextAlignment(.center)
-            .tint(Color.oneDayCyan)
-            .textInputAutocapitalization(.sentences)
-            .autocorrectionDisabled()
-            .submitLabel(.done)
-            .focused(isFocused)
-            .textFieldStyle(.plain)
-            .lineLimit(1...2)
-            .minimumScaleFactor(0.78)
-            .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
-            .padding(.horizontal, 14)
-            .frame(width: proxy.size.width * 0.68, height: 82)
-            .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.43)
-            .onChange(of: text) { _, newValue in
-                if newValue.count > 40 {
-                    text = String(newValue.prefix(40))
-                }
-            }
-        }
-        .allowsHitTesting(true)
     }
 }
 

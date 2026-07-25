@@ -8,6 +8,8 @@ struct ChallengeBoardView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var sheet: BoardSheet?
     @State private var showFinalReel = false
+    /// Brief "your film is here" beat between the last clip and the reel.
+    @State private var celebrate = false
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -92,6 +94,31 @@ struct ChallengeBoardView: View {
                 FinalReelView(
                     challenge: challenge,
                     clips: store.recordedClips(for: challengeID))
+            }
+        }
+        // The magic moment: the last slot lands → a tiny celebration → the
+        // film assembles itself. No button to discover, no thought required.
+        .onChange(of: challenge?.isComplete) { wasComplete, isComplete in
+            guard wasComplete == false, isComplete == true else { return }
+            withAnimation(.snappy(duration: 0.25)) { celebrate = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                celebrate = false
+                showFinalReel = true
+            }
+        }
+        .overlay {
+            if celebrate {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.white)
+                    Text(Strings.yourFilmIsHere)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.oneDayBlue.opacity(0.92).ignoresSafeArea())
+                .transition(.opacity)
             }
         }
         #if DEBUG

@@ -15,6 +15,9 @@ struct RecordClipView: View {
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
     /// clip is filed into a chosen plan instead of a fixed day slot.
     var isFreeform = false
+    /// The challenge's locked frame. Free-form mode ignores this and uses its
+    /// own toggleable orientation instead.
+    var orientation: Challenge.Orientation = .portrait
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -25,6 +28,7 @@ struct RecordClipView: View {
     @State private var overlayText = ""
     @State private var showSavePicker = false
     @State private var toast: String?
+    @State private var freeformOrientation: Challenge.Orientation = .portrait
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -40,6 +44,9 @@ struct RecordClipView: View {
     private var clipSecondsText: String { clipLength.secondsLabel }
     /// Extra bottom room so the free-form controls clear the floating pill.
     private var bottomInset: CGFloat { isFreeform ? 76 : 18 }
+    private var effectiveOrientation: Challenge.Orientation {
+        isFreeform ? freeformOrientation : orientation
+    }
     private var trimmedOverlayText: String? {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : text
@@ -77,8 +84,14 @@ struct RecordClipView: View {
                 .transition(.opacity)
             }
         }
-        .task { await recorder.configure() }
+        .task {
+            recorder.orientation = effectiveOrientation
+            await recorder.configure()
+        }
         .onDisappear { recorder.teardown() }
+        .onChange(of: effectiveOrientation) { _, newValue in
+            recorder.orientation = newValue
+        }
         .onChange(of: recorder.state) { _, state in
             if state == .recording {
                 ringProgress = 0
@@ -100,9 +113,10 @@ struct RecordClipView: View {
                 mode: recorder.state == .recording ? .recording : .live,
                 timestamp: recorder.recordedAt,
                 overlayText: nil,
-                clipSeconds: clipSeconds
+                clipSeconds: clipSeconds,
+                aspectRatio: effectiveOrientation.aspectRatio
             ) {
-                CameraPreview(session: recorder.session)
+                CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
             }
 
             bottomControls
@@ -121,23 +135,50 @@ struct RecordClipView: View {
                     .stroke(.white.opacity(0.35), lineWidth: 5)
                     .frame(width: 84, height: 84)
                 Circle()
+                    .fill(myTint)
+                    .frame(width: 66, height: 66)
+            }
+        }
+    }
+
+    /// While recording: a big countdown ring (tap to stop early) flanked by
+    /// decorative waveform bars.
+    private var recordingControls: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 18) {
+                WaveformBars(tint: myTint)
+                countdownRing
+                WaveformBars(tint: myTint)
+            }
+            Text(Strings.tapToStop)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var countdownRing: some View {
+        Button {
+            recorder.stopRecording()
+        } label: {
+            ZStack {
+                Circle()
+                    .stroke(Color(.systemGray5), lineWidth: 5)
+                    .frame(width: 84, height: 84)
+                Circle()
                     .trim(from: 0, to: ringProgress)
                     .stroke(myTint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .frame(width: 84, height: 84)
-                Circle()
-                    .fill(recorder.state == .recording ? Color(.systemBackground) : myTint)
-                    .frame(width: 66, height: 66)
-                    .scaleEffect(recorder.state == .recording ? 0.85 : 1)
-                    .animation(.spring(duration: 0.3), value: recorder.state == .recording)
-                if recorder.state == .recording {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(myTint)
-                        .frame(width: 26, height: 26)
+                TimelineView(.periodic(from: .now, by: 0.1)) { context in
+                    let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
+                    let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
+                    Text("\(remaining)")
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundStyle(myTint)
+                        .monospacedDigit()
                 }
             }
         }
-        .disabled(recorder.state == .recording)
     }
 
     // MARK: - Review (Use / Retake)
@@ -146,40 +187,29 @@ struct RecordClipView: View {
         VStack(spacing: 16) {
             topBar
 
-            ZStack {
-                CameraShell(
-                    name: myName,
-                    momentTitle: slotTitle ?? Strings.dayN(day),
-                    day: day,
-                    mode: .review,
-                    timestamp: recorder.recordedAt,
-                    overlayText: nil,
-                    clipSeconds: clipSeconds
-                ) {
-                    LoopingClipPlayer(url: url)
-                }
-
-                CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
+            CameraShell(
+                name: myName,
+                momentTitle: slotTitle ?? Strings.dayN(day),
+                day: day,
+                mode: .review,
+                timestamp: recorder.recordedAt,
+                overlayText: trimmedOverlayText,
+                clipSeconds: clipSeconds,
+                aspectRatio: effectiveOrientation.aspectRatio
+            ) {
+                LoopingClipPlayer(url: url)
             }
 
-            HStack(spacing: 14) {
-                Button {
-                    recorder.retake()
-                    ringProgress = 0
-                } label: {
-                    Label(Strings.retake, systemImage: "arrow.counterclockwise")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .tint(.primary)
+            captionBar
 
+            VStack(spacing: 10) {
                 Button {
                     if isFreeform {
+                        let matches = filingCandidates
                         if store.challenges.isEmpty {
                             showToast(Strings.makePlanFirst)
+                        } else if matches.isEmpty {
+                            showToast(Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape))
                         } else {
                             showSavePicker = true
                         }
@@ -191,25 +221,78 @@ struct RecordClipView: View {
                     Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
                           systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
                         .font(.headline)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 16)
+                        .background(myTint, in: Capsule())
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(myTint)
+                .buttonStyle(.plain)
+
+                Button {
+                    recorder.retake()
+                    ringProgress = 0
+                } label: {
+                    Label(Strings.retake, systemImage: "arrow.counterclockwise")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color(.systemGray6), in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 18)
         .padding(.top, 14)
         .padding(.bottom, bottomInset)
         .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
-            ForEach(store.challenges) { challenge in
+            ForEach(filingCandidates) { challenge in
                 Button(challenge.title) { file(url, to: challenge) }
             }
         }
     }
 
+    /// Caption sits below the video (not burned into the frame until save).
+    private var captionBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "bubble.left")
+                .font(.headline)
+                .foregroundStyle(Color.oneDayBlue)
+
+            TextField(
+                "",
+                text: $overlayText,
+                prompt: Text(Strings.addCaption).foregroundStyle(.secondary)
+            )
+            .font(.subheadline.weight(.semibold))
+            .textInputAutocapitalization(.sentences)
+            .submitLabel(.done)
+            .focused($overlayTextFocused)
+            .onChange(of: overlayText) { _, newValue in
+                if newValue.count > 40 { overlayText = String(newValue.prefix(40)) }
+            }
+
+            Image(systemName: "pencil")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.oneDayBlue.opacity(overlayTextFocused ? 0.38 : 0.13), lineWidth: 1.5)
+        )
+        .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
+    }
+
     // MARK: - Free-form filing
+
+    /// Only plans matching the recorded frame can take this clip — a
+    /// challenge never mixes portrait and landscape.
+    private var filingCandidates: [Challenge] {
+        store.challenges.filter { $0.resolvedOrientation == effectiveOrientation }
+    }
 
     /// Free-form: file the clip into a chosen plan's first open slot.
     private func file(_ url: URL, to challenge: Challenge) {
@@ -282,8 +365,22 @@ struct RecordClipView: View {
     private var topBar: some View {
         HStack {
             if isFreeform {
-                // No cover to dismiss in the tab — keep the layout balanced.
-                Color.clear.frame(width: 52, height: 52)
+                // No cover to dismiss in the tab — the left slot carries the
+                // orientation toggle instead.
+                Button {
+                    freeformOrientation = freeformOrientation == .portrait ? .landscape : .portrait
+                } label: {
+                    Image(systemName: freeformOrientation == .portrait
+                        ? "rectangle.portrait.rotate" : "rectangle.rotate")
+                        .font(.system(size: 20, weight: .bold))
+                        .frame(width: 52, height: 52)
+                        .background(.white.opacity(0.92), in: Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Strings.switchOrientation)
+                .disabled(recorder.state == .recording || recorder.clipURL != nil)
+                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
             } else {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
@@ -324,14 +421,36 @@ struct RecordClipView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 12) {
-            VStack(spacing: 10) {
-                recordButton
-                Text(Strings.captureState(recording: recorder.state == .recording, secondsLabel: clipSecondsText))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            if recorder.state == .recording {
+                recordingControls
+            } else {
+                VStack(spacing: 10) {
+                    recordButton
+                    Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(14)
         .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 32))
+    }
+}
+
+/// Decorative symmetric waveform bars flanking the countdown ring while
+/// recording — pure ornament, not a live level meter.
+private struct WaveformBars: View {
+    let tint: Color
+    private let heights: [CGFloat] = [4, 9, 14, 7, 12, 18, 8, 5]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
+                Capsule()
+                    .fill(tint.opacity(0.28))
+                    .frame(width: 3, height: height)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
