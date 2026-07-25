@@ -19,8 +19,6 @@ struct NewChallengeView: View {
     @State private var errorText: String?
     @State private var showSignIn = false
     @State private var showBuildTemplate = false
-    @State private var carouselIndex = 0
-    @State private var carouselPosition: Int?
     @State private var litDays = 0
     @FocusState private var goalFocused: Bool
 
@@ -52,11 +50,10 @@ struct NewChallengeView: View {
                         oneDay: challengeMode == .oneDay,
                         secondsLabel: clipLength.secondsLabel)
                     DayDots(litDays: litDays)
-                    formatPicker
-                    ClipLengthPicker(selection: $clipLength)
+                        .frame(maxWidth: .infinity)
                     goalField
-                    templateCarousel
-                    AudiencePicker(withFriends: $withFriends)
+                    templateDeckSection
+                    optionRows
                     if let errorText {
                         Text(errorText)
                             .font(.footnote)
@@ -114,25 +111,6 @@ struct NewChallengeView: View {
 
     // MARK: - Sections kept inline (they drive local state)
 
-    private var formatPicker: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FormSectionHeader(text: Strings.formatHeader)
-
-            Picker("Format", selection: $challengeMode) {
-                Text(Strings.modeOneDay).tag(Challenge.Mode.oneDay)
-                Text(Strings.modeSevenDay).tag(Challenge.Mode.sevenDay)
-            }
-            .pickerStyle(.segmented)
-            .tint(Color.oneDayBlue)
-            .onChange(of: challengeMode) { _, _ in
-                selectedTemplate = nil
-                title = ""
-                carouselIndex = 0
-                carouselPosition = 0
-            }
-        }
-    }
-
     private var goalField: some View {
         TextField(
             "", text: $title,
@@ -155,49 +133,55 @@ struct NewChallengeView: View {
         }
     }
 
-    /// Immersive swipeable script picker: one big card at a time instead of a
-    /// flat grid, each tinted by the template's own identity color (reusing
-    /// `Identity` — no real per-template footage to show, so an accent color
-    /// + big type stands in for it).
-    private var templateCarousel: some View {
+    /// The template picker: a fanned deck of cards instead of a carousel.
+    /// Swiping (or tapping a back card) brings a template to the front and
+    /// selects it, filling in the goal field.
+    private var templateDeckSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             FormSectionHeader(text: Strings.pickScriptHeader(oneDay: challengeMode == .oneDay))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(Array(templates.enumerated()), id: \.offset) { index, template in
-                        TemplateCard(
-                            template: template,
-                            selected: selectedTemplate == template,
-                            secondsLabel: clipLength.secondsLabel,
-                            onTap: { select(template) },
-                            onDelete: template.isCustom ? { delete(template) } : nil)
-                            .containerRelativeFrame(.horizontal)
-                            .id(index)
-                    }
-                    BuildYourOwnCard { showBuildTemplate = true }
-                        .containerRelativeFrame(.horizontal)
-                        .id(templates.count)
-                }
-                .scrollTargetLayout()
+            TemplateDeck(
+                templates: templates,
+                secondsLabel: clipLength.secondsLabel,
+                oneDay: challengeMode == .oneDay,
+                withFriends: withFriends,
+                selectedTemplate: selectedTemplate
+            ) { index in
+                guard templates.indices.contains(index) else { return }
+                select(templates[index])
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $carouselPosition)
-            .frame(height: 300)
-            .onChange(of: carouselPosition) { _, newValue in
-                guard let newValue, templates.indices.contains(newValue) else { return }
-                carouselIndex = newValue
-                select(templates[newValue])
-            }
+        }
+    }
 
-            HStack(spacing: 6) {
-                ForEach(0...templates.count, id: \.self) { index in
-                    Circle()
-                        .fill(index == carouselIndex ? Color.oneDayBlue : Color.oneDayBlue.opacity(0.22))
-                        .frame(width: 6, height: 6)
-                }
+    /// Secondary choices as settings-style rows, matching the deck card style.
+    private var optionRows: some View {
+        VStack(spacing: 12) {
+            FormListRow(
+                icon: "timer",
+                title: Strings.clipLengthHeader,
+                subtitle: "\(clipLength.secondsLabel) · \(Strings.clipLengthName(clipLength))"
+            ) {
+                cycleClipLength()
             }
-            .frame(maxWidth: .infinity)
+            FormListRow(
+                icon: "calendar.day.timeline.leading",
+                title: Strings.formatHeader,
+                subtitle: challengeMode == .oneDay ? Strings.modeOneDay : Strings.modeSevenDay
+            ) {
+                toggleMode()
+            }
+            FormListRow(
+                icon: "plus",
+                title: Strings.buildYourOwn,
+                subtitle: Strings.pickYourPrompts
+            ) {
+                showBuildTemplate = true
+            }
+            FormToggleRow(
+                icon: "person.2.fill",
+                title: Strings.withFriends,
+                subtitle: Strings.roomInvite,
+                isOn: $withFriends)
         }
     }
 
@@ -209,12 +193,17 @@ struct NewChallengeView: View {
         goalFocused = false
     }
 
-    private func delete(_ template: ChallengeTemplate) {
-        if selectedTemplate == template {
-            selectedTemplate = nil
-            title = ""
-        }
-        store.deleteCustomTemplate(template)
+    private func cycleClipLength() {
+        let all = Challenge.ClipLength.allCases
+        let next = all[(all.firstIndex(of: clipLength) ?? 0) + 1 < all.count
+            ? (all.firstIndex(of: clipLength) ?? 0) + 1 : 0]
+        clipLength = next
+    }
+
+    private func toggleMode() {
+        challengeMode = challengeMode == .oneDay ? .sevenDay : .oneDay
+        selectedTemplate = nil
+        title = ""
     }
 
     private func fullTitle(for template: ChallengeTemplate) -> String {
