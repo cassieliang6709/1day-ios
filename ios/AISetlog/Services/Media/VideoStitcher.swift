@@ -4,20 +4,13 @@ import UIKit
 /// Stitches the daily clips into one short diary film, entirely on-device.
 ///
 /// Features:
-/// - two layouts: sequential (crossfade cuts) and grid (everyone on screen
-///   at once — the future multi-friend "room" finale)
+/// - sequential layout with crossfade cuts
 /// - optional opening title card (challenge name + date range)
 /// - "DAY N" captions burned in via AVVideoCompositionCoreAnimationTool
 ///
 /// Simulator note: CoreAnimationTool overlays (captions + title card) crash
 /// the simulator's software render path, so they are device-only.
 enum VideoStitcher {
-
-    enum Layout: String, CaseIterable, Identifiable, Hashable {
-        case sequential = "Sequence"
-        case grid = "Grid"
-        var id: String { rawValue }
-    }
 
     struct TitleCard {
         let title: String
@@ -27,10 +20,8 @@ enum VideoStitcher {
     struct Options {
         var crossfadeSeconds: Double = 0.35
         var showDayCaptions = true
-        var layout: Layout = .sequential
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
-        var gridSeconds: Double = 6.0
         static let `default` = Options()
     }
 
@@ -74,8 +65,7 @@ enum VideoStitcher {
         }
     }
 
-    /// A caption to draw later: which day, over which part of the frame
-    /// (nil = full frame), during which time window.
+    /// A caption to draw later: which day, over which time window.
     private struct CaptionWindow {
         let day: Int
         let label: String?
@@ -83,7 +73,6 @@ enum VideoStitcher {
         let overlayText: String?
         let recordedAt: Date?
         let emoji: [String]
-        let cell: CGRect?
         let start: Double
         let end: Double
     }
@@ -135,24 +124,16 @@ enum VideoStitcher {
             : CMTime(seconds: options.titleSeconds, preferredTimescale: 600)
         #endif
 
-        // ---- Build the layout-specific parts --------------------------------
+        // ---- Build the track layout ----------------------------------------
         let composition = AVMutableComposition()
         var instructions: [AVMutableVideoCompositionInstruction] = []
         var audioParams: [AVMutableAudioMixInputParameters] = []
         var captions: [CaptionWindow] = []
 
-        switch options.layout {
-        case .sequential:
-            try buildSequential(
-                loaded: loaded, into: composition, renderSize: renderSize,
-                crossfadeSeconds: options.crossfadeSeconds, startAt: titleOffset,
-                instructions: &instructions, audioParams: &audioParams, captions: &captions)
-        case .grid:
-            try buildGrid(
-                loaded: loaded, into: composition, renderSize: renderSize,
-                gridSeconds: options.gridSeconds, startAt: titleOffset,
-                instructions: &instructions, audioParams: &audioParams, captions: &captions)
-        }
+        try buildSequential(
+            loaded: loaded, into: composition, renderSize: renderSize,
+            crossfadeSeconds: options.crossfadeSeconds, startAt: titleOffset,
+            instructions: &instructions, audioParams: &audioParams, captions: &captions)
 
         // ---- Title card: a source-less black segment up front ---------------
         if titleOffset > .zero {
@@ -215,7 +196,7 @@ enum VideoStitcher {
         export.videoComposition = videoComposition
         export.audioMix = audioMix
 
-        print("[stitch] exporting layout=\(options.layout.rawValue) clips=\(loaded.count) renderSize=\(renderSize)")
+        print("[stitch] exporting clips=\(loaded.count) renderSize=\(renderSize)")
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             export.exportAsynchronously { cont.resume() }
         }
@@ -323,7 +304,7 @@ enum VideoStitcher {
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
                 overlayText: p.clip.overlayText,
-                recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, cell: nil,
+                recordedAt: p.clip.recordedAt, emoji: p.clip.emoji,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
         }
@@ -347,91 +328,6 @@ enum VideoStitcher {
             }
         }
         audioParams.append(contentsOf: params)
-    }
-
-    // MARK: - Grid layout (everyone on screen, clips loop)
-
-    private static func buildGrid(
-        loaded: [LoadedClip],
-        into composition: AVMutableComposition,
-        renderSize: CGSize,
-        gridSeconds: Double,
-        startAt: CMTime,
-        instructions: inout [AVMutableVideoCompositionInstruction],
-        audioParams: inout [AVMutableAudioMixInputParameters],
-        captions: inout [CaptionWindow]
-    ) throws {
-        let count = loaded.count
-        let cols = Int(ceil(sqrt(Double(count))))
-        let rows = Int(ceil(Double(count) / Double(cols)))
-        let cellSize = CGSize(
-            width: renderSize.width / CGFloat(cols),
-            height: renderSize.height / CGFloat(rows))
-
-        let end = CMTimeAdd(startAt, CMTime(seconds: gridSeconds, preferredTimescale: 600))
-        let inst = AVMutableVideoCompositionInstruction()
-        inst.timeRange = CMTimeRange(start: startAt, end: end)
-        inst.backgroundColor = UIColor.black.cgColor
-        var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = []
-
-        // Everyone starts muted-ish: N simultaneous audio tracks get loud fast.
-        let gridVolume: Float = max(0.15, 0.8 / Float(count))
-
-        // Thin gap between tiles (background shows through as a separator)
-        let gap = renderSize.width * 0.004
-
-        for (i, clip) in loaded.enumerated() {
-            guard
-                let videoTrack = composition.addMutableTrack(
-                    withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-                let audioCompTrack = composition.addMutableTrack(
-                    withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-            else { throw StitchError.compositionFailed }
-
-            // Loop the clip until the grid segment ends.
-            var cursor = startAt
-            while cursor < end {
-                let remaining = CMTimeSubtract(end, cursor)
-                let videoDur = CMTimeMinimum(clip.videoRange.duration, remaining)
-                try videoTrack.insertTimeRange(
-                    CMTimeRange(start: clip.videoRange.start, duration: videoDur),
-                    of: clip.videoTrack, at: cursor)
-                if let audio = clip.audioTrack {
-                    let audioDur = CMTimeMinimum(clip.audioRange.duration, videoDur)
-                    try audioCompTrack.insertTimeRange(
-                        CMTimeRange(start: clip.audioRange.start, duration: audioDur),
-                        of: audio, at: cursor)
-                }
-                cursor = CMTimeAdd(cursor, videoDur)
-            }
-
-            let row = i / cols
-            let col = i % cols
-            let cell = CGRect(
-                x: CGFloat(col) * cellSize.width,
-                y: CGFloat(row) * cellSize.height,
-                width: cellSize.width, height: cellSize.height)
-                .insetBy(dx: gap, dy: gap)
-
-            let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-            let (transform, sourceCrop) = cellTransform(for: clip, into: cell)
-            layer.setTransform(transform, at: startAt)
-            layer.setCropRectangle(sourceCrop, at: startAt)
-            layerInstructions.append(layer)
-
-            let params = AVMutableAudioMixInputParameters(track: audioCompTrack)
-            params.setVolume(gridVolume, at: .zero)
-            audioParams.append(params)
-
-            captions.append(CaptionWindow(
-                day: clip.day, label: clip.label, authorName: clip.authorName,
-                overlayText: clip.overlayText,
-                recordedAt: clip.recordedAt, emoji: clip.emoji, cell: cell,
-                start: CMTimeGetSeconds(startAt), end: CMTimeGetSeconds(end)))
-        }
-
-        inst.layerInstructions = layerInstructions
-        instructions.append(inst)
     }
 
     // MARK: - Geometry
@@ -547,17 +443,15 @@ enum VideoStitcher {
         }
     }
 
-    /// A rounded "DAY N" pill, full-frame (bottom center) or per grid cell
-    /// (bottom left of the cell), visible only during its time window.
+    /// A rounded "DAY N" pill at the bottom center, visible only during its
+    /// time window.
     private static func addCaption(
         _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize,
         showAuthorMark: Bool
     ) {
-        // Size by the cell's SMALLER edge — tall skinny cells (2-person grid)
-        // would otherwise get comically large pills.
         let label = caption.label?.uppercased() ?? "DAY \(caption.day)"
-        let maxWidth = (caption.cell?.width ?? renderSize.width) * 0.82
-        var fontSize = caption.cell.map { min($0.width, $0.height) * 0.085 } ?? renderSize.height * 0.036
+        let maxWidth = renderSize.width * 0.82
+        var fontSize = renderSize.height * 0.036
         var attributed: NSAttributedString
         repeat {
             let baseFont = UIFont.systemFont(ofSize: fontSize, weight: .heavy)
@@ -579,19 +473,10 @@ enum VideoStitcher {
         let padV = fontSize * 0.45
         let pillSize = CGSize(width: textSize.width + padH * 2, height: textSize.height + padV * 2)
 
-        // CA coordinates: origin bottom-left; cells are given in video
-        // coordinates (origin top-left), so flip the y axis.
-        let pillOrigin: CGPoint
-        if let cell = caption.cell {
-            let margin = min(cell.width, cell.height) * 0.06
-            pillOrigin = CGPoint(
-                x: cell.minX + margin,
-                y: renderSize.height - cell.maxY + margin)
-        } else {
-            pillOrigin = CGPoint(
-                x: (renderSize.width - pillSize.width) / 2,
-                y: renderSize.height * 0.075)
-        }
+        // CA coordinates: origin bottom-left.
+        let pillOrigin = CGPoint(
+            x: (renderSize.width - pillSize.width) / 2,
+            y: renderSize.height * 0.075)
 
         let pill = CALayer()
         pill.frame = CGRect(origin: pillOrigin, size: pillSize)
@@ -655,7 +540,7 @@ enum VideoStitcher {
         let emoji = caption.emoji.filter { seen.insert($0).inserted }.prefix(5)
         guard !emoji.isEmpty else { return }
 
-        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let target = CGRect(origin: .zero, size: renderSize)
         let minEdge = min(target.width, target.height)
         let size = max(minEdge * 0.11, 26)
         let spacing = size * 1.15
@@ -720,9 +605,9 @@ enum VideoStitcher {
         guard let rawText = caption.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
               !rawText.isEmpty else { return }
 
-        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let target = CGRect(origin: .zero, size: renderSize)
         let maxWidth = target.width * 0.68
-        var fontSize = min(target.width, target.height) * (caption.cell == nil ? 0.062 : 0.052)
+        var fontSize = min(target.width, target.height) * 0.062
         var attributed: NSAttributedString
         repeat {
             attributed = NSAttributedString(string: rawText, attributes: [
@@ -782,22 +667,14 @@ enum VideoStitcher {
         }
 
         let identityColor = Identity.uiColor(for: caption.authorName)
-        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let target = CGRect(origin: .zero, size: renderSize)
         let minEdge = min(target.width, target.height)
         let stampWidth = max(minEdge * 0.34, 118)
         let stampHeight = stampWidth * 0.33
-        let margin = minEdge * 0.06
 
-        let origin: CGPoint
-        if let cell = caption.cell {
-            origin = CGPoint(
-                x: cell.maxX - stampWidth - margin,
-                y: renderSize.height - cell.minY - stampHeight - margin)
-        } else {
-            origin = CGPoint(
-                x: renderSize.width - stampWidth - renderSize.width * 0.075,
-                y: renderSize.height - stampHeight - renderSize.height * 0.075)
-        }
+        let origin = CGPoint(
+            x: renderSize.width - stampWidth - renderSize.width * 0.075,
+            y: renderSize.height - stampHeight - renderSize.height * 0.075)
 
         let group = CALayer()
         group.frame = CGRect(origin: origin, size: CGSize(width: stampWidth, height: stampHeight))
@@ -894,7 +771,7 @@ enum VideoStitcher {
         duration: Double,
         edge: Double
     ) {
-        let target = caption.cell ?? CGRect(origin: .zero, size: renderSize)
+        let target = CGRect(origin: .zero, size: renderSize)
         let minEdge = min(target.width, target.height)
 
         let text = "\(formattedStampDateShort(caption.recordedAt))  ·  \(formattedStampTime(caption.recordedAt))"
@@ -908,19 +785,11 @@ enum VideoStitcher {
         let padH = fontSize * 0.72
         let padV = fontSize * 0.42
         let pillSize = CGSize(width: textSize.width + padH * 2, height: textSize.height + padV * 2)
-        let margin = minEdge * 0.06
 
-        // CA coordinates: origin bottom-left; cells are top-left, so flip y.
-        let origin: CGPoint
-        if let cell = caption.cell {
-            origin = CGPoint(
-                x: cell.maxX - pillSize.width - margin,
-                y: renderSize.height - cell.minY - pillSize.height - margin)
-        } else {
-            origin = CGPoint(
-                x: renderSize.width - pillSize.width - renderSize.width * 0.06,
-                y: renderSize.height - pillSize.height - renderSize.height * 0.06)
-        }
+        // CA coordinates: origin bottom-left.
+        let origin = CGPoint(
+            x: renderSize.width - pillSize.width - renderSize.width * 0.06,
+            y: renderSize.height - pillSize.height - renderSize.height * 0.06)
 
         let pill = CALayer()
         pill.frame = CGRect(origin: origin, size: pillSize)

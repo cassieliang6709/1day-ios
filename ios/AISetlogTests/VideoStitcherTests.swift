@@ -6,7 +6,6 @@ final class VideoStitcherTests: XCTestCase {
     func testSequentialStitchExportsPlayableVideo() async throws {
         let clips = try sampleClips(count: 3)
         var options = VideoStitcher.Options()
-        options.layout = .sequential
         options.crossfadeSeconds = 0.3
         options.showDayCaptions = false
 
@@ -20,21 +19,6 @@ final class VideoStitcherTests: XCTestCase {
         XCTAssertFalse(videoTracks.isEmpty)
         XCTAssertGreaterThan(duration, 4.0)
         XCTAssertLessThan(duration, 6.1)
-        XCTAssertGreaterThan(try fileSize(output), 0)
-    }
-
-    func testGridStitchExportsConfiguredDuration() async throws {
-        let clips = try sampleClips(count: 4)
-        var options = VideoStitcher.Options()
-        options.layout = .grid
-        options.gridSeconds = 2.0
-        options.showDayCaptions = false
-
-        let output = try await VideoStitcher.stitch(clips: clips, options: options)
-        defer { try? FileManager.default.removeItem(at: output) }
-
-        let duration = try await AVURLAsset(url: output).load(.duration).seconds
-        XCTAssertEqual(duration, 2.0, accuracy: 0.1)
         XCTAssertGreaterThan(try fileSize(output), 0)
     }
 

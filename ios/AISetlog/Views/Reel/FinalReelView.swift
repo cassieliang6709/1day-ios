@@ -6,8 +6,7 @@ struct FinalReelView: View {
     let challenge: Challenge
     let clips: [DayClip]
 
-    @State private var layout: VideoStitcher.Layout
-    @State private var exportURLs: [VideoStitcher.Layout: URL] = [:]
+    @State private var exportURL: URL?
     @State private var player: AVPlayer?
     @State private var errorMessage: String?
     @State private var isSavingVideo = false
@@ -18,32 +17,14 @@ struct FinalReelView: View {
     @State private var includeTitleCard = true
     @State private var includeCaptions = true
     @State private var fadeSeconds = 0.35
-    @State private var gridSeconds = 6.0
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    init(challenge: Challenge, clips: [DayClip]) {
-        self.challenge = challenge
-        self.clips = clips
-        var initial = VideoStitcher.Layout.sequential
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-demoGrid") { initial = .grid }
-        #endif
-        _layout = State(initialValue: initial)
-    }
-
     var body: some View {
         VStack(spacing: 16) {
-            Picker(Strings.layout, selection: $layout) {
-                Text(Strings.sequence).tag(VideoStitcher.Layout.sequential)
-                Text(Strings.grid).tag(VideoStitcher.Layout.grid)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-
             Group {
-                if let player, exportURLs[layout] != nil {
+                if let player, let url = exportURL {
                     VStack(spacing: 16) {
                         VideoPlayer(player: player)
                             .aspectRatio(9 / 16, contentMode: .fit)
@@ -53,34 +34,32 @@ struct FinalReelView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
-                        if let url = exportURLs[layout] {
-                            VStack(spacing: 10) {
-                                ShareLink(item: url) {
-                                    Label(shareButtonTitle, systemImage: "square.and.arrow.up")
-                                        .font(.headline)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 6)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.large)
+                        VStack(spacing: 10) {
+                            ShareLink(item: url) {
+                                Label(shareButtonTitle, systemImage: "square.and.arrow.up")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
 
-                                Button {
-                                    Task { await saveVideo(url) }
-                                } label: {
-                                    Label(isSavingVideo ? Strings.saving : Strings.saveVideo, systemImage: "square.and.arrow.down")
-                                        .font(.headline)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 6)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                                .disabled(isSavingVideo)
+                            Button {
+                                Task { await saveVideo(url) }
+                            } label: {
+                                Label(isSavingVideo ? Strings.saving : Strings.saveVideo, systemImage: "square.and.arrow.down")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                            .disabled(isSavingVideo)
 
-                                if let saveMessage {
-                                    Text(saveMessage)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
+                            if let saveMessage {
+                                Text(saveMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -94,9 +73,7 @@ struct FinalReelView: View {
                     VStack(spacing: 14) {
                         ProgressView()
                             .controlSize(.large)
-                        Text(layout == .grid
-                            ? Strings.buildingGrid
-                            : Strings.stitching)
+                        Text(Strings.stitching)
                             .font(.headline)
                         Text(Strings.renderedOnDevice)
                             .font(.footnote)
@@ -122,27 +99,21 @@ struct FinalReelView: View {
             AdjustSheet(
                 includeTitleCard: $includeTitleCard,
                 includeCaptions: $includeCaptions,
-                fadeSeconds: $fadeSeconds,
-                gridSeconds: $gridSeconds
+                fadeSeconds: $fadeSeconds
             ) {
-                exportURLs.removeAll()
+                exportURL = nil
                 Task { await render() }
             }
             .presentationDetents([.medium])
         }
-        .task(id: layout) { await render() }
+        .task { await render() }
         .onDisappear { player?.pause() }
     }
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
     private var footerText: String {
-        switch layout {
-        case .sequential:
-            return Strings.footerSequence(clips.count, unit: presenter.unitName)
-        case .grid:
-            return Strings.footerGrid(clips.count)
-        }
+        Strings.footerSequence(clips.count, unit: presenter.unitName)
     }
 
     private var shareButtonTitle: String {
@@ -151,7 +122,7 @@ struct FinalReelView: View {
 
     private func render() async {
         errorMessage = nil
-        if let cached = exportURLs[layout] {
+        if let cached = exportURL {
             play(cached)
             return
         }
@@ -159,13 +130,11 @@ struct FinalReelView: View {
         player = nil
         do {
             var options = VideoStitcher.Options()
-            options.layout = layout
             options.crossfadeSeconds = fadeSeconds
-            options.gridSeconds = gridSeconds
             options.showDayCaptions = includeCaptions
             options.titleCard = includeTitleCard ? titleCard : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
-            exportURLs[layout] = url
+            exportURL = url
             play(url)
         } catch {
             print("[stitch] failed: \(error)")
@@ -222,7 +191,6 @@ private struct AdjustSheet: View {
     @Binding var includeTitleCard: Bool
     @Binding var includeCaptions: Bool
     @Binding var fadeSeconds: Double
-    @Binding var gridSeconds: Double
     let onApply: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -249,16 +217,6 @@ private struct AdjustSheet: View {
                     Text(Strings.sequence)
                 } footer: {
                     Text(Strings.hardCutsFooter)
-                }
-                Section(Strings.grid) {
-                    HStack {
-                        Text(Strings.length)
-                        Slider(value: $gridSeconds, in: 4...12, step: 1)
-                        Text("\(Int(gridSeconds))s")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, alignment: .trailing)
-                    }
                 }
             }
             .navigationTitle(Strings.adjust)
