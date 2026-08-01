@@ -25,6 +25,17 @@ final class AccountStore {
     var isSignedIn: Bool { account != nil }
 
     init() {
+        #if DEBUG
+        // Simulator helper: Sign in with Apple can't run there, so a
+        // signed-in-shaped state is otherwise unreachable — and several
+        // layout paths only appear once there's a display name.
+        // `-demoAccountName "悦 梁"`
+        if let name = UserDefaults.standard.string(forKey: "demoAccountName"),
+           !name.isEmpty {
+            account = Account(id: "demo-account", displayName: name)
+            return
+        }
+        #endif
         if let data = UserDefaults.standard.data(forKey: Self.key),
            let saved = try? JSONDecoder().decode(Account.self, from: data) {
             account = saved

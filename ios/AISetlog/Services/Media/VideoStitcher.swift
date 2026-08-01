@@ -24,12 +24,53 @@ enum VideoStitcher {
         let subtitle: String
     }
 
+    /// The shape of the finished film.
+    ///
+    /// A property of the *film*, not of each clip: you choose it (and change
+    /// it) after the day is filmed. Clips that don't match get letterboxed
+    /// rather than cropped — the whole point of the app is keeping what you
+    /// captured, so it never throws pixels away to make a frame fit.
+    enum Aspect: String, CaseIterable, Identifiable {
+        case portrait, landscape, square
+
+        var id: String { rawValue }
+
+        /// width / height
+        var ratio: CGFloat {
+            switch self {
+            case .portrait: 9.0 / 16.0
+            case .landscape: 16.0 / 9.0
+            case .square: 1
+            }
+        }
+
+        /// Render size for a film whose source clips have this long edge.
+        /// All three land on the same short edge, so switching aspect doesn't
+        /// change how heavy the export is.
+        func renderSize(sourceLongEdge: CGFloat) -> CGSize {
+            let short = (sourceLongEdge * 9 / 16).rounded()
+            let long = sourceLongEdge.rounded()
+            let raw: CGSize = switch self {
+            case .portrait: CGSize(width: short, height: long)
+            case .landscape: CGSize(width: long, height: short)
+            case .square: CGSize(width: short, height: short)
+            }
+            // H.264 wants even dimensions.
+            return CGSize(
+                width: (raw.width / 2).rounded(.down) * 2,
+                height: (raw.height / 2).rounded(.down) * 2)
+        }
+    }
+
     struct Options {
         var crossfadeSeconds: Double = 0.35
         var showDayCaptions = true
         var layout: Layout = .sequential
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
+        /// nil keeps the film in the shape of its first clip — the behaviour
+        /// from before aspect became a choice.
+        var aspect: Aspect?
         static let `default` = Options()
     }
 

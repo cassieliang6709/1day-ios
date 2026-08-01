@@ -55,9 +55,7 @@ struct StoryCard: View {
                     }
                 }
             }
-            .frame(height: 258)
-            .frame(maxWidth: .infinity)
-            .clipped()
+            .clipBox(height: 258)
 
             OneDay.scrim
 

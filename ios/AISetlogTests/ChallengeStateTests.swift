@@ -185,34 +185,38 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(secondLaunch.map(\.id), firstLaunch.map(\.id))
         XCTAssertEqual(fileStore.migratedFileNames, ["day1.mov"])
     }
-    func testPhysicalIPhonePortraitCaptureUsesNinetyDegrees() {
-        XCTAssertEqual(
-            ClipRecorder.rotationAngle(
-                orientation: .portrait,
-                devicePosition: .back,
-                coordinatedAngle: 0),
-            90)
-        XCTAssertEqual(
-            ClipRecorder.rotationAngle(
-                orientation: .portrait,
-                devicePosition: .front,
-                coordinatedAngle: 270),
-            90)
+    /// Portrait takes whatever the rotation coordinator says, for every camera.
+    ///
+    /// This used to assert a hardcoded 90° for physical cameras. That was the
+    /// bug: on an iPhone 17 Pro Max the front camera's pipeline already rotates
+    /// its buffers, so forcing another 90° turned every free-form clip a
+    /// quarter-turn. The coordinator knows how each camera is mounted; the
+    /// function's job is to pass its answer through, not to second-guess it.
+    func testPortraitTakesTheCoordinatorsAngleForEveryCamera() {
+        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
+            for angle: CGFloat in [0, 90, 180, 270] {
+                XCTAssertEqual(
+                    ClipRecorder.rotationAngle(
+                        orientation: .portrait,
+                        devicePosition: position,
+                        coordinatedAngle: angle),
+                    angle,
+                    "portrait/\(position.rawValue) should pass \(angle) through")
+            }
+        }
     }
 
-    func testExternalCameraUsesCoordinatorAndLandscapeStaysUnrotated() {
-        XCTAssertEqual(
-            ClipRecorder.rotationAngle(
-                orientation: .portrait,
-                devicePosition: .unspecified,
-                coordinatedAngle: 270),
-            270)
-        XCTAssertEqual(
-            ClipRecorder.rotationAngle(
-                orientation: .landscape,
-                devicePosition: .back,
-                coordinatedAngle: 90),
-            0)
+    /// Landscape means the sensor's own frame, so nothing rotates — whatever
+    /// the coordinator would have preferred for a horizon-level portrait shot.
+    func testLandscapeStaysUnrotatedRegardlessOfCoordinator() {
+        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
+            XCTAssertEqual(
+                ClipRecorder.rotationAngle(
+                    orientation: .landscape,
+                    devicePosition: position,
+                    coordinatedAngle: 90),
+                0)
+        }
     }
 
 }

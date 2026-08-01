@@ -212,8 +212,7 @@ struct TimelineClip: View {
         switch state {
         case .filmed(let url, let recordedAt):
             ClipThumbnail(url: url, refreshToken: recordedAt)
-                .frame(height: mediaHeight)
-                .frame(maxWidth: .infinity)
+                .clipBox(height: mediaHeight)
                 .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
                     Text(momentTitle)

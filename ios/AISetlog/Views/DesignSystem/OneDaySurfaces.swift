@@ -13,15 +13,23 @@ struct OneDayCanvas: View {
     var seed: Int = 0
 
     var body: some View {
-        ZStack {
-            OneDay.canvas.ignoresSafeArea()
-
-            bloom(.oneDayMist, size: 320, x: -140, y: -280, opacity: 0.9)
-            bloom(.oneDaySky, size: 260, x: 170, y: -180, opacity: 0.28)
-            bloom(.oneDayLavender, size: 300, x: 160, y: 380, opacity: 0.16)
-            bloom(.oneDayMint, size: 200, x: -160, y: 460, opacity: 0.14)
-        }
-        .ignoresSafeArea()
+        // The blooms hang in an overlay on a flexible colour rather than
+        // sitting beside it in a ZStack. A ZStack adopts the width of its
+        // largest child, so the 320pt bloom was setting the size of every
+        // screen that used the canvas as a sibling of its content — pushing
+        // the layout ~60pt wider than the display and cropping both edges.
+        // An overlay is sized by its base, so decoration can't do that.
+        OneDay.canvas
+            .overlay {
+                ZStack {
+                    bloom(.oneDayMist, size: 320, x: -140, y: -280, opacity: 0.9)
+                    bloom(.oneDaySky, size: 260, x: 170, y: -180, opacity: 0.28)
+                    bloom(.oneDayLavender, size: 300, x: 160, y: 380, opacity: 0.16)
+                    bloom(.oneDayMint, size: 200, x: -160, y: 460, opacity: 0.14)
+                }
+                .allowsHitTesting(false)
+            }
+            .ignoresSafeArea()
     }
 
     private func bloom(_ color: Color, size: CGFloat, x: CGFloat, y: CGFloat, opacity: Double) -> some View {
@@ -157,6 +165,24 @@ struct OneDayBuddy: View {
         Circle()
             .fill(.white)
             .frame(width: size * 0.13, height: size * 0.13)
+    }
+}
+
+extension View {
+    /// Lays the view out inside a box of fixed height spanning the available
+    /// width, clipping whatever spills.
+    ///
+    /// Use this for any clip thumbnail. `ClipThumbnail` aspect-*fills*, so its
+    /// ideal width is `height × aspect` — put one straight into
+    /// `.frame(height:)` and a landscape clip demands ~459pt at 258pt tall,
+    /// which widens the enclosing stack and pushes the whole screen past the
+    /// display. Content in an overlay cannot resize its base, so the box wins.
+    func clipBox(height: CGFloat) -> some View {
+        Color.clear
+            .frame(height: height)
+            .frame(maxWidth: .infinity)
+            .overlay { self }
+            .clipped()
     }
 }
 

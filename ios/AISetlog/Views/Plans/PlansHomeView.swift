@@ -125,6 +125,10 @@ struct PlansHomeView: View {
             }
             .padding(.top, 8)
             .padding(.bottom, OneDay.tabBarClearance + 20)
+            // Belt and braces: the page can never be wider than the scroll
+            // viewport. Without this a single over-eager child silently drags
+            // every section off both edges of the display.
+            .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
         .overlay {
@@ -417,6 +421,20 @@ struct PlansHomeView: View {
             if args.contains("-demoTimeline") || args.contains("-demoFilm")
                 || args.contains("-demoEmpty") {
                 path = [seeded.id]
+            }
+        }
+        // A populated home: a hero, other plans, and finished films on the
+        // shelf — the shape a real account has, which is where layout breaks.
+        if args.contains("-demoFull"), store.challenges.count < 6 {
+            for (index, template) in ChallengeTemplate.oneDayBuiltins.prefix(6).enumerated() {
+                let made = store.create(
+                    title: template.displayName,
+                    mode: .oneDay,
+                    templateName: template.displayName,
+                    momentTitles: template.momentKeys)
+                // Four complete (they land on the finished shelf) and two in
+                // progress, which is roughly what a used account looks like.
+                store.fillWithDemoClips(challengeID: made.id, limit: index < 4 ? 7 : 3)
             }
         }
         if args.contains("-demoReel") {

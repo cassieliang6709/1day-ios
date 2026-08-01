@@ -17,6 +17,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    /// The coordinator computes its angles asynchronously — reading them once
+    /// straight after `init` yields 0 before it has settled. Observe instead.
+    private var captureAngleObservation: NSKeyValueObservation?
+    private var previewAngleObservation: NSKeyValueObservation?
 
     private var isConfigured = false
     /// Recording orientation — locks both the output file and the preview to
@@ -112,9 +116,15 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         applyOrientation()
     }
 
-    /// Physical iPhone cameras are mounted in landscape, so portrait capture
-    /// requires a 90° connection rotation. External cameras (used by the
-    /// Simulator) have no fixed mounting and must use RotationCoordinator.
+    /// Rebuilds the rotation coordinator for the current device and preview,
+    /// then keeps applying its angles as it settles.
+    ///
+    /// An earlier version hardcoded 90° for any physical camera on the theory
+    /// that iPhone sensors are always mounted in landscape. On this device
+    /// that over-rotates: the capture pipeline rotates the buffers *and*
+    /// writes a 90° preferred transform, so the clip comes out turned a
+    /// quarter-turn. `RotationCoordinator` exists to compute this number
+    /// correctly per device and camera — use it rather than guessing.
     private func applyOrientation() {
         guard let device = videoInput?.device else { return }
         let coordinator = AVCaptureDevice.RotationCoordinator(
@@ -122,11 +132,34 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             previewLayer: previewLayer)
         rotationCoordinator = coordinator
 
+        // Re-apply whenever the coordinator revises its answer, which it does
+        // shortly after creation and whenever the device is physically turned.
+        captureAngleObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture, options: [.new]
+        ) { [weak self] _, _ in
+            Task { @MainActor in self?.applyAngles() }
+        }
+        previewAngleObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelPreview, options: [.new]
+        ) { [weak self] _, _ in
+            Task { @MainActor in self?.applyAngles() }
+        }
+
+        applyAngles()
+    }
+
+    /// Pushes the coordinator's current angles onto the capture and preview
+    /// connections. Safe to call repeatedly — the angles are absolute.
+    private func applyAngles() {
+        guard let device = videoInput?.device,
+              let coordinator = rotationCoordinator else { return }
+
         let captureAngle = Self.rotationAngle(
             orientation: orientation,
             devicePosition: device.position,
             coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
-        if let connection = movieOutput.connection(with: .video),
+        let captureConnection = movieOutput.connection(with: .video)
+        if let connection = captureConnection,
            connection.isVideoRotationAngleSupported(captureAngle) {
             connection.videoRotationAngle = captureAngle
         }
@@ -141,13 +174,17 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
+    /// The angle to put on a connection.
+    ///
+    /// Portrait trusts the coordinator, which knows how this specific camera is
+    /// mounted. Landscape means "the sensor's own frame", which is 0 — no
+    /// rotation, front or back, physical or external.
     static func rotationAngle(
         orientation: Challenge.Orientation,
         devicePosition: AVCaptureDevice.Position,
         coordinatedAngle: CGFloat
     ) -> CGFloat {
-        guard orientation == .portrait else { return 0 }
-        return devicePosition == .unspecified ? coordinatedAngle : 90
+        orientation == .portrait ? coordinatedAngle : 0
     }
 
     func flipCamera() {
