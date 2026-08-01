@@ -26,7 +26,9 @@ enum MomentCatalog {
         "wind_down": .init(text: .init(en: "Wind down", zh: "睡前放松"), icon: "moon.stars.fill"),
         // Soft Reset
         "messy_start": .init(text: .init(en: "Messy start", zh: "一团糟的开始"), icon: "scribble"),
-        "clear_one_thing": .init(text: .init(en: "Clear one thing", zh: "先清一样东西"), icon: "checkmark.circle.fill"),
+        // Not a checkmark: on the timeline a circled check means "filmed", so a
+        // prompt wearing one reads as already done.
+        "clear_one_thing": .init(text: .init(en: "Clear one thing", zh: "先清一样东西"), icon: "sparkles"),
         "reset_corner": .init(text: .init(en: "Reset corner", zh: "整理一角"), icon: "arrow.triangle.2.circlepath"),
         "step_outside": .init(text: .init(en: "Step outside", zh: "出去走走"), icon: "wind"),
         "small_treat": .init(text: .init(en: "Small treat", zh: "小奖励"), icon: "cup.and.saucer.fill"),

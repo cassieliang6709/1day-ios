@@ -6,6 +6,18 @@ import SwiftUI
 /// moments and 7-day themes — the same short prompts read fine either way.
 struct BuildTemplateView: View {
     var onSave: (ChallengeTemplate) -> Void
+    private let editingTemplate: ChallengeTemplate?
+
+    init(
+        template: ChallengeTemplate? = nil,
+        onSave: @escaping (ChallengeTemplate) -> Void
+    ) {
+        editingTemplate = template
+        self.onSave = onSave
+        _selected = State(initialValue: template?.momentKeys ?? [])
+        _name = State(initialValue: template?.name.en ?? "")
+        _emoji = State(initialValue: template?.emoji ?? "🎬")
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -41,8 +53,8 @@ struct BuildTemplateView: View {
 
                     if !selected.isEmpty {
                         Section {
-                            ForEach(Array(selected.enumerated()), id: \.element) { index, prompt in
-                                orderRow(index: index, prompt: prompt)
+                            ForEach(selected.indices, id: \.self) { index in
+                                orderRow(index: index)
                             }
                             .onMove(perform: move)
                         } header: {
@@ -76,7 +88,7 @@ struct BuildTemplateView: View {
                 .scrollContentBackground(.hidden)
                 .sensoryFeedback(.impact(weight: .medium), trigger: selected.count)
             }
-            .navigationTitle(Strings.buildYourOwn)
+            .navigationTitle(editingTemplate == nil ? Strings.buildYourOwn : Strings.editTemplate)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -123,18 +135,31 @@ struct BuildTemplateView: View {
         .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
     }
 
-    private func orderRow(index: Int, prompt: String) -> some View {
+    private func orderRow(index: Int) -> some View {
         HStack(spacing: 10) {
             Text("\(index + 1)")
                 .font(.caption.bold())
                 .foregroundStyle(.white)
                 .frame(width: 22, height: 22)
                 .background(Color.oneDayBlue, in: Circle())
-            Text(MomentCatalog.localize(prompt))
-                .font(.subheadline.weight(.semibold))
+            TextField(
+                Strings.promptN(index + 1),
+                text: Binding(
+                    get: {
+                        guard selected.indices.contains(index) else { return "" }
+                        return MomentCatalog.localize(selected[index])
+                    },
+                    set: { value in
+                        guard selected.indices.contains(index) else { return }
+                        selected[index] = value
+                    }
+                )
+            )
+            .font(.subheadline.weight(.semibold))
             Spacer()
             Button {
-                toggle(prompt)
+                guard selected.indices.contains(index) else { return }
+                selected.remove(at: index)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary.opacity(0.5))
@@ -174,7 +199,11 @@ struct BuildTemplateView: View {
     // MARK: - State
 
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && !selected.isEmpty
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !selected.isEmpty
+            && selected.allSatisfy {
+                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
     }
 
     private func toggle(_ prompt: String) {
@@ -201,9 +230,12 @@ struct BuildTemplateView: View {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmoji = emoji.trimmingCharacters(in: .whitespaces)
         let template = ChallengeTemplate(
+            id: editingTemplate?.id ?? UUID(),
             emoji: trimmedEmoji.isEmpty ? "🎬" : trimmedEmoji,
             name: LocalizedText(en: trimmedName, zh: trimmedName),
-            momentKeys: selected,
+            momentKeys: selected.map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            },
             isCustom: true)
         onSave(template)
         dismiss()

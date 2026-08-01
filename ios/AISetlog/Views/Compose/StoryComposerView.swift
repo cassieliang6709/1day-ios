@@ -1,0 +1,293 @@
+import SwiftUI
+
+/// Screens 2 and 3 — choosing a story, then setting it up.
+///
+/// The old creation screen was one long form: a title field, a fanned deck,
+/// five settings rows and a toggle, all competing. Splitting it means step one
+/// can be nothing but posters (choosing a mood should feel like browsing a
+/// shelf) and step two can be short enough to read in a glance.
+struct StoryComposerView: View {
+    var onCreate: (UUID) -> Void = { _ in }
+
+    @Environment(ChallengeStore.self) private var store
+    @Environment(AccountStore.self) private var account
+    @Environment(\.dismiss) private var dismiss
+
+    enum Step: Int { case mood, setup }
+
+    @State private var step: Step = .mood
+    @State private var activeIndex = 0
+    @State private var mode: Challenge.Mode = .oneDay
+    @State private var clipLength: Challenge.ClipLength = .tiny
+    @State private var orientation: Challenge.Orientation = .portrait
+    @State private var withFriends = false
+    @State private var startTime: Date = Self.defaultStartTime()
+    @State private var title = ""
+    /// Set once the user edits the name, so switching templates stops
+    /// overwriting what they typed.
+    @State private var titleEdited = false
+    @State private var creating = false
+    @State private var errorText: String?
+    @State private var showSignIn = false
+    @State private var showBuildTemplate = false
+    @State private var editingTemplate: ChallengeTemplate?
+
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    private var templates: [ChallengeTemplate] {
+        let builtins = mode == .oneDay
+            ? ChallengeTemplate.oneDayBuiltins
+            : ChallengeTemplate.sevenDayBuiltins
+        return builtins + store.customTemplates
+    }
+
+    private var selected: ChallengeTemplate? {
+        templates.indices.contains(activeIndex) ? templates[activeIndex] : nil
+    }
+
+    var body: some View {
+        ZStack {
+            OneDayCanvas(seed: 1)
+
+            VStack(spacing: 0) {
+                topBar
+
+                switch step {
+                case .mood:
+                    MoodStep(
+                        templates: templates,
+                        activeIndex: $activeIndex,
+                        mode: $mode,
+                        clipLength: $clipLength,
+                        onBuildOwn: { showBuildTemplate = true },
+                        onEdit: { editingTemplate = $0 },
+                        onDelete: deleteTemplate)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)))
+
+                case .setup:
+                    SetupStep(
+                        template: selected,
+                        title: $title,
+                        titleEdited: $titleEdited,
+                        withFriends: $withFriends,
+                        clipLength: $clipLength,
+                        orientation: $orientation,
+                        startTime: $startTime,
+                        isOneDay: mode == .oneDay,
+                        memberNames: knownFriendNames,
+                        errorText: errorText)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)))
+                }
+
+                footer
+            }
+        }
+        .sheet(isPresented: $showSignIn) {
+            SignInView { createSharedRoom() }
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showBuildTemplate) {
+            BuildTemplateView { template in
+                store.addCustomTemplate(template)
+                activeIndex = max(templates.count - 1, 0)
+            }
+        }
+        .sheet(item: $editingTemplate) { template in
+            BuildTemplateView(template: template) { updated in
+                store.updateCustomTemplate(updated)
+            }
+        }
+        .onAppear {
+            syncTitleToTemplate()
+            #if DEBUG
+            // Screenshot hook: the setup step is otherwise only reachable by tap.
+            if ProcessInfo.processInfo.arguments.contains("-demoSetupStep") {
+                step = .setup
+            }
+            #endif
+        }
+        .onChange(of: activeIndex) { _, _ in syncTitleToTemplate() }
+        .onChange(of: mode) { _, _ in
+            activeIndex = 0
+            titleEdited = false
+            syncTitleToTemplate()
+        }
+    }
+
+    // MARK: - Chrome
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            IconBubble(systemName: step == .mood ? "xmark" : "chevron.left") {
+                if step == .mood {
+                    dismiss()
+                } else {
+                    withAnimation(OneDay.Motion.soft) { step = .mood }
+                }
+            }
+
+            Spacer()
+
+            StepDots(count: 2, index: step.rawValue)
+
+            Spacer()
+
+            // Balances the leading bubble so the dots stay centred.
+            Color.clear.frame(width: 38, height: 38)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+    }
+
+    private var footer: some View {
+        VStack(spacing: 10) {
+            Button(action: advance) {
+                HStack(spacing: 8) {
+                    if creating {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text(primaryTitle)
+                        Image(systemName: step == .mood ? "arrow.right" : "sparkles")
+                    }
+                }
+            }
+            .buttonStyle(.primaryAction)
+            .disabled(!canAdvance)
+            .opacity(canAdvance ? 1 : 0.55)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+    }
+
+    private var primaryTitle: String {
+        switch step {
+        case .mood: return Strings.next
+        case .setup: return withFriends ? Strings.createRoom : Strings.createStoryCTA
+        }
+    }
+
+    private var canAdvance: Bool {
+        switch step {
+        case .mood: return selected != nil
+        case .setup: return !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
+        }
+    }
+
+    // MARK: - Actions
+
+    private func advance() {
+        switch step {
+        case .mood:
+            withAnimation(OneDay.Motion.soft) { step = .setup }
+        case .setup:
+            start()
+        }
+    }
+
+    private func start() {
+        let name = title.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        if withFriends {
+            if account.isSignedIn { createSharedRoom() } else { showSignIn = true }
+        } else {
+            let challenge = store.create(
+                title: name,
+                mode: mode,
+                clipLength: clipLength,
+                orientation: orientation,
+                templateName: selected?.displayName,
+                momentTitles: selected?.momentKeys,
+                startDate: resolvedStartDate)
+            dismiss()
+            onCreate(challenge.id)
+        }
+    }
+
+    private func createSharedRoom() {
+        creating = true
+        errorText = nil
+        Task {
+            defer { creating = false }
+            do {
+                let challenge = try await store.createSharedRoom(
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    mode: mode,
+                    clipLength: clipLength,
+                    orientation: orientation,
+                    templateName: selected?.displayName,
+                    momentTitles: selected?.momentKeys,
+                    startDate: resolvedStartDate)
+                dismiss()
+                onCreate(challenge.id)
+            } catch {
+                errorText = error.localizedDescription
+            }
+        }
+    }
+
+    private func deleteTemplate(_ template: ChallengeTemplate) {
+        store.deleteCustomTemplate(template)
+        activeIndex = min(activeIndex, max(templates.count - 2, 0))
+    }
+
+    // MARK: - Derived state
+
+    /// Keeps the story name in step with the chosen script until the user
+    /// takes the name over.
+    private func syncTitleToTemplate() {
+        guard !titleEdited, let selected else { return }
+        title = mode == .sevenDay
+            ? Strings.fullTitle7Days(selected.displayName)
+            : selected.displayName
+    }
+
+    /// The picker only chooses a time of day; anchor it to today's date.
+    private var resolvedStartDate: Date {
+        let calendar = Calendar.current
+        let time = calendar.dateComponents([.hour, .minute], from: startTime)
+        return calendar.date(
+            bySettingHour: time.hour ?? 8, minute: time.minute ?? 0, second: 0, of: .now)
+            ?? .now
+    }
+
+    /// Names already seen in the user's rooms — shown as suggestions on the
+    /// "with friends" card so it isn't an empty promise.
+    private var knownFriendNames: [String] {
+        var seen: [String] = []
+        for challenge in store.challenges where challenge.isShared {
+            for member in store.members(for: challenge.id) where !seen.contains(member.name) {
+                seen.append(member.name)
+            }
+        }
+        return seen
+    }
+
+    /// Default to the start of today's waking hours, rounded down to the hour.
+    private static func defaultStartTime() -> Date {
+        Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: .now) ?? .now
+    }
+}
+
+/// Two-step progress, as dots rather than a bar — the flow is short enough
+/// that a bar would overstate it.
+struct StepDots: View {
+    let count: Int
+    let index: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { dot in
+                Capsule()
+                    .fill(dot <= index ? Color.oneDayBlue : Color.oneDaySky.opacity(0.3))
+                    .frame(width: dot == index ? 22 : 7, height: 7)
+            }
+        }
+        .animation(OneDay.Motion.snap, value: index)
+    }
+}

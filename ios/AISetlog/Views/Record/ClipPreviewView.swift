@@ -12,6 +12,7 @@ struct ClipPreviewView: View {
     let url: URL
     let recordedAt: Date?
     var challengeID: UUID?
+    var targetAuthorID: String?
     let onReRecord: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -33,10 +34,14 @@ struct ClipPreviewView: View {
         guard let challengeID else { return nil }
         return store.challenge(challengeID)?.cards.first { $0.day == day }
     }
-    private var reactions: [ClipReaction] { card?.reactions ?? [] }
-    private var comments: [ClipComment] {
-        (card?.comments ?? []).sorted { $0.createdAt < $1.createdAt }
+    
+    private var interactions: (reactions: [ClipReaction], comments: [ClipComment]) {
+        guard let challengeID else { return ([], []) }
+        return store.interactions(for: challengeID, day: day, targetAuthorID: targetAuthorID ?? myID)
     }
+
+    private var reactions: [ClipReaction] { interactions.reactions }
+    private var comments: [ClipComment] { interactions.comments }
     private var aspectRatio: CGFloat {
         guard let challengeID else { return 9 / 16 }
         return store.challenge(challengeID)?.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16
@@ -62,7 +67,7 @@ struct ClipPreviewView: View {
                     if challengeID != nil {
                         ReactionBar(reactions: reactions, myID: myID) { emoji in
                             if let challengeID {
-                                store.toggleReaction(emoji, day: day, challengeID: challengeID)
+                                store.toggleReaction(emoji, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
                             }
                         }
                     }
@@ -84,7 +89,7 @@ struct ClipPreviewView: View {
                     if challengeID != nil {
                         CommentsSection(comments: comments, myID: myID) { comment in
                             if let challengeID {
-                                store.deleteComment(comment.id, day: day, challengeID: challengeID)
+                                store.deleteComment(comment.id, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
                             }
                         }
                     }
@@ -112,7 +117,7 @@ struct ClipPreviewView: View {
                 if challengeID != nil {
                     CommentInputBar { text in
                         if let challengeID {
-                            store.addComment(text, day: day, challengeID: challengeID)
+                            store.addComment(text, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
                         }
                     }
                 }
@@ -133,7 +138,7 @@ struct ClipPreviewView: View {
                 clipSeconds: clipLength.seconds
             )
 
-            if challengeID != nil {
+            if challengeID != nil, targetAuthorID == nil || targetAuthorID == "local" || targetAuthorID == myID {
                 if editingCaption {
                     CaptionOverlayEditor(text: $captionDraft, isFocused: $captionFocused)
                 } else {

@@ -8,6 +8,7 @@ struct DayClip: Identifiable {
     let day: Int
     let url: URL
     var authorName: String?
+    var authorID: String?
     var label: String?
     var overlayText: String?
     var recordedAt: Date?
@@ -20,6 +21,7 @@ struct DayClip: Identifiable {
         day: Int,
         url: URL,
         authorName: String? = nil,
+        authorID: String? = nil,
         label: String? = nil,
         overlayText: String? = nil,
         recordedAt: Date? = nil,
@@ -30,6 +32,7 @@ struct DayClip: Identifiable {
         self.day = day
         self.url = url
         self.authorName = authorName
+        self.authorID = authorID
         self.label = label
         self.overlayText = overlayText
         self.recordedAt = recordedAt

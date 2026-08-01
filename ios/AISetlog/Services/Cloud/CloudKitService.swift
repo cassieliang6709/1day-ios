@@ -70,7 +70,10 @@ enum CloudKitService {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil
+        momentTitles: [String]? = nil,
+        /// When the shared day begins — every member's timeline lays out
+        /// against this, so the room agrees on what "7:00 AM" means.
+        startDate: Date = .now
     ) async throws -> RemoteRoom {
         try await ensureAccountAvailable()
         // Retry on the astronomically unlikely code collision.
@@ -78,7 +81,7 @@ enum CloudKitService {
             let code = makeCode()
             let record = CKRecord(recordType: "Room", recordID: .init(recordName: code))
             record["title"] = title as CKRecordValue
-            record["startDate"] = Date.now as CKRecordValue
+            record["startDate"] = startDate as CKRecordValue
             record["ownerID"] = ownerID as CKRecordValue
             record["ownerName"] = ownerName as CKRecordValue
             record["mode"] = mode.rawValue as CKRecordValue
@@ -216,6 +219,7 @@ enum CloudKitService {
         let emoji: String
         let authorID: String
         let authorName: String
+        let targetAuthorID: String
         let createdAt: Date
     }
 
@@ -225,23 +229,24 @@ enum CloudKitService {
         let text: String
         let authorID: String
         let authorName: String
+        let targetAuthorID: String
         let createdAt: Date
     }
 
     /// Deterministic name so re-adding the same emoji is idempotent and a
     /// toggle-off deletes exactly the same record — never a read-modify-write.
-    private static func reactionRecordName(code: String, authorID: String, day: Int, emoji: String) -> String {
-        "\(code)_\(authorID)_day\(day)_\(emoji.unicodeScalars.map { String($0.value) }.joined(separator: "-"))"
+    private static func reactionRecordName(code: String, targetAuthorID: String, authorID: String, day: Int, emoji: String) -> String {
+        "\(code)_\(targetAuthorID)_day\(day)_\(authorID)_\(emoji.unicodeScalars.map { String($0.value) }.joined(separator: "-"))"
     }
 
     /// Add (on) or remove (off) one emoji from a day's clip for one author.
     static func setReaction(
-        code: String, day: Int, authorID: String, authorName: String,
+        code: String, day: Int, authorID: String, authorName: String, targetAuthorID: String,
         emoji: String, on: Bool
     ) async throws {
         try await ensureAccountAvailable()
         let id = CKRecord.ID(recordName: reactionRecordName(
-            code: code, authorID: authorID, day: day, emoji: emoji))
+            code: code, targetAuthorID: targetAuthorID, authorID: authorID, day: day, emoji: emoji))
         if on {
             let record = CKRecord(recordType: "Reaction", recordID: id)
             record["roomCode"] = code as CKRecordValue
@@ -249,6 +254,7 @@ enum CloudKitService {
             record["emoji"] = emoji as CKRecordValue
             record["authorID"] = authorID as CKRecordValue
             record["authorName"] = authorName as CKRecordValue
+            record["targetAuthorID"] = targetAuthorID as CKRecordValue
             record["createdAt"] = Date.now as CKRecordValue
             _ = try await db.save(record)
         } else {
@@ -263,7 +269,7 @@ enum CloudKitService {
     /// Post a comment. `id` is the local ClipComment UUID so both sides dedupe.
     static func postComment(
         code: String, day: Int, id: String,
-        text: String, authorID: String, authorName: String
+        text: String, authorID: String, authorName: String, targetAuthorID: String
     ) async throws {
         try await ensureAccountAvailable()
         let record = CKRecord(recordType: "Comment", recordID: .init(recordName: id))
@@ -272,6 +278,7 @@ enum CloudKitService {
         record["text"] = text as CKRecordValue
         record["authorID"] = authorID as CKRecordValue
         record["authorName"] = authorName as CKRecordValue
+        record["targetAuthorID"] = targetAuthorID as CKRecordValue
         record["createdAt"] = Date.now as CKRecordValue
         _ = try await db.save(record)
     }
@@ -308,6 +315,7 @@ enum CloudKitService {
                 day: r["day"] as? Int ?? 0, emoji: emoji,
                 authorID: r["authorID"] as? String ?? "",
                 authorName: r["authorName"] as? String ?? "Friend",
+                targetAuthorID: r["targetAuthorID"] as? String ?? "",
                 createdAt: r["createdAt"] as? Date ?? .now)
         }
     }
@@ -327,6 +335,7 @@ enum CloudKitService {
                 day: r["day"] as? Int ?? 0, text: text,
                 authorID: r["authorID"] as? String ?? "",
                 authorName: r["authorName"] as? String ?? "Friend",
+                targetAuthorID: r["targetAuthorID"] as? String ?? "",
                 createdAt: r["createdAt"] as? Date ?? .now)
         }
     }

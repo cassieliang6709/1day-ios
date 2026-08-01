@@ -61,6 +61,21 @@ final class ChallengeStore {
         customTemplates.removeAll { $0.id == template.id }
     }
 
+    func updateCustomTemplate(_ template: ChallengeTemplate) {
+        guard let index = customTemplates.firstIndex(where: { $0.id == template.id }) else {
+            return
+        }
+        customTemplates[index] = template
+    }
+
+    func updatePlan(_ id: UUID, title: String, momentTitles: [String]) {
+        guard let index = challenges.firstIndex(where: { $0.id == id }) else { return }
+        var updated = challenges[index]
+        updated.title = title
+        updated.momentTitles = momentTitles
+        challenges[index] = updated
+    }
+
     @discardableResult
     func create(
         title: String,
@@ -68,12 +83,16 @@ final class ChallengeStore {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil
+        momentTitles: [String]? = nil,
+        /// When the day begins. Drives the timeline's clock positions
+        /// (`StorySchedule`), so a story that starts at 4 AM lays out
+        /// differently from one that starts at noon.
+        startDate: Date = .now
     ) -> Challenge {
         let challenge = Challenge(
             id: UUID(),
             title: title,
-            startDate: .now,
+            startDate: startDate,
             cards: (1...cardCount(for: momentTitles)).map { DayCard(day: $0) },
             mode: mode,
             clipLength: clipLength,
@@ -101,13 +120,15 @@ final class ChallengeStore {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil
+        momentTitles: [String]? = nil,
+        startDate: Date = .now
     ) async throws -> Challenge {
         guard let me = account?.account else { throw RoomError.notSignedIn }
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
             mode: mode, clipLength: clipLength, orientation: orientation,
-            templateName: templateName, momentTitles: momentTitles)
+            templateName: templateName, momentTitles: momentTitles,
+            startDate: startDate)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
@@ -151,6 +172,8 @@ final class ChallengeStore {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
         _ = await roomSync.syncClips(code: code)
         if let interactions = await roomSync.fetchInteractions(code: code) {
+            roomSync.remoteReactions[code] = interactions.reactions
+            roomSync.remoteComments[code] = interactions.comments
             mergeInteractions(interactions, into: id)
         }
     }
@@ -180,7 +203,7 @@ final class ChallengeStore {
             let day = challenges[ci].cards[cardIdx].day
 
             var reactions = remote.reactions
-                .filter { $0.day == day }
+                .filter { $0.day == day && $0.targetAuthorID == myID }
                 .map { ClipReaction(emoji: $0.emoji, authorID: $0.authorID, authorName: $0.authorName, createdAt: $0.createdAt) }
             for mine in challenges[ci].cards[cardIdx].reactions where mine.authorID == myID {
                 if !reactions.contains(where: { $0.id == mine.id }) { reactions.append(mine) }
@@ -188,7 +211,7 @@ final class ChallengeStore {
             challenges[ci].cards[cardIdx].reactions = reactions
 
             var comments = remote.comments
-                .filter { $0.day == day }
+                .filter { $0.day == day && $0.targetAuthorID == myID }
                 .compactMap { rc -> ClipComment? in
                     guard let uuid = UUID(uuidString: rc.id) else { return nil }
                     return ClipComment(id: uuid, text: rc.text, authorID: rc.authorID, authorName: rc.authorName, createdAt: rc.createdAt)
@@ -273,57 +296,92 @@ final class ChallengeStore {
 
     /// Toggle one emoji on a day's clip for the current author. Optimistic
     /// local write; a shared room also mirrors it to CloudKit (best-effort).
-    func toggleReaction(_ emoji: String, day: Int, challengeID: UUID) {
-        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
-              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+    func toggleReaction(_ emoji: String, day: Int, challengeID: UUID, targetAuthorID: String) {
         let me = currentAuthor
-        var reactions = challenges[ci].cards[idx].reactions
+        let isMe = targetAuthorID == me.id || targetAuthorID == "local"
         let nowOn: Bool
-        if let hit = reactions.firstIndex(where: { $0.authorID == me.id && $0.emoji == emoji }) {
-            reactions.remove(at: hit)
-            nowOn = false
-        } else {
-            reactions.append(ClipReaction(emoji: emoji, authorID: me.id, authorName: me.name))
-            nowOn = true
-        }
-        challenges[ci].cards[idx].reactions = reactions
 
-        if let code = challenges[ci].roomCode, let acct = account?.account {
+        if isMe {
+            guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+                  let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+            var reactions = challenges[ci].cards[idx].reactions
+            if let hit = reactions.firstIndex(where: { $0.authorID == me.id && $0.emoji == emoji }) {
+                reactions.remove(at: hit)
+                nowOn = false
+            } else {
+                reactions.append(ClipReaction(emoji: emoji, authorID: me.id, authorName: me.name))
+                nowOn = true
+            }
+            challenges[ci].cards[idx].reactions = reactions
+        } else {
+            guard let code = challenge(challengeID)?.roomCode else { return }
+            var remoteR = roomSync.remoteReactions[code] ?? []
+            let existingIdx = remoteR.firstIndex { $0.authorID == me.id && $0.emoji == emoji && $0.targetAuthorID == targetAuthorID && $0.day == day }
+            if let existingIdx {
+                remoteR.remove(at: existingIdx)
+                nowOn = false
+            } else {
+                remoteR.append(.init(day: day, emoji: emoji, authorID: me.id, authorName: me.name, targetAuthorID: targetAuthorID, createdAt: .now))
+                nowOn = true
+            }
+            roomSync.remoteReactions[code] = remoteR
+        }
+
+        if let code = challenge(challengeID)?.roomCode, let acct = account?.account {
             Task { @MainActor in
                 await roomSync.setReaction(
                     code: code, day: day, authorID: acct.id, authorName: acct.displayName,
-                    emoji: emoji, on: nowOn)
+                    targetAuthorID: targetAuthorID, emoji: emoji, on: nowOn)
             }
         }
     }
 
     /// Append a comment to a day's clip. Empty/whitespace-only text is ignored.
-    func addComment(_ text: String, day: Int, challengeID: UUID) {
+    func addComment(_ text: String, day: Int, challengeID: UUID, targetAuthorID: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
-              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+        
         let me = currentAuthor
+        let isMe = targetAuthorID == me.id || targetAuthorID == "local"
         let comment = ClipComment(text: trimmed, authorID: me.id, authorName: me.name)
-        challenges[ci].cards[idx].comments.append(comment)
 
-        if let code = challenges[ci].roomCode, let acct = account?.account {
+        if isMe {
+            guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+                  let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+            challenges[ci].cards[idx].comments.append(comment)
+        } else {
+            guard let code = challenge(challengeID)?.roomCode else { return }
+            var remoteC = roomSync.remoteComments[code] ?? []
+            remoteC.append(.init(id: comment.id.uuidString, day: day, text: trimmed, authorID: me.id, authorName: me.name, targetAuthorID: targetAuthorID, createdAt: comment.createdAt))
+            roomSync.remoteComments[code] = remoteC
+        }
+
+        if let code = challenge(challengeID)?.roomCode, let acct = account?.account {
             Task { @MainActor in
                 await roomSync.postComment(
                     code: code, day: day, id: comment.id.uuidString,
-                    text: trimmed, authorID: acct.id, authorName: acct.displayName)
+                    text: trimmed, authorID: acct.id, authorName: acct.displayName, targetAuthorID: targetAuthorID)
             }
         }
     }
 
     /// Remove one of the current author's own comments.
-    func deleteComment(_ commentID: UUID, day: Int, challengeID: UUID) {
-        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
-              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+    func deleteComment(_ commentID: UUID, day: Int, challengeID: UUID, targetAuthorID: String) {
         let me = currentAuthor
-        challenges[ci].cards[idx].comments.removeAll { $0.id == commentID && $0.authorID == me.id }
+        let isMe = targetAuthorID == me.id || targetAuthorID == "local"
 
-        if challenges[ci].roomCode != nil, account?.account != nil {
+        if isMe {
+            guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+                  let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
+            challenges[ci].cards[idx].comments.removeAll { $0.id == commentID && $0.authorID == me.id }
+        } else {
+            guard let code = challenge(challengeID)?.roomCode else { return }
+            var remoteC = roomSync.remoteComments[code] ?? []
+            remoteC.removeAll { $0.id == commentID.uuidString && $0.authorID == me.id }
+            roomSync.remoteComments[code] = remoteC
+        }
+
+        if challenge(challengeID)?.roomCode != nil, account?.account != nil {
             Task { @MainActor in
                 await roomSync.deleteComment(id: commentID.uuidString)
             }
@@ -338,19 +396,33 @@ final class ChallengeStore {
         let presenter = ChallengePresenter(challenge: challenge)
         if let code = challenge.roomCode,
            let remote = roomSync.remoteClips[code], !remote.isEmpty {
+            let remoteReactions = roomSync.remoteReactions[code] ?? []
+            let remoteComments = roomSync.remoteComments[code] ?? []
             return remote
                 .sorted { ($0.day, $0.authorName) < ($1.day, $1.authorName) }
                 .map { clip in
-                    // Remote clip files don't carry interactions; fold in the
-                    // local card's reactions/comments for that day.
-                    let card = challenge.cards.first { c in c.day == clip.day }
+                    let isMe = clip.authorID == (account?.account?.id ?? "")
+                    let card = isMe ? challenge.cards.first { c in c.day == clip.day } : nil
+                    
+                    let emojis = isMe 
+                        ? (card?.reactions.map(\.emoji) ?? [])
+                        : remoteReactions.filter { $0.day == clip.day && $0.targetAuthorID == clip.authorID }.map(\.emoji)
+                        
+                    let commentLines = isMe
+                        ? (card.map(Self.commentLines(for:)) ?? [])
+                        : remoteComments
+                            .filter { $0.day == clip.day && $0.targetAuthorID == clip.authorID }
+                            .sorted { $0.createdAt < $1.createdAt }
+                            .map { "\($0.authorName): \($0.text)" }
+
                     return DayClip(
                         day: clip.day, url: clip.localURL, authorName: clip.authorName,
+                        authorID: clip.authorID,
                         label: presenter.title(forSlot: clip.day),
                         overlayText: clip.overlayText,
                         recordedAt: clip.recordedAt,
-                        emoji: card?.reactions.map(\.emoji) ?? [],
-                        comments: card.map(Self.commentLines(for:)) ?? [],
+                        emoji: emojis,
+                        comments: commentLines,
                         key: clip.id)
                 }
         }
@@ -359,12 +431,37 @@ final class ChallengeStore {
                 DayClip(
                     day: card.day,
                     url: $0,
+                    authorID: account?.account?.id ?? "local",
                     label: presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
                     recordedAt: card.recordedAt,
                     emoji: card.reactions.map(\.emoji),
                     comments: Self.commentLines(for: card))
             }
+        }
+    }
+
+    func interactions(for challengeID: UUID, day: Int, targetAuthorID: String) -> (reactions: [ClipReaction], comments: [ClipComment]) {
+        let me = account?.account?.id ?? "local"
+        let isMe = targetAuthorID == me || targetAuthorID == "local"
+        
+        if isMe {
+            guard let challenge = challenge(challengeID),
+                  let card = challenge.cards.first(where: { $0.day == day }) else { return ([], []) }
+            return (card.reactions, card.comments.sorted { $0.createdAt < $1.createdAt })
+        } else {
+            guard let code = challenge(challengeID)?.roomCode else { return ([], []) }
+            let r = (roomSync.remoteReactions[code] ?? [])
+                .filter { $0.day == day && $0.targetAuthorID == targetAuthorID }
+                .map { ClipReaction(emoji: $0.emoji, authorID: $0.authorID, authorName: $0.authorName, createdAt: $0.createdAt) }
+            let c = (roomSync.remoteComments[code] ?? [])
+                .filter { $0.day == day && $0.targetAuthorID == targetAuthorID }
+                .compactMap { rc -> ClipComment? in
+                    guard let id = UUID(uuidString: rc.id) else { return nil }
+                    return ClipComment(id: id, text: rc.text, authorID: rc.authorID, authorName: rc.authorName, createdAt: rc.createdAt)
+                }
+                .sorted { $0.createdAt < $1.createdAt }
+            return (r, c)
         }
     }
 
@@ -384,10 +481,12 @@ final class ChallengeStore {
     }
 
     #if DEBUG
-    /// Simulator helper: fill every card with the bundled demo clips (only 7 exist)
+    /// Simulator helper: fill cards with the bundled demo clips (only 7 exist)
     /// so the stitching flow can be tested without a camera or waiting 7 days.
-    func fillWithDemoClips(challengeID: UUID) {
-        let dayCount = challenge(challengeID)?.cards.count ?? 7
+    /// `limit` stops early, which is how a part-filmed day gets screenshotted.
+    func fillWithDemoClips(challengeID: UUID, limit: Int = 7) {
+        let dayCount = min(challenge(challengeID)?.cards.count ?? 7, limit)
+        guard dayCount >= 1 else { return }
         for day in 1...min(dayCount, 7) {
             if let demo = Bundle.main.url(forResource: "day\(day)", withExtension: "mp4") {
                 saveClip(

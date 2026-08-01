@@ -8,6 +8,10 @@ import Observation
 final class RoomSyncService {
     /// Clips fetched per room code (all members). Transient cache.
     private(set) var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
+    /// Reactions fetched per room code.
+    var remoteReactions: [String: [CloudKitService.RemoteReaction]] = [:]
+    /// Comments fetched per room code.
+    var remoteComments: [String: [CloudKitService.RemoteComment]] = [:]
     /// Room codes currently being synced (drives a spinner in the board).
     private(set) var syncing: Set<String> = []
     /// Last CloudKit failure per room. Kept visible instead of silently
@@ -27,6 +31,8 @@ final class RoomSyncService {
     func clearRoom(_ code: String) {
         fileStore.deleteRemoteCache(roomCode: code)
         remoteClips[code] = nil
+        remoteReactions[code] = nil
+        remoteComments[code] = nil
         lastError[code] = nil
     }
 
@@ -75,17 +81,17 @@ final class RoomSyncService {
     }
 
     func setReaction(code: String, day: Int, authorID: String, authorName: String,
-                     emoji: String, on: Bool) async {
+                     targetAuthorID: String, emoji: String, on: Bool) async {
         try? await CloudKitService.setReaction(
             code: code, day: day, authorID: authorID, authorName: authorName,
-            emoji: emoji, on: on)
+            targetAuthorID: targetAuthorID, emoji: emoji, on: on)
     }
 
     func postComment(code: String, day: Int, id: String, text: String,
-                     authorID: String, authorName: String) async {
+                     authorID: String, authorName: String, targetAuthorID: String) async {
         try? await CloudKitService.postComment(
             code: code, day: day, id: id, text: text,
-            authorID: authorID, authorName: authorName)
+            authorID: authorID, authorName: authorName, targetAuthorID: targetAuthorID)
     }
 
     func deleteComment(id: String) async {

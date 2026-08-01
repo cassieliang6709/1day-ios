@@ -78,6 +78,82 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(ChallengePresenter(challenge: make(mode: .sevenDay)).unitNamePlural, Strings.unitNamePlural(oneDay: false))
         XCTAssertEqual(ChallengePresenter(challenge: make(mode: .oneDay)).storyLabel, Strings.storyLabel(oneDay: true))
     }
+    func testCustomTemplateOverSevenPromptsCreatesEveryCaptureSlot() throws {
+        let repository = MemoryChallengeRepository()
+        let store = ChallengeStore(
+            repository: repository,
+            fileStore: MigrationClipFileStore())
+        let prompts = (1...9).map { "Moment \($0)" }
+
+        let challenge = store.create(
+            title: "Long morning",
+            mode: .oneDay,
+            momentTitles: prompts)
+
+        XCTAssertEqual(challenge.cards.count, 9)
+        XCTAssertEqual(challenge.momentTitles, prompts)
+        XCTAssertEqual(
+            ChallengePresenter(challenge: challenge).title(forSlot: 9),
+            "Moment 9")
+        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 9)
+        XCTAssertEqual(
+            Strings.recordedProgress(
+                0, total: 9, secondsLabel: "2s", unitPlural: "moments"),
+            "0 of 9 2s moments recorded")
+        UserDefaults.standard.set(
+            AppLanguage.chinese.rawValue,
+            forKey: AppLanguage.storageKey)
+        XCTAssertEqual(
+            Strings.recordedProgress(
+                0, total: 9, secondsLabel: "2 秒", unitPlural: "个瞬间"),
+            "9 个瞬间中已录 0 段（2 秒）")
+    }
+
+    func testUpdatingPlanTitlesPersistsWithoutDroppingSlotsOrClips() throws {
+        let repository = MemoryChallengeRepository()
+        let store = ChallengeStore(
+            repository: repository,
+            fileStore: MigrationClipFileStore())
+        let original = store.create(
+            title: "Morning routine",
+            mode: .oneDay,
+            momentTitles: ["Wake", "Coffee", "After"])
+        store.challenges[0].cards[0].clipFileName = "day1.mov"
+
+        store.updatePlan(
+            original.id,
+            title: "Perfect morning",
+            momentTitles: ["Wake", "Coffee", "Shower"])
+
+        let updated = try XCTUnwrap(store.challenge(original.id))
+        XCTAssertEqual(updated.title, "Perfect morning")
+        XCTAssertEqual(updated.cards.count, 3)
+        XCTAssertEqual(updated.momentTitles, ["Wake", "Coffee", "Shower"])
+        XCTAssertEqual(updated.cards[0].clipFileName, "day1.mov")
+        XCTAssertEqual(repository.savedChallenges.first?.momentTitles?.last, "Shower")
+    }
+
+    func testUpdatingCustomTemplateKeepsItsIdentityAndAllPrompts() throws {
+        let repository = MemoryChallengeRepository()
+        let store = ChallengeStore(
+            repository: repository,
+            fileStore: MigrationClipFileStore())
+        let template = ChallengeTemplate(
+            emoji: "☀️",
+            name: LocalizedText(en: "Morning", zh: "Morning"),
+            momentKeys: (1...9).map { "Step \($0)" },
+            isCustom: true)
+        store.addCustomTemplate(template)
+        var edited = template
+        edited.momentKeys?[8] = "Shower"
+
+        store.updateCustomTemplate(edited)
+
+        XCTAssertEqual(store.customTemplates.first?.id, template.id)
+        XCTAssertEqual(store.customTemplates.first?.momentKeys?.count, 9)
+        XCTAssertEqual(repository.savedTemplates.first?.momentKeys?.last, "Shower")
+    }
+
     func testLegacyChallengeMigrationSurvivesRelaunch() throws {
         struct LegacyChallenge: Codable {
             var title: String
@@ -139,6 +215,16 @@ final class ChallengeStateTests: XCTestCase {
             0)
     }
 
+}
+
+private final class MemoryChallengeRepository: ChallengeRepository {
+    private(set) var savedChallenges: [Challenge] = []
+    private(set) var savedTemplates: [ChallengeTemplate] = []
+
+    func loadChallenges() -> [Challenge] { [] }
+    func saveChallenges(_ challenges: [Challenge]) { savedChallenges = challenges }
+    func loadTemplates() -> [ChallengeTemplate] { [] }
+    func saveTemplates(_ templates: [ChallengeTemplate]) { savedTemplates = templates }
 }
 
 private final class MigrationClipFileStore: ClipFileStore {

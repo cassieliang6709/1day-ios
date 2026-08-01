@@ -8,7 +8,6 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    TARGETED_DEVICE_FAMILY: "1"
 targets:
   AISetlog:
     type: application
@@ -19,8 +18,9 @@ targets:
         DEVELOPMENT_TEAM: M7BPQ88622
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "2"
+        CURRENT_PROJECT_VERSION: "3"
       configs:
         Debug:
           APS_ENVIRONMENT: development
