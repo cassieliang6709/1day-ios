@@ -25,6 +25,11 @@ struct StoryComposerView: View {
     /// Set once the user edits the name, so switching templates stops
     /// overwriting what they typed.
     @State private var titleEdited = false
+    /// The story's moments. Seeded from the chosen template, then editable —
+    /// and replaced wholesale by the guided flow.
+    @State private var moments: [String] = []
+    @State private var momentsEdited = false
+    @State private var showGuided = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
@@ -58,7 +63,7 @@ struct StoryComposerView: View {
                         activeIndex: $activeIndex,
                         mode: $mode,
                         clipLength: $clipLength,
-                        onBuildOwn: { showBuildTemplate = true },
+                        onBuildOwn: { showGuided = true },
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate)
                         .transition(.asymmetric(
@@ -73,6 +78,7 @@ struct StoryComposerView: View {
                         withFriends: $withFriends,
                         clipLength: $clipLength,
                         orientation: $orientation,
+                        moments: $moments,
                         isOneDay: mode == .oneDay,
                         memberNames: knownFriendNames,
                         errorText: errorText)
@@ -87,6 +93,19 @@ struct StoryComposerView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView { createSharedRoom() }
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showGuided) {
+            GuidedMomentsView { written, name in
+                moments = written
+                momentsEdited = true
+                if !name.isEmpty {
+                    title = name
+                    titleEdited = true
+                }
+                // Straight to setup: the moments question is already answered,
+                // so sending them back to the poster rack would be a detour.
+                withAnimation(OneDay.Motion.soft) { step = .setup }
+            }
         }
         .sheet(isPresented: $showBuildTemplate) {
             BuildTemplateView { template in
@@ -112,6 +131,7 @@ struct StoryComposerView: View {
         .onChange(of: mode) { _, _ in
             activeIndex = 0
             titleEdited = false
+            momentsEdited = false
             syncTitleToTemplate()
         }
     }
@@ -200,7 +220,7 @@ struct StoryComposerView: View {
                 clipLength: clipLength,
                 orientation: orientation,
                 templateName: selected?.displayName,
-                momentTitles: selected?.momentKeys)
+                momentTitles: resolvedMoments)
             dismiss()
             onCreate(challenge.id)
         }
@@ -218,7 +238,7 @@ struct StoryComposerView: View {
                     clipLength: clipLength,
                     orientation: orientation,
                     templateName: selected?.displayName,
-                    momentTitles: selected?.momentKeys)
+                    momentTitles: resolvedMoments)
                 dismiss()
                 onCreate(challenge.id)
             } catch {
@@ -237,10 +257,24 @@ struct StoryComposerView: View {
     /// Keeps the story name in step with the chosen script until the user
     /// takes the name over.
     private func syncTitleToTemplate() {
-        guard !titleEdited, let selected else { return }
-        title = mode == .sevenDay
-            ? Strings.fullTitle7Days(selected.displayName)
-            : selected.displayName
+        guard let selected else { return }
+        if !titleEdited {
+            title = mode == .sevenDay
+                ? Strings.fullTitle7Days(selected.displayName)
+                : selected.displayName
+        }
+        if !momentsEdited {
+            moments = selected.momentKeys ?? []
+        }
+    }
+
+    /// Blank rows are dropped; an entirely empty list falls back to the
+    /// template's own moments so a story can never be created with none.
+    private var resolvedMoments: [String]? {
+        let cleaned = moments
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return cleaned.isEmpty ? selected?.momentKeys : cleaned
     }
 
     /// Names already seen in the user's rooms — shown as suggestions on the

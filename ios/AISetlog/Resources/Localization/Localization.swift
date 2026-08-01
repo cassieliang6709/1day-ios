@@ -420,7 +420,6 @@ enum Strings {
 
     // MARK: Board
 
-    static var fillDemoClips: String { lang == .chinese ? "填充示例片段" : "Fill with demo clips" }
     static func createFilm(oneDay: Bool) -> String {
         if lang == .chinese { return oneDay ? "生成一日影片" : "生成每周影片" }
         return oneDay ? "Create 1-day film" : "Create weekly film"
@@ -655,9 +654,6 @@ enum Strings {
             : "Room isn't set up yet — the CloudKit index is still deploying."
     }
 
-    /// DEBUG-only demo overlay caption.
-    static var demoFirstProof: String { lang == .chinese ? "第一个小证据" : "first little proof" }
-
     // MARK: Plans home
 
     /// Time-of-day greeting. The name is optional — a solo user never signs in.
@@ -753,6 +749,35 @@ enum Strings {
     static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
     static var createStoryCTA: String { lang == .chinese ? "创建故事" : "Create story" }
 
+    // MARK: Moments (composer)
+
+    static var theMoments: String { lang == .chinese ? "七个瞬间" : "The moments" }
+    static var reviewMoments: String { lang == .chinese ? "查看/编辑" : "Review" }
+    static var hideMoments: String { lang == .chinese ? "收起" : "Hide" }
+    static var addMoment: String { lang == .chinese ? "加一个瞬间" : "Add a moment" }
+    static var writeYourOwn: String { lang == .chinese ? "写自己的" : "Write your own" }
+    /// Entry point from the poster rack into the guided flow.
+    static var writeYourOwnMoments: String {
+        lang == .chinese ? "自己写七个瞬间" : "Write your own moments"
+    }
+    static var useTheseMoments: String { lang == .chinese ? "就用这些" : "Use these" }
+    static var guidedHeading: String {
+        lang == .chinese ? "你的一天会是什么样？" : "What will your day look like?"
+    }
+    static var guidedSubtitle: String {
+        lang == .chinese
+            ? "回答几个小问题，答案就是你今天要拍的瞬间。不想答的可以留空。"
+            : "Answer a few small questions — your answers become the moments you'll film. Leave any of them blank to skip."
+    }
+    static var guidedNamePlaceholder: String {
+        lang == .chinese ? "给这一天起个名字…" : "Name this day…"
+    }
+    static func guidedFootnote(filled: Int) -> String {
+        lang == .chinese
+            ? "现在有 \(filled) 个瞬间。留空的会被跳过，之后也随时能改。"
+            : "\(filled) moments so far. Blank ones are skipped, and you can change any of them later."
+    }
+
     // MARK: Timeline
 
     static var everyonesMoments: String {
@@ -827,4 +852,38 @@ enum Strings {
     static var momentsLabel: String { lang == .chinese ? "瞬间" : "Moments" }
     static var peopleLabel: String { lang == .chinese ? "参与者" : "People" }
     static var rebuildFilm: String { lang == .chinese ? "重新生成" : "Rebuild film" }
+
+    // MARK: Account
+
+    static var account: String { lang == .chinese ? "账号" : "Account" }
+    static var about: String { lang == .chinese ? "关于" : "About" }
+    static var version: String { lang == .chinese ? "版本" : "Version" }
+    static var privacyPolicy: String { lang == .chinese ? "隐私政策" : "Privacy Policy" }
+    static var signedInAs: String { lang == .chinese ? "已登录" : "Signed in as" }
+    static var notSignedIn: String {
+        lang == .chinese ? "未登录（只有共享故事需要登录）" : "Not signed in — only shared stories need it"
+    }
+    static var signOut: String { lang == .chinese ? "退出登录" : "Sign out" }
+    static var deleteAccount: String { lang == .chinese ? "删除账号" : "Delete account" }
+    static var deleteAccountTitle: String {
+        lang == .chinese ? "删除账号和所有内容？" : "Delete your account and everything in it?"
+    }
+    static var deleteAccountWarning: String {
+        lang == .chinese
+            ? "这会永久删除这台设备上的全部故事和片段，以及你在共享房间里上传的片段、回应和评论。朋友们自己的片段会保留，但你的名字会被移除。此操作无法撤销。"
+            : "This permanently removes every story and clip on this device, plus the clips, reactions and comments you added to shared rooms. Your friends keep their own clips, but your name is removed. This cannot be undone."
+    }
+    static var deleteAccountConfirm: String {
+        lang == .chinese ? "永久删除" : "Delete permanently"
+    }
+    static var deleteAccountFootnote: String {
+        lang == .chinese
+            ? "退出登录只是登出，故事仍留在设备上。删除账号会清空一切。"
+            : "Signing out just signs you out; your stories stay on this device. Deleting removes everything."
+    }
+    static var deletingAccount: String { lang == .chinese ? "正在删除…" : "Deleting…" }
+    /// Replaces a departed creator's name on a room their friends still use.
+    static var deletedMemberName: String {
+        lang == .chinese ? "已注销的用户" : "A former member"
+    }
 }

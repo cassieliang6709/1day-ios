@@ -226,6 +226,67 @@ final class ChallengeStore {
         return seen.map { ($0.key, $0.value) }.sorted { $0.name < $1.name }
     }
 
+    // MARK: - Account deletion
+
+    /// Removes the person from the app entirely: their clips and interactions
+    /// in every shared room they're part of, then every local story, clip file
+    /// and preference on this device.
+    ///
+    /// Required by App Store guideline 5.1.1(v) — an app that creates accounts
+    /// has to let you delete one. Signing out is not the same thing.
+    @MainActor
+    func deleteAccountAndAllData() async {
+        if let me = account?.account {
+            // Everything this person authored, addressed by reconstructable
+            // record IDs rather than a query. See `deleteMyRoomData`.
+            var clips: [(code: String, day: Int)] = []
+            var reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)] = []
+            var commentIDs: [String] = []
+            var roomCodes: [String] = []
+
+            for challenge in challenges {
+                guard let code = challenge.roomCode else { continue }
+                roomCodes.append(code)
+                for card in challenge.cards {
+                    clips.append((code, card.day))
+                }
+                for reaction in roomSync.remoteReactions[code] ?? []
+                where reaction.authorID == me.id {
+                    reactions.append((code, reaction.targetAuthorID, reaction.day, reaction.emoji))
+                }
+                for comment in roomSync.remoteComments[code] ?? []
+                where comment.authorID == me.id {
+                    commentIDs.append(comment.id)
+                }
+                // My own comments on my own clips live only on the card.
+                for card in challenge.cards {
+                    for comment in card.comments where comment.authorID == me.id {
+                        commentIDs.append(comment.id.uuidString)
+                    }
+                }
+            }
+
+            try? await CloudKitService.deleteMyRoomData(
+                authorID: me.id,
+                clips: clips,
+                reactions: reactions,
+                commentIDs: commentIDs,
+                roomCodes: roomCodes)
+        }
+
+        // Local wipe happens whether or not the cloud step succeeded — the
+        // person asked to be gone from this device, and a network failure
+        // must not leave them still signed in with their stories intact.
+        for challenge in challenges {
+            fileStore.deleteClips(challengeID: challenge.id)
+            if let code = challenge.roomCode { roomSync.clearRoom(code) }
+        }
+        challenges = []
+        customTemplates = []
+        account?.signOut()
+        NotificationPreferences.resetAll()
+    }
+
     func delete(_ id: UUID) {
         fileStore.deleteClips(challengeID: id)
         if let code = challenge(id)?.roomCode {
@@ -475,20 +536,16 @@ final class ChallengeStore {
     }
 
     #if DEBUG
-    /// Simulator helper: fill cards with the bundled demo clips (only 7 exist)
-    /// so the stitching flow can be tested without a camera or waiting 7 days.
-    /// `limit` stops early, which is how a part-filmed day gets screenshotted.
-    func fillWithDemoClips(challengeID: UUID, limit: Int = 7) {
+    /// Simulator helper: fill cards with generated clips so the stitching flow
+    /// can be exercised without a camera. `limit` stops early, which is how a
+    /// part-filmed day gets screenshotted.
+    @MainActor
+    func fillWithDemoClips(challengeID: UUID, limit: Int = 7) async {
         let dayCount = min(challenge(challengeID)?.cards.count ?? 7, limit)
         guard dayCount >= 1 else { return }
-        for day in 1...min(dayCount, 7) {
-            if let demo = Bundle.main.url(forResource: "day\(day)", withExtension: "mp4") {
-                saveClip(
-                    from: demo,
-                    day: day,
-                    challengeID: challengeID,
-                    overlayText: day == 1 ? Strings.demoFirstProof : nil)
-            }
+        for day in 1...dayCount {
+            guard let url = await DemoClipFactory.makeClip(index: day - 1) else { continue }
+            saveClip(from: url, day: day, challengeID: challengeID)
         }
     }
     #endif

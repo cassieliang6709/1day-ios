@@ -369,9 +369,25 @@ enum VideoStitcher {
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
         }
 
-        let params = audioTracks.map { AVMutableAudioMixInputParameters(track: $0) }
+        // Audio tracks are added up front but only filled for clips that have
+        // sound. Any that stay empty — every clip filmed with the microphone
+        // denied, say — must come back out: an empty audio track fails the
+        // export with AVError -11838 instead of producing a silent film.
+        //
+        // Keyed by the original track index rather than compacted, because
+        // placements refer to tracks by that index.
+        var params: [Int: AVMutableAudioMixInputParameters] = [:]
+        for (index, track) in audioTracks.enumerated() {
+            if track.segments.isEmpty {
+                composition.removeTrack(track)
+            } else {
+                params[index] = AVMutableAudioMixInputParameters(track: track)
+            }
+        }
+        guard !params.isEmpty else { return }
+
         for (i, p) in placements.enumerated() {
-            let track = params[p.trackIndex]
+            guard let track = params[p.trackIndex] else { continue }
             if i == 0 {
                 track.setVolume(1, at: .zero)
             } else if fade > .zero {
@@ -387,7 +403,7 @@ enum VideoStitcher {
                     timeRange: CMTimeRange(start: placements[i + 1].start, duration: fade))
             }
         }
-        audioParams.append(contentsOf: params)
+        audioParams.append(contentsOf: params.values)
     }
 
     // MARK: - Shared-room layout

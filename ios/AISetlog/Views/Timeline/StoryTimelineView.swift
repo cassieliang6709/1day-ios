@@ -77,14 +77,18 @@ struct StoryTimelineView: View {
         #if DEBUG
         .onAppear {
             let args = ProcessInfo.processInfo.arguments
-            if args.contains("-demoReel") {
-                store.fillWithDemoClips(challengeID: challengeID)
-                showFilm = true
-            }
             if args.contains("-demoFilm") { showFilm = true }
+            if args.contains("-demoReel") {
+                Task {
+                    await store.fillWithDemoClips(challengeID: challengeID)
+                    showFilm = true
+                }
+            }
             if args.contains("-demoPreview") {
-                store.fillWithDemoClips(challengeID: challengeID)
-                sheet = .preview(day: 2, authorID: nil)
+                Task {
+                    await store.fillWithDemoClips(challengeID: challengeID)
+                    sheet = .preview(day: 2, authorID: nil)
+                }
             }
         }
         #endif
@@ -260,11 +264,6 @@ struct StoryTimelineView: View {
             }
 
             Menu {
-                #if DEBUG
-                Button(Strings.fillDemoClips) {
-                    store.fillWithDemoClips(challengeID: challengeID)
-                }
-                #endif
                 Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
                 Button(
                     challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,

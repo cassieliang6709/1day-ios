@@ -68,7 +68,7 @@ struct MoodStep: View {
                         compact: true)
 
                     Button(action: onBuildOwn) {
-                        Label(Strings.buildYourOwn, systemImage: "plus")
+                        Label(Strings.writeYourOwnMoments, systemImage: "square.and.pencil")
                     }
                     .buttonStyle(.softAction)
                     .padding(.top, 2)
@@ -93,11 +93,16 @@ struct SetupStep: View {
     @Binding var withFriends: Bool
     @Binding var clipLength: Challenge.ClipLength
     @Binding var orientation: Challenge.Orientation
+    /// The story's moments, as raw display strings once touched. Editable here
+    /// so you can see exactly what you'll be asked to film before committing —
+    /// picking a mood shouldn't mean accepting seven prompts sight unseen.
+    @Binding var moments: [String]
     let isOneDay: Bool
     let memberNames: [String]
     let errorText: String?
 
     @FocusState private var titleFocused: Bool
+    @State private var momentsExpanded = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
@@ -105,6 +110,7 @@ struct SetupStep: View {
             VStack(alignment: .leading, spacing: 20) {
                 heading
                 nameField
+                momentsCard
                 companyPicker
                 if withFriends { roomExplainer }
                 setupCard
@@ -141,8 +147,9 @@ struct SetupStep: View {
         GlassCard(padding: 14) {
             HStack(spacing: 13) {
                 if let template {
-                    Text(template.emoji)
-                        .font(.system(size: 22))
+                    Image(systemName: template.displaySymbol)
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
                         .background {
                             TemplateCover(identityKey: template.identityKey)
@@ -166,6 +173,88 @@ struct SetupStep: View {
                 }
             }
         }
+    }
+
+    /// The moments, spelled out and editable. Collapsed to a summary until you
+    /// ask for it, so the page still reads as "set it up" rather than a form.
+    private var momentsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionLabel(text: Strings.theMoments)
+                Spacer()
+                Button {
+                    withAnimation(OneDay.Motion.soft) { momentsExpanded.toggle() }
+                } label: {
+                    Label(
+                        momentsExpanded ? Strings.hideMoments : Strings.reviewMoments,
+                        systemImage: momentsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBlue)
+                }
+                .buttonStyle(.plain)
+            }
+
+            GlassCard(padding: 14) {
+                if momentsExpanded {
+                    VStack(spacing: 0) {
+                        ForEach(moments.indices, id: \.self) { index in
+                            momentRow(index)
+                            if index < moments.count - 1 {
+                                Divider().overlay(OneDay.hairline).padding(.leading, 38)
+                            }
+                        }
+
+                        if moments.count < 12 {
+                            Divider().overlay(OneDay.hairline).padding(.leading, 38)
+                            Button {
+                                withAnimation(OneDay.Motion.soft) { moments.append("") }
+                            } label: {
+                                Label(Strings.addMoment, systemImage: "plus.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.oneDayBlue)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    // Collapsed: the whole day as a run of small labels.
+                    WrappingMoments(titles: moments.map { MomentCatalog.localize($0) })
+                }
+            }
+        }
+    }
+
+    private func momentRow(_ index: Int) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: MomentCatalog.icon(for: moments[index]))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.oneDaySky)
+                .frame(width: 28, height: 28)
+                .background(OneDay.surfaceSoft, in: Circle())
+
+            TextField(
+                Strings.promptN(index + 1),
+                text: Binding(
+                    get: { MomentCatalog.localize(moments[index]) },
+                    set: { moments[index] = $0 }))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .tint(Color.oneDayBlue)
+
+            if moments.count > 2 {
+                Button {
+                    withAnimation(OneDay.Motion.soft) { _ = moments.remove(at: index) }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 7)
     }
 
     /// Two big choices, side by side. Cards rather than a toggle — who you're
@@ -246,6 +335,26 @@ struct SetupStep: View {
                         compact: true)
                         .frame(width: 172)
                 }
+            }
+        }
+    }
+}
+
+/// The collapsed moment summary: every title as a small chip, wrapping like
+/// text. Shows the shape of the day in one glance without becoming a list.
+private struct WrappingMoments: View {
+    let titles: [String]
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(Array(titles.enumerated()), id: \.offset) { _, title in
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5.5)
+                    .background(OneDay.surfaceSoft.opacity(0.85), in: Capsule())
             }
         }
     }

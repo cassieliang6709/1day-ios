@@ -4,7 +4,7 @@ import XCTest
 
 final class VideoStitcherTests: XCTestCase {
     func testSequentialStitchExportsPlayableVideo() async throws {
-        let clips = try sampleClips(count: 3)
+        let clips = try await sampleClips(count: 3)
         var options = VideoStitcher.Options()
         options.crossfadeSeconds = 0.3
         options.showDayCaptions = false
@@ -23,8 +23,9 @@ final class VideoStitcherTests: XCTestCase {
     }
 
     func testFriendsTogetherPlaysSameDayClipsSimultaneously() async throws {
-        let source = try XCTUnwrap(
-            Bundle.main.url(forResource: "day1", withExtension: "mp4"))
+        let made = await DemoClipFactory.makeClip(index: 0)
+        let source = try XCTUnwrap(made)
+        defer { try? FileManager.default.removeItem(at: source) }
         let clips = [
             DayClip(day: 1, url: source, authorName: "A"),
             DayClip(day: 1, url: source, authorName: "B"),
@@ -53,13 +54,17 @@ final class VideoStitcherTests: XCTestCase {
         }
     }
 
-    private func sampleClips(count: Int) throws -> [DayClip] {
-        try (1...count).map { day in
-            let url = try XCTUnwrap(
-                Bundle.main.url(forResource: "day\(day)", withExtension: "mp4")
-            )
-            return DayClip(day: day, url: url, label: "Day \(day)")
+    /// Fixtures are generated rather than bundled: the seven `day*.mp4` files
+    /// these used to load existed only for development, and shipped inside
+    /// every release build to serve these tests and a debug menu item.
+    private func sampleClips(count: Int) async throws -> [DayClip] {
+        var clips: [DayClip] = []
+        for day in 1...count {
+            let made = await DemoClipFactory.makeClip(index: day - 1)
+            let url = try XCTUnwrap(made)
+            clips.append(DayClip(day: day, url: url, label: "Day \(day)"))
         }
+        return clips
     }
 
     private func fileSize(_ url: URL) throws -> Int {

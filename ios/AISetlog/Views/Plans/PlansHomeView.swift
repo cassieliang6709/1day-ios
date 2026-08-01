@@ -414,9 +414,8 @@ struct PlansHomeView: View {
                     templateName: "Soft Reset",
                     momentTitles: ChallengeTemplate.oneDayBuiltins[1].momentKeys)
             if seeded.recordedCount == 0, !args.contains("-demoEmpty") {
-                store.fillWithDemoClips(
-                    challengeID: seeded.id,
-                    limit: args.contains("-demoFilm") ? 7 : 3)
+                let limit = args.contains("-demoFilm") ? 7 : 3
+                Task { await store.fillWithDemoClips(challengeID: seeded.id, limit: limit) }
             }
             if args.contains("-demoTimeline") || args.contains("-demoFilm")
                 || args.contains("-demoEmpty") {
@@ -434,7 +433,8 @@ struct PlansHomeView: View {
                     momentTitles: template.momentKeys)
                 // Four complete (they land on the finished shelf) and two in
                 // progress, which is roughly what a used account looks like.
-                store.fillWithDemoClips(challengeID: made.id, limit: index < 4 ? 7 : 3)
+                let limit = index < 4 ? 7 : 3
+                Task { await store.fillWithDemoClips(challengeID: made.id, limit: limit) }
             }
         }
         if args.contains("-demoReel") {
@@ -445,7 +445,7 @@ struct PlansHomeView: View {
         if args.contains("-demoBoard") {
             let demo = store.challenges.first { $0.title == "Demo Week" }
                 ?? store.create(title: "Demo Week")
-            store.fillWithDemoClips(challengeID: demo.id)
+            Task { await store.fillWithDemoClips(challengeID: demo.id) }
             path = [demo.id]
         }
         if args.contains("-newChallenge") {

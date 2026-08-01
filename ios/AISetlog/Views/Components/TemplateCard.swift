@@ -36,9 +36,10 @@ struct TemplateCard: View {
         ZStack {
             TemplateCover(identityKey: template.identityKey)
 
-            Text(template.emoji)
-                .font(.system(size: 62))
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 6)
+            Image(systemName: template.displaySymbol)
+                .font(.system(size: 46, weight: .medium))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
         }
         .frame(height: 168)
         .frame(maxWidth: .infinity)

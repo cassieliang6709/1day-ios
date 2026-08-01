@@ -244,7 +244,9 @@ struct BuildTemplateView: View {
 
 /// Wraps children onto multiple lines, left-to-right, like text — used for
 /// the prompt pool "tag cloud" instead of a fixed grid.
-private struct FlowLayout: Layout {
+/// Wraps children onto multiple lines, left-to-right, like text. Shared with
+/// the composer's collapsed moment summary.
+struct FlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

@@ -5,6 +5,10 @@ import UserNotifications
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
+    @Environment(AccountStore.self) private var account
+
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(NotificationPreferences.eveningEnabledKey)
@@ -99,6 +103,8 @@ struct SettingsView: View {
                         }
                     }
                 }
+                accountSection
+                aboutSection
             }
             .navigationTitle(Strings.settings)
             .navigationBarTitleDisplayMode(.inline)
@@ -113,6 +119,75 @@ struct SettingsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    // MARK: - Account
+
+    /// Sign out and delete. Both were missing entirely: `signOut()` existed on
+    /// `AccountStore` but nothing in the UI ever called it, and there was no
+    /// way at all to delete an account — which App Store guideline 5.1.1(v)
+    /// requires of any app that creates one.
+    @ViewBuilder
+    private var accountSection: some View {
+        Section {
+            if let name = account.account?.displayName {
+                LabeledContent(Strings.signedInAs, value: name)
+                Button(Strings.signOut) { account.signOut() }
+            } else {
+                Text(Strings.notSignedIn)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button(Strings.deleteAccount, role: .destructive) {
+                showDeleteConfirmation = true
+            }
+            .disabled(isDeleting)
+        } header: {
+            Text(Strings.account)
+        } footer: {
+            Text(Strings.deleteAccountFootnote)
+        }
+        .confirmationDialog(
+            Strings.deleteAccountTitle,
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(Strings.deleteAccountConfirm, role: .destructive) {
+                isDeleting = true
+                Task {
+                    await store.deleteAccountAndAllData()
+                    isDeleting = false
+                    dismiss()
+                }
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        } message: {
+            Text(Strings.deleteAccountWarning)
+        }
+        .overlay {
+            if isDeleting {
+                ProgressView(Strings.deletingAccount)
+                    .controlSize(.large)
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        Section {
+            Link(Strings.privacyPolicy, destination: Self.privacyPolicyURL)
+            LabeledContent(Strings.version, value: Self.versionString)
+        } header: {
+            Text(Strings.about)
+        }
+    }
+
+    static let privacyPolicyURL = URL(string: "https://1day.cassieliang.com/privacy")!
+
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(short) (\(build))"
     }
 
     private var reminderTime: Binding<Date> {

@@ -289,6 +289,58 @@ enum CloudKitService {
         }
     }
 
+    // MARK: - Account deletion
+
+    /// Erases everything this person put in a shared room.
+    ///
+    /// Deletion works from record IDs the app can reconstruct rather than from
+    /// queries: clip and reaction record names are deterministic, and comment
+    /// records use the local comment UUID. A query-based sweep would depend on
+    /// `authorID` being a queryable index in the production schema, and would
+    /// silently delete nothing if it isn't — the wrong failure mode for
+    /// something a user asked for explicitly.
+    ///
+    /// Rooms the person created are kept but stripped of their name: the room
+    /// holds other people's clips too, and destroying a friend's story is not
+    /// what "delete my account" should mean.
+    static func deleteMyRoomData(
+        authorID: String,
+        clips: [(code: String, day: Int)],
+        reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)],
+        commentIDs: [String],
+        roomCodes: [String]
+    ) async throws {
+        try await ensureAccountAvailable()
+
+        var ids: [CKRecord.ID] = []
+        for clip in clips {
+            ids.append(.init(recordName: clipRecordName(
+                code: clip.code, authorID: authorID, day: clip.day)))
+        }
+        for reaction in reactions {
+            ids.append(.init(recordName: reactionRecordName(
+                code: reaction.code, targetAuthorID: reaction.targetAuthorID,
+                authorID: authorID, day: reaction.day, emoji: reaction.emoji)))
+        }
+        ids.append(contentsOf: commentIDs.map { CKRecord.ID(recordName: $0) })
+
+        // Chunked: CloudKit rejects oversized batches, and one bad ID
+        // shouldn't abort the rest of someone's deletion.
+        for chunk in stride(from: 0, to: ids.count, by: 200).map({
+            Array(ids[$0..<min($0 + 200, ids.count)])
+        }) {
+            _ = try? await db.modifyRecords(saving: [], deleting: chunk)
+        }
+
+        for code in roomCodes {
+            guard let room = try? await db.record(for: .init(recordName: code)),
+                  room["ownerID"] as? String == authorID
+            else { continue }
+            room["ownerName"] = Strings.deletedMemberName as CKRecordValue
+            _ = try? await db.save(room)
+        }
+    }
+
     /// Fetch all reactions + comments in a room. Returns empties (never throws
     /// for a missing index) so the caller degrades cleanly to local-only.
     static func fetchInteractions(code: String) async throws -> (reactions: [RemoteReaction], comments: [RemoteComment]) {

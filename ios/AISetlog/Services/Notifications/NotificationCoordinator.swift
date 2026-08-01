@@ -48,6 +48,18 @@ enum NotificationPreferences {
 
     private static var defaults: UserDefaults { .standard }
 
+    /// Clears every stored preference. Part of account deletion — leaving a
+    /// reminder schedule behind after someone erases their account would keep
+    /// notifying a person who asked to be gone.
+    static func resetAll() {
+        for key in [
+            eveningEnabledKey, eveningHourKey, eveningMinuteKey, primerSeenKey,
+            sharedEnabledKey, showFriendNamesKey, mutedRoomsKey,
+        ] {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     static var eveningEnabled: Bool {
         get { defaults.bool(forKey: eveningEnabledKey) }
         set { defaults.set(newValue, forKey: eveningEnabledKey) }
