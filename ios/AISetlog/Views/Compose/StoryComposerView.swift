@@ -21,7 +21,6 @@ struct StoryComposerView: View {
     @State private var clipLength: Challenge.ClipLength = .tiny
     @State private var orientation: Challenge.Orientation = .portrait
     @State private var withFriends = false
-    @State private var startTime: Date = Self.defaultStartTime()
     @State private var title = ""
     /// Set once the user edits the name, so switching templates stops
     /// overwriting what they typed.
@@ -74,7 +73,6 @@ struct StoryComposerView: View {
                         withFriends: $withFriends,
                         clipLength: $clipLength,
                         orientation: $orientation,
-                        startTime: $startTime,
                         isOneDay: mode == .oneDay,
                         memberNames: knownFriendNames,
                         errorText: errorText)
@@ -202,8 +200,7 @@ struct StoryComposerView: View {
                 clipLength: clipLength,
                 orientation: orientation,
                 templateName: selected?.displayName,
-                momentTitles: selected?.momentKeys,
-                startDate: resolvedStartDate)
+                momentTitles: selected?.momentKeys)
             dismiss()
             onCreate(challenge.id)
         }
@@ -221,8 +218,7 @@ struct StoryComposerView: View {
                     clipLength: clipLength,
                     orientation: orientation,
                     templateName: selected?.displayName,
-                    momentTitles: selected?.momentKeys,
-                    startDate: resolvedStartDate)
+                    momentTitles: selected?.momentKeys)
                 dismiss()
                 onCreate(challenge.id)
             } catch {
@@ -247,15 +243,6 @@ struct StoryComposerView: View {
             : selected.displayName
     }
 
-    /// The picker only chooses a time of day; anchor it to today's date.
-    private var resolvedStartDate: Date {
-        let calendar = Calendar.current
-        let time = calendar.dateComponents([.hour, .minute], from: startTime)
-        return calendar.date(
-            bySettingHour: time.hour ?? 8, minute: time.minute ?? 0, second: 0, of: .now)
-            ?? .now
-    }
-
     /// Names already seen in the user's rooms — shown as suggestions on the
     /// "with friends" card so it isn't an empty promise.
     private var knownFriendNames: [String] {
@@ -266,11 +253,6 @@ struct StoryComposerView: View {
             }
         }
         return seen
-    }
-
-    /// Default to the start of today's waking hours, rounded down to the hour.
-    private static func defaultStartTime() -> Date {
-        Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: .now) ?? .now
     }
 }
 

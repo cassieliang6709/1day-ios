@@ -1,70 +1,44 @@
 import Foundation
 
-/// The time axis behind the vertical timeline.
+/// Time labels for the story timeline.
 ///
-/// A `Challenge` only knows a slot's *index* (`DayCard.day`) and, once filmed,
-/// its `recordedAt`. The timeline needs a clock position for every slot —
-/// including the empty ones — so it can lay a day out from top to bottom.
-/// This derives one: moments spread evenly across a waking-day window that
-/// begins at the story's start time.
+/// There is no schedule. You film a moment whenever it happens, and the
+/// timeline stamps it with when that was — an earlier version spread slots
+/// evenly across an invented 16-hour day, which put confident times next to
+/// moments nobody had filmed yet. A slot with no clip has no time, and says so
+/// by showing nothing.
 ///
-/// Presentation only. Nothing here is persisted, so changing the shape of the
-/// day never migrates anyone's saved stories.
+/// A 7-day story is the exception: "Day 3" is a real fact about the plan, not
+/// a guess, so the rail keeps showing it whether or not the clip exists.
 struct StorySchedule {
     let challenge: Challenge
-
-    /// How much of the day a 1-day story covers. 16 hours from the start time
-    /// lands a 7-moment 4 AM story on 4 AM → 8 PM, which is what a day
-    /// actually feels like.
-    private static let dayWindow: TimeInterval = 16 * 3600
 
     init(_ challenge: Challenge) {
         self.challenge = challenge
     }
 
-    private var slotCount: Int { max(challenge.cards.count, 1) }
-
-    /// Where a slot sits on the clock if nobody has filmed it yet.
-    func plannedDate(forSlot slot: Int) -> Date {
-        let index = max(slot - 1, 0)
-        guard challenge.isOneDay else {
-            return Calendar.current.date(
-                byAdding: .day, value: index,
-                to: Calendar.current.startOfDay(for: challenge.startDate))
-                ?? challenge.startDate
-        }
-        guard slotCount > 1 else { return challenge.startDate }
-        let spacing = Self.dayWindow / Double(slotCount - 1)
-        let raw = challenge.startDate.addingTimeInterval(spacing * Double(index))
-        return Self.roundedToFiveMinutes(raw)
-    }
-
-    /// The rail label: a clock time for a 1-day film, a day number for a week.
-    ///
-    /// Deliberately the *planned* time, not `recordedAt`. The rail is the shape
-    /// of the day, and it has to stay ordered and evenly spaced whether a
-    /// moment was filmed on time, late, or not at all — three clips captured
-    /// back-to-back in the evening should still read as morning, noon and
-    /// night. When the moment was actually filmed is a detail for the clip
-    /// preview, not the spine of the story.
-    func railLabel(forSlot slot: Int) -> String {
+    /// The rail label. Nil for a 1-day moment that hasn't been filmed —
+    /// the caller leaves the column blank rather than inventing a time.
+    func railLabel(forSlot slot: Int, recordedAt: Date?) -> String? {
         guard challenge.isOneDay else { return Strings.dayN(slot) }
-        return Self.timeFormatter.string(from: plannedDate(forSlot: slot))
+        guard let recordedAt else { return nil }
+        return Self.timeFormatter.string(from: recordedAt)
     }
 
     /// Secondary line under the rail label — the date for a 7-day story, so a
     /// week still reads as a stretch of real time.
-    func railCaption(forSlot slot: Int) -> String? {
+    func railCaption(forSlot slot: Int, recordedAt: Date?) -> String? {
         guard !challenge.isOneDay else { return nil }
-        return plannedDate(forSlot: slot).formatted(
+        guard let recordedAt else { return nil }
+        return recordedAt.formatted(
             .dateTime.month(.abbreviated).day().locale(AppLanguage.effective.locale))
     }
 
-    /// A small glyph for the part of the day a moment lands in. Purely
-    /// atmospheric — it's what makes the rail read as a day passing.
-    func dayPartIcon(forSlot slot: Int) -> String {
-        let hour = Calendar.current.component(.hour, from: plannedDate(forSlot: slot))
-        switch hour {
+    /// A glyph for the part of the day a moment landed in. Atmospheric — it's
+    /// what makes a filled rail read as a day passing. Nil until it's filmed.
+    func dayPartIcon(recordedAt: Date?) -> String? {
+        guard let recordedAt else { return nil }
+        switch Calendar.current.component(.hour, from: recordedAt) {
         case 0..<5: return "moon.stars.fill"
         case 5..<9: return "sunrise.fill"
         case 9..<16: return "sun.max.fill"
@@ -80,31 +54,35 @@ struct StorySchedule {
         return Strings.seconds(max(seconds, 0))
     }
 
-    /// "4:00 AM – 8:00 PM" (or the week's date range) for a story header.
+    /// The header line: the real span of what's been filmed so far
+    /// ("9:15 AM – 6:40 PM"), or the story's date before anything exists.
     var spanLabel: String {
-        let first = plannedDate(forSlot: 1)
-        let last = plannedDate(forSlot: slotCount)
-        if challenge.isOneDay {
-            return "\(Self.timeFormatter.string(from: first)) – \(Self.timeFormatter.string(from: last))"
-        }
-        let fmt = Date.FormatStyle()
+        let stamps = challenge.cards.compactMap(\.recordedAt).sorted()
+        let dateFmt = Date.FormatStyle()
             .month(.abbreviated).day().locale(AppLanguage.effective.locale)
-        return "\(first.formatted(fmt)) – \(last.formatted(fmt))"
-    }
 
-    // MARK: - Helpers
+        guard challenge.isOneDay else {
+            let start = challenge.startDate
+            let end = Calendar.current.date(
+                byAdding: .day, value: max(challenge.cards.count - 1, 0), to: start) ?? start
+            return "\(start.formatted(dateFmt)) – \(end.formatted(dateFmt))"
+        }
+
+        guard let first = stamps.first, let last = stamps.last else {
+            return challenge.startDate.formatted(dateFmt)
+        }
+        let from = Self.timeFormatter.string(from: first)
+        let to = Self.timeFormatter.string(from: last)
+        // Everything so far landed in the same minute — "10:00 PM – 10:00 PM"
+        // is a range of nothing.
+        guard from != to else { return from }
+        return "\(from) – \(to)"
+    }
 
     private static var timeFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.effective.locale
         formatter.setLocalizedDateFormatFromTemplate("jmm")
         return formatter
-    }
-
-    /// Derived times land on ugly minutes (6:51 AM). Round so the rail reads
-    /// like a plan someone wrote, not a computation.
-    private static func roundedToFiveMinutes(_ date: Date) -> Date {
-        let interval = date.timeIntervalSinceReferenceDate
-        return Date(timeIntervalSinceReferenceDate: (interval / 300).rounded() * 300)
     }
 }

@@ -84,8 +84,8 @@ struct MoodStep: View {
 
 // MARK: - Step 2: set it up
 
-/// Solo or together, then the three things that actually change the film:
-/// how long each clip runs, which way the frame sits, and when the day starts.
+/// Solo or together, then the two things that actually change the film: how
+/// long each clip runs and which way the frame sits.
 struct SetupStep: View {
     let template: ChallengeTemplate?
     @Binding var title: String
@@ -93,7 +93,6 @@ struct SetupStep: View {
     @Binding var withFriends: Bool
     @Binding var clipLength: Challenge.ClipLength
     @Binding var orientation: Challenge.Orientation
-    @Binding var startTime: Date
     let isOneDay: Bool
     let memberNames: [String]
     let errorText: String?
@@ -246,17 +245,6 @@ struct SetupStep: View {
                         selection: $orientation,
                         compact: true)
                         .frame(width: 172)
-                }
-
-                if isOneDay {
-                    Divider().overlay(OneDay.hairline)
-
-                    OptionRow(icon: "sunrise", title: Strings.startTimeLabel, accent: .oneDayButter) {
-                        DatePicker(
-                            "", selection: $startTime, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .tint(Color.oneDayBlue)
-                    }
                 }
             }
         }

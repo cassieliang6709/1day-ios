@@ -104,7 +104,7 @@ struct GeneratingFilm: View {
                             ? Color.oneDayBlue : Color.oneDaySky.opacity(0.45))
                         .contentTransition(.symbolEffect(.replace))
 
-                    Text(schedule.railLabel(forSlot: clip.day))
+                    Text(schedule.railLabel(forSlot: clip.day, recordedAt: clip.recordedAt) ?? "")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(OneDay.inkFaint)

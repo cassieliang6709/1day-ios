@@ -63,22 +63,26 @@ struct TimelineRail: View {
     }
 }
 
-/// The time column: when this moment sits in the day, plus a glyph for the
-/// part of the day it lands in.
+/// The time column: when this moment was filmed, plus a glyph for the part of
+/// the day it landed in. `label` is nil for a moment that hasn't happened yet
+/// — the column stays blank rather than inventing a time, and the fixed width
+/// keeps the rail aligned regardless.
 struct TimelineStamp: View {
-    let label: String
+    let label: String?
     var caption: String?
     var icon: String?
     var isEmphasized = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 3) {
-            Text(label)
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(isEmphasized ? Color.oneDayBlue : OneDay.inkSoft)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+            if let label {
+                Text(label)
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(isEmphasized ? Color.oneDayBlue : OneDay.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
 
             if let caption {
                 Text(caption)

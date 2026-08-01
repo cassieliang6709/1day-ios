@@ -161,11 +161,15 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             session.addInput(input)
             videoInput = input
             position = newPosition
-            applyOrientation()
         } else if let videoInput, session.canAddInput(videoInput) {
             session.addInput(videoInput) // revert
         }
         session.commitConfiguration()
+        // After the commit, never before: swapping an input rebuilds the
+        // session's connections, so an angle set inside the transaction is
+        // discarded and the connection falls back to 0° — which records a
+        // portrait clip sideways.
+        applyOrientation()
     }
 
     func startRecording(seconds: Double) {

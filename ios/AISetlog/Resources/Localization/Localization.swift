@@ -749,19 +749,17 @@ enum Strings {
             ? "大家在一天里各自拍下瞬间，1Day 把它们缝成一部影片。"
             : "Everyone captures moments through the day. 1Day stitches them into one beautiful film."
     }
-    static var startTimeLabel: String { lang == .chinese ? "开始时间" : "Start time" }
     static var scriptLabel: String { lang == .chinese ? "脚本" : "Script" }
     static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
     static var createStoryCTA: String { lang == .chinese ? "创建故事" : "Create story" }
-    static func startTimeToday(_ time: String) -> String {
-        lang == .chinese ? "今天 \(time)" : "Today, \(time)"
-    }
 
     // MARK: Timeline
 
     static var everyonesMoments: String {
         lang == .chinese ? "大家的瞬间" : "Everyone's moments"
     }
+    static var viewTimeline: String { lang == .chinese ? "时间线视图" : "Timeline view" }
+    static var viewGrid: String { lang == .chinese ? "网格视图" : "Grid view" }
     static var tapToFilm: String { lang == .chinese ? "点一下开拍" : "Tap to film" }
     /// Row labels. `clipLengthHeader` / `orientationHeader` are the older
     /// all-caps section headers and wrap awkwardly inside an `OptionRow`.

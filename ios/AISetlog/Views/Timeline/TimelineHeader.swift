@@ -6,6 +6,7 @@ struct TimelineHeader: View {
     let challenge: Challenge
     let memberNames: [String]
     let myName: String?
+    @Binding var viewMode: StoryViewMode
     var isSyncing = false
     var syncError: String?
 
@@ -80,13 +81,9 @@ struct TimelineHeader: View {
                 OneDayChip(icon: "film", text: schedule.filmDuration, tint: .oneDayMint)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
 
-            MomentPips(
-                filled: challenge.recordedCount,
-                total: max(challenge.cards.count, 1),
-                size: 6,
-                tint: .oneDayBlue)
+            ViewModeToggle(mode: $viewMode)
         }
     }
 }

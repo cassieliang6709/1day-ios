@@ -33,7 +33,8 @@ enum MomentCatalog {
         "step_outside": .init(text: .init(en: "Step outside", zh: "出去走走"), icon: "wind"),
         "small_treat": .init(text: .init(en: "Small treat", zh: "小奖励"), icon: "cup.and.saucer.fill"),
         "cozy_detail": .init(text: .init(en: "Cozy detail", zh: "温柔的细节"), icon: "house.fill"),
-        "after": .init(text: .init(en: "After", zh: "之后"), icon: "checkmark.seal.fill"),
+        // Also not a checkmark — see `clear_one_thing`.
+        "after": .init(text: .init(en: "After", zh: "之后"), icon: "leaf.fill"),
         // Lock In
         "desk_setup": .init(text: .init(en: "Desk setup", zh: "布置桌面"), icon: "gearshape.fill"),
         "first_sprint": .init(text: .init(en: "First sprint", zh: "第一段冲刺"), icon: "bolt.fill"),

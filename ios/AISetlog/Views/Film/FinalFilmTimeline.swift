@@ -148,10 +148,12 @@ struct FinalFilmTimeline: View {
                 ForEach(Array(clips.enumerated()), id: \.element.id) { index, clip in
                     TimelineRow(
                         stamp: TimelineStamp(
-                            label: schedule.railLabel(forSlot: clip.day),
-                            caption: schedule.railCaption(forSlot: clip.day),
+                            label: schedule.railLabel(
+                                forSlot: clip.day, recordedAt: clip.recordedAt),
+                            caption: schedule.railCaption(
+                                forSlot: clip.day, recordedAt: clip.recordedAt),
                             icon: challenge.isOneDay
-                                ? schedule.dayPartIcon(forSlot: clip.day)
+                                ? schedule.dayPartIcon(recordedAt: clip.recordedAt)
                                 : nil,
                             isEmphasized: true),
                         isFirst: index == 0,

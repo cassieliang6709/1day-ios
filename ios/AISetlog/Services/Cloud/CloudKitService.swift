@@ -70,10 +70,7 @@ enum CloudKitService {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil,
-        /// When the shared day begins — every member's timeline lays out
-        /// against this, so the room agrees on what "7:00 AM" means.
-        startDate: Date = .now
+        momentTitles: [String]? = nil
     ) async throws -> RemoteRoom {
         try await ensureAccountAvailable()
         // Retry on the astronomically unlikely code collision.
@@ -81,7 +78,7 @@ enum CloudKitService {
             let code = makeCode()
             let record = CKRecord(recordType: "Room", recordID: .init(recordName: code))
             record["title"] = title as CKRecordValue
-            record["startDate"] = startDate as CKRecordValue
+            record["startDate"] = Date.now as CKRecordValue
             record["ownerID"] = ownerID as CKRecordValue
             record["ownerName"] = ownerName as CKRecordValue
             record["mode"] = mode.rawValue as CKRecordValue

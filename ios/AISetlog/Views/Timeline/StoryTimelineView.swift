@@ -21,6 +21,8 @@ struct StoryTimelineView: View {
     @State private var celebrate = false
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    /// Timeline or contact sheet. Persisted, so the choice sticks.
+    @AppStorage(StoryViewMode.storageKey) private var viewMode: StoryViewMode = .timeline
 
     private var challenge: Challenge? { store.challenge(challengeID) }
 
@@ -100,13 +102,26 @@ struct StoryTimelineView: View {
                     challenge: challenge,
                     memberNames: members.map(\.name),
                     myName: account.account?.displayName,
+                    viewMode: $viewMode,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
                     syncError: store.syncError(for: challengeID))
                     .padding(.horizontal, 20)
                     .padding(.bottom, 18)
 
-                ForEach(challenge.cards) { card in
-                    row(for: card, in: challenge, clips: clips, members: members)
+                switch viewMode {
+                case .timeline:
+                    ForEach(challenge.cards) { card in
+                        row(for: card, in: challenge, clips: clips, members: members)
+                    }
+                case .grid:
+                    StoryGridView(
+                        challenge: challenge,
+                        clips: clips,
+                        myID: account.account?.id ?? "local",
+                        onTapFilmed: { day, authorID in
+                            sheet = .preview(day: day, authorID: authorID)
+                        },
+                        onTapEmpty: { day in sheet = .record(day: day) })
                 }
             }
             .padding(.top, 6)
@@ -153,9 +168,13 @@ struct StoryTimelineView: View {
 
         TimelineRow(
             stamp: TimelineStamp(
-                label: schedule.railLabel(forSlot: card.day),
-                caption: schedule.railCaption(forSlot: card.day),
-                icon: challenge.isOneDay ? schedule.dayPartIcon(forSlot: card.day) : nil,
+                label: schedule.railLabel(
+                    forSlot: card.day, recordedAt: slotClips.first?.recordedAt),
+                caption: schedule.railCaption(
+                    forSlot: card.day, recordedAt: slotClips.first?.recordedAt),
+                icon: challenge.isOneDay
+                    ? schedule.dayPartIcon(recordedAt: slotClips.first?.recordedAt)
+                    : nil,
                 isEmphasized: isNext || !slotClips.isEmpty),
             isFirst: card.day == challenge.cards.first?.day,
             isLast: card.day == challenge.cards.last?.day,

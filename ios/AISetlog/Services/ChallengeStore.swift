@@ -83,16 +83,12 @@ final class ChallengeStore {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil,
-        /// When the day begins. Drives the timeline's clock positions
-        /// (`StorySchedule`), so a story that starts at 4 AM lays out
-        /// differently from one that starts at noon.
-        startDate: Date = .now
+        momentTitles: [String]? = nil
     ) -> Challenge {
         let challenge = Challenge(
             id: UUID(),
             title: title,
-            startDate: startDate,
+            startDate: .now,
             cards: (1...cardCount(for: momentTitles)).map { DayCard(day: $0) },
             mode: mode,
             clipLength: clipLength,
@@ -120,15 +116,13 @@ final class ChallengeStore {
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
         templateName: String? = nil,
-        momentTitles: [String]? = nil,
-        startDate: Date = .now
+        momentTitles: [String]? = nil
     ) async throws -> Challenge {
         guard let me = account?.account else { throw RoomError.notSignedIn }
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
             mode: mode, clipLength: clipLength, orientation: orientation,
-            templateName: templateName, momentTitles: momentTitles,
-            startDate: startDate)
+            templateName: templateName, momentTitles: momentTitles)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },

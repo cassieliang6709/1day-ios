@@ -408,9 +408,7 @@ struct PlansHomeView: View {
                     mode: .oneDay,
                     clipLength: .tiny,
                     templateName: "Soft Reset",
-                    momentTitles: ChallengeTemplate.oneDayBuiltins[1].momentKeys,
-                    startDate: Calendar.current.date(
-                        bySettingHour: 7, minute: 0, second: 0, of: .now) ?? .now)
+                    momentTitles: ChallengeTemplate.oneDayBuiltins[1].momentKeys)
             if seeded.recordedCount == 0, !args.contains("-demoEmpty") {
                 store.fillWithDemoClips(
                     challengeID: seeded.id,
