@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AppleLogo, ArrowRight, CalendarBlank, Camera, Check, FilmStrip, LockKey, Play, Smiley, UsersThree } from '@phosphor-icons/react';
+import { AppleLogo, ArrowRight, CalendarBlank, Camera, Check, FilmStrip, LockKey, Smiley, UsersThree } from '@phosphor-icons/react';
 
 const TESTFLIGHT_URL = 'https://testflight.apple.com/join/cRQm6Va2';
 
@@ -23,7 +23,7 @@ const copy = {
       ['观看成片', '1Day 自动整理所有片段，完成一支好看的每日短片。', FilmStrip],
     ],
     finished: '在 iPhone 上完成', filmTitle: <>每一段。<br />一个完整故事。</>, filmText: '随时预览最后的竖版短片；想和朋友一起看时切成网格，然后保存到照片或通过 iOS 分享。', privacy: '单人故事只留在你的设备上。要不要保存或分享，始终由你决定。',
-    modes: [['独自记录', '只关于你和你的这一天。', UsersThree], ['朋友房间', '无论身处哪里，一起记录。', UsersThree], ['每日成片', '每天一支，都是故事。', FilmStrip]], footer: ['隐私政策', '测试海报', '支持'], back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 7 月 24 日',
+    modes: [['独自记录', '只关于你和你的这一天。', UsersThree], ['朋友房间', '无论身处哪里，一起记录。', UsersThree], ['每日成片', '每天一支，都是故事。', FilmStrip]], footer: ['隐私政策', '测试海报', '支持'], filmNote: '真实成片 · 7 个瞬间 · 11 秒', filmAria: '1Day 生成的样片', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 7 月 24 日',
   },
   en: {
     nav: ['How it works', 'What you can do', 'Privacy'], beta: 'Join the beta on TestFlight', betaSmall: 'Join beta', heroNote: 'Your day is a story worth keeping.',
@@ -37,7 +37,7 @@ const copy = {
       ['Watch your film', '1Day orders every clip and turns it into a beautiful daily film.', FilmStrip],
     ],
     finished: 'Finished on your iPhone', filmTitle: <>Every clip.<br />One complete story.</>, filmText: 'Preview the finished vertical film, turn shared clips into a grid when you want, then save it to Photos or share it through iOS.', privacy: 'Solo stories stay on your device. You decide what to save or share.',
-    modes: [['Solo', 'Just you and your day.', UsersThree], ['Friends Room', 'Capture together, from anywhere.', UsersThree], ['Daily Film', 'One film. Every day.', FilmStrip]], footer: ['Privacy Policy', 'Beta Poster', 'Support'], back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective July 24, 2026',
+    modes: [['Solo', 'Just you and your day.', UsersThree], ['Friends Room', 'Capture together, from anywhere.', UsersThree], ['Daily Film', 'One film. Every day.', FilmStrip]], footer: ['Privacy Policy', 'Beta Poster', 'Support'], filmNote: 'A real film · 7 moments · 11s', filmAria: 'Sample film made by 1Day', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective July 24, 2026',
   },
 };
 
@@ -73,7 +73,6 @@ export function App() {
   }, [locale]);
   if (path.endsWith('/privacy') || path.endsWith('/privacy/')) return <PrivacyPolicy locale={locale} />;
   const [selectedTheme, setSelectedTheme] = useState(themes[0].id);
-  const [playing, setPlaying] = useState(false);
   const selected = useMemo(() => themes.find((theme) => theme.id === selectedTheme), [selectedTheme]);
   const home = locale === 'zh' ? '' : '/en';
   const themeName = selected[locale];
@@ -86,7 +85,7 @@ export function App() {
       <aside className="theme-panel" aria-label={t.themeTitle}><h2>{t.themeTitle}</h2><div className="theme-options">{themes.map((theme) => <button type="button" key={theme.id} className={selectedTheme === theme.id ? 'selected' : ''} onClick={() => setSelectedTheme(theme.id)} aria-pressed={selectedTheme === theme.id}><img src={theme.image} alt="" /><span><strong>{theme[locale]}</strong><small>{theme[`${locale}Note`]}</small></span>{selectedTheme === theme.id ? <Check weight="bold" /> : <i />}</button>)}</div><a href="#how" className="text-link">{t.allThemes} <ArrowRight /></a><p className="selected-theme" aria-live="polite">{themeName}</p></aside>
     </section>
     <section id="how" className="how shell"><div className="how-heading"><p className="eyebrow">{t.how}</p><p>{t.howNote}</p></div><div className="steps">{t.steps.map(([title, note, Icon], index) => <article className="step" key={title}><div className="step-icon"><Icon weight="fill" /></div><div><p><b>{index + 1}</b> {title}</p><small>{note}</small></div>{index < t.steps.length - 1 && <ArrowRight className="step-arrow" />}</article>)}</div></section>
-    <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.finished}</p><h2>{t.filmTitle}</h2><p>{t.filmText}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><button className={`movie ${playing ? 'playing' : ''}`} type="button" onClick={() => setPlaying(!playing)} aria-label={playing ? 'Pause sample movie' : 'Play sample movie'}><div className="filmstrip">{['moment-1.jpg', 'moment-3.jpg', 'moment-4.jpg', 'moment-6.jpg', 'moment-7.jpg'].map((src, i) => <img key={`${src}-${i}`} src={`/assets/${src}`} alt="" />)}</div><span className="play"><Play weight="fill" /></span><span className="progress"><i /></span><small>{playing ? '0:18' : '0:00'} <span>0:45</span></small></button></section>
+    <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.finished}</p><h2>{t.filmTitle}</h2><p>{t.filmText}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><figure className="movie"><video className="sample-film" src="/assets/sample-film.mp4" poster="/assets/sample-film-poster.jpg" autoPlay muted loop playsInline preload="metadata" aria-label={t.filmAria} /><figcaption>{t.filmNote}</figcaption></figure></section>
     <section className="modes shell">{t.modes.map(([title, note, Icon], index) => <div key={title}><Icon weight="fill" /><span><small>0{index + 1}</small><strong>{title}</strong><em>{note}</em></span></div>)}</section>
     <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/privacy`}>{t.footer[0]}</a><a href="/assets/testflight-qr-poster-ipad.png" download>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a></div></footer>
   </main>;
