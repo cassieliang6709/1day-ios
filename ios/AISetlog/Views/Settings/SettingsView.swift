@@ -181,11 +181,11 @@ struct SettingsView: View {
         }
     }
 
-    /// The landing page's production alias — stable across deploys, unlike a
-    /// per-deployment URL. Swap this for a custom domain once one is pointed
-    /// at the project; App Store Connect needs the same address.
-    static let privacyPolicyURL =
-        URL(string: "https://landing-page-smoky-seven-22.vercel.app/privacy")!
+    /// Baked into the binary, so changing it costs a release: it points at the
+    /// `1day.` subdomain rather than the apex, leaving the apex free for a
+    /// personal site without ever breaking this link. App Store Connect must
+    /// carry the same address.
+    static let privacyPolicyURL = URL(string: "https://1day.liangyue.site/privacy")!
 
     private static var versionString: String {
         let info = Bundle.main.infoDictionary

@@ -88,7 +88,7 @@ the clips, reactions and comments this user uploaded to shared rooms.
 Sign in with Apple is only used for shared rooms; solo users never create
 an account.
 
-Privacy policy: https://landing-page-smoky-seven-22.vercel.app/privacy
+Privacy policy: https://1day.liangyue.site/privacy
 
 No third-party SDKs, no analytics, no advertising, no tracking. Solo
 stories never leave the device.
@@ -115,7 +115,7 @@ stories never leave the device.
 删除账号(指南 5.1.1(v)):
   首页 → 点右上角头像 → 设置 → 账号 → 删除账号
 
-隐私政策:https://landing-page-smoky-seven-22.vercel.app/privacy
+隐私政策:https://1day.liangyue.site/privacy
 ```
 
 ---
