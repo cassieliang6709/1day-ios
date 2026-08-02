@@ -118,15 +118,7 @@ struct StoryComposerView: View {
                 store.updateCustomTemplate(updated)
             }
         }
-        .onAppear {
-            syncTitleToTemplate()
-            #if DEBUG
-            // Screenshot hook: the setup step is otherwise only reachable by tap.
-            if ProcessInfo.processInfo.arguments.contains("-demoSetupStep") {
-                step = .setup
-            }
-            #endif
-        }
+        .onAppear(perform: syncTitleToTemplate)
         .onChange(of: activeIndex) { _, _ in syncTitleToTemplate() }
         .onChange(of: mode) { _, _ in
             activeIndex = 0

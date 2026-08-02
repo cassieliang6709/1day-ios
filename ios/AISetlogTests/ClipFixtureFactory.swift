@@ -1,30 +1,28 @@
-#if DEBUG
 import AVFoundation
 import UIKit
 
-/// Synthesises throwaway clips so the simulator can show a filmed story
-/// without a camera.
+/// Generates short video files for the stitcher tests.
 ///
-/// This replaces seven `day*.mp4` files that used to ship inside the release
-/// bundle purely so a DEBUG-only menu item could load them. Generating the
-/// frames costs nothing at runtime and keeps development scaffolding out of
-/// what users download.
-enum DemoClipFactory {
+/// These used to be seven `day*.mp4` files in the app bundle, which meant
+/// every release shipped test fixtures to users. Fixtures belong to the tests
+/// that need them, so they're built here instead.
+enum ClipFixtureFactory {
     /// Portrait, matching what the camera actually produces, so seeded stories
     /// exercise the same layout paths as real ones.
     private static let size = CGSize(width: 540, height: 960)
 
+    /// Distinct flat colours — a test only needs each clip to be
+    /// distinguishable and decodable.
     private static let palette: [UIColor] = [
-        UIColor(hex: 0x2C4A52), UIColor(hex: 0x1F8A70), UIColor(hex: 0xE8B54D),
-        UIColor(hex: 0xE98A5B), UIColor(hex: 0xE8776E), UIColor(hex: 0xA98BE0),
-        UIColor(hex: 0x5BC8E8),
+        .systemTeal, .systemGreen, .systemOrange,
+        .systemPink, .systemPurple, .systemBlue, .systemYellow,
     ]
 
     /// Frames at 30fps. Two seconds, matching the app's default clip length so
     /// seeded stories and stitcher tests behave like the real thing.
     private static let frameCount = 60
 
-    /// Writes a 2s solid-colour clip and returns its URL, or nil on failure.
+    /// Writes a 2s clip and returns its URL, or nil on failure.
     static func makeClip(index: Int) async -> URL? {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("demo_\(index)_\(UUID().uuidString).mov")
@@ -82,4 +80,3 @@ enum DemoClipFactory {
         return buffer
     }
 }
-#endif

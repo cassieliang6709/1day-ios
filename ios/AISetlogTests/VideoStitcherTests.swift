@@ -23,7 +23,7 @@ final class VideoStitcherTests: XCTestCase {
     }
 
     func testFriendsTogetherPlaysSameDayClipsSimultaneously() async throws {
-        let made = await DemoClipFactory.makeClip(index: 0)
+        let made = await ClipFixtureFactory.makeClip(index: 0)
         let source = try XCTUnwrap(made)
         defer { try? FileManager.default.removeItem(at: source) }
         let clips = [
@@ -55,12 +55,11 @@ final class VideoStitcherTests: XCTestCase {
     }
 
     /// Fixtures are generated rather than bundled: the seven `day*.mp4` files
-    /// these used to load existed only for development, and shipped inside
-    /// every release build to serve these tests and a debug menu item.
+    /// these used to load shipped inside every release build.
     private func sampleClips(count: Int) async throws -> [DayClip] {
         var clips: [DayClip] = []
         for day in 1...count {
-            let made = await DemoClipFactory.makeClip(index: day - 1)
+            let made = await ClipFixtureFactory.makeClip(index: day - 1)
             let url = try XCTUnwrap(made)
             clips.append(DayClip(day: day, url: url, label: "Day \(day)"))
         }

@@ -534,19 +534,4 @@ final class ChallengeStore {
         guard let count = momentTitles?.count, count > 0 else { return 7 }
         return count
     }
-
-    #if DEBUG
-    /// Simulator helper: fill cards with generated clips so the stitching flow
-    /// can be exercised without a camera. `limit` stops early, which is how a
-    /// part-filmed day gets screenshotted.
-    @MainActor
-    func fillWithDemoClips(challengeID: UUID, limit: Int = 7) async {
-        let dayCount = min(challenge(challengeID)?.cards.count ?? 7, limit)
-        guard dayCount >= 1 else { return }
-        for day in 1...dayCount {
-            guard let url = await DemoClipFactory.makeClip(index: day - 1) else { continue }
-            saveClip(from: url, day: day, challengeID: challengeID)
-        }
-    }
-    #endif
 }

@@ -74,24 +74,6 @@ struct StoryTimelineView: View {
                 showFilm = true
             }
         }
-        #if DEBUG
-        .onAppear {
-            let args = ProcessInfo.processInfo.arguments
-            if args.contains("-demoFilm") { showFilm = true }
-            if args.contains("-demoReel") {
-                Task {
-                    await store.fillWithDemoClips(challengeID: challengeID)
-                    showFilm = true
-                }
-            }
-            if args.contains("-demoPreview") {
-                Task {
-                    await store.fillWithDemoClips(challengeID: challengeID)
-                    sheet = .preview(day: 2, authorID: nil)
-                }
-            }
-        }
-        #endif
     }
 
     // MARK: - Layout

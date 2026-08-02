@@ -181,7 +181,11 @@ struct SettingsView: View {
         }
     }
 
-    static let privacyPolicyURL = URL(string: "https://1day.cassieliang.com/privacy")!
+    /// The landing page's production alias — stable across deploys, unlike a
+    /// per-deployment URL. Swap this for a custom domain once one is pointed
+    /// at the project; App Store Connect needs the same address.
+    static let privacyPolicyURL =
+        URL(string: "https://landing-page-smoky-seven-22.vercel.app/privacy")!
 
     private static var versionString: String {
         let info = Bundle.main.infoDictionary

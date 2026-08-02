@@ -97,9 +97,6 @@ struct PlansHomeView: View {
         }
         .onChange(of: pendingJoinCode) { _, _ in consumePendingJoinCode() }
         .onChange(of: launchAction) { _, _ in consumeLaunchAction() }
-        #if DEBUG
-        .onAppear(perform: applyDebugLaunchArguments)
-        #endif
     }
 
     // MARK: - Content
@@ -399,60 +396,6 @@ struct PlansHomeView: View {
         challenge.cards.last { $0.clipFileName != nil }?.recordedAt
     }
 
-    #if DEBUG
-    private func applyDebugLaunchArguments() {
-        let args = ProcessInfo.processInfo.arguments
-        // A part-filmed 1-day story — the state most screens are designed
-        // around, and the one worth looking at in the simulator.
-        if args.contains("-demoSeed") || args.contains("-demoTimeline")
-            || args.contains("-demoFilm") || args.contains("-demoEmpty") {
-            let seeded = store.challenges.first { $0.title == "Soft Reset" }
-                ?? store.create(
-                    title: "Soft Reset",
-                    mode: .oneDay,
-                    clipLength: .tiny,
-                    templateName: "Soft Reset",
-                    momentTitles: ChallengeTemplate.oneDayBuiltins[1].momentKeys)
-            if seeded.recordedCount == 0, !args.contains("-demoEmpty") {
-                let limit = args.contains("-demoFilm") ? 7 : 3
-                Task { await store.fillWithDemoClips(challengeID: seeded.id, limit: limit) }
-            }
-            if args.contains("-demoTimeline") || args.contains("-demoFilm")
-                || args.contains("-demoEmpty") {
-                path = [seeded.id]
-            }
-        }
-        // A populated home: a hero, other plans, and finished films on the
-        // shelf — the shape a real account has, which is where layout breaks.
-        if args.contains("-demoFull"), store.challenges.count < 6 {
-            for (index, template) in ChallengeTemplate.oneDayBuiltins.prefix(6).enumerated() {
-                let made = store.create(
-                    title: template.displayName,
-                    mode: .oneDay,
-                    templateName: template.displayName,
-                    momentTitles: template.momentKeys)
-                // Four complete (they land on the finished shelf) and two in
-                // progress, which is roughly what a used account looks like.
-                let limit = index < 4 ? 7 : 3
-                Task { await store.fillWithDemoClips(challengeID: made.id, limit: limit) }
-            }
-        }
-        if args.contains("-demoReel") {
-            let demo = store.challenges.first { $0.title == "Demo Week" }
-                ?? store.create(title: "Demo Week")
-            path = [demo.id]
-        }
-        if args.contains("-demoBoard") {
-            let demo = store.challenges.first { $0.title == "Demo Week" }
-                ?? store.create(title: "Demo Week")
-            Task { await store.fillWithDemoClips(challengeID: demo.id) }
-            path = [demo.id]
-        }
-        if args.contains("-newChallenge") {
-            showComposer = true
-        }
-    }
-    #endif
 }
 
 /// A finished film on the shelf: cover frame, title, and the date it happened.
