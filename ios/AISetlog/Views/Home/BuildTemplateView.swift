@@ -38,7 +38,7 @@ struct BuildTemplateView: View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color.white, Color.oneDayMist.opacity(0.85), Color.white],
+                    colors: [OneDay.surface, OneDay.surfaceSoft.opacity(0.85), OneDay.surface],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
@@ -127,7 +127,7 @@ struct BuildTemplateView: View {
             .focused($nameFocused)
         }
         .padding(16)
-        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
+        .background(OneDay.surface.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(Color.oneDayBlue.opacity(nameFocused ? 0.38 : 0.13), lineWidth: 1.5)
@@ -167,7 +167,7 @@ struct BuildTemplateView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
+        .background(OneDay.surface.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(Color.oneDayBlue.opacity(0.12), lineWidth: 1)
@@ -181,11 +181,11 @@ struct BuildTemplateView: View {
         } label: {
             Text(MomentCatalog.localize(prompt))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? .white : Color.primary)
+                .foregroundStyle(isSelected ? .white : .primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
                 .background(
-                    isSelected ? Color.oneDayBlue : .white.opacity(0.94),
+                    isSelected ? Color.oneDayBlue : OneDay.surface.opacity(0.94),
                     in: Capsule()
                 )
                 .overlay(

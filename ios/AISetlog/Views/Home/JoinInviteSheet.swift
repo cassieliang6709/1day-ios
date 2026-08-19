@@ -18,8 +18,8 @@ struct JoinInviteSheet: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.96, green: 0.99, blue: 1.0),
-                    Color.oneDayMist,
+                    OneDay.surface,
+                    OneDay.surfaceSoft.opacity(0.85),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -47,7 +47,7 @@ struct JoinInviteSheet: View {
                 VStack(spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(.white.opacity(0.88))
+                            .fill(OneDay.surface.opacity(0.9))
                             .frame(width: 86, height: 70)
                             .shadow(color: .cyan.opacity(0.15), radius: 14, y: 8)
 
@@ -142,13 +142,13 @@ struct CodeSlot: View {
         Text(character ?? "")
             .font(.system(size: 22, weight: .black, design: .rounded))
             .monospaced()
-            .foregroundStyle(Color(red: 0.06, green: 0.12, blue: 0.18))
+            .foregroundStyle(OneDay.ink)
             .frame(width: 44, height: 54)
-            .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(OneDay.surface.opacity(0.94), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(
-                        isActive ? Color(red: 0.0, green: 0.62, blue: 0.95) : Color.black.opacity(0.06),
+                        isActive ? Color(red: 0.0, green: 0.62, blue: 0.95) : Color.secondary.opacity(0.35),
                         lineWidth: isActive ? 2 : 1
                     )
             }

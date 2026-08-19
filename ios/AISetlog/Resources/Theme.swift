@@ -7,6 +7,14 @@ import UIKit
 /// without importing SwiftUI); the SwiftUI colors derive from it. Everything
 /// visual in the app resolves back to this file — screens never hardcode a
 /// hex, a corner radius, or a shadow.
+private extension UIColor {
+    static func themed(light: UIColor, dark: UIColor) -> UIColor {
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        }
+    }
+}
+
 extension UIColor {
     convenience init(hex: UInt32) {
         self.init(
@@ -22,12 +30,21 @@ extension UIColor {
     static let oneDayCyan = UIColor(hex: 0x38B6FF)
     /// #7FB4FF — tinted rails, inactive strokes, gradient midpoints.
     static let oneDaySky = UIColor(hex: 0x7FB4FF)
-    /// #0F2E6B — headline ink. Never pure black; the app stays blue all the way down.
-    static let oneDayNavy = UIColor(hex: 0x0F2E6B)
+    /// #0F2E6B — headline ink in light mode. In dark mode we keep the same
+    /// intent with lighter blue so text remains legible.
+    static let oneDayNavy = UIColor.themed(
+        light: UIColor(hex: 0x0F2E6B),
+        dark: UIColor(hex: 0x9AB7FF))
     /// #DCEBFF — soft blue surfaces (chips, icon tiles, empty slots).
     static let oneDayMist = UIColor(hex: 0xDCEBFF)
     /// #F5F8FF — the page behind everything.
-    static let oneDayCanvas = UIColor(hex: 0xF5F8FF)
+    static let oneDayCanvas = UIColor.themed(
+        light: UIColor(hex: 0xF5F8FF),
+        dark: UIColor(hex: 0x131B2A))
+    /// Soft surface token for cards / form fields that used to be white.
+    static let oneDaySurface = UIColor.themed(
+        light: UIColor(hex: 0xDCEBFF),
+        dark: UIColor(hex: 0x171F33))
 
     // Accents. Used sparingly — one per surface, to keep things cute not busy.
     static let oneDayLavender = UIColor(hex: 0xB3A4FF)
@@ -43,6 +60,7 @@ extension Color {
     static let oneDayNavy = Color(uiColor: .oneDayNavy)
     static let oneDayMist = Color(uiColor: .oneDayMist)
     static let oneDayCanvas = Color(uiColor: .oneDayCanvas)
+    static let oneDaySurface = Color(uiColor: .oneDaySurface)
     static let oneDayLavender = Color(uiColor: .oneDayLavender)
     static let oneDayMint = Color(uiColor: .oneDayMint)
     static let oneDayButter = Color(uiColor: .oneDayButter)
@@ -55,16 +73,27 @@ enum OneDay {
     // MARK: Ink
 
     static let ink = Color.oneDayNavy
-    static let inkSoft = Color(uiColor: UIColor(hex: 0x5B7099))
-    static let inkFaint = Color(uiColor: UIColor(hex: 0x93A6C6))
+    static let inkSoft = Color(uiColor: UIColor.themed(
+        light: UIColor(hex: 0x5B7099),
+        dark: UIColor(hex: 0x7E95C5)))
+    static let inkFaint = Color(uiColor: UIColor.themed(
+        light: UIColor(hex: 0x93A6C6),
+        dark: UIColor(hex: 0x657FAF)))
 
     // MARK: Surfaces
 
     static let canvas = Color.oneDayCanvas
-    static let surface = Color.white
-    static let surfaceSoft = Color.oneDayMist
+    /// System-surface-aware card background in light mode and a deep blue in dark
+    /// mode so it never turns “gray on gray”.
+    static let surface = Color(uiColor: UIColor.themed(
+        light: UIColor.white,
+        dark: UIColor(hex: 0x171F33)))
+    /// Soft fill for chips/cards, now adapted for both modes.
+    static let surfaceSoft = Color.oneDaySurface
     /// Hairline border on glass — barely there, just enough to catch an edge.
-    static let hairline = Color.oneDayBlue.opacity(0.10)
+    static let hairline = Color(uiColor: .themed(
+        light: UIColor.oneDayBlue.withAlphaComponent(0.10),
+        dark: UIColor.white.withAlphaComponent(0.16)))
 
     // MARK: Radii
     //

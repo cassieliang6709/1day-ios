@@ -34,7 +34,7 @@ struct SoftActionStyle: ButtonStyle {
             .foregroundStyle(Color.oneDayBlue)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
-            .background(.background, in: Capsule())
+            .background(OneDay.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
             .oneDaySoftShadow(strength: 0.6)
             .scaleEffect(configuration.isPressed ? 0.975 : 1)

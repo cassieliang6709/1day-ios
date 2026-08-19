@@ -11,6 +11,7 @@ struct OneDayCanvas: View {
     /// Blooms shift with the screen so each surface feels like a different
     /// room in the same house.
     var seed: Int = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         // The blooms hang in an overlay on a flexible colour rather than
@@ -21,20 +22,37 @@ struct OneDayCanvas: View {
         // An overlay is sized by its base, so decoration can't do that.
         OneDay.canvas
             .overlay {
+                // In dark mode the pale blooms read as a hard white flare over
+                // the top of the screen — the headline sits in it and stops
+                // being legible. Dark keeps the same shapes as a dim brand
+                // glow instead: decoration, never a spotlight.
                 ZStack {
-                    bloom(.oneDayMist, size: 320, x: -140, y: -280, opacity: 0.9)
-                    bloom(.oneDaySky, size: 260, x: 170, y: -180, opacity: 0.28)
-                    bloom(.oneDayLavender, size: 300, x: 160, y: 380, opacity: 0.16)
-                    bloom(.oneDayMint, size: 200, x: -160, y: 460, opacity: 0.14)
+                    bloom(.oneDayMist, dark: .oneDayBlue,
+                          size: 320, x: -140, y: -280, opacity: 0.9, darkOpacity: 0.16)
+                    bloom(.oneDaySky, dark: .oneDayCyan,
+                          size: 260, x: 170, y: -180, opacity: 0.28, darkOpacity: 0.10)
+                    bloom(.oneDayLavender, dark: .oneDayLavender,
+                          size: 300, x: 160, y: 380, opacity: 0.16, darkOpacity: 0.10)
+                    bloom(.oneDayMint, dark: .oneDayMint,
+                          size: 200, x: -160, y: 460, opacity: 0.14, darkOpacity: 0.09)
                 }
                 .allowsHitTesting(false)
             }
             .ignoresSafeArea()
     }
 
-    private func bloom(_ color: Color, size: CGFloat, x: CGFloat, y: CGFloat, opacity: Double) -> some View {
-        Circle()
-            .fill(color.opacity(opacity))
+    private func bloom(
+        _ color: Color,
+        dark darkColor: Color,
+        size: CGFloat,
+        x: CGFloat,
+        y: CGFloat,
+        opacity: Double,
+        darkOpacity: Double
+    ) -> some View {
+        let isDark = colorScheme == .dark
+        return Circle()
+            .fill((isDark ? darkColor : color).opacity(isDark ? darkOpacity : opacity))
             .frame(width: size, height: size)
             .blur(radius: 48)
             .offset(x: x + CGFloat(seed % 3) * 18, y: y - CGFloat(seed % 2) * 24)
@@ -56,7 +74,7 @@ struct GlassCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(.background)
+                    .fill(OneDay.surface)
                     .overlay {
                         if let tint {
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -80,7 +98,7 @@ extension View {
     ) -> some View {
         background {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.background)
+                .fill(OneDay.surface)
                 .overlay {
                     if let tint {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)

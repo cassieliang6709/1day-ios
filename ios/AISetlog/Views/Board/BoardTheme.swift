@@ -14,15 +14,15 @@ enum BoardTheme {
     static let accent = Color.oneDayCyan
     static let deep = Color.oneDayNavy
     static let tint = Color.oneDaySky
-    static let page = Color.oneDayCanvas
-    static let card = Color.white.opacity(0.94)
-    static let cardStrong = Color.white
+    static let page = OneDay.canvas
+    static let card = OneDay.surface.opacity(0.94)
+    static let cardStrong = OneDay.surface
     static let stroke = OneDay.hairline
     static let primaryText = OneDay.ink
     static let secondaryText = OneDay.inkSoft
 
     static let background = LinearGradient(
-        colors: [Color.oneDayCanvas, Color.white, Color.oneDayMist.opacity(0.7)],
+        colors: [OneDay.canvas, OneDay.surface, OneDay.surfaceSoft.opacity(0.75)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing)
 

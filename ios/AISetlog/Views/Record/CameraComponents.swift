@@ -8,9 +8,9 @@ struct CuteCameraBackdrop: View {
     var body: some View {
         LinearGradient(
             colors: [
-                Color(.systemBackground),
+                OneDay.canvas,
                 Color.cyan.opacity(0.12),
-                Color(.systemBackground),
+                OneDay.canvas,
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

@@ -32,7 +32,7 @@ struct StoryCard: View {
             cover
             footer
         }
-        .background(.background, in: RoundedRectangle(cornerRadius: OneDay.Radius.hero, style: .continuous))
+        .background(OneDay.surface, in: RoundedRectangle(cornerRadius: OneDay.Radius.hero, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: OneDay.Radius.hero, style: .continuous)
                 .strokeBorder(OneDay.hairline, lineWidth: 1)

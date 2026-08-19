@@ -6,6 +6,7 @@ import AuthenticationServices
 struct SignInView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     /// Called once sign-in succeeds so the caller can continue its flow.
     var onSignedIn: () -> Void
 
@@ -52,7 +53,7 @@ struct SignInView: View {
                     errorMessage = error.localizedDescription
                 }
             }
-            .signInWithAppleButtonStyle(.black)
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 50)
 
             Button(Strings.notNow) { dismiss() }

@@ -14,9 +14,9 @@ struct FirstRunOnboardingView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.oneDayMist,
-                    Color(red: 0.95, green: 0.99, blue: 1.0),
-                    Color(red: 0.82, green: 0.94, blue: 1.0),
+                    OneDay.surfaceSoft,
+                    OneDay.canvas,
+                    OneDay.surfaceSoft,
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

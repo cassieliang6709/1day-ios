@@ -397,7 +397,7 @@ private struct CompanyOption: View {
             .padding(14)
             .background {
                 RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous)
-                    .fill(.background)
+                    .fill(OneDay.surface)
                     .overlay {
                         RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous)
                             .fill(accent.opacity(isOn ? 0.09 : 0))

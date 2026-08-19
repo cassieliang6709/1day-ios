@@ -60,7 +60,7 @@ struct RecordClipView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            OneDay.canvas.ignoresSafeArea()
             CuteCameraBackdrop()
 
             if let url = recorder.clipURL {
