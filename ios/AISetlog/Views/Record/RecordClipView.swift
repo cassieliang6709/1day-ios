@@ -344,11 +344,16 @@ struct RecordClipView: View {
             #if DEBUG
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
             Button(Strings.useDemoClip(localizedMomentTitle)) {
-                if let demo = Bundle.main.url(forResource: "day\(day)", withExtension: "mp4") {
+                Task {
+                    guard let demo = await DemoClipFactory.makeClip(
+                        moment: day,
+                        label: localizedMomentTitle,
+                        author: myName,
+                        seconds: clipSeconds,
+                        orientation: effectiveOrientation)
+                    else { return }
                     onSave(demo, trimmedOverlayText)
                     offerNotificationPrimer(dismissWhenFinished: true)
-                } else {
-                    dismiss()
                 }
             }
             .buttonStyle(.borderedProminent)

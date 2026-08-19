@@ -13,6 +13,7 @@
 		1CF9553D522526F39E799665 /* RoomSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */; };
 		1D594261F817EA77C9010C27 /* FinalFilmTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A56B0E8E0A51EAA2B9D024D /* FinalFilmTimeline.swift */; };
 		1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1203805BE113F00D0764E06C /* LocalizationTests.swift */; };
+		4F7A247077E04F308E1FD080 /* DemoClipFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5576015897394AC1A640DF82 /* DemoClipFactoryTests.swift */; };
 		E6B1F79BCE6C479687874C9B /* InviteCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C36D71CF04524A1593084 /* InviteCodeTests.swift */; };
 		1F37BFE90A0883A53F0CF4BE /* DayClip.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0E3B6710E2DA89EAD960CF /* DayClip.swift */; };
 		22DF98AB87695CF709B9BFDA /* ClipFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B166E63A2BA6F620F69321D /* ClipFileStore.swift */; };
@@ -27,6 +28,7 @@
 		4BF03CC71350B5D34B616932 /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BE138CBEA47AFE2B8D7B81 /* ReminderService.swift */; };
 		54BC59A4D84A8547653AC09A /* ClipPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC7524C5A9AAC7162DDDA87 /* ClipPlayback.swift */; };
 		563F86A16EC88D4D55B8CB04 /* VideoStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDFA2FC17353B12549FB3213 /* VideoStitcher.swift */; };
+		B629E5778BE14127950CE7E5 /* DemoClipFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D4C47217244748B461F362 /* DemoClipFactory.swift */; };
 		575E54F104D80A114762C420 /* GuidedMomentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 218AC0301CBC98849CD9C335 /* GuidedMomentsView.swift */; };
 		586AF2600531B99839F3ECEF /* AISetlogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0C91DDF53E65DB3F78D79E /* AISetlogApp.swift */; };
 		5AA2B95A97D5608F8A3FB0D2 /* StoryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F898A00CB2C9F6BE1DD94A02 /* StoryGridView.swift */; };
@@ -93,6 +95,7 @@
 		0B53FFB838BA4383441088A2 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
 		0E0FDF28043B736116C77C99 /* CameraComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraComponents.swift; sourceTree = "<group>"; };
 		1203805BE113F00D0764E06C /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		5576015897394AC1A640DF82 /* DemoClipFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoClipFactoryTests.swift; sourceTree = "<group>"; };
 		2C2C36D71CF04524A1593084 /* InviteCodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeTests.swift; sourceTree = "<group>"; };
 		1A56B0E8E0A51EAA2B9D024D /* FinalFilmTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinalFilmTimeline.swift; sourceTree = "<group>"; };
 		1C3C2A2B0AE72D844F68EB50 /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
@@ -146,6 +149,7 @@
 		D9F6E9F42EBCF8511F5D31BA /* NotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCoordinator.swift; sourceTree = "<group>"; };
 		DA520086AD531DD7B14C9812 /* ClipPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPreviewView.swift; sourceTree = "<group>"; };
 		DDFA2FC17353B12549FB3213 /* VideoStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcher.swift; sourceTree = "<group>"; };
+		E1D4C47217244748B461F362 /* DemoClipFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoClipFactory.swift; sourceTree = "<group>"; };
 		DE617BB67B2ED88146C35DD9 /* OneDayControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneDayControls.swift; sourceTree = "<group>"; };
 		E2BE138CBEA47AFE2B8D7B81 /* ReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderService.swift; sourceTree = "<group>"; };
 		E5705E42B10C9FF7234A2E15 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -312,6 +316,7 @@
 			children = (
 				9A9F4DAB25F0BED115C92230 /* ClipRecorder.swift */,
 				DDFA2FC17353B12549FB3213 /* VideoStitcher.swift */,
+				E1D4C47217244748B461F362 /* DemoClipFactory.swift */,
 			);
 			path = Media;
 			sourceTree = "<group>";
@@ -385,6 +390,7 @@
 				910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */,
 				50C2CEBEB0FCD4A5A8D229BA /* ClipFixtureFactory.swift */,
 				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
+				5576015897394AC1A640DF82 /* DemoClipFactoryTests.swift */,
 				2C2C36D71CF04524A1593084 /* InviteCodeTests.swift */,
 				0B53FFB838BA4383441088A2 /* NotificationTests.swift */,
 				334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */,
@@ -573,6 +579,7 @@
 				319C3B6B634790E42F500D9A /* TimelineClip.swift in Sources */,
 				B7B4BF6AEECB218511A14B35 /* TimelineHeader.swift in Sources */,
 				563F86A16EC88D4D55B8CB04 /* VideoStitcher.swift in Sources */,
+				B629E5778BE14127950CE7E5 /* DemoClipFactory.swift in Sources */,
 				5C5F0F46766760C4238CA71B /* VlogPlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -584,6 +591,7 @@
 				01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */,
 				E6B92F0093A90EDDE3F0F08A /* ClipFixtureFactory.swift in Sources */,
 				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,
+				4F7A247077E04F308E1FD080 /* DemoClipFactoryTests.swift in Sources */,
 				E6B1F79BCE6C479687874C9B /* InviteCodeTests.swift in Sources */,
 				94FA1CA14DC73ADCF0885E26 /* NotificationTests.swift in Sources */,
 				938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */,
