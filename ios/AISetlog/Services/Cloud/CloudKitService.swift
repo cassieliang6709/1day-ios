@@ -49,6 +49,32 @@ enum CloudKitService {
         String((0..<6).map { _ in codeAlphabet.randomElement()! })
     }
 
+    /// Pull a join code out of arbitrary pasted text. The share blurb is a
+    /// whole sentence with the code mid-string and a deep link at the end, so
+    /// "first six alphanumerics" used to yield `1DAY` from the product name.
+    /// Trust the deep link first, then any standalone run of exactly six
+    /// characters from the code alphabet.
+    static func extractCode(from text: String) -> String? {
+        let allowed = Set(codeAlphabet)
+        let upper = text.uppercased()
+
+        if let marker = upper.range(of: "CODE=") {
+            let candidate = String(upper[marker.upperBound...].prefix(6))
+            if candidate.count == 6, candidate.allSatisfy(allowed.contains) { return candidate }
+        }
+
+        var run = ""
+        for character in upper + " " {
+            if allowed.contains(character) {
+                run.append(character)
+            } else {
+                if run.count == 6 { return run }
+                run = ""
+            }
+        }
+        return nil
+    }
+
     struct RemoteRoom {
         let code: String
         let title: String

@@ -1,5 +1,6 @@
 import Foundation
 import AuthenticationServices
+import UIKit
 import Observation
 
 /// The signed-in identity used to attribute clips in a shared room.
@@ -73,6 +74,18 @@ final class AccountStore {
             return acct
         }
     }
+
+#if DEBUG
+    /// Sign in with Apple is unreliable on the simulator, which makes two-device
+    /// room testing (the whole point of shared stories) hard to exercise. A
+    /// debug build can mint a throwaway identity instead: the device name keeps
+    /// the two testers apart, the UUID keeps their clip record names apart.
+    func signInAsTester() {
+        persist(Account(
+            id: "tester-" + UUID().uuidString,
+            displayName: UIDevice.current.name))
+    }
+#endif
 
     private func persist(_ account: Account) {
         self.account = account

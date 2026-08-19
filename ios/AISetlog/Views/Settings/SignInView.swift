@@ -56,6 +56,17 @@ struct SignInView: View {
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 50)
 
+            #if DEBUG
+            // Two simulators can't both get through Sign in with Apple, so a
+            // debug build can join a room as a throwaway identity instead.
+            Button("Use a test identity (debug)") {
+                account.signInAsTester()
+                onSignedIn()
+                dismiss()
+            }
+            .font(.footnote.weight(.semibold))
+            #endif
+
             Button(Strings.notNow) { dismiss() }
                 .font(.subheadline)
                 .padding(.bottom, 8)

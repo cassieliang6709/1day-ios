@@ -794,6 +794,8 @@ enum Strings {
         lang == .chinese ? "等 \(name) 的瞬间…" : "Waiting for \(name)'s moment…"
     }
     static var inviteLabel: String { lang == .chinese ? "邀请" : "Invite" }
+    static var inviteCodeLabel: String { lang == .chinese ? "邀请码" : "Invite code" }
+    static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static var makeTheFilm: String { lang == .chinese ? "生成影片" : "Make the film" }
     static func previewTheFilm(_ count: Int) -> String {
         lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) moments"

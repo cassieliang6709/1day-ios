@@ -10,6 +10,8 @@ struct TimelineHeader: View {
     var isSyncing = false
     var syncError: String?
 
+    @State private var didCopyCode = false
+
     private var schedule: StorySchedule { StorySchedule(challenge) }
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
@@ -19,6 +21,10 @@ struct TimelineHeader: View {
 
             if challenge.isShared, !memberNames.isEmpty {
                 roster
+            }
+
+            if challenge.isShared, let code = challenge.roomCode {
+                inviteCode(code)
             }
 
             stats
@@ -64,6 +70,50 @@ struct TimelineHeader: View {
             .padding(.vertical, 2)
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// The join code, in full, on the screen the owner is already looking at.
+    /// Sharing used to mean opening a share sheet and pulling six characters
+    /// out of a sentence — fine for iMessage, useless when you just want to
+    /// read the code aloud. Tapping copies the bare code, not the blurb.
+    private func inviteCode(_ code: String) -> some View {
+        Button {
+            UIPasteboard.general.string = code
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.easeOut(duration: 0.15)) { didCopyCode = true }
+        } label: {
+            HStack(spacing: 8) {
+                Text(Strings.inviteCodeLabel)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+
+                Text(code)
+                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                    .tracking(2)
+                    .foregroundStyle(Color.oneDayBlue)
+
+                Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(didCopyCode ? Color.oneDayMint : OneDay.inkFaint)
+
+                if didCopyCode {
+                    Text(Strings.inviteCodeCopied)
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayMint)
+                        .transition(.opacity)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(OneDay.surfaceSoft.opacity(0.7), in: Capsule())
+            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .task(id: didCopyCode) {
+            guard didCopyCode else { return }
+            try? await Task.sleep(for: .seconds(1.6))
+            withAnimation(.easeOut(duration: 0.2)) { didCopyCode = false }
+        }
     }
 
     private var stats: some View {

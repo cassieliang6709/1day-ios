@@ -36,8 +36,9 @@ struct JoinInviteSheet: View {
                         .frame(width: 42, height: 5)
                     Spacer()
                     Button(Strings.paste) {
-                        if let pasted = UIPasteboard.general.string {
-                            code = String(pasted.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(6))
+                        if let pasted = UIPasteboard.general.string,
+                           let found = CloudKitService.extractCode(from: pasted) {
+                            code = found
                         }
                     }
                     .font(.headline)
