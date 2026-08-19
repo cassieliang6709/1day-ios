@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1Day TestFlight Poster</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; background: #eaf6ff; color: #10213a; }
+    .poster { position: relative; width: 1200px; height: 1600px; overflow: hidden; padding: 70px 78px 54px; background: radial-gradient(circle at 92% 5%, rgba(58, 190, 255, .48), transparent 34%), radial-gradient(circle at 0 100%, rgba(40, 226, 212, .30), transparent 32%), linear-gradient(145deg, #f8fcff 0%, #e8f6ff 56%, #f9fcff 100%); }
+    .poster::before, .poster::after { content: ""; position: absolute; border-radius: 999px; filter: blur(2px); pointer-events: none; }
+    .poster::before { width: 430px; height: 430px; right: -165px; top: 300px; background: rgba(255,255,255,.28); }
+    .poster::after { width: 300px; height: 300px; left: -150px; bottom: 150px; background: rgba(15, 180, 255, .12); }
+    .top, .hero, .showcase, .feature-row, .footer { position: relative; z-index: 1; }
+    .top { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 18px; color: #0862c8; }
+    .brand-mark { width: 82px; height: 82px; display: grid; place-items: center; border-radius: 23px; color: #fff; font-size: 31px; font-weight: 800; border: 1px solid rgba(255,255,255,.9); background: linear-gradient(145deg, #0f8eff, #05cfde); box-shadow: inset 0 0 0 7px rgba(255,255,255,.16), 0 18px 40px rgba(7,106,214,.17); }
+    .brand-copy strong { display: block; font-size: 36px; line-height: 1; letter-spacing: -.04em; }
+    .brand-copy span { display: block; margin-top: 7px; color: #587087; font-size: 16px; font-weight: 650; letter-spacing: .08em; }
+    .beta { padding: 13px 20px; border: 1px solid rgba(5, 105, 220, .18); border-radius: 999px; color: #0862c8; background: rgba(255,255,255,.72); font-size: 17px; font-weight: 720; box-shadow: 0 12px 30px rgba(7,91,180,.08); }
+    .hero { margin-top: 58px; }
+    h1 { margin: 0; color: #0762cc; font-size: 96px; line-height: .96; letter-spacing: -.065em; font-weight: 790; }
+    .intro { width: 920px; margin: 30px 0 0; color: #344a62; font-size: 28px; line-height: 1.42; letter-spacing: -.015em; }
+    .showcase { display: grid; grid-template-columns: 430px 1fr; align-items: center; gap: 56px; margin-top: 54px; }
+    .phone { justify-self: center; position: relative; width: 338px; height: 724px; padding: 12px; overflow: hidden; border: 7px solid #08101c; border-radius: 58px; background: #08101c; box-shadow: 0 32px 66px rgba(13,50,89,.24); }
+    .phone::before { content: ""; position: absolute; z-index: 2; top: 19px; left: 50%; translate: -50% 0; width: 108px; height: 27px; border-radius: 999px; background: #05090f; }
+    .phone img { width: 100%; height: 100%; display: block; border-radius: 43px; object-fit: cover; object-position: top center; }
+    .join { align-self: center; padding: 40px 42px 34px; border: 1px solid rgba(8, 98, 204, .13); border-radius: 38px; text-align: center; background: rgba(255,255,255,.84); box-shadow: 0 24px 60px rgba(9,83,160,.14); backdrop-filter: blur(20px); }
+    .join h2 { margin: 0; color: #0762cc; font-size: 43px; line-height: 1.05; letter-spacing: -.045em; }
+    .join > p { margin: 14px auto 22px; max-width: 440px; color: #536a82; font-size: 20px; line-height: 1.4; }
+    .qr { width: 340px; height: 340px; display: block; margin: 0 auto; border-radius: 16px; image-rendering: pixelated; }
+    .scan { margin-top: 12px; color: #0876d8; font-size: 17px; font-weight: 750; letter-spacing: .08em; }
+    .feature-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 46px; }
+    .feature { min-height: 86px; padding: 17px 20px; border: 1px solid rgba(8, 98, 204, .13); border-radius: 23px; background: rgba(255,255,255,.68); }
+    .feature b { display: block; color: #0872d8; font-size: 15px; letter-spacing: .08em; }
+    .feature span { display: block; margin-top: 7px; color: #233a52; font-size: 19px; font-weight: 650; }
+    .footer { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 38px; color: #526b83; font-size: 18px; }
+    .footer strong { display: block; margin-bottom: 6px; color: #0762cc; font-size: 24px; }
+    .footer .right { text-align: right; }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <header class="top">
+      <div class="brand">
+        <div class="brand-mark">1D</div>
+        <div class="brand-copy"><strong>1Day</strong><span>PRIVATE TESTFLIGHT BETA</span></div>
+      </div>
+      <div class="beta">Made for iPhone · iOS 17+</div>
+    </header>
+
+    <section class="hero">
+      <h1>Live the day.<br />Keep the story.</h1>
+      <p class="intro">Create a one-day or seven-day video challenge. Record 2, 5, or 10 seconds at a time—solo or with friends—and let 1Day turn every moment into one finished film.</p>
+    </section>
+
+    <section class="showcase">
+      <div class="phone"><img src="/assets/app-screen-current.png" alt="1Day app home screen" /></div>
+      <div class="join">
+        <h2>Start your 1Day.</h2>
+        <p>Scan with your iPhone camera to join the TestFlight beta.</p>
+        <img class="qr" src="/assets/testflight-qr.png" alt="TestFlight QR code" />
+        <div class="scan">SCAN TO JOIN</div>
+      </div>
+    </section>
+
+    <section class="feature-row">
+      <div class="feature"><b>01 · CREATE</b><span>One day or seven days</span></div>
+      <div class="feature"><b>02 · TOGETHER</b><span>Solo or with friends</span></div>
+      <div class="feature"><b>03 · FINISH</b><span>Auto-edited on iPhone</span></div>
+    </section>
+
+    <footer class="footer">
+      <div><strong>No manual editing.</strong>Save to Photos or share through iOS.</div>
+      <div class="right">testflight.apple.com/join/cRQm6Va2<br />English · 简体中文</div>
+    </footer>
+  </main>
+</body>
+</html>

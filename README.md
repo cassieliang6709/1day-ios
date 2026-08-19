@@ -12,8 +12,9 @@ finished film, entirely on-device.
   <img src="docs/assets/demo.gif" width="280" alt="Seven short clips becoming one film">
 </p>
 
-> The animation shows the original deterministic rendering proof of concept.
-> The iOS app now records and renders with AVFoundation.
+> The animation preserves the original deterministic rendering proof. The iOS
+> app now records and renders with AVFoundation; the retired FFmpeg scripts are
+> no longer part of the repository.
 
 ## The idea
 
@@ -138,7 +139,6 @@ ios/
 ├── AISetlogTests/          # State, localization, migration, and export tests
 └── project.yml             # XcodeGen project definition
 landing-page/               # React/Vite product site
-poc/                        # Reproducible FFmpeg rendering proof of concept
 docs/                       # Beta protocol and README assets
 ```
 

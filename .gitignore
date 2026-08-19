@@ -19,6 +19,8 @@ landing-page/implementation-*.png
 landing-page/deployed.png
 landing-page/AGENTS.md
 landing-page/design-qa.md
+landing-page/.playwright-cli/
+landing-page/output/
 
 # Generated video proof output
 poc/clips/
