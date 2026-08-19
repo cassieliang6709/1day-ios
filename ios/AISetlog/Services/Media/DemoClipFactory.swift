@@ -29,6 +29,21 @@ enum DemoClipFactory {
         text.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFF_FFFF }
     }
 
+    /// Hue identifies the author, brightness identifies the moment. Folding
+    /// the moment into the colour *choice* instead let one author's moment N
+    /// land on the same colour as the other author's moment N+1 — exactly the
+    /// confusion the palette exists to prevent.
+    private static func tint(author: String, moment: Int) -> UIColor {
+        let base = palette[stableHash(author) % palette.count]
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        guard base.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        else { return base }
+        let step = CGFloat((moment - 1) % 4) * 0.09
+        return UIColor(
+            hue: hue, saturation: saturation,
+            brightness: min(brightness + step, 1), alpha: alpha)
+    }
+
     static func makeClip(
         moment: Int,
         label: String,
@@ -40,9 +55,7 @@ enum DemoClipFactory {
             ? CGSize(width: 960, height: 540)
             : CGSize(width: 540, height: 960)
         let name = author ?? "Tester"
-        // Shift by the moment too, so one author's seven clips don't all look
-        // identical in the finished film.
-        let color = palette[(stableHash(name) + moment) % palette.count]
+        let color = tint(author: name, moment: moment)
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("demo_\(moment)_\(UUID().uuidString).mov")

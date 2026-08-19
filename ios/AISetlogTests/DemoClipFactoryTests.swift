@@ -34,6 +34,17 @@ final class DemoClipFactoryTests: XCTestCase {
         XCTAssertNotEqual(minePixels, theirPixels)
     }
 
+    /// Regression: the palette used to fold the moment number into the colour
+    /// *choice*, so one author's moment 1 and the other's moment 2 came out
+    /// identically coloured in the stitched film.
+    func testAuthorsStayDistinctAcrossAdjacentMoments() async throws {
+        let mineFirst = try await makeClip(author: "iPhone 17 Pro Max", moment: 1)
+        let theirsSecond = try await makeClip(author: "1DAY-B", moment: 2)
+        let minePixels = try await firstFramePixels(mineFirst)
+        let theirPixels = try await firstFramePixels(theirsSecond)
+        XCTAssertNotEqual(minePixels, theirPixels)
+    }
+
     func testLandscapeRoomsGetLandscapeFootage() async throws {
         let made = await DemoClipFactory.makeClip(
             moment: 1, label: "Wake up", author: "1DAY-B",
