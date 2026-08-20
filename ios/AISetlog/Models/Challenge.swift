@@ -62,6 +62,9 @@ struct Challenge: Codable, Identifiable {
     var roomCode: String? = nil
     /// Display name of whoever created the room (shown in the roster).
     var ownerName: String? = nil
+    /// Author id of whoever created the room, so the roster can show them
+    /// before they've filmed anything. nil in rooms saved before this existed.
+    var ownerID: String? = nil
 
     var isShared: Bool { roomCode != nil }
     var resolvedMode: Mode { mode ?? .sevenDay }

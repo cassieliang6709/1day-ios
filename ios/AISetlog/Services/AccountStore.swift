@@ -36,6 +36,12 @@ final class AccountStore {
     /// If the Apple ID credential was revoked (e.g. user signed out in Settings),
     /// drop the local account so we prompt again.
     private func revalidate(_ userID: String) {
+        #if DEBUG
+        // A debug tester isn't an Apple ID. Asking Apple about one comes back
+        // `.notFound`, which would sign the tester out again on the next
+        // launch — the identity would look like it never stuck.
+        if userID.hasPrefix(Self.testerPrefix) { return }
+        #endif
         ASAuthorizationAppleIDProvider().getCredentialState(forUserID: userID) { [weak self] state, _ in
             guard state == .revoked || state == .notFound else { return }
             Task { @MainActor in self?.signOut() }
@@ -80,10 +86,12 @@ final class AccountStore {
     /// room testing (the whole point of shared stories) hard to exercise. A
     /// debug build can mint a throwaway identity instead: the device name keeps
     /// the two testers apart, the UUID keeps their clip record names apart.
-    func signInAsTester() {
+    static let testerPrefix = "tester-"
+
+    func signInAsTester(named name: String? = nil) {
         persist(Account(
-            id: "tester-" + UUID().uuidString,
-            displayName: UIDevice.current.name))
+            id: Self.testerPrefix + UUID().uuidString,
+            displayName: name ?? UIDevice.current.name))
     }
 #endif
 

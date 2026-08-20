@@ -130,7 +130,7 @@ final class ChallengeStore {
             orientation: room.orientation,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
-            roomCode: room.code, ownerName: room.ownerName)
+            roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
         return challenge
     }
@@ -153,7 +153,7 @@ final class ChallengeStore {
             orientation: room.orientation,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
-            roomCode: room.code, ownerName: room.ownerName)
+            roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
         await syncRoom(challenge.id)
         return challenge
@@ -221,8 +221,20 @@ final class ChallengeStore {
     func members(for challengeID: UUID) -> [(id: String, name: String)] {
         guard let challenge = challenge(challengeID), let code = challenge.roomCode else { return [] }
         var seen: [String: String] = [:]
+        // The owner belongs in the roster before they've filmed anything —
+        // otherwise someone who just joined sees a room with only themselves
+        // in it and can't tell whether the code worked.
+        if let ownerName = challenge.ownerName {
+            seen[challenge.ownerID ?? ownerName] = ownerName
+        }
         for clip in roomSync.remoteClips[code] ?? [] { seen[clip.authorID] = clip.authorName }
         if let me = account?.account { seen[me.id] = me.displayName }
+        // Rooms saved before `ownerID` existed key the owner by name; drop that
+        // placeholder once the same person turns up under a real author id.
+        if challenge.ownerID == nil, let ownerName = challenge.ownerName,
+           seen.contains(where: { $0.key != ownerName && $0.value == ownerName }) {
+            seen.removeValue(forKey: ownerName)
+        }
         return seen.map { ($0.key, $0.value) }.sorted { $0.name < $1.name }
     }
 
