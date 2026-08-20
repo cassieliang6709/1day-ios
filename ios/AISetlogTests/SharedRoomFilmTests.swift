@@ -70,14 +70,70 @@ final class SharedRoomFilmTests: XCTestCase {
         let film = try await VideoStitcher.stitch(clips: clips, options: options)
         let duration = try await AVURLAsset(url: film).load(.duration).seconds
 
-        // Same moment from two people plays once, side by side — not back to back.
+        // Same moment from two people plays once, together — not back to back.
         XCTAssertEqual(duration, 2, accuracy: 0.2)
-        _ = try await frame(of: film, at: 1, saveAs: "friends-together")
+
+        // And stacked top-to-bottom, not side by side: the two halves of the
+        // frame must differ vertically and match horizontally.
+        let image = try await frameImage(of: film, at: 1, saveAs: "friends-together")
+        let top = pixel(image, atX: 0.5, y: 0.25)
+        let bottom = pixel(image, atX: 0.5, y: 0.75)
+        let topLeft = pixel(image, atX: 0.25, y: 0.25)
+        XCTAssertNotEqual(top, bottom, "the two authors should be stacked vertically")
+        XCTAssertEqual(topLeft, top, "each author should span the full width")
+    }
+
+    func testGridStaysVerticalForTwoAndThreeThenSquaresOff() {
+        let portrait = CGSize(width: 540, height: 960)
+        func assertGrid(
+            _ count: Int, in size: CGSize, rows: Int, columns: Int,
+            line: UInt = #line
+        ) {
+            let actual = VideoStitcher.grid(for: count, in: size)
+            XCTAssertEqual(actual.rows, rows, "rows for \(count)", line: line)
+            XCTAssertEqual(actual.columns, columns, "columns for \(count)", line: line)
+        }
+
+        assertGrid(1, in: portrait, rows: 1, columns: 1)
+        assertGrid(2, in: portrait, rows: 2, columns: 1)
+        assertGrid(3, in: portrait, rows: 3, columns: 1)
+        assertGrid(4, in: portrait, rows: 2, columns: 2)
+
+        // A landscape film keeps people side by side — stacking would sliver them.
+        let landscape = CGSize(width: 960, height: 540)
+        assertGrid(2, in: landscape, rows: 1, columns: 2)
     }
 
     /// Grabs a frame, saves a PNG into Caches for inspection (Documents is the
     /// app's own storage — test output doesn't belong there), and returns its
     /// pixels for comparison.
+    /// Colour at a proportional point in the frame, for asking "who is where".
+    private func pixel(_ image: CGImage, atX x: Double, y: Double) -> [UInt8] {
+        guard let data = image.dataProvider?.data,
+              let bytes = CFDataGetBytePtr(data) else { return [] }
+        let px = Int(Double(image.width) * x)
+        let py = Int(Double(image.height) * y)
+        let offset = py * image.bytesPerRow + px * (image.bitsPerPixel / 8)
+        return (0..<3).map { bytes[offset + $0] }
+    }
+
+    private func frameImage(
+        of film: URL, at seconds: Double, saveAs name: String
+    ) async throws -> CGImage {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: film))
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let image = try await generator.image(
+            at: CMTime(seconds: seconds, preferredTimescale: 600)).image
+        if let caches = FileManager.default.urls(
+            for: .cachesDirectory, in: .userDomainMask).first,
+           let data = UIImage(cgImage: image).pngData() {
+            try? data.write(to: caches.appendingPathComponent("\(name).png"))
+        }
+        return image
+    }
+
     private func frame(of film: URL, at seconds: Double, saveAs name: String) async throws -> Data {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: film))
         generator.appliesPreferredTrackTransform = true

@@ -432,8 +432,7 @@ enum VideoStitcher {
             instruction.backgroundColor = UIColor.black.cgColor
             var layers: [AVMutableVideoCompositionLayerInstruction] = []
 
-            let columns = Int(ceil(sqrt(Double(clips.count))))
-            let rows = Int(ceil(Double(clips.count) / Double(columns)))
+            let (rows, columns) = grid(for: clips.count, in: renderSize)
             let cellSize = CGSize(
                 width: renderSize.width / CGFloat(columns),
                 height: renderSize.height / CGFloat(rows))
@@ -530,6 +529,24 @@ enum VideoStitcher {
     /// Like fillTransform, but crops the source so nothing spills outside the
     /// cell (layer instructions do not clip). Returns the transform plus the
     /// crop rectangle in the source track's pre-transform coordinates.
+    /// How a moment's clips share the frame when everyone filmed it.
+    ///
+    /// A square-ish grid put two people side by side, which in a portrait film
+    /// crops each 9:16 clip to a sliver — heads clipped, nobody legible. Two or
+    /// three people stack top to bottom instead, so each keeps the full width
+    /// and the moment reads as a list of who was there. Past three, strips get
+    /// too short to see and a grid is the better trade.
+    static func grid(for count: Int, in renderSize: CGSize) -> (rows: Int, columns: Int) {
+        guard count > 1 else { return (1, 1) }
+        let isPortrait = renderSize.height >= renderSize.width
+        if count <= 3 {
+            return isPortrait ? (count, 1) : (1, count)
+        }
+        let side = Int(ceil(sqrt(Double(count))))
+        let other = Int(ceil(Double(count) / Double(side)))
+        return isPortrait ? (side, other) : (other, side)
+    }
+
     private static func cellTransform(
         for clip: LoadedClip, into cell: CGRect
     ) -> (CGAffineTransform, CGRect) {
