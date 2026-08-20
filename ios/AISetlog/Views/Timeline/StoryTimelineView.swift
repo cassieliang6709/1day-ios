@@ -108,6 +108,7 @@ struct StoryTimelineView: View {
                     StoryGridView(
                         challenge: challenge,
                         clips: clips,
+                        members: members,
                         myID: account.account?.id ?? "local",
                         onTapFilmed: { day, _ in sheet = .moment(day: day) },
                         onTapEmpty: { day in sheet = .record(day: day) })

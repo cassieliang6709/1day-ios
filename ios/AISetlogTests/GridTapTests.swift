@@ -34,4 +34,54 @@ final class GridTapTests: XCTestCase {
         let slot = [clip(day: 1, authorID: "local")]
         XCTAssertEqual(StoryGridView.tap(slotClips: slot, myID: myID), .preview(authorID: "local"))
     }
+
+    // MARK: - Lanes
+
+    private var roster: [(id: String, name: String)] {
+        [(id: friendID, name: "Ada"), (id: myID, name: "Me"), (id: "zoe", name: "Zoe")]
+    }
+
+    func testMyLaneComesFirstAndTheRestFollowByName() {
+        let lanes = StoryGridView.lanes(
+            slotClips: [clip(day: 1, authorID: friendID)], members: roster, myID: myID)
+
+        XCTAssertEqual(lanes.map(\.authorID), [myID, friendID, "zoe"])
+        XCTAssertTrue(lanes[0].isMine)
+        XCTAssertNil(lanes[0].clip, "I haven't filmed this one")
+        XCTAssertNotNil(lanes[1].clip, "Ada has")
+        XCTAssertNil(lanes[2].clip)
+    }
+
+    /// A friend who has filmed nothing still holds a place — that's what makes
+    /// the tile a picture of the moment rather than just of its footage.
+    func testEveryoneInTheRosterGetsALaneEvenWithNoClips() {
+        let lanes = StoryGridView.lanes(slotClips: [], members: roster, myID: myID)
+        XCTAssertEqual(lanes.count, 3)
+        XCTAssertTrue(lanes.allSatisfy { $0.clip == nil })
+    }
+
+    /// Footage must never be dropped, even if its author is missing from the
+    /// roster the view was handed.
+    func testAClipFromOutsideTheRosterStillGetsALane() {
+        let lanes = StoryGridView.lanes(
+            slotClips: [clip(day: 1, authorID: "ghost")],
+            members: [(id: myID, name: "Me")], myID: myID)
+
+        XCTAssertEqual(lanes.map(\.authorID), [myID, "ghost"])
+        XCTAssertNotNil(lanes.last?.clip)
+    }
+
+    func testASoloStoryIsOneLane() {
+        let lanes = StoryGridView.lanes(
+            slotClips: [clip(day: 1, authorID: "local")], members: [], myID: "local")
+        XCTAssertEqual(lanes.count, 1)
+        XCTAssertTrue(lanes[0].isMine)
+        XCTAssertNotNil(lanes[0].clip)
+    }
+
+    func testRowsSplitOnTheColumnCount() {
+        let lanes = StoryGridView.lanes(slotClips: [], members: roster, myID: myID)
+        XCTAssertEqual(StoryGridView.rows(of: lanes, columns: 1).count, 3)
+        XCTAssertEqual(StoryGridView.rows(of: lanes, columns: 2).map(\.count), [2, 1])
+    }
 }
