@@ -83,12 +83,36 @@ struct StoryGridView: View {
         .padding(.horizontal, 20)
     }
 
+    /// What tapping a tile should do.
+    ///
+    /// The grid used to open the viewer whenever *anyone* had filmed the slot,
+    /// so a moment a friend had already filmed became unreachable — there was
+    /// no way left to add your own take. The timeline never had that problem
+    /// because it asks "have *I* filmed this", and so does this.
+    enum Tap: Equatable {
+        case preview(authorID: String?)
+        case record
+    }
+
+    static func tap(slotClips: [DayClip], myID: String) -> Tap {
+        if let mine = mineAmong(slotClips, myID: myID) {
+            return .preview(authorID: mine.authorID)
+        }
+        return .record
+    }
+
+    static func mineAmong(_ slotClips: [DayClip], myID: String) -> DayClip? {
+        slotClips.first { $0.authorID == myID || $0.authorID == "local" }
+    }
+
     @ViewBuilder
     private func cell(for card: DayCard) -> some View {
         let slotClips = clips.filter { $0.day == card.day }
-        // Prefer my own take, so the sheet I'm most likely to want is on top.
-        let clip = slotClips.first { $0.authorID == myID || $0.authorID == "local" }
-            ?? slotClips.first
+        let mine = Self.mineAmong(slotClips, myID: myID)
+        // Show a friend's take when I have none — seeing what they filmed is
+        // the point of the tile — but the tap still belongs to me.
+        let clip = mine ?? slotClips.first
+        let awaitingMine = mine == nil && clip != nil
 
         StoryGridCell(
             momentTitle: presenter.title(forSlot: card.day),
@@ -98,12 +122,12 @@ struct StoryGridView: View {
             timeStamp: schedule.railLabel(forSlot: card.day, recordedAt: clip?.recordedAt),
             reactions: clip?.emoji ?? [],
             isNext: card.day == nextSlot,
+            awaitingMine: awaitingMine,
             aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72
         ) {
-            if let clip {
-                onTapFilmed(card.day, clip.authorID)
-            } else {
-                onTapEmpty(card.day)
+            switch Self.tap(slotClips: slotClips, myID: myID) {
+            case .preview(let authorID): onTapFilmed(card.day, authorID)
+            case .record: onTapEmpty(card.day)
             }
         }
     }
@@ -120,6 +144,9 @@ struct StoryGridCell: View {
     var timeStamp: String?
     var reactions: [String] = []
     var isNext = false
+    /// A friend filmed this moment and I haven't — the tile shows their take
+    /// but is still an invitation to film mine.
+    var awaitingMine = false
     var aspectRatio: CGFloat = 0.72
     let onTap: () -> Void
 
@@ -190,9 +217,9 @@ struct StoryGridCell: View {
                         .padding(.vertical, 2.5)
                         .background(.ultraThinMaterial, in: Capsule())
                 }
-                Image(systemName: "play.circle.fill")
+                Image(systemName: awaitingMine ? "camera.circle.fill" : "play.circle.fill")
                     .font(.system(size: 17))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(awaitingMine ? Color.oneDayBlue : .white.opacity(0.92))
                     .shadow(radius: 3)
             }
             .padding(6)

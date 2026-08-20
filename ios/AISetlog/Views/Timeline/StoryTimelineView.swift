@@ -29,11 +29,16 @@ struct StoryTimelineView: View {
     enum TimelineSheet: Identifiable, Equatable {
         case record(day: Int)
         case preview(day: Int, authorID: String?)
+        /// The whole moment rather than one person's take — everyone who
+        /// filmed it, stacked. The grid opens this: a tile stands for the
+        /// moment, so it should show what the moment ends up looking like.
+        case moment(day: Int)
 
         var id: String {
             switch self {
             case .record(let day): "record-\(day)"
             case .preview(let day, let authorID): "preview-\(day)-\(authorID ?? "local")"
+            case .moment(let day): "moment-\(day)"
             }
         }
     }
@@ -104,9 +109,7 @@ struct StoryTimelineView: View {
                         challenge: challenge,
                         clips: clips,
                         myID: account.account?.id ?? "local",
-                        onTapFilmed: { day, authorID in
-                            sheet = .preview(day: day, authorID: authorID)
-                        },
+                        onTapFilmed: { day, _ in sheet = .moment(day: day) },
                         onTapEmpty: { day in sheet = .record(day: day) })
                 }
             }
@@ -330,6 +333,22 @@ struct StoryTimelineView: View {
             ) { url, overlayText in
                 store.saveClip(
                     from: url, day: day, challengeID: challengeID, overlayText: overlayText)
+            }
+
+        case .moment(let day):
+            let slotClips = store.recordedClips(for: challengeID).filter { $0.day == day }
+            StitchedMomentPreview(
+                clips: slotClips,
+                day: day,
+                slotTitle: slotTitle(for: day),
+                clipLength: challenge?.resolvedClipLength ?? .tiny,
+                challengeID: challengeID,
+                myID: account.account?.id ?? "local"
+            ) {
+                sheet = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    sheet = .record(day: day)
+                }
             }
 
         case .preview(let day, let targetAuthorID):
