@@ -16,6 +16,39 @@ enum CloudKitService {
         CKContainer(identifier: containerID).publicCloudDatabase
     }
 
+    /// Every record matching a query, following CloudKit's cursor.
+    ///
+    /// One `records(matching:)` returns a single page — 100 records in
+    /// practice — plus a cursor for the rest. Reading only the first page
+    /// silently drops everything past it, which for a room that has been going
+    /// a while means most of its comments just aren't there.
+    private static func allRecords(matching query: CKQuery) async throws -> [CKRecord] {
+        var records: [CKRecord] = []
+        var response = try await db.records(matching: query)
+        // A guard against a cursor that never clears; 50 pages is far past any
+        // room we expect and still terminates.
+        for _ in 0..<50 {
+            records.append(contentsOf: response.matchResults.compactMap { try? $0.1.get() })
+            guard let cursor = response.queryCursor else { break }
+            response = try await db.records(continuingMatchFrom: cursor)
+        }
+        return records
+    }
+
+    /// Save a record whose name we chose ourselves, overwriting anything
+    /// already there.
+    ///
+    /// `db.save` on a freshly built `CKRecord` fails with "record to insert
+    /// already exists" when the name is taken, and every deterministic name
+    /// here is taken the second time around — a retry, a double tap, or a
+    /// second device replaying the same write. `.allKeys` ignores the change
+    /// tag, which is what "writing this again is harmless" has to mean.
+    private static func upsert(_ record: CKRecord) async throws {
+        let (saved, _) = try await db.modifyRecords(
+            saving: [record], deleting: [], savePolicy: .allKeys)
+        for (_, result) in saved { _ = try result.get() }
+    }
+
     enum CKServiceError: LocalizedError {
         case notSignedIntoiCloud
         case roomNotFound
@@ -204,9 +237,9 @@ enum CloudKitService {
             predicate: NSPredicate(format: "roomCode == %@", code))
         query.sortDescriptors = [NSSortDescriptor(key: "day", ascending: true)]
 
-        let matched: [(CKRecord.ID, Result<CKRecord, Error>)]
+        let matched: [CKRecord]
         do {
-            (matched, _) = try await db.records(matching: query)
+            matched = try await allRecords(matching: query)
         } catch let error as CKError where error.code == .invalidArguments {
             // Field not marked queryable yet (schema still deploying).
             throw CKServiceError.fieldNotQueryable
@@ -214,9 +247,8 @@ enum CloudKitService {
 
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         var clips: [RemoteClip] = []
-        for (_, result) in matched {
-            guard let record = try? result.get(),
-                  let asset = record["video"] as? CKAsset,
+        for record in matched {
+            guard let asset = record["video"] as? CKAsset,
                   let assetURL = asset.fileURL else { continue }
             let dest = cacheDir.appendingPathComponent("\(record.recordID.recordName).mov")
             try? FileManager.default.removeItem(at: dest)
@@ -279,7 +311,7 @@ enum CloudKitService {
             record["authorName"] = authorName as CKRecordValue
             record["targetAuthorID"] = targetAuthorID as CKRecordValue
             record["createdAt"] = Date.now as CKRecordValue
-            _ = try await db.save(record)
+            try await upsert(record)
         } else {
             do {
                 try await db.deleteRecord(withID: id)
@@ -303,7 +335,7 @@ enum CloudKitService {
         record["authorName"] = authorName as CKRecordValue
         record["targetAuthorID"] = targetAuthorID as CKRecordValue
         record["createdAt"] = Date.now as CKRecordValue
-        _ = try await db.save(record)
+        try await upsert(record)
     }
 
     static func deleteComment(id: String) async throws {
@@ -378,13 +410,13 @@ enum CloudKitService {
 
     private static func fetchReactions(code: String) async throws -> [RemoteReaction] {
         let query = CKQuery(recordType: "Reaction", predicate: NSPredicate(format: "roomCode == %@", code))
-        let matched: [(CKRecord.ID, Result<CKRecord, Error>)]
+        let matched: [CKRecord]
         do {
-            (matched, _) = try await db.records(matching: query)
+            matched = try await allRecords(matching: query)
         } catch let error as CKError where error.code == .invalidArguments || error.code == .unknownItem {
             return [] // type/index not deployed yet — degrade to local-only
         }
-        return matched.compactMap { try? $0.1.get() }.compactMap { r in
+        return matched.compactMap { r in
             guard let emoji = r["emoji"] as? String else { return nil }
             return RemoteReaction(
                 day: r["day"] as? Int ?? 0, emoji: emoji,
@@ -397,13 +429,13 @@ enum CloudKitService {
 
     private static func fetchComments(code: String) async throws -> [RemoteComment] {
         let query = CKQuery(recordType: "Comment", predicate: NSPredicate(format: "roomCode == %@", code))
-        let matched: [(CKRecord.ID, Result<CKRecord, Error>)]
+        let matched: [CKRecord]
         do {
-            (matched, _) = try await db.records(matching: query)
+            matched = try await allRecords(matching: query)
         } catch let error as CKError where error.code == .invalidArguments || error.code == .unknownItem {
             return []
         }
-        return matched.compactMap { try? $0.1.get() }.compactMap { r in
+        return matched.compactMap { r in
             guard let text = r["text"] as? String else { return nil }
             return RemoteComment(
                 id: r.recordID.recordName,

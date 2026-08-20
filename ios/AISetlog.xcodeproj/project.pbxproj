@@ -13,6 +13,8 @@
 		1CF9553D522526F39E799665 /* RoomSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */; };
 		1D594261F817EA77C9010C27 /* FinalFilmTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A56B0E8E0A51EAA2B9D024D /* FinalFilmTimeline.swift */; };
 		1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1203805BE113F00D0764E06C /* LocalizationTests.swift */; };
+		0ACEC6DF6F6A44AFB0767901 /* CloudKitPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */; };
+		AB7A901C9DE94F269C09D751 /* CloudKitIdempotencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */; };
 		E7F2158EB91B4C81927139B6 /* JoinedRoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD7389AC89945958C67689F /* JoinedRoomTests.swift */; };
 		E3EA150143544D69B99C62B7 /* RoomSyncIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0832A77F8EA49C0B2ED97B1 /* RoomSyncIntegrationTests.swift */; };
 		76715FB3BB80475681541050 /* SharedRoomFilmTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE02F9BD12049D7B9C81691 /* SharedRoomFilmTests.swift */; };
@@ -98,6 +100,8 @@
 		0B53FFB838BA4383441088A2 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
 		0E0FDF28043B736116C77C99 /* CameraComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraComponents.swift; sourceTree = "<group>"; };
 		1203805BE113F00D0764E06C /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitPaginationTests.swift; sourceTree = "<group>"; };
+		C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitIdempotencyTests.swift; sourceTree = "<group>"; };
 		1BD7389AC89945958C67689F /* JoinedRoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinedRoomTests.swift; sourceTree = "<group>"; };
 		D0832A77F8EA49C0B2ED97B1 /* RoomSyncIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSyncIntegrationTests.swift; sourceTree = "<group>"; };
 		4DE02F9BD12049D7B9C81691 /* SharedRoomFilmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRoomFilmTests.swift; sourceTree = "<group>"; };
@@ -396,6 +400,8 @@
 				910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */,
 				50C2CEBEB0FCD4A5A8D229BA /* ClipFixtureFactory.swift */,
 				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
+				A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */,
+				C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */,
 				1BD7389AC89945958C67689F /* JoinedRoomTests.swift */,
 				D0832A77F8EA49C0B2ED97B1 /* RoomSyncIntegrationTests.swift */,
 				4DE02F9BD12049D7B9C81691 /* SharedRoomFilmTests.swift */,
@@ -600,6 +606,8 @@
 				01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */,
 				E6B92F0093A90EDDE3F0F08A /* ClipFixtureFactory.swift in Sources */,
 				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,
+				0ACEC6DF6F6A44AFB0767901 /* CloudKitPaginationTests.swift in Sources */,
+				AB7A901C9DE94F269C09D751 /* CloudKitIdempotencyTests.swift in Sources */,
 				E7F2158EB91B4C81927139B6 /* JoinedRoomTests.swift in Sources */,
 				E3EA150143544D69B99C62B7 /* RoomSyncIntegrationTests.swift in Sources */,
 				76715FB3BB80475681541050 /* SharedRoomFilmTests.swift in Sources */,
