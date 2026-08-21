@@ -46,6 +46,26 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     var displayBlurb: String { blurb?.resolved() ?? Strings.customTemplateBlurb }
     /// Language-stable string for deriving a consistent accent color.
     var identityKey: String { name.en }
+    /// Built-in poster art. Custom and unknown templates keep the generated
+    /// gradient cover so older saved data remains visually complete.
+    var coverAssetName: String? {
+        guard !isCustom else { return nil }
+        return switch name.en {
+        case "Perfect Day": "TemplatePerfectDay"
+        case "Soft Reset": "TemplateSoftReset"
+        case "Lock In": "TemplateLockIn"
+        case "Main Character": "TemplateMainCharacter"
+        case "Cook With Me": "TemplateCookWithMe"
+        case "Little Adventure": "TemplateLittleAdventure"
+        case "7 Days Moving": "TemplateSevenDaysMoving"
+        case "Morning Person": "TemplateMorningPerson"
+        case "Study Streak": "TemplateStudyStreak"
+        case "Eat Well": "TemplateEatWell"
+        case "Calm Week": "TemplateCalmWeek"
+        case "Make Something": "TemplateMakeSomething"
+        default: nil
+        }
+    }
     /// Localized moment prompts — for the card's count and any list display.
     var momentTitles: [String]? { momentKeys?.map { MomentCatalog.localize($0) } }
 
