@@ -34,12 +34,21 @@ struct TemplateCard: View {
 
     private var cover: some View {
         ZStack {
-            TemplateCover(identityKey: template.identityKey)
+            if let assetName = template.coverAssetName {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
+            } else {
+                TemplateCover(identityKey: template.identityKey)
 
-            Image(systemName: template.displaySymbol)
-                .font(.system(size: 46, weight: .medium))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+                Image(systemName: template.displaySymbol)
+                    .font(.system(size: 46, weight: .medium))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+            }
         }
         .frame(height: 168)
         .frame(maxWidth: .infinity)

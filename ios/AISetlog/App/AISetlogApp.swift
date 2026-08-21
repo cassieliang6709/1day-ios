@@ -6,6 +6,7 @@ struct AISetlogApp: App {
     @State private var account: AccountStore
     @State private var store: ChallengeStore
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
 
     init() {
         let account = AccountStore()
@@ -23,6 +24,7 @@ struct AISetlogApp: App {
                 .environment(store)
                 .environment(account)
                 .tint(Color.oneDayBlue)
+                .preferredColorScheme(appAppearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
                     ReminderService.reconcile(for: store.challenges)

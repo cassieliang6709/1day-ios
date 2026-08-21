@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var isDeleting = false
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -46,6 +47,20 @@ struct SettingsView: View {
                     Text(Strings.language)
                 } footer: {
                     Text(Strings.languageFootnote)
+                }
+
+                Section {
+                    Picker(Strings.appearance, selection: $appAppearance) {
+                        ForEach(AppAppearance.allCases) { appearance in
+                            Text(appearance.displayName).tag(appearance)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    Text(Strings.appearance)
+                } footer: {
+                    Text(Strings.appearanceFootnote)
                 }
 
                 Section {

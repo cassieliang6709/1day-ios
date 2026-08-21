@@ -13,6 +13,7 @@
 		1CF9553D522526F39E799665 /* RoomSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */; };
 		1D594261F817EA77C9010C27 /* FinalFilmTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A56B0E8E0A51EAA2B9D024D /* FinalFilmTimeline.swift */; };
 		1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1203805BE113F00D0764E06C /* LocalizationTests.swift */; };
+		B1328E9083A8421AA37744CB /* GridTapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 411078829788441BB326684B /* GridTapTests.swift */; };
 		0ACEC6DF6F6A44AFB0767901 /* CloudKitPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */; };
 		AB7A901C9DE94F269C09D751 /* CloudKitIdempotencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */; };
 		E7F2158EB91B4C81927139B6 /* JoinedRoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD7389AC89945958C67689F /* JoinedRoomTests.swift */; };
@@ -37,6 +38,7 @@
 		575E54F104D80A114762C420 /* GuidedMomentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 218AC0301CBC98849CD9C335 /* GuidedMomentsView.swift */; };
 		586AF2600531B99839F3ECEF /* AISetlogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0C91DDF53E65DB3F78D79E /* AISetlogApp.swift */; };
 		5AA2B95A97D5608F8A3FB0D2 /* StoryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F898A00CB2C9F6BE1DD94A02 /* StoryGridView.swift */; };
+		C56E25733EFC4CF3BFE1D95D /* StitchedMomentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE22FC07B5348758B0C441F /* StitchedMomentPreview.swift */; };
 		5B6DE91ABBC34EFBBD138A5F /* BoardTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92B55A0585DEBADDE34CA337 /* BoardTheme.swift */; };
 		5C5F0F46766760C4238CA71B /* VlogPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFE37A31301F718C534F268A /* VlogPlayer.swift */; };
 		63DB6F142539AA1B767B9953 /* SharedActivityNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72ADE1A2FBF5E0B812B8C66B /* SharedActivityNotificationService.swift */; };
@@ -100,6 +102,7 @@
 		0B53FFB838BA4383441088A2 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
 		0E0FDF28043B736116C77C99 /* CameraComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraComponents.swift; sourceTree = "<group>"; };
 		1203805BE113F00D0764E06C /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		411078829788441BB326684B /* GridTapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridTapTests.swift; sourceTree = "<group>"; };
 		A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitPaginationTests.swift; sourceTree = "<group>"; };
 		C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitIdempotencyTests.swift; sourceTree = "<group>"; };
 		1BD7389AC89945958C67689F /* JoinedRoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinedRoomTests.swift; sourceTree = "<group>"; };
@@ -168,6 +171,7 @@
 		EE75EB1358ED3CA2E38EE93E /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		EF6D32673A9943272D5463EC /* JoinInviteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinInviteSheet.swift; sourceTree = "<group>"; };
 		F898A00CB2C9F6BE1DD94A02 /* StoryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryGridView.swift; sourceTree = "<group>"; };
+		7BE22FC07B5348758B0C441F /* StitchedMomentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StitchedMomentPreview.swift; sourceTree = "<group>"; };
 		FA61F6678AC2E613A827F771 /* OneDaySurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneDaySurfaces.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -388,6 +392,7 @@
 			isa = PBXGroup;
 			children = (
 				F898A00CB2C9F6BE1DD94A02 /* StoryGridView.swift */,
+				7BE22FC07B5348758B0C441F /* StitchedMomentPreview.swift */,
 				5FA535170ECF2F2F587FAD0F /* StoryTimelineView.swift */,
 				812A5180E975AB0DEC13DE2F /* TimelineHeader.swift */,
 			);
@@ -400,6 +405,7 @@
 				910499E8EA4BC20C9D19A805 /* ChallengeStateTests.swift */,
 				50C2CEBEB0FCD4A5A8D229BA /* ClipFixtureFactory.swift */,
 				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
+				411078829788441BB326684B /* GridTapTests.swift */,
 				A44D21469C0F48E5ABF47D61 /* CloudKitPaginationTests.swift */,
 				C5CEF48CA06F4A4BAC0DC4B5 /* CloudKitIdempotencyTests.swift */,
 				1BD7389AC89945958C67689F /* JoinedRoomTests.swift */,
@@ -587,6 +593,7 @@
 				A8BBBFB3731891646D619B30 /* StoryCard.swift in Sources */,
 				F59980780B969C45E7093738 /* StoryComposerView.swift in Sources */,
 				5AA2B95A97D5608F8A3FB0D2 /* StoryGridView.swift in Sources */,
+				C56E25733EFC4CF3BFE1D95D /* StitchedMomentPreview.swift in Sources */,
 				D9D4473D30AAF92EDA832329 /* StorySchedule.swift in Sources */,
 				3FC822A27E374AA692D73A4D /* StoryTimelineView.swift in Sources */,
 				710BDE7134B50D9B689B85A8 /* TemplateCard.swift in Sources */,
@@ -606,6 +613,7 @@
 				01ED0D8617160F0FE7C242AE /* ChallengeStateTests.swift in Sources */,
 				E6B92F0093A90EDDE3F0F08A /* ClipFixtureFactory.swift in Sources */,
 				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,
+				B1328E9083A8421AA37744CB /* GridTapTests.swift in Sources */,
 				0ACEC6DF6F6A44AFB0767901 /* CloudKitPaginationTests.swift in Sources */,
 				AB7A901C9DE94F269C09D751 /* CloudKitIdempotencyTests.swift in Sources */,
 				E7F2158EB91B4C81927139B6 /* JoinedRoomTests.swift in Sources */,

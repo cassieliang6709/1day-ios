@@ -14,6 +14,37 @@ import SwiftUI
 /// 4. Add a `<lang>.lproj/InfoPlist.strings` for the permission prompts and
 ///    the region to `knownRegions` in project.yml.
 /// The Settings picker picks the new case up automatically via `CaseIterable`.
+/// Light / dark / follow the system, chosen in Settings.
+///
+/// The app is a light-first design, so "follow the system" is the default but
+/// not the only sensible answer — someone who keeps iOS in dark mode may still
+/// want this one bright, and vice versa.
+enum AppAppearance: String, CaseIterable, Identifiable, Codable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    /// UserDefaults key, shared with the `@AppStorage` the views bind to.
+    static let storageKey = "appAppearance"
+
+    /// nil hands the decision back to the system.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .system: Strings.systemAppearance
+        case .light: Strings.lightAppearance
+        case .dark: Strings.darkAppearance
+        }
+    }
+}
+
 enum AppLanguage: String, CaseIterable, Identifiable, Codable {
     case system, english, chinese
 
@@ -794,6 +825,18 @@ enum Strings {
         lang == .chinese ? "等 \(name) 的瞬间…" : "Waiting for \(name)'s moment…"
     }
     static var inviteLabel: String { lang == .chinese ? "邀请" : "Invite" }
+    static var stitchingMoment: String {
+        lang == .chinese ? "正在拼接这个瞬间…" : "Stitching this moment…"
+    }
+    static var appearance: String { lang == .chinese ? "外观" : "Appearance" }
+    static var systemAppearance: String { lang == .chinese ? "跟随系统" : "System" }
+    static var lightAppearance: String { lang == .chinese ? "浅色" : "Light" }
+    static var darkAppearance: String { lang == .chinese ? "深色" : "Dark" }
+    static var appearanceFootnote: String {
+        lang == .chinese
+            ? "只影响 1Day，不改变系统设置。"
+            : "Applies to 1Day only — your system setting is untouched."
+    }
     static var inviteCodeLabel: String { lang == .chinese ? "邀请码" : "Invite code" }
     static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static var makeTheFilm: String { lang == .chinese ? "生成影片" : "Make the film" }
