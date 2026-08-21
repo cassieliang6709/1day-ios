@@ -52,6 +52,7 @@
 		7E8BEF849C579E4C2BA064A7 /* Challenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C77CA7B14A9377DA4208ECED /* Challenge.swift */; };
 		7E9B4219C8D6196273ECE291 /* RecordClipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08062D437D1CBE853146D03F /* RecordClipView.swift */; };
 		87B43DAA272CACEFA7291E28 /* ChallengePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */; };
+		A11D15A72108000100000001 /* ModelDisplayText.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11D15A72108000100000002 /* ModelDisplayText.swift */; };
 		8D1A5A68DF6BA0461E980BF1 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE75EB1358ED3CA2E38EE93E /* Localization.swift */; };
 		938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */; };
 		94FA1CA14DC73ADCF0885E26 /* NotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B53FFB838BA4383441088A2 /* NotificationTests.swift */; };
@@ -156,6 +157,7 @@
 		C77CA7B14A9377DA4208ECED /* Challenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Challenge.swift; sourceTree = "<group>"; };
 		C9E29668954C7B76AF34FCD5 /* MemberChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberChip.swift; sourceTree = "<group>"; };
 		CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengePresenter.swift; sourceTree = "<group>"; };
+		A11D15A72108000100000002 /* ModelDisplayText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDisplayText.swift; sourceTree = "<group>"; };
 		CFE37A31301F718C534F268A /* VlogPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlogPlayer.swift; sourceTree = "<group>"; };
 		D496FA2FD678B671A1723CCE /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		D84B3F62C6B701FAA556F17C /* ChallengeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeStore.swift; sourceTree = "<group>"; };
@@ -423,6 +425,7 @@
 			isa = PBXGroup;
 			children = (
 				CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */,
+				A11D15A72108000100000002 /* ModelDisplayText.swift */,
 				9393BC3FC31A23786C7E5543 /* StorySchedule.swift */,
 			);
 			path = Presentation;
@@ -552,6 +555,7 @@
 				2AD9583C53C6A55CD773CC0C /* CameraComponents.swift in Sources */,
 				7E8BEF849C579E4C2BA064A7 /* Challenge.swift in Sources */,
 				87B43DAA272CACEFA7291E28 /* ChallengePresenter.swift in Sources */,
+				A11D15A72108000100000001 /* ModelDisplayText.swift in Sources */,
 				ABA3F184ED9F5F221FC69467 /* ChallengeRepository.swift in Sources */,
 				72BB38409A834950DC0B8376 /* ChallengeStore.swift in Sources */,
 				E538DFC3DB8E4704C64ED6FF /* ChallengeTemplate.swift in Sources */,
