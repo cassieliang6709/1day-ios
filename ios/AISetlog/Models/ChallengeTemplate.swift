@@ -42,8 +42,6 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     var displayName: String { name.resolved() }
     /// The card's icon, with a fallback for templates saved before symbols.
     var displaySymbol: String { symbol ?? "wand.and.stars" }
-    /// Emotional line, falling back to a generic one for user-built scripts.
-    var displayBlurb: String { blurb?.resolved() ?? Strings.customTemplateBlurb }
     /// Language-stable string for deriving a consistent accent color.
     var identityKey: String { name.en }
     /// Built-in poster art. Custom and unknown templates keep the generated

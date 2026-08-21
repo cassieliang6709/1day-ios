@@ -38,10 +38,6 @@ struct Challenge: Codable, Identifiable {
             }
         }
 
-        var secondsLabel: String {
-            Strings.seconds(Int(seconds))
-        }
-
     }
 
     let id: UUID
