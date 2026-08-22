@@ -980,20 +980,27 @@ enum VideoStitcher {
         mark.borderWidth = max(markSize * 0.06, 2)
         group.addSublayer(mark)
 
-        let markText = CATextLayer()
-        let markFontSize = markSize * 0.38
-        markText.string = NSAttributedString(string: Identity.initial(for: caption.authorName), attributes: [
-            .font: roundedFont(size: markFontSize, weight: .black),
-            .foregroundColor: UIColor.black,
-        ])
-        markText.alignmentMode = .center
-        markText.contentsScale = 2
-        markText.frame = CGRect(
-            x: mark.frame.minX,
-            y: mark.frame.minY + (markSize - markFontSize * 1.25) / 2,
-            width: markSize,
-            height: markFontSize * 1.25)
-        group.addSublayer(markText)
+        if let authorName = caption.authorName, !authorName.isEmpty {
+            let markText = CATextLayer()
+            let markFontSize = markSize * 0.38
+            markText.string = NSAttributedString(string: Identity.initial(for: authorName), attributes: [
+                .font: roundedFont(size: markFontSize, weight: .black),
+                .foregroundColor: UIColor.black,
+            ])
+            markText.alignmentMode = .center
+            markText.contentsScale = 2
+            markText.frame = CGRect(
+                x: mark.frame.minX,
+                y: mark.frame.minY + (markSize - markFontSize * 1.25) / 2,
+                width: markSize,
+                height: markFontSize * 1.25)
+            group.addSublayer(markText)
+        } else if let mascot = UIImage(named: "OneDayMascot")?.cgImage {
+            mark.contents = mascot
+            mark.contentsGravity = .resizeAspectFill
+            mark.contentsScale = 2
+            mark.masksToBounds = true
+        }
 
         let dateText = formattedStampDate(caption.recordedAt)
         let timeText = formattedStampTime(caption.recordedAt)

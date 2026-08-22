@@ -114,10 +114,21 @@ extension View {
     }
 }
 
-// MARK: - Small illustrations
-//
-// A couple of hand-drawn-feeling marks. They carry the "cute" without any
-// image assets — pure shapes, so they tint and scale with the layout.
+// MARK: - Brand artwork and small illustrations
+
+/// The current 1day lockup: the blue mascot leads, with the handwritten name
+/// kept secondary. Its transparent artwork can sit directly on app surfaces.
+struct OneDayBrandLogo: View {
+    var width: CGFloat = 96
+
+    var body: some View {
+        Image("OneDayBrandLockup")
+            .resizable()
+            .scaledToFit()
+            .frame(width: width, height: width * 0.49)
+            .accessibilityLabel("1day")
+    }
+}
 
 /// The app mark: a rounded blue tile with a lens and a shutter dot.
 struct OneDayLogoMark: View {

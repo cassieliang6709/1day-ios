@@ -417,9 +417,7 @@ struct RecordClipView: View {
             Spacer(minLength: 8)
 
             VStack(spacing: 1) {
-                Text("1DAY")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(myTint)
+                OneDayBrandLogo(width: 92)
                 Text(localizedMomentTitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)

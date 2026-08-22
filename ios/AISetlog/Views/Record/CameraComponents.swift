@@ -234,24 +234,20 @@ struct BrandStamp: View {
     var scale: CGFloat = 1
 
     var body: some View {
-        HStack(spacing: 9 * scale) {
-            Text("1D")
-                .font(.system(size: 16 * scale, weight: .black, design: .rounded))
-                .foregroundStyle(.black)
-                .frame(width: 42 * scale, height: 42 * scale)
-                .background(.white, in: Circle())
-                .overlay(Circle().stroke(Color.oneDayBlue, lineWidth: max(2, 3 * scale)))
-
-            VStack(alignment: .leading, spacing: max(1, scale)) {
-                Text("1DAY")
-                    .font(.system(size: 15 * scale, weight: .black, design: .rounded))
-                Text(Strings.dailyFilm)
-                    .font(.system(size: 10 * scale, weight: .bold, design: .rounded))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-                    .opacity(0.8)
-            }
-            .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: max(1, 2 * scale)) {
+            OneDayBrandLogo(width: 94 * scale)
+            Text(Strings.dailyFilm)
+                .font(.system(size: 9.5 * scale, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.oneDayNavy.opacity(0.72))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(.horizontal, 9 * scale)
+        .padding(.vertical, 6 * scale)
+        .background(Color.oneDayMist.opacity(0.9), in: RoundedRectangle(cornerRadius: 12 * scale, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12 * scale, style: .continuous)
+                .strokeBorder(.white.opacity(0.55), lineWidth: max(0.7, scale))
         }
     }
 }

@@ -14,11 +14,22 @@ struct AvatarDot: View {
     var isYou = false
 
     private var tint: Color { Identity.tint(for: name) }
+    private var hasName: Bool { name?.isEmpty == false }
 
     var body: some View {
-        Text(Identity.initial(for: name))
-            .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
-            .foregroundStyle(isPending ? tint : .white)
+        Group {
+            if hasName {
+                Text(Identity.initial(for: name))
+                    .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
+                    .foregroundStyle(isPending ? tint : .white)
+            } else {
+                Image("OneDayMascot")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(isPending ? 0.58 : 1)
+                    .accessibilityHidden(true)
+            }
+        }
             .frame(width: size, height: size)
             .background {
                 if isPending {
@@ -27,6 +38,7 @@ struct AvatarDot: View {
                     Circle().fill(tint.gradient)
                 }
             }
+            .clipShape(Circle())
             .overlay {
                 if isPending {
                     Circle().strokeBorder(

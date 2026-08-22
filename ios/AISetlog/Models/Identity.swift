@@ -15,12 +15,10 @@ enum Identity {
         let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return paletteUIColors[sum % paletteUIColors.count]
     }
-
-
-    /// Falls back to the app's brand mark when there's no one to identify
-    /// (a solo challenge has no recorded author).
+    /// An absent name has no text fallback; views use the mascot artwork for
+    /// that state so the retired "1D" initials never return as a brand mark.
     static func initial(for name: String?) -> String {
-        guard let name, let first = name.first else { return "1D" }
+        guard let name, let first = name.first else { return "" }
         return String(first).uppercased()
     }
 }
