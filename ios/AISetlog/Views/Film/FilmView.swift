@@ -186,13 +186,13 @@ struct FilmView: View {
             .month(.abbreviated).day().locale(appLanguage.resolved.locale)
         if challenge.isOneDay {
             return VideoStitcher.TitleCard(
-                title: challenge.title,
+                title: presenter.displayTitle,
                 subtitle: Strings.titleCardSubtitleOneDay(
                     clips.count, challenge.cards.count,
                     secondsLabel: challenge.resolvedClipLength.secondsLabel))
         }
         return VideoStitcher.TitleCard(
-            title: challenge.title,
+            title: presenter.displayTitle,
             subtitle: "\(start.formatted(fmt)) – \(end.formatted(fmt))")
     }
 

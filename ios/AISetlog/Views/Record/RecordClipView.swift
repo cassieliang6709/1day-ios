@@ -278,7 +278,9 @@ struct RecordClipView: View {
         .padding(.bottom, bottomInset)
         .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
             ForEach(filingCandidates) { challenge in
-                Button(challenge.title) { file(url, to: challenge) }
+                Button(ChallengePresenter(challenge: challenge).displayTitle) {
+                    file(url, to: challenge)
+                }
             }
         }
     }
@@ -297,7 +299,7 @@ struct RecordClipView: View {
         recorder.retake()
         ringProgress = 0
         overlayText = ""
-        showToast(Strings.filedTo(challenge.title))
+        showToast(Strings.filedTo(ChallengePresenter(challenge: challenge).displayTitle))
         offerNotificationPrimer(dismissWhenFinished: false)
     }
 

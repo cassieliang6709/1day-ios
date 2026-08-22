@@ -54,6 +54,61 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
+    // MARK: Template identity and story titles
+
+    func testBuiltInTemplateLookupAcceptsStableAndLegacyLocalizedNames() {
+        XCTAssertEqual(
+            ChallengeTemplate.builtIn(matching: "Soft Reset")?.coverAssetName,
+            "TemplateSoftReset")
+        XCTAssertEqual(
+            ChallengeTemplate.builtIn(matching: "慢慢重启")?.identityKey,
+            "Soft Reset")
+        XCTAssertNil(ChallengeTemplate.builtIn(matching: "My own story"))
+    }
+
+    func testBuiltInDefaultTitleSwitchesIndependentlyBetweenLanguages() {
+        let challenge = Challenge(
+            id: UUID(),
+            title: "Soft Reset",
+            startDate: .now,
+            cards: [DayCard(day: 1)],
+            mode: .oneDay,
+            templateName: "Soft Reset")
+        let presenter = ChallengePresenter(challenge: challenge)
+
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(presenter.displayTitle, "慢慢重启")
+        XCTAssertEqual(presenter.coverAssetName, "TemplateSoftReset")
+
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(presenter.displayTitle, "Soft Reset")
+    }
+
+    func testUserEditedTitleIsNotTranslatedAndCustomStoryGetsArtwork() {
+        let challenge = Challenge(
+            id: UUID(),
+            title: "Cassie's Sunday",
+            startDate: .now,
+            cards: [DayCard(day: 1)],
+            mode: .oneDay,
+            templateName: "Soft Reset")
+        let presenter = ChallengePresenter(challenge: challenge)
+
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(presenter.displayTitle, "Cassie's Sunday")
+
+        let custom = Challenge(
+            id: UUID(),
+            title: "我的周末",
+            startDate: .now,
+            cards: [DayCard(day: 1)],
+            mode: .oneDay,
+            templateName: "我的周末")
+        XCTAssertEqual(
+            ChallengePresenter(challenge: custom).coverAssetName,
+            "TemplateCustomStory")
+    }
+
     // MARK: Strings
 
     func testStringsSwitchWithStoredLanguage() {

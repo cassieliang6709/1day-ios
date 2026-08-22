@@ -389,11 +389,12 @@ struct StoryTimelineView: View {
     }
 
     private func shareText(code: String, challenge: Challenge) -> String {
+        let presenter = ChallengePresenter(challenge: challenge)
         if challenge.recordedCount > 0 {
             return Strings.shareMessageCaptured(
-                first: ChallengePresenter(challenge: challenge).title(forSlot: 1),
-                title: challenge.title, code: code)
+                first: presenter.title(forSlot: 1),
+                title: presenter.displayTitle, code: code)
         }
-        return Strings.shareMessageInvite(title: challenge.title, code: code)
+        return Strings.shareMessageInvite(title: presenter.displayTitle, code: code)
     }
 }

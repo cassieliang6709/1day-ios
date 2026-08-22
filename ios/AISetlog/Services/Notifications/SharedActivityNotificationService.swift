@@ -81,7 +81,7 @@ enum SharedActivityNotificationService {
         }
 
         let content = UNMutableNotificationContent()
-        content.title = challenge.title
+        content.title = ChallengePresenter(challenge: challenge).displayTitle
         content.body = activityBody(
             kind: context.kind,
             authorName: fields.authorName,

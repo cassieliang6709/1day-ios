@@ -404,6 +404,8 @@ struct FilmPoster: View {
     let coverURL: URL?
     var refreshToken: Date?
 
+    private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
+
     private var dateStamp: String {
         challenge.startDate.formatted(
             .dateTime.month(.abbreviated).day().locale(AppLanguage.effective.locale))
@@ -415,7 +417,9 @@ struct FilmPoster: View {
                 if let coverURL {
                     ClipThumbnail(url: coverURL, refreshToken: refreshToken)
                 } else {
-                    TemplateCover(identityKey: challenge.title)
+                    Image(presenter.coverAssetName)
+                        .resizable()
+                        .scaledToFill()
                 }
             }
             .frame(width: 132, height: 186)
@@ -424,7 +428,7 @@ struct FilmPoster: View {
             OneDay.scrim
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(challenge.title)
+                Text(presenter.displayTitle)
                     .font(.system(size: 13.5, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)

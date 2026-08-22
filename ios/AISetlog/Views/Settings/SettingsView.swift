@@ -98,7 +98,7 @@ struct SettingsView: View {
                     Section(Strings.sharedRooms) {
                         ForEach(sharedChallenges) { challenge in
                             Toggle(
-                                challenge.title,
+                                ChallengePresenter(challenge: challenge).displayTitle,
                                 isOn: roomEnabledBinding(for: challenge))
                         }
                     }

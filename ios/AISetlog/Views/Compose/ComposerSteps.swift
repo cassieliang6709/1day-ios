@@ -147,14 +147,12 @@ struct SetupStep: View {
         GlassCard(padding: 14) {
             HStack(spacing: 13) {
                 if let template {
-                    Image(systemName: template.displaySymbol)
-                        .font(.system(size: 19, weight: .medium))
-                        .foregroundStyle(.white)
+                    Image(template.coverAssetName ?? "TemplateCustomStory")
+                        .resizable()
+                        .scaledToFill()
                         .frame(width: 46, height: 46)
-                        .background {
-                            TemplateCover(identityKey: template.identityKey)
-                                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .accessibilityHidden(true)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {

@@ -211,7 +211,7 @@ struct StoryComposerView: View {
                 mode: mode,
                 clipLength: clipLength,
                 orientation: orientation,
-                templateName: selected?.displayName,
+                templateName: selected?.identityKey,
                 momentTitles: resolvedMoments)
             dismiss()
             onCreate(challenge.id)
@@ -229,7 +229,7 @@ struct StoryComposerView: View {
                     mode: mode,
                     clipLength: clipLength,
                     orientation: orientation,
-                    templateName: selected?.displayName,
+                    templateName: selected?.identityKey,
                     momentTitles: resolvedMoments)
                 dismiss()
                 onCreate(challenge.id)

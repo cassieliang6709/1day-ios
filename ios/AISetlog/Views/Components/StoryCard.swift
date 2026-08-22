@@ -23,9 +23,6 @@ struct StoryCard: View {
             ?? min(challenge.recordedCount + 1, max(challenge.cards.count, 1))
     }
     private var nextMoment: String { presenter.title(forSlot: nextSlot) }
-    private var momentIcon: String {
-        MomentCatalog.icon(for: challenge.momentValue(forSlot: nextSlot))
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,11 +45,9 @@ struct StoryCard: View {
                 if let coverURL {
                     ClipThumbnail(url: coverURL, refreshToken: refreshToken)
                 } else {
-                    OneDay.brand.overlay {
-                        Image(systemName: momentIcon)
-                            .font(.system(size: 44, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
+                    Image(presenter.coverAssetName)
+                        .resizable()
+                        .scaledToFill()
                 }
             }
             .clipBox(height: 258)
@@ -60,7 +55,7 @@ struct StoryCard: View {
             OneDay.scrim
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(challenge.title)
+                Text(presenter.displayTitle)
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)
@@ -172,7 +167,7 @@ struct StoryRowCard: View {
             thumbnail
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(challenge.title)
+                Text(presenter.displayTitle)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
@@ -214,11 +209,9 @@ struct StoryRowCard: View {
             if let coverURL {
                 ClipThumbnail(url: coverURL, refreshToken: refreshToken)
             } else {
-                OneDay.surfaceSoft.overlay {
-                    Image(systemName: "film")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(Color.oneDaySky)
-                }
+                Image(presenter.coverAssetName)
+                    .resizable()
+                    .scaledToFill()
             }
         }
         .frame(width: 58, height: 66)

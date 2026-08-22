@@ -42,12 +42,19 @@ struct TemplateCard: View {
                     .clipped()
                     .accessibilityHidden(true)
             } else {
-                TemplateCover(identityKey: template.identityKey)
+                Image("TemplateCustomStory")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
 
                 Image(systemName: template.displaySymbol)
-                    .font(.system(size: 46, weight: .medium))
+                    .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+                    .padding(14)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
             }
         }
         .frame(height: 168)

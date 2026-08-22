@@ -44,8 +44,8 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     var displaySymbol: String { symbol ?? "wand.and.stars" }
     /// Language-stable string for deriving a consistent accent color.
     var identityKey: String { name.en }
-    /// Built-in poster art. Custom and unknown templates keep the generated
-    /// gradient cover so older saved data remains visually complete.
+    /// Built-in poster art. Custom templates use the shared custom-story art
+    /// at the presentation layer because their names are user-authored.
     var coverAssetName: String? {
         guard !isCustom else { return nil }
         return switch name.en {
@@ -112,6 +112,20 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
               momentKeys: ["blank_page", "first_mark", "ugly_middle", "keep_going", "detail", "almost", "finished_piece"],
               blurb: .init(en: "Blank page to finished piece.", zh: "从空白页，到完成品。")),
     ]
+
+    /// All localized built-ins behind one language-stable lookup. Persisted
+    /// challenges use the English identity key going forward, while matching
+    /// both localized names keeps stories created by older app versions valid.
+    static var allBuiltins: [ChallengeTemplate] {
+        oneDayBuiltins + sevenDayBuiltins
+    }
+
+    static func builtIn(matching token: String?) -> ChallengeTemplate? {
+        guard let token, !token.isEmpty else { return nil }
+        return allBuiltins.first {
+            token == $0.identityKey || token == $0.name.zh
+        }
+    }
 
     /// Every moment key across the built-in 1-day templates, deduplicated and in
     /// first-seen order — the pool `BuildTemplateView` picks from.

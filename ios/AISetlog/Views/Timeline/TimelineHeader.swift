@@ -40,7 +40,7 @@ struct TimelineHeader: View {
     private var title: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
-                Text(challenge.title)
+                Text(presenter.displayTitle)
                     .font(.system(size: 29, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(2)
