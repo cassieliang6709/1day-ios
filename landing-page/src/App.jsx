@@ -49,7 +49,7 @@ function StoreButton({ locale, compact = false }) {
 function PrivacyPolicy({ locale }) {
   const t = copy[locale];
   const zh = locale === 'zh';
-  return <main className="legal-page"><header className="nav shell"><a href={zh ? '/' : '/en'} className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a><a className="language" href={zh ? '/en/privacy' : '/privacy'}>{zh ? 'EN' : '中文'}</a></header><article className="legal-copy">
+  return <main className="legal-page"><header className="nav shell"><a href={zh ? '/' : '/en'} className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="" /></a><a className="language" href={zh ? '/en/privacy' : '/privacy'}>{zh ? 'EN' : '中文'}</a></header><article className="legal-copy">
     <p className="eyebrow">1Day</p><h1>{t.privacyTitle}</h1><p className="legal-updated">{t.privacyDate}</p>
     <h2>{zh ? '概览' : 'Overview'}</h2><p>{zh ? '1Day 帮你记录短视频瞬间，并将它们编成一支短片。单人挑战保存在你的设备上；共享挑战使用 Apple iCloud，并需要“通过 Apple 登录”。' : '1Day helps you record short video moments and assemble them into a film. Solo challenges stay on your device. Shared challenges use Apple iCloud and require Sign in with Apple.'}</p>
     <h2>{zh ? '我们处理的信息' : 'Information we handle'}</h2><p>{zh ? '应用可能会处理“通过 Apple 登录”提供的名称与稳定标识符、挑战详情、房间成员、文字说明，以及你选择上传到共享房间的视频片段。相机、麦克风和照片图库仅在你授权后使用。' : 'The app may handle the name and stable identifier provided through Sign in with Apple, challenge details, room membership, captions, and video clips you choose to upload to a shared room. Camera, microphone, and photo-library access are used only after you grant permission.'}</p>
@@ -78,7 +78,7 @@ export function App() {
   const themeName = selected[locale];
 
   return <main className="site-page">
-    <header className="nav shell"><a href="#top" className="brand" aria-label="1Day home"><span className="brand-mark" />1Day</a><nav aria-label="Main navigation"><a href="#how">{t.nav[0]}</a><a href="#film">{t.nav[1]}</a><a href={`${home}/privacy`}>{t.nav[2]}</a></nav><div className="nav-actions"><a className="language" href={locale === 'zh' ? '/en' : '/'}>{locale === 'zh' ? 'EN' : '中文'}</a><StoreButton locale={locale} compact /></div></header>
+    <header className="nav shell"><a href="#top" className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="" /></a><nav aria-label="Main navigation"><a href="#how">{t.nav[0]}</a><a href="#film">{t.nav[1]}</a><a href={`${home}/privacy`}>{t.nav[2]}</a></nav><div className="nav-actions"><a className="language" href={locale === 'zh' ? '/en' : '/'}>{locale === 'zh' ? 'EN' : '中文'}</a><StoreButton locale={locale} compact /></div></header>
     <section id="top" className="hero shell">
       <div className="hero-copy"><p className="scribble">{t.heroNote}</p><h1>{t.title}</h1><p className="lede">{t.lede}</p><div className="hero-actions"><StoreButton locale={locale} /><a className="text-link" href="#how">{t.learn} <ArrowRight /></a></div></div>
       <div className="phone-wrap"><div className="phone"><div className="speaker" /><img src="/assets/app-screen-current.jpg" alt={locale === 'zh' ? '1Day 应用主页预览' : '1Day app home preview'} /></div><p className="phone-callout">{locale === 'zh' ? '短短片段，一支完整短片。' : 'Short clips. One beautiful film.'}</p></div>
