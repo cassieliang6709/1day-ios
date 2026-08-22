@@ -41,23 +41,34 @@ final class GridTapTests: XCTestCase {
         [(id: friendID, name: "Ada"), (id: myID, name: "Me"), (id: "zoe", name: "Zoe")]
     }
 
-    func testMyLaneComesFirstAndTheRestFollowByName() {
+    func testMyFilmedLaneComesFirstAndTheRestFollowByName() {
         let lanes = StoryGridView.lanes(
-            slotClips: [clip(day: 1, authorID: friendID)], members: roster, myID: myID)
+            slotClips: [
+                clip(day: 1, authorID: friendID),
+                clip(day: 1, authorID: "zoe"),
+                clip(day: 1, authorID: myID),
+            ],
+            members: roster,
+            myID: myID)
 
         XCTAssertEqual(lanes.map(\.authorID), [myID, friendID, "zoe"])
         XCTAssertTrue(lanes[0].isMine)
-        XCTAssertNil(lanes[0].clip, "I haven't filmed this one")
+        XCTAssertNotNil(lanes[0].clip)
         XCTAssertNotNil(lanes[1].clip, "Ada has")
-        XCTAssertNil(lanes[2].clip)
+        XCTAssertNotNil(lanes[2].clip)
     }
 
-    /// A friend who has filmed nothing still holds a place — that's what makes
-    /// the tile a picture of the moment rather than just of its footage.
-    func testEveryoneInTheRosterGetsALaneEvenWithNoClips() {
+    func testRosterMembersWithoutClipsDoNotCreateEmptyLanes() {
         let lanes = StoryGridView.lanes(slotClips: [], members: roster, myID: myID)
-        XCTAssertEqual(lanes.count, 3)
-        XCTAssertTrue(lanes.allSatisfy { $0.clip == nil })
+        XCTAssertTrue(lanes.isEmpty)
+    }
+
+    func testOnlyFilmedFriendsAppearBeforeIRecord() {
+        let lanes = StoryGridView.lanes(
+            slotClips: [clip(day: 1, authorID: friendID)], members: roster, myID: myID)
+
+        XCTAssertEqual(lanes.map(\.authorID), [friendID])
+        XCTAssertNotNil(lanes[0].clip)
     }
 
     /// Footage must never be dropped, even if its author is missing from the
@@ -67,8 +78,8 @@ final class GridTapTests: XCTestCase {
             slotClips: [clip(day: 1, authorID: "ghost")],
             members: [(id: myID, name: "Me")], myID: myID)
 
-        XCTAssertEqual(lanes.map(\.authorID), [myID, "ghost"])
-        XCTAssertNotNil(lanes.last?.clip)
+        XCTAssertEqual(lanes.map(\.authorID), ["ghost"])
+        XCTAssertNotNil(lanes.first?.clip)
     }
 
     func testASoloStoryIsOneLane() {
@@ -80,8 +91,16 @@ final class GridTapTests: XCTestCase {
     }
 
     func testRowsSplitOnTheColumnCount() {
-        let lanes = StoryGridView.lanes(slotClips: [], members: roster, myID: myID)
+        let lanes = StoryGridView.lanes(
+            slotClips: [
+                clip(day: 1, authorID: friendID),
+                clip(day: 1, authorID: myID),
+                clip(day: 1, authorID: "zoe"),
+            ],
+            members: roster,
+            myID: myID)
         XCTAssertEqual(StoryGridView.rows(of: lanes, columns: 1).count, 3)
         XCTAssertEqual(StoryGridView.rows(of: lanes, columns: 2).map(\.count), [2, 1])
     }
+
 }

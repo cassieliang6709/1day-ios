@@ -120,13 +120,10 @@ struct StoryGridView: View {
         authorID == myID || authorID == "local"
     }
 
-    /// Who shares this moment, in the order the tile stacks them.
-    ///
-    /// Me first: my own lane is the one I need to find and tap, so it shouldn't
-    /// move as friends' clips arrive. Everyone else follows by name, which
-    /// keeps the rest stable too. Seats come from the room's roster, so a
-    /// friend who has filmed nothing yet still holds a place — that's the
-    /// point of showing the moment rather than just its footage.
+    /// Filmed takes for this moment, in the order the tile stacks them.
+    /// My take stays first when it exists; everyone else follows by name.
+    /// Pending members are expressed by the room roster elsewhere rather than
+    /// as empty video panes, so the tile matches what its preview can play.
     static func lanes(
         slotClips: [DayClip],
         members: [(id: String, name: String)],
@@ -135,24 +132,20 @@ struct StoryGridView: View {
         var byAuthor: [String: DayClip] = [:]
         for clip in slotClips { byAuthor[clip.authorID ?? myID] = clip }
 
-        var seats: [(id: String, name: String?)] = members.map { ($0.id, $0.name) }
-        // Footage always earns a lane, even if its author somehow isn't in the
-        // roster — dropping a clip from the tile would be the worse failure.
-        let known = Set(seats.map(\.id))
-        for (id, clip) in byAuthor where !known.contains(id) {
-            seats.append((id, clip.authorName))
-        }
-        if seats.isEmpty { seats = [(myID, nil)] }
-
-        let mine = seats.filter { isMe($0.id, myID: myID) }
-        let others = seats
-            .filter { !isMe($0.id, myID: myID) }
-            .sorted { ($0.name ?? "") < ($1.name ?? "") }
-
-        return (mine + others).map { seat in
+        var memberNames: [String: String] = [:]
+        for member in members { memberNames[member.id] = member.name }
+        return byAuthor.map { authorID, clip in
             MomentLane(
-                authorID: seat.id, authorName: seat.name,
-                clip: byAuthor[seat.id], isMine: isMe(seat.id, myID: myID))
+                authorID: authorID,
+                authorName: clip.authorName ?? memberNames[authorID],
+                clip: clip,
+                isMine: isMe(authorID, myID: myID))
+        }
+        .sorted { lhs, rhs in
+            if lhs.isMine != rhs.isMine { return lhs.isMine }
+            let left = lhs.authorName ?? lhs.authorID
+            let right = rhs.authorName ?? rhs.authorID
+            return left == right ? lhs.authorID < rhs.authorID : left < right
         }
     }
 
@@ -169,12 +162,7 @@ struct StoryGridView: View {
         let slotClips = clips.filter { $0.day == card.day }
         let mine = Self.mineAmong(slotClips, myID: myID)
         let awaitingMine = mine == nil && !slotClips.isEmpty
-        // A moment nobody has filmed keeps the plain empty tile. Held places
-        // only say something once there's a take to hold them against;
-        // otherwise every untouched slot turns into a stack of blanks.
-        let lanes = slotClips.isEmpty
-            ? []
-            : Self.lanes(slotClips: slotClips, members: members, myID: myID)
+        let lanes = Self.lanes(slotClips: slotClips, members: members, myID: myID)
 
         StoryGridCell(
             momentTitle: presenter.title(forSlot: card.day),
@@ -185,7 +173,10 @@ struct StoryGridView: View {
             reactions: (mine ?? slotClips.first)?.emoji ?? [],
             isNext: card.day == nextSlot,
             awaitingMine: awaitingMine,
-            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72
+            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72,
+            onPreview: awaitingMine
+                ? { onTapFilmed(card.day, slotClips.first?.authorID) }
+                : nil
         ) {
             switch Self.tap(slotClips: slotClips, myID: myID) {
             case .preview(let authorID): onTapFilmed(card.day, authorID)
@@ -211,6 +202,7 @@ struct StoryGridCell: View {
     /// but is still an invitation to film mine.
     var awaitingMine = false
     var aspectRatio: CGFloat = 0.72
+    var onPreview: (() -> Void)?
     let onTap: () -> Void
 
     private let radius: CGFloat = 16
@@ -224,9 +216,36 @@ struct StoryGridCell: View {
     }
 
     var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: onTap) {
+                tile
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text(awaitingMine ? Strings.record : Strings.previewSharedFilm(lanes.count)))
+
+            if isFilled, let onPreview {
+                Button(action: onPreview) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(Strings.previewSharedFilm(lanes.count)))
+            }
+        }
+        .animation(OneDay.Motion.soft, value: lanes.map(\.id).joined())
+    }
+
+    private var tile: some View {
         Color.clear
             .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay { background.clipped() }
+            .overlay { captureIndicator }
             .overlay(alignment: .topLeading) { topLeading }
             .overlay(alignment: .topTrailing) { topTrailing }
             .overlay(alignment: .bottom) { caption }
@@ -234,8 +253,6 @@ struct StoryGridCell: View {
             .overlay { border }
             .oneDaySoftShadow(strength: isFilled ? 0.7 : 0.35)
             .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .onTapGesture(perform: onTap)
-            .animation(OneDay.Motion.soft, value: lanes.map(\.id).joined())
     }
 
     @ViewBuilder
@@ -309,14 +326,26 @@ struct StoryGridCell: View {
 
     @ViewBuilder
     private var topTrailing: some View {
-        if isFilled {
-            HStack(spacing: 3) {
-                Image(systemName: awaitingMine ? "camera.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 17))
-                    .foregroundStyle(awaitingMine ? Color.oneDayBlue : .white.opacity(0.92))
-                    .shadow(radius: 3)
-            }
-            .padding(6)
+        if isFilled, !awaitingMine {
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 17))
+                .foregroundStyle(.white.opacity(0.92))
+                .shadow(radius: 3)
+                .padding(6)
+        }
+    }
+
+    @ViewBuilder
+    private var captureIndicator: some View {
+        if awaitingMine {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.oneDayBlue)
+                .frame(width: 34, height: 34)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.45), lineWidth: 1))
+                .shadow(color: .black.opacity(0.16), radius: 5, y: 2)
+                .accessibilityHidden(true)
         }
     }
 
