@@ -833,6 +833,18 @@ enum Strings {
     static var promptsNotNeeded: String {
         lang == .chinese ? "按时间记录不需要题目" : "Recording by time needs no prompts"
     }
+    /// How many prompts the chosen template will ask for, beside its name.
+    static func promptCountLabel(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 个题目" : "\(count) prompts"
+    }
+    /// Jumps from the preview strip down to the recommendation grid.
+    static var swapTemplate: String { lang == .chinese ? "换一个" : "Swap" }
+    /// The preview strip when there are no prompts to preview.
+    static var timeOnlyPreviewBody: String {
+        lang == .chinese
+            ? "没有题目 · 拍到的每一段按时间排好"
+            : "No prompts · every clip lands in time order"
+    }
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)，合成一部小影片。"

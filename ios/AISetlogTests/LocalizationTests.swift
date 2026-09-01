@@ -136,17 +136,39 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(Strings.dayN(3), "Day 3")
     }
 
-    /// The composer's dimmed-grid explanation. Shipping it in one language
-    /// would leave the other with a grey grid and no reason given.
-    func testPromptsNotNeededIsWrittenInBothLanguages() {
-        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
-        let chinese = Strings.promptsNotNeeded
-        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
-        let english = Strings.promptsNotNeeded
+    /// The composer's new copy. Shipping any of it in one language only would
+    /// leave the other with a grey grid, or a count, and no words around it.
+    func testComposerPromptCopyIsWrittenInBothLanguages() {
+        func inBothLanguages(_ string: () -> String) -> (String, String) {
+            UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+            let chinese = string()
+            UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+            return (chinese, string())
+        }
 
-        XCTAssertFalse(chinese.isEmpty)
-        XCTAssertFalse(english.isEmpty)
-        XCTAssertNotEqual(chinese, english)
+        let pairs = [
+            inBothLanguages { Strings.promptsNotNeeded },
+            inBothLanguages { Strings.swapTemplate },
+            inBothLanguages { Strings.timeOnlyPreviewBody },
+            inBothLanguages { Strings.promptCountLabel(7) },
+            inBothLanguages { Strings.headerDateProgress(1, 7) },
+        ]
+
+        for (chinese, english) in pairs {
+            XCTAssertFalse(chinese.isEmpty)
+            XCTAssertFalse(english.isEmpty)
+            XCTAssertNotEqual(chinese, english)
+        }
+    }
+
+    func testPromptCountAndProgressCarryTheirNumbers() {
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.promptCountLabel(7), "7 个题目")
+        XCTAssertEqual(Strings.headerDateProgress(1, 7), "今天 1/7")
+
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.promptCountLabel(7), "7 prompts")
+        XCTAssertEqual(Strings.headerDateProgress(1, 7), "Today 1/7")
     }
 
     func testForcedLanguageUsesMatchingLocaleAndPureCopy() throws {

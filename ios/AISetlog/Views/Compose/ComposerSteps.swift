@@ -25,6 +25,11 @@ struct MoodStep: View {
         mode == .oneDay ? oneDayTemplates : sevenDayTemplates
     }
 
+    private var selectedTemplate: ChallengeTemplate? {
+        guard let templateID = selection.templateID else { return nil }
+        return (oneDayTemplates + sevenDayTemplates).first { $0.id == templateID }
+    }
+
     private var promptTemplates: [ChallengeTemplate] {
         currentModeTemplates.filter { !$0.isTimeOnly }
     }
@@ -34,7 +39,24 @@ struct MoodStep: View {
     }
 
     var body: some View {
-        ScrollView {
+        ScrollViewReader { scroll in
+            ScrollView {
+                page(scroll)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .sheet(isPresented: $showLibrary) {
+            TemplateLibraryView(
+                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
+                sevenDayTemplates: sevenDayTemplates,
+                selection: $selection,
+                onEdit: onEdit,
+                onDelete: onDelete)
+                .presentationDetents([.large])
+        }
+    }
+
+    private func page(_ scroll: ScrollViewProxy) -> some View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(Strings.newStoryQuestion)
@@ -67,6 +89,15 @@ struct MoodStep: View {
                         action: selectTimeOnly)
                 }
                 .padding(.horizontal, 20)
+
+                PromptPreviewStrip(
+                    template: selection.style == .timeOnly ? nil : selectedTemplate,
+                    onSwap: {
+                        withAnimation(OneDay.Motion.soft) {
+                            scroll.scrollTo(Self.recommendationsAnchor, anchor: .top)
+                        }
+                    })
+                    .padding(.horizontal, 20)
 
                 Button(action: onBuildOwn) {
                     HStack(spacing: 12) {
@@ -102,20 +133,13 @@ struct MoodStep: View {
                 .padding(.horizontal, 20)
 
                 promptSection
+                    .id(Self.recommendationsAnchor)
             }
             .padding(.bottom, 16)
-        }
-        .scrollIndicators(.hidden)
-        .sheet(isPresented: $showLibrary) {
-            TemplateLibraryView(
-                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
-                sevenDayTemplates: sevenDayTemplates,
-                selection: $selection,
-                onEdit: onEdit,
-                onDelete: onDelete)
-                .presentationDetents([.large])
-        }
     }
+
+    /// Scroll target for the preview strip's "swap" link.
+    private static let recommendationsAnchor = "recommendations"
 
     /// The recommendations. Dimmed and inert while "record by time" is chosen —
     /// they used to stay live, so one tap would quietly take you out of the mode
@@ -178,6 +202,84 @@ struct MoodStep: View {
 
     private func select(_ template: ChallengeTemplate) {
         selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+    }
+}
+
+/// The prompts you're actually signing up for, spelled out before you commit.
+///
+/// Until now this screen showed a template's name and a mood line, and the
+/// seven questions only appeared on the *next* step behind a collapsed card —
+/// so "pick a story" meant accepting seven prompts sight unseen.
+private struct PromptPreviewStrip: View {
+    /// Nil when the story has no prompts to preview: time-only, or the guided
+    /// flow's own moments, which aren't a template.
+    let template: ChallengeTemplate?
+    let onSwap: () -> Void
+
+    private var moments: [String] {
+        template?.momentKeys?.map { MomentCatalog.localize($0) } ?? []
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            if let template, !moments.isEmpty {
+                HStack(spacing: 6) {
+                    Text(template.displayName)
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                        .lineLimit(1)
+
+                    Text("·")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.inkFaint)
+
+                    Text(Strings.promptCountLabel(moments.count))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                        .fixedSize()
+
+                    Spacer(minLength: 6)
+
+                    Button(action: onSwap) {
+                        HStack(spacing: 3) {
+                            Text(Strings.swapTemplate)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBlue)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                FlowLayout(spacing: 6) {
+                    ForEach(Array(moments.enumerated()), id: \.offset) { index, moment in
+                        HStack(spacing: 4) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 10, weight: .black, design: .rounded))
+                                .foregroundStyle(Color.oneDayBlue)
+                            Text(moment)
+                                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(OneDay.inkSoft)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5.5)
+                        .background(OneDay.surfaceSoft.opacity(0.9), in: Capsule())
+                    }
+                }
+            } else {
+                Label(Strings.timeOnlyPreviewBody, systemImage: "clock.badge.checkmark")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBlue)
+        .animation(OneDay.Motion.soft, value: template?.id)
     }
 }
 
@@ -253,11 +355,27 @@ private struct RecordingModeCard: View {
 }
 
 private struct PromptTemplateTile: View {
+    /// What the second line says. The recommendation grid is the last place
+    /// before committing, so there it names actual prompts; the library is for
+    /// browsing by feel, so there the mood line still earns its place.
+    enum Subtitle { case prompts, blurb }
+
     let template: ChallengeTemplate
     let isSelected: Bool
     let onSelect: () -> Void
+    var subtitle: Subtitle = .prompts
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
+
+    /// "起床 · 咖啡 · 收拾出门…" — enough to recognise the day's shape in a
+    /// tile this size. Falls back to the blurb for templates without prompts.
+    private var subtitleText: String {
+        guard subtitle == .prompts, let keys = template.momentKeys, !keys.isEmpty else {
+            return template.displayBlurb
+        }
+        let head = keys.prefix(3).map { MomentCatalog.localize($0) }.joined(separator: " · ")
+        return keys.count > 3 ? head + "…" : head
+    }
 
     var body: some View {
         Button(action: onSelect) {
@@ -274,7 +392,7 @@ private struct PromptTemplateTile: View {
                         .font(.system(size: 14.5, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
                         .lineLimit(1)
-                    Text(template.displayBlurb)
+                    Text(subtitleText)
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
                         .lineLimit(2)
@@ -355,6 +473,7 @@ private struct TemplateLibraryView: View {
                                     template: template,
                                     isSelected: selection.templateID == template.id,
                                     onSelect: { select(template) },
+                                    subtitle: .blurb,
                                     onEdit: template.isCustom ? { onEdit(template) } : nil,
                                     onDelete: template.isCustom ? { onDelete(template) } : nil)
                             }
