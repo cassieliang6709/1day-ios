@@ -828,6 +828,11 @@ enum Strings {
     static var moreTemplates: String {
         lang == .chinese ? "更多模板" : "More templates"
     }
+    /// Replaces the "more templates" link when the recommendation grid is
+    /// switched off, so the dimming reads as an answer rather than a fault.
+    static var promptsNotNeeded: String {
+        lang == .chinese ? "按时间记录不需要题目" : "Recording by time needs no prompts"
+    }
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)，合成一部小影片。"

@@ -16,8 +16,10 @@ struct StoryComposerView: View {
     enum Step: Int { case mood, setup }
 
     @State private var step: Step = .mood
-    @State private var selectedTemplateID: UUID? = ChallengeTemplate.liveWithMe.id
-    @State private var mode: Challenge.Mode = .oneDay
+    /// Style, template and mode as one value — see `ComposerSelection` for why
+    /// the style can't be inferred from the template.
+    @State private var selection = ComposerSelection.initial(
+        oneDay: ChallengeTemplate.oneDayBuiltins)
     @State private var clipLength: Challenge.ClipLength = .tiny
     @State private var orientation: Challenge.Orientation = .portrait
     @State private var withFriends = false
@@ -50,9 +52,11 @@ struct StoryComposerView: View {
         oneDayTemplates + sevenDayTemplates
     }
 
+    private var mode: Challenge.Mode { selection.mode }
+
     private var selected: ChallengeTemplate? {
-        guard let selectedTemplateID else { return nil }
-        return allTemplates.first { $0.id == selectedTemplateID }
+        guard let templateID = selection.templateID else { return nil }
+        return allTemplates.first { $0.id == templateID }
     }
 
     var body: some View {
@@ -67,8 +71,7 @@ struct StoryComposerView: View {
                     MoodStep(
                         oneDayTemplates: oneDayTemplates,
                         sevenDayTemplates: sevenDayTemplates,
-                        selectedTemplateID: $selectedTemplateID,
-                        mode: $mode,
+                        selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate)
@@ -86,7 +89,7 @@ struct StoryComposerView: View {
                         orientation: $orientation,
                         moments: $moments,
                         isOneDay: mode == .oneDay,
-                        isTimeOnly: selected?.isTimeOnly == true,
+                        isTimeOnly: selection.style == .timeOnly,
                         memberNames: knownFriendNames,
                         errorText: errorText)
                         .transition(.asymmetric(
@@ -103,9 +106,8 @@ struct StoryComposerView: View {
         }
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView { written, name in
-                mode = .oneDay
                 isCustomPromptStory = true
-                selectedTemplateID = nil
+                selection.useCustomPrompts()
                 moments = written
                 momentsEdited = true
                 title = name
@@ -119,18 +121,17 @@ struct StoryComposerView: View {
             }
         }
         .onAppear(perform: syncTitleToTemplate)
-        .onChange(of: selectedTemplateID) { _, newID in
+        .onChange(of: selection.templateID) { _, newID in
             guard newID != nil else { return }
             isCustomPromptStory = false
             titleEdited = false
             momentsEdited = false
             syncTitleToTemplate()
         }
-        .onChange(of: mode) { _, newMode in
+        .onChange(of: selection.mode) { _, _ in
             guard !isCustomPromptStory else { return }
-            let validTemplates = newMode == .oneDay ? oneDayTemplates : sevenDayTemplates
-            guard !validTemplates.contains(where: { $0.id == selectedTemplateID }) else { return }
-            selectedTemplateID = validTemplates.first?.id
+            selection.reconcileTemplate(
+                oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
         }
     }
 
@@ -246,11 +247,10 @@ struct StoryComposerView: View {
     }
 
     private func deleteTemplate(_ template: ChallengeTemplate) {
-        let wasSelected = selectedTemplateID == template.id
+        let wasSelected = selection.templateID == template.id
         store.deleteCustomTemplate(template)
         if wasSelected {
-            selectedTemplateID = ChallengeTemplate.oneDayBuiltins
-                .first(where: { !$0.isTimeOnly })?.id
+            selection.clearTemplate(fallingBackTo: ChallengeTemplate.oneDayBuiltins)
         }
     }
 

@@ -136,6 +136,19 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(Strings.dayN(3), "Day 3")
     }
 
+    /// The composer's dimmed-grid explanation. Shipping it in one language
+    /// would leave the other with a grey grid and no reason given.
+    func testPromptsNotNeededIsWrittenInBothLanguages() {
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        let chinese = Strings.promptsNotNeeded
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        let english = Strings.promptsNotNeeded
+
+        XCTAssertFalse(chinese.isEmpty)
+        XCTAssertFalse(english.isEmpty)
+        XCTAssertNotEqual(chinese, english)
+    }
+
     func testForcedLanguageUsesMatchingLocaleAndPureCopy() throws {
         let date = try XCTUnwrap(
             Calendar(identifier: .gregorian).date(

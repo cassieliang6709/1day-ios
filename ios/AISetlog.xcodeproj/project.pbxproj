@@ -65,7 +65,9 @@
 		B69D9E828BF48E81B54F17E2 /* ModelDisplayText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4ABC2D60D8190530746233 /* ModelDisplayText.swift */; };
 		B7B4BF6AEECB218511A14B35 /* TimelineHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812A5180E975AB0DEC13DE2F /* TimelineHeader.swift */; };
 		B8BC2FD3F3ED65CB60949595 /* NotificationPrimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC32E99E37FDF4EC43AC0B0E /* NotificationPrimerView.swift */; };
+		BDFBF10670DEB207270EC700 /* ComposerSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE6D98EA6C3C300F8FABFAA /* ComposerSelection.swift */; };
 		BEE46540CE9EB7A802B05D16 /* OneDayControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE617BB67B2ED88146C35DD9 /* OneDayControls.swift */; };
+		C274F7ED6FD1CA79D7E8D0F6 /* ComposerSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E7C08216B95CC114FACFBB /* ComposerSelectionTests.swift */; };
 		C6B267B599F7D352342E5315 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03F8F9F092CD5354A1197CCB /* Assets.xcassets */; };
 		C6CFE97F01C60F17A9CCE835 /* FilmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AF38A018C9C338F64FE0EF /* FilmView.swift */; };
 		CC5D2220CC11B1DBECE0ABA6 /* FloatingTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B64CA7AAB2506B0D612DD8 /* FloatingTabBar.swift */; };
@@ -140,6 +142,7 @@
 		5FA535170ECF2F2F587FAD0F /* StoryTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryTimelineView.swift; sourceTree = "<group>"; };
 		666B572B0B977A7478668FF0 /* PlansHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlansHomeView.swift; sourceTree = "<group>"; };
 		67E11342D735675040AE7050 /* TemplateCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCard.swift; sourceTree = "<group>"; };
+		69E7C08216B95CC114FACFBB /* ComposerSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerSelectionTests.swift; sourceTree = "<group>"; };
 		6E746E00C782FC429881A9E0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		71F4B8537CFE73ED795CBBE3 /* AISetlogTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AISetlogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		72ADE1A2FBF5E0B812B8C66B /* SharedActivityNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedActivityNotificationService.swift; sourceTree = "<group>"; };
@@ -175,6 +178,7 @@
 		C79D5F27B8576AAB79E4C5D1 /* GridTapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridTapTests.swift; sourceTree = "<group>"; };
 		C9E29668954C7B76AF34FCD5 /* MemberChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberChip.swift; sourceTree = "<group>"; };
 		CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengePresenter.swift; sourceTree = "<group>"; };
+		CCE6D98EA6C3C300F8FABFAA /* ComposerSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerSelection.swift; sourceTree = "<group>"; };
 		CFE37A31301F718C534F268A /* VlogPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlogPlayer.swift; sourceTree = "<group>"; };
 		D368B5EEB82BA19C2F326C07 /* CloudKitIdempotencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitIdempotencyTests.swift; sourceTree = "<group>"; };
 		D496FA2FD678B671A1723CCE /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
@@ -446,6 +450,7 @@
 				50C2CEBEB0FCD4A5A8D229BA /* ClipFixtureFactory.swift */,
 				D368B5EEB82BA19C2F326C07 /* CloudKitIdempotencyTests.swift */,
 				C17D93D02F8DC097DBC7A95E /* CloudKitPaginationTests.swift */,
+				69E7C08216B95CC114FACFBB /* ComposerSelectionTests.swift */,
 				012557C7BAC9618102CA207A /* DemoClipFactoryTests.swift */,
 				C79D5F27B8576AAB79E4C5D1 /* GridTapTests.swift */,
 				B595C1B836B816FC0E1DD54C /* HomeHeaderSummaryTests.swift */,
@@ -464,6 +469,7 @@
 			isa = PBXGroup;
 			children = (
 				CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */,
+				CCE6D98EA6C3C300F8FABFAA /* ComposerSelection.swift */,
 				3A0C98CC5E6DECB12A567511 /* HomeHeaderSummary.swift */,
 				4B4ABC2D60D8190530746233 /* ModelDisplayText.swift */,
 				9393BC3FC31A23786C7E5543 /* StorySchedule.swift */,
@@ -629,6 +635,7 @@
 				B1D076EB4830B7B50BEC6B47 /* ClipPreviewView.swift in Sources */,
 				E4856DCD8401EA9875206061 /* ClipRecorder.swift in Sources */,
 				B4B8040731E08FEF6E7CE47C /* CloudKitService.swift in Sources */,
+				BDFBF10670DEB207270EC700 /* ComposerSelection.swift in Sources */,
 				7CC660696787B3AE773F541B /* ComposerSteps.swift in Sources */,
 				D3CB195CDE74A66B36954C10 /* DayCard.swift in Sources */,
 				1F37BFE90A0883A53F0CF4BE /* DayClip.swift in Sources */,
@@ -683,6 +690,7 @@
 				E6B92F0093A90EDDE3F0F08A /* ClipFixtureFactory.swift in Sources */,
 				7DBC79C73BE96F8F05EC3ADC /* CloudKitIdempotencyTests.swift in Sources */,
 				91462E380EFCCFEDDAA578AD /* CloudKitPaginationTests.swift in Sources */,
+				C274F7ED6FD1CA79D7E8D0F6 /* ComposerSelectionTests.swift in Sources */,
 				9ACA019799B6AA5A3B6CF38B /* DemoClipFactoryTests.swift in Sources */,
 				F58DE78F432CEC831C3606EF /* GridTapTests.swift in Sources */,
 				B3C26869172D622BF93B9838 /* HomeHeaderSummaryTests.swift in Sources */,

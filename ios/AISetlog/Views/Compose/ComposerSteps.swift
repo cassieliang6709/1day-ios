@@ -11,8 +11,7 @@ import SwiftUI
 struct MoodStep: View {
     let oneDayTemplates: [ChallengeTemplate]
     let sevenDayTemplates: [ChallengeTemplate]
-    @Binding var selectedTemplateID: UUID?
-    @Binding var mode: Challenge.Mode
+    @Binding var selection: ComposerSelection
     let onBuildOwn: () -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
@@ -20,18 +19,14 @@ struct MoodStep: View {
     @State private var showLibrary = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var allTemplates: [ChallengeTemplate] {
-        oneDayTemplates + sevenDayTemplates
-    }
+    private var mode: Challenge.Mode { selection.mode }
 
-    private var selectedTemplate: ChallengeTemplate? {
-        guard let selectedTemplateID else { return nil }
-        return allTemplates.first { $0.id == selectedTemplateID }
+    private var currentModeTemplates: [ChallengeTemplate] {
+        mode == .oneDay ? oneDayTemplates : sevenDayTemplates
     }
 
     private var promptTemplates: [ChallengeTemplate] {
-        let source = mode == .oneDay ? oneDayTemplates : sevenDayTemplates
-        return source.filter { !$0.isTimeOnly }
+        currentModeTemplates.filter { !$0.isTimeOnly }
     }
 
     private var recommendedTemplates: [ChallengeTemplate] {
@@ -52,22 +47,24 @@ struct MoodStep: View {
                 }
                 .padding(.horizontal, 20)
 
+                // Prompted first: it's the default, and it's the one whose
+                // consequences (the grid below) are visible on this screen.
                 HStack(alignment: .top, spacing: 12) {
-                    RecordingModeCard(
-                        title: Strings.timeRecordingTitle,
-                        caption: Strings.timeRecordingCaption,
-                        imageName: "TemplatePerfectDay",
-                        symbol: "point.3.connected.trianglepath.dotted",
-                        isSelected: selectedTemplate?.isTimeOnly == true,
-                        action: selectTimeOnly)
-
                     RecordingModeCard(
                         title: Strings.promptChallengeTitle,
                         caption: Strings.promptChallengeCaption,
                         imageName: "TemplateLockIn",
                         symbol: "scope",
-                        isSelected: selectedTemplate?.isTimeOnly != true,
+                        isSelected: selection.style == .prompted,
                         action: selectPromptMode)
+
+                    RecordingModeCard(
+                        title: Strings.timeRecordingTitle,
+                        caption: Strings.timeRecordingCaption,
+                        imageName: "TemplatePerfectDay",
+                        symbol: "point.3.connected.trianglepath.dotted",
+                        isSelected: selection.style == .timeOnly,
+                        action: selectTimeOnly)
                 }
                 .padding(.horizontal, 20)
 
@@ -104,11 +101,33 @@ struct MoodStep: View {
                 .accessibilityIdentifier("custom-prompts-entry")
                 .padding(.horizontal, 20)
 
-                HStack {
-                    SectionLabel(text: mode == .oneDay
-                        ? Strings.recommendedPrompts
-                        : Strings.sevenDayChallenges)
-                    Spacer()
+                promptSection
+            }
+            .padding(.bottom, 16)
+        }
+        .scrollIndicators(.hidden)
+        .sheet(isPresented: $showLibrary) {
+            TemplateLibraryView(
+                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
+                sevenDayTemplates: sevenDayTemplates,
+                selection: $selection,
+                onEdit: onEdit,
+                onDelete: onDelete)
+                .presentationDetents([.large])
+        }
+    }
+
+    /// The recommendations. Dimmed and inert while "record by time" is chosen —
+    /// they used to stay live, so one tap would quietly take you out of the mode
+    /// you'd just picked without the cards above ever saying so.
+    private var promptSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                SectionLabel(text: mode == .oneDay
+                    ? Strings.recommendedPrompts
+                    : Strings.sevenDayChallenges)
+                Spacer()
+                if selection.promptGridEnabled {
                     Button {
                         showLibrary = true
                     } label: {
@@ -121,57 +140,44 @@ struct MoodStep: View {
                         .foregroundStyle(Color.oneDayBlue)
                     }
                     .buttonStyle(.plain)
+                } else {
+                    Text(Strings.promptsNotNeeded)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkFaint)
                 }
-                .padding(.horizontal, 20)
-
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
-                    spacing: 12
-                ) {
-                    ForEach(recommendedTemplates) { template in
-                        PromptTemplateTile(
-                            template: template,
-                            isSelected: selectedTemplateID == template.id,
-                            onSelect: { select(template) },
-                            onEdit: template.isCustom ? { onEdit(template) } : nil,
-                            onDelete: template.isCustom ? { onDelete(template) } : nil)
-                    }
-                }
-                .padding(.horizontal, 20)
             }
-            .padding(.bottom, 16)
+            .padding(.horizontal, 20)
+
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
+                spacing: 12
+            ) {
+                ForEach(recommendedTemplates) { template in
+                    PromptTemplateTile(
+                        template: template,
+                        isSelected: selection.templateID == template.id,
+                        onSelect: { select(template) },
+                        onEdit: template.isCustom ? { onEdit(template) } : nil,
+                        onDelete: template.isCustom ? { onDelete(template) } : nil)
+                }
+            }
+            .padding(.horizontal, 20)
         }
-        .scrollIndicators(.hidden)
-        .sheet(isPresented: $showLibrary) {
-            TemplateLibraryView(
-                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
-                sevenDayTemplates: sevenDayTemplates,
-                selectedTemplateID: $selectedTemplateID,
-                mode: $mode,
-                onEdit: onEdit,
-                onDelete: onDelete)
-                .presentationDetents([.large])
-        }
+        .disabled(!selection.promptGridEnabled)
+        .opacity(selection.promptGridEnabled ? 1 : 0.4)
+        .animation(OneDay.Motion.soft, value: selection.promptGridEnabled)
     }
 
     private func selectTimeOnly() {
-        mode = .oneDay
-        selectedTemplateID = oneDayTemplates.first(where: \.isTimeOnly)?.id
+        selection.selectTimeOnly(in: oneDayTemplates)
     }
 
     private func selectPromptMode() {
-        if selectedTemplate?.isTimeOnly != true, selectedTemplate != nil { return }
-        mode = .oneDay
-        selectedTemplateID = oneDayTemplates.first(where: { !$0.isTimeOnly })?.id
+        selection.selectPrompted(in: currentModeTemplates)
     }
 
     private func select(_ template: ChallengeTemplate) {
-        if sevenDayTemplates.contains(where: { $0.id == template.id }) {
-            mode = .sevenDay
-        } else {
-            mode = .oneDay
-        }
-        selectedTemplateID = template.id
+        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
     }
 }
 
@@ -311,8 +317,7 @@ private struct PromptTemplateTile: View {
 private struct TemplateLibraryView: View {
     let oneDayTemplates: [ChallengeTemplate]
     let sevenDayTemplates: [ChallengeTemplate]
-    @Binding var selectedTemplateID: UUID?
-    @Binding var mode: Challenge.Mode
+    @Binding var selection: ComposerSelection
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
 
@@ -320,7 +325,11 @@ private struct TemplateLibraryView: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var templates: [ChallengeTemplate] {
-        mode == .oneDay ? oneDayTemplates : sevenDayTemplates
+        selection.mode == .oneDay ? oneDayTemplates : sevenDayTemplates
+    }
+
+    private var mode: Binding<Challenge.Mode> {
+        Binding(get: { selection.mode }, set: { selection.setMode($0) })
     }
 
     var body: some View {
@@ -335,7 +344,7 @@ private struct TemplateLibraryView: View {
                                 .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
                                 .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
                             ],
-                            selection: $mode)
+                            selection: mode)
 
                         LazyVGrid(
                             columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
@@ -344,7 +353,7 @@ private struct TemplateLibraryView: View {
                             ForEach(templates) { template in
                                 PromptTemplateTile(
                                     template: template,
-                                    isSelected: selectedTemplateID == template.id,
+                                    isSelected: selection.templateID == template.id,
                                     onSelect: { select(template) },
                                     onEdit: template.isCustom ? { onEdit(template) } : nil,
                                     onDelete: template.isCustom ? { onDelete(template) } : nil)
@@ -366,7 +375,7 @@ private struct TemplateLibraryView: View {
     }
 
     private func select(_ template: ChallengeTemplate) {
-        selectedTemplateID = template.id
+        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
         dismiss()
     }
 }
