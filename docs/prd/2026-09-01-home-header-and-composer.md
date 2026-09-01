@@ -2,7 +2,7 @@
 
 - 日期：2026-09-01
 - 提出人：Cassie
-- 状态：**待确认**（确认后按下方 PR 拆分实施）
+- 状态：**已实施**（PR-0 ~ PR-3 全部落地，验收见 §5；真机 iPhone SE 回归见 §8）
 - 设计稿：[docs/mockups/home-composer-v2.html](../mockups/home-composer-v2.html)
 - 采用方案：header **方案 A**；新建故事 **方案 A 打底 + 借方案 C 的网格副标题**
 
@@ -134,27 +134,36 @@ View 只持有它并渲染，逻辑全部可单测。
 | **PR-2** | `fix: 新建故事只留一套选择器` | `ComposerSteps.swift`、新增 `Presentation/ComposerSelection.swift`、`StoryComposerView.swift`、`AISetlogTests/ComposerSelectionTests.swift` | PR-0 |
 | **PR-3** | `feat: 选题目之前先看见题目` | `ComposerSteps.swift`、`Localization.swift`、`LocalizationTests.swift` | PR-2 |
 
+落地分支与 commit：
+
+| PR | 分支 | commit |
+|---|---|---|
+| PR-0 | `migration/2026-08-24` | `bb27b2d` `38bc0da` `db428c4` `9b3e0e1` `6ebd009` `eabf0eb` |
+| PR-1 | `feat/home-header-today` | `49ec680` |
+| PR-2 | `fix/composer-single-selector` | `373be03` |
+| PR-3 | `feat/prompts-visible-first` | `dc1e215` |
+
 PR-2 与 PR-3 都改 `ComposerSteps.swift`，但分工明确：PR-2 只动选择逻辑与 disabled 态，PR-3 只加预览条与替换 tile 副标题。顺序执行不冲突。
 
 ### 各 PR 的验收标准
 
 **PR-1**
-- [ ] header 无 `OneDayBrandLogo`；头像在最左且可进设置。
-- [ ] 副行显示日期；有进行中故事时显示 `今天 n/m` 与 pips，无故事时只显示日期。
-- [ ] `+` 视觉直径 36pt、无 glow；热区 ≥ 44pt（`contentShape`）。
-- [ ] `HomeHeaderSummaryTests`：中英两种语言下日期串正确；无故事时 `recorded == nil`；有故事时数字与 `challenge.recordedCount / cards.count` 一致。
+- [x] header 无 `OneDayBrandLogo`；头像在最左且可进设置。
+- [x] 副行显示日期；有进行中故事时显示 `今天 n/m` 与 pips，无故事时只显示日期。
+- [x] `+` 视觉直径 36pt、无 glow；热区 ≥ 44pt（`contentShape`）。
+- [x] `HomeHeaderSummaryTests`：中英两种语言下日期串正确；无故事时 `recorded == nil`；有故事时数字与 `challenge.recordedCount / cards.count` 一致。
 
 **PR-2**
-- [ ] 主题挑战在左且为默认选中，同时默认选中「完美的一天」。
-- [ ] 选中「按时间记录」时推荐网格不可点、透明度 0.4，并显示 `promptsNotNeeded`。
-- [ ] 七日模式下已选模板时点「主题挑战」有明确反馈，不再静默无响应。
-- [ ] `ComposerSelectionTests`：覆盖 time-only ↔ prompted 互切、点网格卡片自动切 mode、`promptGridEnabled` 在两种态下的取值。
+- [x] 主题挑战在左且为默认选中，同时默认选中「完美的一天」。
+- [x] 选中「按时间记录」时推荐网格不可点、透明度 0.4，并显示 `promptsNotNeeded`。
+- [x] 七日模式下已选模板时点「主题挑战」有明确反馈，不再静默无响应。
+- [x] `ComposerSelectionTests`：覆盖 time-only ↔ prompted 互切、点网格卡片自动切 mode、`promptGridEnabled` 在两种态下的取值。
 
 **PR-3**
-- [ ] 预览条在主题挑战态展示该模板全部题目（序号 + 名称），在时间记录态展示 `timeOnlyPreviewBody`。
-- [ ] 推荐网格每张卡副标题为前三个题目，不再是 blurb。
-- [ ] 「更多模板」库页面仍显示 blurb。
-- [ ] `LocalizationTests`：新增 5 个 key 的中英文均非空且互不相同。
+- [x] 预览条在主题挑战态展示该模板全部题目（序号 + 名称），在时间记录态展示 `timeOnlyPreviewBody`。
+- [x] 推荐网格每张卡副标题为前三个题目，不再是 blurb。
+- [x] 「更多模板」库页面仍显示 blurb（`PromptTemplateTile.Subtitle.blurb`）。
+- [x] `LocalizationTests`：新增 5 个 key 的中英文均非空且互不相同。
 
 ## 6. PR-0：先把现在这堆改动理干净
 
@@ -181,3 +190,13 @@ PR-0 的动作（不改任何行为，只做归档）：
 - `ComposerSteps.swift` 已被上一位 agent 大改（+418 行）且未提交。PR-2/PR-3 必须建立在 PR-0 之后，否则改动会和未提交内容纠缠。
 - 新增 `Presentation/` 类型需同步 `ios/project.yml` 与 XcodeGen 生成，注意 `project.pbxproj` 的冲突。
 - header 副行在 iPhone SE（375pt）宽度下 `日期 + 今天 n/m + 7 颗 pips` 可能挤，需要 `minimumScaleFactor` 或在窄屏隐藏 pips —— 实施时以 SE 为准回归一次。
+  - **回归结果（2026-09-01，iPhone SE 2nd gen 真机模拟器）**：`9月1日 周二 · 今天 0/3` + pips 一行放得下且有余量；pips 已加 `layoutPriority(-1)`，7 颗的故事在更窄的屏上会先让位，日期与数字始终完整。
+
+## 9. 已知环境问题（与本次改动无关）
+
+`CloudKitIdempotencyTests` / `CloudKitPaginationTests` 直接写真实 CloudKit
+development 容器，本机跑会报 `CKError 10/2007 "CREATE operation not permitted"
+(iCloud.com.cassie.AISetlog)`。这是容器权限/schema 的问题，不是代码问题——PR-1
+基线那次它们是整体 skip 的，之后 iCloud 一旦可达就会失败。本次验收用
+`-skip-testing:` 排除这两个类，其余 78 个测试全绿。要根治需要单独查 CloudKit
+Dashboard 的 development schema 权限。
