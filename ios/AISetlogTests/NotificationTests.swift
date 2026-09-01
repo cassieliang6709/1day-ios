@@ -75,6 +75,24 @@ final class NotificationTests: XCTestCase {
         XCTAssertEqual(Set(plans.map(\.challengeID)), [shared.id])
     }
 
+    func testTimeOnlyReminderDoesNotInventADayOrPromptTitle() throws {
+        let now = try date(2026, 7, 25, 12, 0)
+        let challenge = makeChallenge(
+            title: "Live With Me",
+            startDate: now,
+            mode: .oneDay,
+            cardCount: 7,
+            templateName: ChallengeTemplate.liveWithMeIdentityKey)
+
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
+        let plan = ReminderService.plannedReminders(
+            for: [challenge], now: now, calendar: calendar, hour: 20, minute: 30).first
+
+        XCTAssertEqual(plan?.body, Strings.timeOnlyReminder)
+        XCTAssertFalse(plan?.body.contains("Day") == true)
+    }
+
     func testNotificationRouteParsesCloudKitPayload() {
         let id = UUID()
         let route = NotificationRecordRoute(userInfo: [
@@ -91,7 +109,8 @@ final class NotificationTests: XCTestCase {
         mode: Challenge.Mode,
         cardCount: Int,
         recordedDays: Set<Int> = [],
-        roomCode: String? = nil
+        roomCode: String? = nil,
+        templateName: String? = nil
     ) -> Challenge {
         var cards = (1...cardCount).map { DayCard(day: $0) }
         for index in cards.indices where recordedDays.contains(cards[index].day) {
@@ -103,6 +122,7 @@ final class NotificationTests: XCTestCase {
             startDate: startDate,
             cards: cards,
             mode: mode,
+            templateName: templateName,
             roomCode: roomCode)
     }
 

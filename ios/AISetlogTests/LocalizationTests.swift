@@ -66,6 +66,22 @@ final class LocalizationTests: XCTestCase {
         XCTAssertNil(ChallengeTemplate.builtIn(matching: "My own story"))
     }
 
+    func testLiveWithMeIsAStablePromptFreeTemplate() {
+        let template = ChallengeTemplate.liveWithMe
+        XCTAssertTrue(template.isTimeOnly)
+        XCTAssertNil(template.momentKeys)
+        XCTAssertEqual(template.coverAssetName, "TemplateMainCharacter")
+
+        let challenge = Challenge(
+            id: UUID(),
+            title: template.identityKey,
+            startDate: .now,
+            cards: [DayCard(day: 1)],
+            mode: .oneDay,
+            templateName: template.identityKey)
+        XCTAssertTrue(challenge.isTimeOnly)
+    }
+
     func testBuiltInDefaultTitleSwitchesIndependentlyBetweenLanguages() {
         let challenge = Challenge(
             id: UUID(),
