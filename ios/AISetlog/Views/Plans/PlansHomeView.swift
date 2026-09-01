@@ -29,10 +29,11 @@ struct PlansHomeView: View {
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var active: [Challenge] { store.challenges.filter { !$0.isComplete } }
-    private var finished: [Challenge] { store.challenges.filter(\.isComplete) }
     private var hero: Challenge? { heroChoice.challenge }
-    private var others: [Challenge] { active.filter { $0.id != hero?.id } }
+    /// Everything except the hero, by the day it was for. See `StoryTimeline`.
+    private var timeline: StoryTimeline {
+        StoryTimeline(challenges: store.challenges, excluding: hero?.id)
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -115,12 +116,8 @@ struct PlansHomeView: View {
                     if store.challenges.isEmpty { emptyState } else { startTodayCard }
                 }
 
-                if !others.isEmpty {
-                    otherPlansSection
-                }
-
-                if !finished.isEmpty {
-                    finishedSection
+                if !timeline.isEmpty {
+                    timelineSection
                 }
             }
             .padding(.top, 8)
@@ -292,70 +289,53 @@ struct PlansHomeView: View {
         .padding(.horizontal, 20)
     }
 
-    private var otherPlansSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            SectionLabel(text: Strings.yourOtherPlans)
+    /// Everything that isn't today, newest day first. One label per day, then
+    /// that day's stories — finished or not, they sit together, because "when"
+    /// is the axis people actually remember by.
+    private var timelineSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            SectionLabel(text: timeline.includesToday
+                ? Strings.yourStories
+                : Strings.scrollBack)
                 .padding(.horizontal, 20)
 
-            ForEach(others) { challenge in
-                Button {
-                    path.append(challenge.id)
-                } label: {
-                    StoryRowCard(
-                        challenge: challenge,
-                        coverURL: latestClipURL(for: challenge),
-                        refreshToken: latestRecordedAt(for: challenge),
-                        memberNames: store.members(for: challenge.id).map(\.name))
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(
-                        challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
-                        role: .destructive
-                    ) {
-                        store.delete(challenge.id)
+            ForEach(timeline.days) { day in
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(day.label)
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.inkFaint)
+                        .padding(.horizontal, 20)
+
+                    ForEach(day.stories) { challenge in
+                        storyRow(challenge)
                     }
                 }
-                .padding(.horizontal, 20)
             }
         }
     }
 
-    /// Finished films as a horizontal shelf of posters — a small archive,
-    /// not another list to work through.
-    private var finishedSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            SectionLabel(text: Strings.finishedFilms)
-                .padding(.horizontal, 20)
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 13) {
-                    ForEach(finished) { challenge in
-                        Button {
-                            path.append(challenge.id)
-                        } label: {
-                            FilmPoster(
-                                challenge: challenge,
-                                coverURL: firstClipURL(for: challenge),
-                                refreshToken: firstRecordedAt(for: challenge))
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button(
-                                challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
-                                role: .destructive
-                            ) {
-                                store.delete(challenge.id)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 4)
-            }
-            .scrollIndicators(.hidden)
+    private func storyRow(_ challenge: Challenge) -> some View {
+        Button {
+            path.append(challenge.id)
+        } label: {
+            StoryRowCard(
+                challenge: challenge,
+                coverURL: latestClipURL(for: challenge),
+                refreshToken: latestRecordedAt(for: challenge),
+                memberNames: store.members(for: challenge.id).map(\.name))
         }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(
+                challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
+                role: .destructive
+            ) {
+                store.delete(challenge.id)
+            }
+        }
+        .padding(.horizontal, 20)
     }
+
 
     // MARK: - Recorder
 
@@ -449,80 +429,15 @@ struct PlansHomeView: View {
 
     // MARK: - Cover art
 
-    private func firstClipURL(for challenge: Challenge) -> URL? {
-        challenge.cards.first { $0.clipFileName != nil }
-            .flatMap { store.clipURL(for: $0, in: challenge.id) }
-    }
-
     private func latestClipURL(for challenge: Challenge) -> URL? {
         challenge.cards.last { $0.clipFileName != nil }
             .flatMap { store.clipURL(for: $0, in: challenge.id) }
     }
 
-    /// Re-records reuse the same file name, so a cached first frame needs the
-    /// card's `recordedAt` to notice the change.
-    private func firstRecordedAt(for challenge: Challenge) -> Date? {
-        challenge.cards.first { $0.clipFileName != nil }?.recordedAt
-    }
-
+    /// Re-records reuse the same file name, so a cached frame needs the card's
+    /// `recordedAt` to notice the change.
     private func latestRecordedAt(for challenge: Challenge) -> Date? {
         challenge.cards.last { $0.clipFileName != nil }?.recordedAt
     }
 
-}
-
-/// A finished film on the shelf: cover frame, title, and the date it happened.
-struct FilmPoster: View {
-    let challenge: Challenge
-    let coverURL: URL?
-    var refreshToken: Date?
-
-    private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-
-    private var dateStamp: String {
-        challenge.startDate.formatted(
-            .dateTime.month(.abbreviated).day().locale(AppLanguage.effective.locale))
-    }
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let coverURL {
-                    ClipThumbnail(url: coverURL, refreshToken: refreshToken)
-                } else {
-                    Image(presenter.coverAssetName)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 132, height: 186)
-            .clipped()
-
-            OneDay.scrim
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(presenter.displayTitle)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                Text(dateStamp)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            .padding(11)
-        }
-        .frame(width: 132, height: 186)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            if challenge.isShared {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(6)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .padding(8)
-            }
-        }
-        .oneDaySoftShadow(strength: 0.8)
-    }
 }

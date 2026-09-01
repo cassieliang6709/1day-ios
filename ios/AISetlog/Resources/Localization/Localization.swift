@@ -802,8 +802,16 @@ enum Strings {
     static var startTodayCTA: String {
         lang == .chinese ? "开始今天的故事" : "Start today's story"
     }
-    static var yourOtherPlans: String { lang == .chinese ? "其他的故事" : "Your other plans" }
-    static var finishedFilms: String { lang == .chinese ? "完成的影片" : "Finished films" }
+    /// Heads the reverse-chronological list below today's story. Replaces the
+    /// old "your other plans" / "finished films" split, which sorted by state
+    /// and so couldn't answer "what did I film on the 31st".
+    static var scrollBack: String { lang == .chinese ? "往前翻" : "Earlier" }
+    /// Used instead of "scroll back" when today's own stories are in the list —
+    /// "scroll back" sitting directly above a row labelled "today" reads as a
+    /// small lie about what's underneath it.
+    static var yourStories: String { lang == .chinese ? "你的故事" : "Your stories" }
+    static var todayLabel: String { lang == .chinese ? "今天" : "Today" }
+    static var yesterdayLabel: String { lang == .chinese ? "昨天" : "Yesterday" }
     static var continueTodaysStory: String {
         lang == .chinese ? "继续今天的故事" : "Continue today's story"
     }
