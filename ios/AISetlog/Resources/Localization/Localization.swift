@@ -589,6 +589,42 @@ enum Strings {
         lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
     }
     static var draftKept: String { lang == .chinese ? "已存起来" : "Kept for later" }
+
+    // Drafts: the list they live in until they're filed.
+    static func draftsPending(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 段待归档" : "\(count) waiting to be filed"
+    }
+    static var draftsTitle: String { lang == .chinese ? "待归档" : "Waiting to be filed" }
+    static var draftsEmpty: String {
+        lang == .chinese
+            ? "没有待归档的片子。录完找不到地方放的时候，会先存到这里。"
+            : "Nothing waiting. Clips with nowhere to go get kept here."
+    }
+    static var archiveDraft: String { lang == .chinese ? "归档到…" : "File to…" }
+    static var deleteDraft: String { lang == .chinese ? "删除" : "Delete" }
+    static var draftArchiveFailed: String {
+        lang == .chinese ? "没归档成功，片子还在这儿" : "Couldn't file it. The clip is still here."
+    }
+    /// No matching story for this clip's frame, from inside the drafts list —
+    /// where "retake" isn't an option, so it says what would help instead.
+    static func noPlaceForDraft(landscape: Bool) -> String {
+        let kind = lang == .chinese
+            ? (landscape ? "横屏" : "竖屏")
+            : (landscape ? "landscape" : "portrait")
+        return lang == .chinese
+            ? "还没有\(kind)的故事能放这段"
+            : "No \(kind) story can take this yet"
+    }
+    /// Rounded file size, so someone can see which drafts are worth deleting.
+    static func draftSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useKB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    static var draftsTotalSize: String {
+        lang == .chinese ? "共占用" : "Using"
+    }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static var retryCamera: String { lang == .chinese ? "重新打开相机" : "Try camera again" }
     static func useDemoClip(_ title: String) -> String {

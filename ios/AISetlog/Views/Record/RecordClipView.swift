@@ -342,10 +342,8 @@ struct RecordClipView: View {
 
     // MARK: - Free-form filing
 
-    /// Only plans matching the recorded frame can take this clip — a
-    /// challenge never mixes portrait and landscape.
     private var filingCandidates: [Challenge] {
-        store.challenges.filter { $0.resolvedOrientation == effectiveOrientation }
+        ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
     }
 
     /// Free-form: file the clip into a chosen plan's first open slot.
@@ -385,10 +383,7 @@ struct RecordClipView: View {
     }
 
     private func targetDay(for challenge: Challenge) -> Int {
-        if let open = challenge.cards.first(where: { $0.clipFileName == nil })?.day {
-            return open
-        }
-        return min(max(challenge.currentDay, 1), challenge.cards.count)
+        ClipFiling.targetDay(in: challenge)
     }
 
     private func showToast(_ text: String) {
@@ -435,8 +430,15 @@ struct RecordClipView: View {
                         seconds: clipSeconds,
                         orientation: effectiveOrientation)
                     else { return }
-                    onSave(demo, trimmedOverlayText)
-                    offerNotificationPrimer(dismissWhenFinished: true)
+                    // Free-form has no `onSave` — its clips are filed from the
+                    // review screen — so hand the demo to the recorder and let
+                    // it walk the same path a real take does.
+                    if isFreeform {
+                        recorder.acceptDemoClip(demo)
+                    } else {
+                        onSave(demo, trimmedOverlayText)
+                        offerNotificationPrimer(dismissWhenFinished: true)
+                    }
                 }
             }
             .buttonStyle(.borderedProminent)

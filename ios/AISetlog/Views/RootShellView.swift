@@ -131,6 +131,9 @@ struct CameraTabView: View {
     var unfiledGuard: UnfiledClipGuard?
     var onStartStory: (() -> Void)?
 
+    @Environment(ClipDraftStore.self) private var drafts
+    @State private var showDrafts = false
+
     var body: some View {
         RecordClipView(
             day: 1,
@@ -139,5 +142,16 @@ struct CameraTabView: View {
             unfiledGuard: unfiledGuard,
             onStartStory: onStartStory
         ) { _, _ in }
+            // Over the camera rather than on the home screen: this is where the
+            // clips came from, and home doesn't need another section. Clear of
+            // the wordmark, and gone while a take is in review — the clip in
+            // front of you is the one that needs deciding about.
+            .overlay(alignment: .top) {
+                if !drafts.isEmpty, unfiledGuard?.hasUnfiledClip != true {
+                    DraftsEntryButton(count: drafts.count) { showDrafts = true }
+                        .padding(.top, 88)
+                }
+            }
+            .sheet(isPresented: $showDrafts) { ClipDraftsView() }
     }
 }
