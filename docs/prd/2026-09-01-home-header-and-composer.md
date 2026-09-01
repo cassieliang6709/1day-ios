@@ -180,7 +180,7 @@ PR-0 的动作（不改任何行为，只做归档）：
 | 项 | 位置 | 说明 |
 |---|---|---|
 | hero 选错 | `RootShellView.swift:31` | `.min { $0.recordedCount < $1.recordedCount }` 让「拍得最少」的旧故事霸占「今天的故事」，今天真正在拍的被挤到下面。PR-1 的日期只是缓解，不是根治。 |
-| 自由拍摄丢视频 | `RootShellView.swift:77` | `onSave` 是空闭包；用户在「拍摄」tab 录完不手动归档就永久丢失，无草稿箱无提示。**严重度最高。** |
+| 自由拍摄丢视频 | `RecordClipView.swift:255`、`ClipRecorder.swift:215` | ~~`onSave` 是空闭包~~ —— 更正：自由拍摄走的是 `showSavePicker` → `store.saveClip`，`CameraTabView` 那个空 `onSave` 在这条路径上从不被调用。真正的问题是**没有草稿箱**：片子先写进 `temporaryDirectory`，只有归档成功才落盘；而「一个计划都没有」和「画幅不匹配」两种情况只弹一句 toast，用户除了重拍就只能离开，一离开这一屏片子就没了。**严重度最高。** |
 | 封面重复 | `ChallengeTemplate.swift:56,60` | 「和我过一天」与「我的主角日」共用 `TemplateMainCharacter`，在网格里长得一样。 |
 | 首页无日期维度 | `PlansHomeView` | 只按「进行中/已完成」分组，没有按天回看的入口。 |
 | 引导题目时态混乱 | `GuidedMomentsView.swift:170` | 「今天吃了什么？」是过去时，但填写时机在一天开始之前。 |
