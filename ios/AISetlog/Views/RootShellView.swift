@@ -32,12 +32,10 @@ struct RootShellView: View {
     /// Bound only so a language change re-renders the tab labels.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// "Today's story" — the active story with the fewest moments in, so the
-    /// home screen leads with whatever most needs filming.
-    private var featuredChallenge: Challenge? {
-        store.challenges
-            .filter { !$0.isComplete && !$0.cards.isEmpty }
-            .min { $0.recordedCount < $1.recordedCount }
+    /// What the home screen leads with. See `HomeHeroChoice` for why this isn't
+    /// just "the story with the fewest moments filmed".
+    private var heroChoice: HomeHeroChoice {
+        HomeHeroChoice(challenges: store.challenges)
     }
 
     var body: some View {
@@ -45,7 +43,7 @@ struct RootShellView: View {
             PlansHomeView(
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $launchAction,
-                featuredChallengeID: featuredChallenge?.id)
+                heroChoice: heroChoice)
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
 

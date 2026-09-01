@@ -755,6 +755,17 @@ enum Strings {
         lang == .chinese ? "今天会是什么故事？" : "What story will today be?"
     }
     static var todaysStory: String { lang == .chinese ? "今天的故事" : "Today's story" }
+    /// Used instead of `todaysStory` when nothing was started today but
+    /// something is still unfinished — saying "today's story" then would be a
+    /// lie about what the card is.
+    static var resumeStory: String { lang == .chinese ? "接着拍" : "Pick it back up" }
+    static var startTodayLabel: String { lang == .chinese ? "今天" : "Today" }
+    static var startTodayBody: String {
+        lang == .chinese ? "还没开始今天的故事" : "Today's story hasn't started"
+    }
+    static var startTodayCTA: String {
+        lang == .chinese ? "开始今天的故事" : "Start today's story"
+    }
     static var yourOtherPlans: String { lang == .chinese ? "其他的故事" : "Your other plans" }
     static var finishedFilms: String { lang == .chinese ? "完成的影片" : "Finished films" }
     static var continueTodaysStory: String {

@@ -11,8 +11,8 @@ struct PlansHomeView: View {
     @Environment(AccountStore.self) private var account
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
-    /// The story the shell considers "today's" — the least-finished active one.
-    let featuredChallengeID: UUID?
+    /// What the shell decided to lead with, and why. See `HomeHeroChoice`.
+    let heroChoice: HomeHeroChoice
 
     @State private var path: [UUID] = []
     @State private var showComposer = false
@@ -31,9 +31,7 @@ struct PlansHomeView: View {
 
     private var active: [Challenge] { store.challenges.filter { !$0.isComplete } }
     private var finished: [Challenge] { store.challenges.filter(\.isComplete) }
-    private var hero: Challenge? {
-        featuredChallengeID.flatMap(store.challenge) ?? active.first
-    }
+    private var hero: Challenge? { heroChoice.challenge }
     private var others: [Challenge] { active.filter { $0.id != hero?.id } }
 
     var body: some View {
@@ -106,10 +104,15 @@ struct PlansHomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
 
-                if let hero {
-                    heroSection(hero)
-                } else {
-                    emptyState
+                switch heroChoice {
+                case .today(let challenge):
+                    heroSection(challenge, label: Strings.todaysStory)
+                case .resume(let challenge):
+                    heroSection(challenge, label: Strings.resumeStory)
+                case .startToday:
+                    // First run gets the mascot; someone who already has
+                    // finished films just needs the one button.
+                    if store.challenges.isEmpty { emptyState } else { startTodayCard }
                 }
 
                 if !others.isEmpty {
@@ -222,9 +225,12 @@ struct PlansHomeView: View {
         }
     }
 
-    private func heroSection(_ challenge: Challenge) -> some View {
+    /// `label` varies because the card isn't always today's story — calling an
+    /// unfinished story from yesterday "today's story" is the kind of small lie
+    /// that makes the whole screen untrustworthy.
+    private func heroSection(_ challenge: Challenge, label: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: Strings.todaysStory)
+            SectionLabel(text: label)
                 .padding(.horizontal, 20)
 
             StoryCard(
@@ -235,6 +241,29 @@ struct PlansHomeView: View {
                 onContinue: { recordChallenge = challenge },
                 onOpen: { path.append(challenge.id) })
                 .padding(.horizontal, 20)
+        }
+    }
+
+    /// Nothing to lead with, but this isn't a first run — there are films
+    /// behind this screen, just nothing going on today. Compact on purpose:
+    /// the timeline below it is the interesting part.
+    private var startTodayCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: Strings.startTodayLabel)
+                .padding(.horizontal, 20)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(Strings.startTodayBody)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+
+                Button(Strings.startTodayCTA) { showComposer = true }
+                    .buttonStyle(.primaryAction)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .glassSurface(radius: OneDay.Radius.card)
+            .padding(.horizontal, 20)
         }
     }
 
