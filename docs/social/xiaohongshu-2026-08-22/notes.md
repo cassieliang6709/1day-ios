@@ -86,7 +86,7 @@
 
 ## 05｜影片全在iPhone本地合成
 
-配图：`05-on-device-render.png`
+配图：`05-on-device-render-v2.png`
 
 我没有给 1Day 做一个视频转码服务器。
 
