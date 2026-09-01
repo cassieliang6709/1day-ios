@@ -34,3 +34,6 @@ build-teammate/
 
 # Repo-root xcodebuild output
 /build/
+
+# Local Playwright QA scratch (root)
+.playwright-cli/

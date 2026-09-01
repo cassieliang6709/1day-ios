@@ -55,7 +55,7 @@ struct RootView: View {
                 FirstRunOnboardingView(
                     onCreateStory: {
                         hasCompletedOnboarding = true
-                        homeLaunchAction = .newStory
+                        homeLaunchAction = .quickStart
                     },
                     onJoin: {
                         hasCompletedOnboarding = true
