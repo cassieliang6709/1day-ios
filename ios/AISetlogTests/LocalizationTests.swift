@@ -147,9 +147,11 @@ final class LocalizationTests: XCTestCase {
         }
 
         let pairs = [
-            inBothLanguages { Strings.promptsNotNeeded },
-            inBothLanguages { Strings.swapTemplate },
-            inBothLanguages { Strings.timeOnlyPreviewBody },
+            inBothLanguages { Strings.followPrompts },
+            inBothLanguages { Strings.recordByTime },
+            inBothLanguages { Strings.pickPromptSet },
+            inBothLanguages { Strings.timeOnlyCardBody },
+            inBothLanguages { Strings.timeOnlyCaptionNote },
             inBothLanguages { Strings.promptCountLabel(7) },
             inBothLanguages { Strings.headerDateProgress(1, 7) },
         ]

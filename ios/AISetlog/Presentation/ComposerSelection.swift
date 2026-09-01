@@ -10,7 +10,7 @@ import Foundation
 /// explicit means the two selectors can never disagree, and the transitions
 /// between them can be tested without a simulator.
 struct ComposerSelection: Equatable {
-    enum Style: Equatable {
+    enum Style: Hashable {
         /// Live With Me — no prompts, clips land in the order they're filmed.
         case timeOnly
         /// A template's prompts, or the user's own from the guided flow.
@@ -21,8 +21,9 @@ struct ComposerSelection: Equatable {
     private(set) var templateID: UUID?
     private(set) var mode: Challenge.Mode
 
-    /// The recommendation grid only means anything when the story will have
-    /// prompts at all.
+    /// The template grid only means anything when the story will have prompts
+    /// at all. It used to gate `.disabled` + `.opacity(0.4)`; now it decides
+    /// whether the grid is on screen, which is the same question asked once.
     var promptGridEnabled: Bool { style == .prompted }
 
     init(style: Style = .prompted, templateID: UUID? = nil, mode: Challenge.Mode = .oneDay) {

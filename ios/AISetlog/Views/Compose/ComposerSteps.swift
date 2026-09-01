@@ -5,9 +5,14 @@ import SwiftUI
 
 // MARK: - Step 1: choose how to record
 
-/// Time-only recording is a first-class mode, not one poster hidden inside a
-/// long carousel. Prompted stories sit beside it as the more directed option,
-/// with a short recommendation grid and an explicit route to the full library.
+/// One choice, not two. This screen used to ask twice: two 150pt posters for
+/// "prompt challenge vs record by time", and then a grid of templates below —
+/// where picking a poster could silently flip the mode above it. The prompts
+/// themselves appeared a third time, in a preview strip in between.
+///
+/// Now the pill at the top only *filters*: it says which kind of story this is,
+/// and the one thing below it answers accordingly. The prompts live on the card
+/// you selected, and nowhere else.
 struct MoodStep: View {
     let oneDayTemplates: [ChallengeTemplate]
     let sevenDayTemplates: [ChallengeTemplate]
@@ -25,26 +30,38 @@ struct MoodStep: View {
         mode == .oneDay ? oneDayTemplates : sevenDayTemplates
     }
 
-    private var selectedTemplate: ChallengeTemplate? {
-        guard let templateID = selection.templateID else { return nil }
-        return (oneDayTemplates + sevenDayTemplates).first { $0.id == templateID }
-    }
-
     private var promptTemplates: [ChallengeTemplate] {
         currentModeTemplates.filter { !$0.isTimeOnly }
     }
 
+    /// One more than before: the space the two mode posters used to take is
+    /// roughly a row and a half of these.
     private var recommendedTemplates: [ChallengeTemplate] {
-        Array(promptTemplates.prefix(4))
+        Array(promptTemplates.prefix(5))
+    }
+
+    private var timeOnlyTemplate: ChallengeTemplate? {
+        oneDayTemplates.first(where: \.isTimeOnly)
+    }
+
+    /// The pill writes through to the selection so the two can't disagree —
+    /// that disagreement is the bug this screen was rebuilt around.
+    private var style: Binding<ComposerSelection.Style> {
+        Binding(
+            get: { selection.style },
+            set: { next in
+                switch next {
+                case .timeOnly: selectTimeOnly()
+                case .prompted: selectPromptMode()
+                }
+            })
     }
 
     var body: some View {
-        ScrollViewReader { scroll in
-            ScrollView {
-                page(scroll)
-            }
-            .scrollIndicators(.hidden)
+        ScrollView {
+            page
         }
+        .scrollIndicators(.hidden)
         .sheet(isPresented: $showLibrary) {
             TemplateLibraryView(
                 oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
@@ -56,7 +73,7 @@ struct MoodStep: View {
         }
     }
 
-    private func page(_ scroll: ScrollViewProxy) -> some View {
+    private var page: some View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(Strings.newStoryQuestion)
@@ -69,35 +86,19 @@ struct MoodStep: View {
                 }
                 .padding(.horizontal, 20)
 
-                // Prompted first: it's the default, and it's the one whose
-                // consequences (the grid below) are visible on this screen.
-                HStack(alignment: .top, spacing: 12) {
-                    RecordingModeCard(
-                        title: Strings.promptChallengeTitle,
-                        caption: Strings.promptChallengeCaption,
-                        imageName: "TemplateLockIn",
-                        symbol: "scope",
-                        isSelected: selection.style == .prompted,
-                        action: selectPromptMode)
-
-                    RecordingModeCard(
-                        title: Strings.timeRecordingTitle,
-                        caption: Strings.timeRecordingCaption,
-                        imageName: "TemplatePerfectDay",
-                        symbol: "point.3.connected.trianglepath.dotted",
-                        isSelected: selection.style == .timeOnly,
-                        action: selectTimeOnly)
-                }
-                .padding(.horizontal, 20)
-
-                PromptPreviewStrip(
-                    template: selection.style == .timeOnly ? nil : selectedTemplate,
-                    onSwap: {
-                        withAnimation(OneDay.Motion.soft) {
-                            scroll.scrollTo(Self.recommendationsAnchor, anchor: .top)
-                        }
-                    })
+                PillSelector(
+                    options: [
+                        .init(value: ComposerSelection.Style.prompted, label: Strings.followPrompts),
+                        .init(value: ComposerSelection.Style.timeOnly, label: Strings.recordByTime),
+                    ],
+                    selection: style)
                     .padding(.horizontal, 20)
+
+                if selection.promptGridEnabled {
+                    promptSection
+                } else {
+                    timeOnlySection
+                }
 
                 Button(action: onBuildOwn) {
                     HStack(spacing: 12) {
@@ -131,55 +132,52 @@ struct MoodStep: View {
                 .accessibilityLabel(Strings.customPromptsTitle)
                 .accessibilityIdentifier("custom-prompts-entry")
                 .padding(.horizontal, 20)
-
-                promptSection
-                    .id(Self.recommendationsAnchor)
             }
             .padding(.bottom, 16)
     }
 
-    /// Scroll target for the preview strip's "swap" link.
-    private static let recommendationsAnchor = "recommendations"
-
-    /// The recommendations. Dimmed and inert while "record by time" is chosen —
-    /// they used to stay live, so one tap would quietly take you out of the mode
-    /// you'd just picked without the cards above ever saying so.
+    /// The chosen story, opened up, then the alternatives. The selected card
+    /// rises to the top rather than expanding where it sits: full width is the
+    /// only way seven prompts fit, and a card that grows sideways out of one
+    /// grid column has to shove its neighbour somewhere.
     private var promptSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 SectionLabel(text: mode == .oneDay
-                    ? Strings.recommendedPrompts
+                    ? Strings.pickPromptSet
                     : Strings.sevenDayChallenges)
                 Spacer()
-                if selection.promptGridEnabled {
-                    Button {
-                        showLibrary = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(Strings.moreTemplates)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                Button {
+                    showLibrary = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(Strings.moreTemplates)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
                     }
-                    .buttonStyle(.plain)
-                } else {
-                    Text(Strings.promptsNotNeeded)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.inkFaint)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.oneDayBlue)
                 }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
+
+            if let chosen = selectedPromptTemplate {
+                OpenTemplateCard(template: chosen) {
+                    MomentChips(moments: chosen.momentKeys?
+                        .map { MomentCatalog.localize($0) } ?? [])
+                }
+                .padding(.horizontal, 20)
+            }
 
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
                 spacing: 12
             ) {
-                ForEach(recommendedTemplates) { template in
+                ForEach(alternativeTemplates) { template in
                     PromptTemplateTile(
                         template: template,
-                        isSelected: selection.templateID == template.id,
+                        isSelected: false,
                         onSelect: { select(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
@@ -187,9 +185,45 @@ struct MoodStep: View {
             }
             .padding(.horizontal, 20)
         }
-        .disabled(!selection.promptGridEnabled)
-        .opacity(selection.promptGridEnabled ? 1 : 0.4)
-        .animation(OneDay.Motion.soft, value: selection.promptGridEnabled)
+        .animation(OneDay.Motion.soft, value: selection.templateID)
+    }
+
+    /// Record-by-time replaces the grid instead of dimming it. The old screen
+    /// left five posters sitting there greyed out — an answer to a question
+    /// nobody asked, and still the most eye-catching thing on screen.
+    private var timeOnlySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let template = timeOnlyTemplate {
+                SectionLabel(text: template.displayName)
+                    .padding(.horizontal, 20)
+
+                OpenTemplateCard(template: template, showsPromptCount: false) {
+                    Text(Strings.timeOnlyCardBody)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 20)
+
+                Label(Strings.timeOnlyCaptionNote, systemImage: "clock")
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkFaint)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    /// The prompted story currently chosen. Nil during the guided flow, whose
+    /// moments aren't backed by a template.
+    private var selectedPromptTemplate: ChallengeTemplate? {
+        guard let templateID = selection.templateID else { return nil }
+        return promptTemplates.first { $0.id == templateID }
+    }
+
+    /// Everything except the one already open above.
+    private var alternativeTemplates: [ChallengeTemplate] {
+        recommendedTemplates.filter { $0.id != selectedPromptTemplate?.id }
     }
 
     private func selectTimeOnly() {
@@ -205,152 +239,94 @@ struct MoodStep: View {
     }
 }
 
-/// The prompts you're actually signing up for, spelled out before you commit.
+/// The story you've chosen, opened up: cover, name, and — right there on the
+/// card — exactly what it will ask you to film.
 ///
-/// Until now this screen showed a template's name and a mood line, and the
-/// seven questions only appeared on the *next* step behind a collapsed card —
-/// so "pick a story" meant accepting seven prompts sight unseen.
-private struct PromptPreviewStrip: View {
-    /// Nil when the story has no prompts to preview: time-only, or the guided
-    /// flow's own moments, which aren't a template.
-    let template: ChallengeTemplate?
-    let onSwap: () -> Void
+/// The prompts used to be spread across three places on this screen (a preview
+/// strip, a tile subtitle, and the next step behind a collapsed card). They
+/// live here now, and only here.
+private struct OpenTemplateCard<Detail: View>: View {
+    let template: ChallengeTemplate
+    /// Off for the time-only story, which has no prompts to count.
+    var showsPromptCount = true
+    @ViewBuilder var detail: Detail
 
-    private var moments: [String] {
-        template?.momentKeys?.map { MomentCatalog.localize($0) } ?? []
-    }
+    private var promptCount: Int { template.momentKeys?.count ?? 0 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            if let template, !moments.isEmpty {
+        VStack(alignment: .leading, spacing: 0) {
+            Image(template.coverAssetName ?? "TemplateCustomStory")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 118)
+                .clipped()
+
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text(template.displayName)
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
                         .foregroundStyle(OneDay.ink)
                         .lineLimit(1)
 
-                    Text("·")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.inkFaint)
-
-                    Text(Strings.promptCountLabel(moments.count))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
-                        .fixedSize()
-
-                    Spacer(minLength: 6)
-
-                    Button(action: onSwap) {
-                        HStack(spacing: 3) {
-                            Text(Strings.swapTemplate)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                    if showsPromptCount, promptCount > 0 {
+                        Text("·")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.inkFaint)
+                        Text(Strings.promptCountLabel(promptCount))
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .fixedSize()
                     }
-                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 4)
                 }
 
-                FlowLayout(spacing: 6) {
-                    ForEach(Array(moments.enumerated()), id: \.offset) { index, moment in
-                        HStack(spacing: 4) {
-                            Text("\(index + 1)")
-                                .font(.system(size: 10, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.oneDayBlue)
-                            Text(moment)
-                                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                                .foregroundStyle(OneDay.inkSoft)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5.5)
-                        .background(OneDay.surfaceSoft.opacity(0.9), in: Capsule())
-                    }
-                }
-            } else {
-                Label(Strings.timeOnlyPreviewBody, systemImage: "clock.badge.checkmark")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
+                detail
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(13)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(13)
-        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBlue)
-        .animation(OneDay.Motion.soft, value: template?.id)
+        .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.oneDayBlue.opacity(0.65), lineWidth: 2)
+        }
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22, weight: .bold))
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, Color.oneDayBlue)
+                .padding(9)
+        }
+        .oneDaySoftShadow(strength: 0.8)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isSelected)
     }
 }
 
-private struct RecordingModeCard: View {
-    let title: String
-    let caption: String
-    let imageName: String
-    let symbol: String
-    let isSelected: Bool
-    let action: () -> Void
+/// The prompts, numbered, in the order they'll be asked for.
+private struct MomentChips: View {
+    let moments: [String]
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottomLeading) {
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 76)
-                        .clipped()
-
-                    LinearGradient(
-                        colors: [.clear, .white.opacity(0.94)],
-                        startPoint: .top,
-                        endPoint: .bottom)
-
-                    Image(systemName: symbol)
-                        .font(.system(size: 17, weight: .semibold))
+        FlowLayout(spacing: 6) {
+            ForEach(Array(moments.enumerated()), id: \.offset) { index, moment in
+                HStack(spacing: 4) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.oneDayBlue)
-                        .frame(width: 34, height: 34)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 11))
-                        .shadow(color: OneDay.ink.opacity(0.1), radius: 7, y: 3)
-                        .padding(10)
-                }
-                .frame(height: 76)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .heavy, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                    Text(caption)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    Text(moment)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(2)
-                        .frame(minHeight: 32, alignment: .topLeading)
+                        .lineLimit(1)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5.5)
+                .background(OneDay.surfaceSoft.opacity(0.9), in: Capsule())
             }
-            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(
-                        isSelected ? Color.oneDayBlue.opacity(0.62) : OneDay.hairline,
-                        lineWidth: isSelected ? 2 : 1)
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(OneDay.brandHorizontal, in: Circle())
-                        .padding(9)
-                }
-            }
-            .oneDaySoftShadow(strength: isSelected ? 0.85 : 0.4)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

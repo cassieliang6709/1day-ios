@@ -819,20 +819,17 @@ enum Strings {
     }
     static var recordingStyleSubtitle: String {
         lang == .chinese
-            ? "先选记录方式，再决定要不要跟着题目拍。"
-            : "Choose how to record, then decide whether to follow prompts."
+            ? "跟着题目拍，或者按时间随手拍。"
+            : "Follow prompts, or just record as the day goes."
     }
-    static var timeRecordingTitle: String {
-        lang == .chinese ? "按时间记录" : "Record by time"
+    /// The two halves of the one pill selector at the top of the screen. They
+    /// filter what's below; they are not themselves a thing you "pick", which
+    /// is why they're pills and not two posters the size of the templates.
+    static var followPrompts: String {
+        lang == .chinese ? "跟着题目拍" : "Follow prompts"
     }
-    static var timeRecordingCaption: String {
-        lang == .chinese ? "Live With Me · 无题目" : "Live With Me · No prompts"
-    }
-    static var promptChallengeTitle: String {
-        lang == .chinese ? "主题挑战" : "Prompt challenge"
-    }
-    static var promptChallengeCaption: String {
-        lang == .chinese ? "选一组题目，跟着拍完" : "Pick a set of prompts and follow along"
+    static var recordByTime: String {
+        lang == .chinese ? "按时间拍" : "Record by time"
     }
     static var customPromptsTitle: String {
         lang == .chinese ? "自己写题目" : "Write your own prompts"
@@ -842,8 +839,8 @@ enum Strings {
             ? "先写几个想拍的，之后随时可以改"
             : "Start with a few ideas. You can change them anytime."
     }
-    static var recommendedPrompts: String {
-        lang == .chinese ? "推荐题目" : "Recommended prompts"
+    static var pickPromptSet: String {
+        lang == .chinese ? "选一组题目" : "Pick a set of prompts"
     }
     static var sevenDayChallenges: String {
         lang == .chinese ? "七日挑战" : "Seven-day challenges"
@@ -851,22 +848,22 @@ enum Strings {
     static var moreTemplates: String {
         lang == .chinese ? "更多模板" : "More templates"
     }
-    /// Replaces the "more templates" link when the recommendation grid is
-    /// switched off, so the dimming reads as an answer rather than a fault.
-    static var promptsNotNeeded: String {
-        lang == .chinese ? "按时间记录不需要题目" : "Recording by time needs no prompts"
-    }
     /// How many prompts the chosen template will ask for, beside its name.
     static func promptCountLabel(_ count: Int) -> String {
         lang == .chinese ? "\(count) 个题目" : "\(count) prompts"
     }
-    /// Jumps from the preview strip down to the recommendation grid.
-    static var swapTemplate: String { lang == .chinese ? "换一个" : "Swap" }
-    /// The preview strip when there are no prompts to preview.
-    static var timeOnlyPreviewBody: String {
+    /// The whole of the "record by time" state. It replaces the grid rather
+    /// than dimming it — showing a wall of things you can't tap was a patch,
+    /// not an answer.
+    static var timeOnlyCardBody: String {
         lang == .chinese
-            ? "没有题目 · 拍到的每一段按时间排好"
-            : "No prompts · every clip lands in time order"
+            ? "没有题目。拍到的每一段按时间排好，发生什么拍什么。"
+            : "No prompts. Every clip lands in the order you filmed it."
+    }
+    static var timeOnlyCaptionNote: String {
+        lang == .chinese
+            ? "字幕由你自己在每段片子上填写，1Day 只负责保留拍摄时间。"
+            : "You write the captions on each clip; 1Day just keeps the time."
     }
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
