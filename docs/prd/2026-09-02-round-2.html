@@ -251,11 +251,11 @@ PR 编号即执行顺序。</p>
 </tbody>
 </table>
 
-<div class="card note">
-  <h4>为什么 PR-8 依赖 PR-7</h4>
-  <p style="margin-bottom:0">PR-7 要把「和我过一天」的封面从 <code>TemplateMainCharacter</code> 换成
-  <code>TemplateSoftReset</code>（解决撞脸），而 PR-8 的「按时间拍」态正好要用那张新封面做主视觉。
-  PR-7 只有 2 行，所以<b>把它们交给同一个 agent</b>（见 §3.2）。</p>
+<div class="card ok">
+  <h4>PR-8 其实不依赖 PR-7 了</h4>
+  <p style="margin-bottom:0">原来的依赖来自「PR-8 的按时间拍卡要用 PR-7 换的新封面」。但封面这条本轮
+  做不了（<a href="#pr7">§7</a>：没有空闲素材，需要新画），PR-7 缩成 2 行文案。两者<b>完全无关</b>了 ——
+  不过 PR-7 太小，单独开一个 agent 不值得，仍然跟 PR-8 捆给同一个 agent（见 §3.2）。</p>
 </div>
 
 <h3 id="parallel">3.2 并行开发计划</h3>
@@ -272,15 +272,15 @@ PR 编号即执行顺序。</p>
 <table>
 <thead><tr><th style="width:66px">PR</th><th style="width:150px">Localization<br>(1062 行)</th>
   <th style="width:150px">RootShellView<br>(80 行)</th><th style="width:130px">RecordClipView</th>
-  <th style="width:120px">PlansHomeView</th><th>pbxproj</th></tr></thead>
+  <th style="width:120px">PlansHomeView</th><th>pbxproj<br><span style="font-size:10px">已不追踪</span></th></tr></thead>
 <tbody>
-<tr><td><b>PR-4</b></td><td>录制区</td><td class="no">L47–64 tab 拦截</td><td class="no">主要战场</td><td></td><td class="no">加 2 文件</td></tr>
-<tr><td><b>PR-5</b></td><td>草稿区</td><td></td><td class="no">入口</td><td></td><td class="no">加 1 文件</td></tr>
-<tr><td><b>PR-6</b></td><td>首页区</td><td class="no">L29–42 hero</td><td></td><td class="no">空卡</td><td class="no">加 1 文件</td></tr>
-<tr><td><b>PR-7</b></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td><b>PR-8</b></td><td>composer 区</td><td></td><td></td><td></td><td></td></tr>
-<tr><td><b>PR-9</b></td><td></td><td></td><td></td><td class="no">时间轴</td><td class="no">加 1 文件</td></tr>
-<tr><td><b>PR-10</b></td><td>AI 区</td><td></td><td></td><td></td><td class="no">加 1 文件</td></tr>
+<tr><td><b>PR-4</b></td><td>录制区</td><td class="no">L47–64 tab 拦截</td><td class="no">主要战场</td><td></td><td class="yes">不再冲突</td></tr>
+<tr><td><b>PR-5</b></td><td>草稿区</td><td></td><td class="no">入口</td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-6</b></td><td>首页区</td><td class="no">L29–42 hero</td><td></td><td class="no">空卡</td><td class="yes">—</td></tr>
+<tr><td><b>PR-7</b></td><td></td><td></td><td></td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-8</b></td><td>composer 区</td><td></td><td></td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-9</b></td><td></td><td></td><td></td><td class="no">时间轴</td><td class="yes">—</td></tr>
+<tr><td><b>PR-10</b></td><td>AI 区</td><td></td><td></td><td></td><td class="yes">—</td></tr>
 </tbody>
 </table>
 <p style="font-size:13px;color:var(--inkSoft)">PR-4 / PR-6 在 <code>RootShellView</code> 里的两处相隔约 5 行
@@ -319,11 +319,19 @@ PR 编号即执行顺序。</p>
         会互相污染产物 —— 这是最容易忽略、症状最莫名其妙的一条。</li>
     <li><b>各自指定的模拟器 UDID。</b>四台都已 Booted，不要让 agent 自己挑（上一轮的 10 分钟卡死就是
         选到了未启动的机器）。</li>
-    <li><b><code>project.pbxproj</code> 不要手工合并 —— 重新生成。</b>它被 git 追踪（1016 行），
-        每个加文件的 PR 都会重写它，冲突是<b>必然</b>的。合并时
-        <code>git checkout --ours</code> 之后跑 <code>xcodegen generate</code>，因为
-        <code>project.yml</code> 用的是目录 glob，产物由文件系统决定，不由 diff 决定。</li>
+    <li><b>新增文件后各自 <code>xcodegen generate</code>。</b><code>.xcodeproj</code> 已不再被 git 追踪
+        （见下），所以它不会冲突了 —— 但每个 worktree 都得自己生成一份才能 build。</li>
   </ol>
+</div>
+
+<div class="card ok">
+  <h4 style="margin-bottom:8px">✓ 已执行 —— <code>.xcodeproj</code> 不再被 git 追踪（<code>1f4365d</code>）</h4>
+  <p style="margin-bottom:8px">原来这里列的是「pbxproj 冲突是必然的，合并时要重生成」。Cassie 2026-09-02 拍板
+  直接从 git 里拿掉，<b>这条约束消失了</b>。</p>
+  <p style="margin-bottom:0">动手前验过一遍：<code>xcodegen generate</code> 的输出和被追踪的那份
+  <b>逐字节相同</b>（<code>diff</code> 0 行），说明没有手工改动会丢失，xcodegen 的 UUID 也是确定性的。
+  README 本来就把 <code>xcodegen generate --spec project.yml</code> 写成必需步骤，
+  仓库布局图里也从没列过 <code>.xcodeproj</code> —— 拿掉之后仓库反而跟自己的文档一致了。</p>
 </div>
 
 <div class="card warn">
@@ -335,13 +343,6 @@ PR 编号即执行顺序。</p>
   而不是「三倍速度完成三个 PR」。</p>
 </div>
 
-<div class="card note">
-  <h4>一个可以永久解掉 pbxproj 冲突的选项（需要你拍板）</h4>
-  <p style="margin-bottom:0">把 <code>ios/AISetlog.xcodeproj/</code> 加进 <code>.gitignore</code>，
-  改成「clone 之后跑 <code>xcodegen generate</code>」。既然 <code>project.yml</code> 已经是唯一事实来源，
-  追踪产物本来就是多余的。<b>好处</b>：所有并行开发再也不会撞 pbxproj。
-  <b>代价</b>：新环境上手多一步，且必须装 xcodegen。这是仓库策略，我不替你决定。</p>
-</div>
 
 <!-- ============================================================ -->
 <h2 id="pr4"><span class="n">4</span>PR-4 · 录完的片子不再无声消失</h2>
@@ -526,13 +527,29 @@ PR 编号即执行顺序。</p>
   <ol>
     <li><b>封面撞脸</b>（<code>ChallengeTemplate.swift:56,60</code>）：「和我过一天」(Live With Me) 和
         「我的主角日」(Main Character) 共用 <code>TemplateMainCharacter</code>，在推荐网格里长得一模一样。
-        给 Live With Me 换成 <code>TemplateSoftReset</code> —— 气质上更贴「不设题目、慢慢过」。
-        <b>不新增素材。</b></li>
+        <b>需要新素材才能修，见下。</b></li>
     <li><b>题目时态</b>：只剩 <b>2 条</b>，都在 <code>MomentCatalog.swift</code>。</li>
   </ol>
 
+  <div class="card hot">
+    <h4>更正 — 我原来推荐的 <code>TemplateSoftReset</code> 是错的，封面这条本轮做不了</h4>
+    <p style="margin-bottom:8px">我原本写「给 Live With Me 换成 <code>TemplateSoftReset</code>，不新增素材」。
+    查过代码：<code>"Soft Reset"</code> <b>自己就映射到 <code>TemplateSoftReset</code></b>
+    （<code>ChallengeTemplate.swift</code>）。这么换只是把撞脸从 Main Character 搬到 Soft Reset，没修好。</p>
+    <p style="margin-bottom:8px">而 13 张 <code>Template*.imageset</code> <b>全部有主</b>：12 张在
+    <code>coverAssetName</code> 的 switch 里，剩下的 <code>TemplateCustomStory</code> 是自定义模板的兜底
+    （<code>ChallengePresenter.swift:25</code>、<code>TemplateCard.swift:45</code>、
+    <code>ComposerSteps.swift:383,594</code>）。<b>没有空闲封面</b>，所以「不新增素材」这个前提让这个 bug
+    无解。</p>
+    <p style="margin-bottom:0"><b>结论：</b>封面撞脸要新画一张（建议命名 <code>TemplateLiveWithMe</code>），
+    这是设计活不是代码活。本轮 PR-7 <b>只做时态那 2 行</b>；封面等素材到位再补一个一行 PR。<br>
+    <span style="color:var(--inkSoft)">顺带说一句：<code>TemplatePerfectDay</code> 和
+    <code>TemplateSoftReset</code> 的 <code>cover-v2.jpg</code> 今天已经在工作区里了（未提交），
+    看起来封面正在重做 —— 那批里加一张 Live With Me 最省事。</span></p>
+  </div>
+
   <div class="card ok">
-    <h4>更正 — 这条比上一轮 PRD 写的小得多</h4>
+    <h4>时态这条也比上一轮 PRD 写的小得多</h4>
     <p style="margin-bottom:8px">上一轮和本 PRD 初稿都把位置写成 <code>GuidedMomentsView.swift:170</code>，
     <b>错了两次</b>：那行是 footnote 的 <code>OneDayBuddy</code>，跟文案无关。所有题目文案都在
     <code>MomentCatalog.swift</code>。</p>
@@ -563,7 +580,6 @@ PR 编号即执行顺序。</p>
   已存故事的题目会跟着变新文案 —— 这是期望行为。</p>
   <h4>验收</h4>
   <ul class="ck">
-    <li>推荐网格里「和我过一天」和「我的主角日」封面不同。</li>
     <li><code>MomentCatalog</code> 里 <code>what_i_ate</code> / <code>found_a_spot</code> 中英均非过去时。</li>
     <li>上面「不改的 4 条」保持原样（防止顺手改多）。</li>
   </ul>
