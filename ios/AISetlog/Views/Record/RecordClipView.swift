@@ -20,15 +20,22 @@ struct RecordClipView: View {
     /// The challenge's locked frame. Free-form mode ignores this and uses its
     /// own toggleable orientation instead.
     var orientation: Challenge.Orientation = .portrait
+    /// Free-form only: lets the shell block a tab switch that would throw an
+    /// unfiled clip away.
+    var unfiledGuard: UnfiledClipGuard?
+    /// Free-form only: "there's nowhere to file this yet — make somewhere".
+    var onStartStory: (() -> Void)?
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
+    @Environment(ClipDraftStore.self) private var drafts
     @Environment(AccountStore.self) private var account
     @State private var recorder = ClipRecorder()
     @State private var ringProgress: CGFloat = 0
     @State private var overlayText = ""
     @State private var showSavePicker = false
+    @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
     @State private var showNotificationPrimer = false
@@ -119,6 +126,12 @@ struct RecordClipView: View {
                 ringProgress = 0
                 withAnimation(.linear(duration: clipSeconds)) { ringProgress = 1 }
             }
+        }
+        .onChange(of: recorder.clipURL) { _, url in
+            guard isFreeform, let unfiledGuard else { return }
+            unfiledGuard.hasUnfiledClip = url != nil
+            unfiledGuard.keep = { keepAsDraft() }
+            unfiledGuard.discard = { clearReview() }
         }
     }
 
@@ -255,11 +268,11 @@ struct RecordClipView: View {
             HStack(spacing: 10) {
                 Button {
                     if isFreeform {
-                        let matches = filingCandidates
-                        if store.challenges.isEmpty {
-                            showToast(Strings.makePlanFirst)
-                        } else if matches.isEmpty {
-                            showToast(Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape))
+                        // Both dead ends used to end at a toast, which left
+                        // retake-or-leave as the only moves — and leaving meant
+                        // losing the clip. Now they end at a choice instead.
+                        if filingCandidates.isEmpty {
+                            showNoPlaceExits = true
                         } else {
                             showSavePicker = true
                         }
@@ -306,6 +319,25 @@ struct RecordClipView: View {
                 }
             }
         }
+        .confirmationDialog(
+            Strings.noPlaceYet,
+            isPresented: $showNoPlaceExits,
+            titleVisibility: .visible
+        ) {
+            Button(Strings.saveAsDraft) { keepAsDraft() }
+            // Keep the clip first: walking to the composer unmounts this screen,
+            // which is precisely how clips used to disappear.
+            Button(Strings.createStoryNow) { keepAsDraft(then: onStartStory) }
+        } message: {
+            Text(noPlaceMessage)
+        }
+    }
+
+    /// Why there's nowhere to file it — no stories at all, or none in this frame.
+    private var noPlaceMessage: String {
+        store.challenges.isEmpty
+            ? Strings.makePlanFirst
+            : Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape)
     }
 
     // MARK: - Free-form filing
@@ -324,6 +356,32 @@ struct RecordClipView: View {
         overlayText = ""
         showToast(Strings.filedTo(ChallengePresenter(challenge: challenge).displayTitle))
         offerNotificationPrimer(dismissWhenFinished: false)
+    }
+
+    /// Copy the clip somewhere permanent so it survives leaving this screen.
+    ///
+    /// On failure this deliberately does **not** retake: the temp file is still
+    /// the only copy, so clearing the review would finish the job the bug used
+    /// to do. Staying put leaves a retry available.
+    private func keepAsDraft(then next: (() -> Void)? = nil) {
+        guard let url = recorder.clipURL else { return }
+        do {
+            try drafts.keep(
+                tempURL: url,
+                orientation: effectiveOrientation,
+                overlayText: trimmedOverlayText)
+            clearReview()
+            showToast(Strings.draftKept)
+            next?()
+        } catch {
+            showToast(Strings.draftSaveFailed)
+        }
+    }
+
+    private func clearReview() {
+        recorder.retake()
+        ringProgress = 0
+        overlayText = ""
     }
 
     private func targetDay(for challenge: Challenge) -> Int {

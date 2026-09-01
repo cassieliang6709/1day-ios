@@ -5,6 +5,7 @@ struct AISetlogApp: App {
     @UIApplicationDelegateAdaptor(NotificationAppDelegate.self) private var appDelegate
     @State private var account: AccountStore
     @State private var store: ChallengeStore
+    @State private var drafts = ClipDraftStore()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
 
@@ -23,6 +24,7 @@ struct AISetlogApp: App {
             RootView()
                 .environment(store)
                 .environment(account)
+                .environment(drafts)
                 .tint(Color.oneDayBlue)
                 .preferredColorScheme(appAppearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in

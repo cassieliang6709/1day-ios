@@ -577,6 +577,18 @@ enum Strings {
             : (lang == .chinese ? "竖屏" : "portrait")
         return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
     }
+
+    // Drafts: what a clip does when there's nowhere to file it yet.
+    static var saveAsDraft: String { lang == .chinese ? "先存起来" : "Keep it for now" }
+    static var createStoryNow: String { lang == .chinese ? "现在就建个故事" : "Start a story now" }
+    static var noPlaceYet: String { lang == .chinese ? "这段还没有地方放" : "Nowhere to put this yet" }
+    static var keepClipQuestion: String { lang == .chinese ? "这段还没归档" : "This clip isn't filed yet" }
+    static var keepClip: String { lang == .chinese ? "保留" : "Keep" }
+    static var discardClip: String { lang == .chinese ? "丢弃" : "Discard" }
+    static var draftSaveFailed: String {
+        lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
+    }
+    static var draftKept: String { lang == .chinese ? "已存起来" : "Kept for later" }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static var retryCamera: String { lang == .chinese ? "重新打开相机" : "Try camera again" }
     static func useDemoClip(_ title: String) -> String {
