@@ -7,6 +7,11 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 
+# XcodeGen output. `project.yml` is the source of truth and uses directory
+# globs, so the project is a build artifact — regenerate it, never merge it.
+#   cd ios && xcodegen generate --spec project.yml
+ios/AISetlog.xcodeproj/
+
 # Web dependencies and build output
 node_modules/
 .npm-cache/
