@@ -67,6 +67,7 @@ struct Challenge: Codable, Identifiable {
     var resolvedClipLength: ClipLength { clipLength ?? .tiny }
     var resolvedOrientation: Orientation { orientation ?? .portrait }
     var isOneDay: Bool { resolvedMode == .oneDay }
+    var isTimeOnly: Bool { templateName == ChallengeTemplate.liveWithMeIdentityKey }
 
     /// 1-based index of "today" within the challenge (day 1 = startDate).
     /// Can exceed 7 once the week is over.

@@ -40,6 +40,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
 
     /// Name in the active language.
     var displayName: String { name.resolved() }
+    var isTimeOnly: Bool { identityKey == Self.liveWithMeIdentityKey }
     /// The card's icon, with a fallback for templates saved before symbols.
     var displaySymbol: String { symbol ?? "wand.and.stars" }
     /// Language-stable string for deriving a consistent accent color.
@@ -47,8 +48,12 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     /// Built-in poster art. Custom templates use the shared custom-story art
     /// at the presentation layer because their names are user-authored.
     var coverAssetName: String? {
+        if let assetName = Self.legacyCompatibilityCoverAssetName(matching: name.en) {
+            return assetName
+        }
         guard !isCustom else { return nil }
         return switch name.en {
+        case Self.liveWithMeIdentityKey: "TemplateMainCharacter"
         case "Perfect Day": "TemplatePerfectDay"
         case "Soft Reset": "TemplateSoftReset"
         case "Lock In": "TemplateLockIn"
@@ -71,7 +76,17 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         lhs.isCustom ? lhs.id == rhs.id : lhs.name.en == rhs.name.en
     }
 
+    static let liveWithMeIdentityKey = "Live With Me"
+    static let liveWithMe = ChallengeTemplate(
+        symbol: "clock.badge.checkmark",
+        name: .init(en: liveWithMeIdentityKey, zh: "和我过一天"),
+        momentKeys: nil,
+        blurb: .init(
+            en: "No prompts. Just moments as the day happens.",
+            zh: "没有题目，只记录此刻发生的事。"))
+
     static let oneDayBuiltins: [ChallengeTemplate] = [
+        liveWithMe,
         .init(symbol: "sun.max.fill", name: .init(en: "Perfect Day", zh: "完美的一天"),
               momentKeys: ["wake_up", "coffee", "get_ready", "out_the_door", "midday", "golden_hour", "wind_down"],
               blurb: .init(en: "The day you'd happily live twice.", zh: "愿意再过一遍的一天。")),
@@ -124,6 +139,43 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         guard let token, !token.isEmpty else { return nil }
         return allBuiltins.first {
             token == $0.identityKey || token == $0.name.zh
+        } ?? legacyCompatibility(matching: token)
+    }
+
+    /// A pair of names from the early custom-template flow shipped without
+    /// their own artwork or description. Their persisted shape is otherwise
+    /// indistinguishable from a custom template, so keep this display-only
+    /// compatibility mapping at the presentation boundary.
+    static func legacyCompatibility(matching token: String) -> ChallengeTemplate? {
+        switch token {
+        case "Out Together":
+            .init(
+                symbol: "figure.2.and.child.holdinghands",
+                name: .init(en: "Out Together", zh: "一起出门"),
+                momentKeys: nil,
+                blurb: .init(
+                    en: "A little outing, remembered together.",
+                    zh: "一起出门，把这段时光记下来。"),
+                isCustom: true)
+        case "Perfect Morning":
+            .init(
+                symbol: "sunrise.fill",
+                name: .init(en: "Perfect Morning", zh: "完美早晨"),
+                momentKeys: nil,
+                blurb: .init(
+                    en: "Keep a morning worth remembering.",
+                    zh: "留住一个值得记住的早晨。"),
+                isCustom: true)
+        default:
+            nil
+        }
+    }
+
+    private static func legacyCompatibilityCoverAssetName(matching token: String) -> String? {
+        switch token {
+        case "Out Together": "TemplateLittleAdventure"
+        case "Perfect Morning": "TemplateMorningPerson"
+        default: nil
         }
     }
 

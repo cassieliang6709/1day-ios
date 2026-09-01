@@ -100,6 +100,19 @@ final class ChallengeStore {
         return challenge
     }
 
+    /// The first-run story: an immediately filmable personal day. Keeping this
+    /// alongside `create` means it has the exact same persistence and reminder
+    /// behavior as a story made in the composer.
+    @discardableResult
+    func createQuickStart() -> Challenge {
+        create(
+            title: Strings.quickStartTitle,
+            mode: .oneDay,
+            clipLength: .tiny,
+            orientation: .portrait,
+            momentTitles: ["morning_light", "on_the_move", "golden_hour"])
+    }
+
     // MARK: - Shared rooms (CloudKit)
 
     enum RoomError: LocalizedError {
@@ -485,7 +498,7 @@ final class ChallengeStore {
                     return DayClip(
                         day: clip.day, url: clip.localURL, authorName: clip.authorName,
                         authorID: clip.authorID,
-                        label: presenter.title(forSlot: clip.day),
+                        label: challenge.isTimeOnly ? nil : presenter.title(forSlot: clip.day),
                         overlayText: clip.overlayText,
                         recordedAt: clip.recordedAt,
                         emoji: emojis,
@@ -499,7 +512,7 @@ final class ChallengeStore {
                     day: card.day,
                     url: $0,
                     authorID: account?.account?.id ?? "local",
-                    label: presenter.title(forSlot: card.day),
+                    label: challenge.isTimeOnly ? nil : presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
                     recordedAt: card.recordedAt,
                     emoji: card.reactions.map(\.emoji),

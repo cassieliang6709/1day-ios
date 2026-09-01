@@ -16,7 +16,7 @@ struct StoryComposerView: View {
     enum Step: Int { case mood, setup }
 
     @State private var step: Step = .mood
-    @State private var activeIndex = 0
+    @State private var selectedTemplateID: UUID? = ChallengeTemplate.liveWithMe.id
     @State private var mode: Challenge.Mode = .oneDay
     @State private var clipLength: Challenge.ClipLength = .tiny
     @State private var orientation: Challenge.Orientation = .portrait
@@ -29,24 +29,30 @@ struct StoryComposerView: View {
     /// and replaced wholesale by the guided flow.
     @State private var moments: [String] = []
     @State private var momentsEdited = false
+    @State private var isCustomPromptStory = false
     @State private var showGuided = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
-    @State private var showBuildTemplate = false
     @State private var editingTemplate: ChallengeTemplate?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var templates: [ChallengeTemplate] {
-        let builtins = mode == .oneDay
-            ? ChallengeTemplate.oneDayBuiltins
-            : ChallengeTemplate.sevenDayBuiltins
-        return builtins + store.customTemplates
+    private var oneDayTemplates: [ChallengeTemplate] {
+        ChallengeTemplate.oneDayBuiltins + store.customTemplates
+    }
+
+    private var sevenDayTemplates: [ChallengeTemplate] {
+        ChallengeTemplate.sevenDayBuiltins
+    }
+
+    private var allTemplates: [ChallengeTemplate] {
+        oneDayTemplates + sevenDayTemplates
     }
 
     private var selected: ChallengeTemplate? {
-        templates.indices.contains(activeIndex) ? templates[activeIndex] : nil
+        guard let selectedTemplateID else { return nil }
+        return allTemplates.first { $0.id == selectedTemplateID }
     }
 
     var body: some View {
@@ -59,11 +65,11 @@ struct StoryComposerView: View {
                 switch step {
                 case .mood:
                     MoodStep(
-                        templates: templates,
-                        activeIndex: $activeIndex,
+                        oneDayTemplates: oneDayTemplates,
+                        sevenDayTemplates: sevenDayTemplates,
+                        selectedTemplateID: $selectedTemplateID,
                         mode: $mode,
-                        clipLength: $clipLength,
-                        onBuildOwn: { showGuided = true },
+                        onBuildOwn: beginCustomPromptFlow,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate)
                         .transition(.asymmetric(
@@ -80,6 +86,7 @@ struct StoryComposerView: View {
                         orientation: $orientation,
                         moments: $moments,
                         isOneDay: mode == .oneDay,
+                        isTimeOnly: selected?.isTimeOnly == true,
                         memberNames: knownFriendNames,
                         errorText: errorText)
                         .transition(.asymmetric(
@@ -96,21 +103,14 @@ struct StoryComposerView: View {
         }
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView { written, name in
+                mode = .oneDay
+                isCustomPromptStory = true
+                selectedTemplateID = nil
                 moments = written
                 momentsEdited = true
-                if !name.isEmpty {
-                    title = name
-                    titleEdited = true
-                }
-                // Straight to setup: the moments question is already answered,
-                // so sending them back to the poster rack would be a detour.
+                title = name
+                titleEdited = true
                 withAnimation(OneDay.Motion.soft) { step = .setup }
-            }
-        }
-        .sheet(isPresented: $showBuildTemplate) {
-            BuildTemplateView { template in
-                store.addCustomTemplate(template)
-                activeIndex = max(templates.count - 1, 0)
             }
         }
         .sheet(item: $editingTemplate) { template in
@@ -119,12 +119,18 @@ struct StoryComposerView: View {
             }
         }
         .onAppear(perform: syncTitleToTemplate)
-        .onChange(of: activeIndex) { _, _ in syncTitleToTemplate() }
-        .onChange(of: mode) { _, _ in
-            activeIndex = 0
+        .onChange(of: selectedTemplateID) { _, newID in
+            guard newID != nil else { return }
+            isCustomPromptStory = false
             titleEdited = false
             momentsEdited = false
             syncTitleToTemplate()
+        }
+        .onChange(of: mode) { _, newMode in
+            guard !isCustomPromptStory else { return }
+            let validTemplates = newMode == .oneDay ? oneDayTemplates : sevenDayTemplates
+            guard !validTemplates.contains(where: { $0.id == selectedTemplateID }) else { return }
+            selectedTemplateID = validTemplates.first?.id
         }
     }
 
@@ -184,7 +190,7 @@ struct StoryComposerView: View {
 
     private var canAdvance: Bool {
         switch step {
-        case .mood: return selected != nil
+        case .mood: return selected != nil || isCustomPromptStory
         case .setup: return !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
         }
     }
@@ -240,8 +246,16 @@ struct StoryComposerView: View {
     }
 
     private func deleteTemplate(_ template: ChallengeTemplate) {
+        let wasSelected = selectedTemplateID == template.id
         store.deleteCustomTemplate(template)
-        activeIndex = min(activeIndex, max(templates.count - 2, 0))
+        if wasSelected {
+            selectedTemplateID = ChallengeTemplate.oneDayBuiltins
+                .first(where: { !$0.isTimeOnly })?.id
+        }
+    }
+
+    private func beginCustomPromptFlow() {
+        showGuided = true
     }
 
     // MARK: - Derived state
@@ -263,6 +277,7 @@ struct StoryComposerView: View {
     /// Blank rows are dropped; an entirely empty list falls back to the
     /// template's own moments so a story can never be created with none.
     private var resolvedMoments: [String]? {
+        if selected?.isTimeOnly == true { return nil }
         let cleaned = moments
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }

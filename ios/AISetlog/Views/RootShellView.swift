@@ -8,6 +8,8 @@ import SwiftUI
 /// matters lives inside today's `StoryCard`, where it has the context to say
 /// what it will actually do.
 enum HomeLaunchAction: Equatable {
+    /// First-run path: make the three-moment personal story immediately.
+    case quickStart
     case newStory
     case join
     case record(UUID)

@@ -3,82 +3,371 @@ import SwiftUI
 /// The two pages of `StoryComposerView`. Stateless — the composer owns every
 /// choice; these just render it.
 
-// MARK: - Step 1: pick a mood
+// MARK: - Step 1: choose how to record
 
-/// Nothing on this page but posters. The format and clip-length controls sit
-/// under the rack because they change what the posters *say* (moment count,
-/// duration chips), so they belong next to them rather than on the next page.
+/// Time-only recording is a first-class mode, not one poster hidden inside a
+/// long carousel. Prompted stories sit beside it as the more directed option,
+/// with a short recommendation grid and an explicit route to the full library.
 struct MoodStep: View {
-    let templates: [ChallengeTemplate]
-    @Binding var activeIndex: Int
+    let oneDayTemplates: [ChallengeTemplate]
+    let sevenDayTemplates: [ChallengeTemplate]
+    @Binding var selectedTemplateID: UUID?
     @Binding var mode: Challenge.Mode
-    @Binding var clipLength: Challenge.ClipLength
     let onBuildOwn: () -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
 
+    @State private var showLibrary = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var momentCount: Int {
-        templates.indices.contains(activeIndex)
-            ? (templates[activeIndex].momentKeys?.count ?? 7)
-            : 7
+    private var allTemplates: [ChallengeTemplate] {
+        oneDayTemplates + sevenDayTemplates
+    }
+
+    private var selectedTemplate: ChallengeTemplate? {
+        guard let selectedTemplateID else { return nil }
+        return allTemplates.first { $0.id == selectedTemplateID }
+    }
+
+    private var promptTemplates: [ChallengeTemplate] {
+        let source = mode == .oneDay ? oneDayTemplates : sevenDayTemplates
+        return source.filter { !$0.isTimeOnly }
+    }
+
+    private var recommendedTemplates: [ChallengeTemplate] {
+        Array(promptTemplates.prefix(4))
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                VStack(spacing: 6) {
-                    Text(Strings.headerTitle(oneDay: mode == .oneDay))
-                        .font(.system(size: 27, weight: .heavy, design: .rounded))
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(Strings.newStoryQuestion)
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(OneDay.ink)
-                        .multilineTextAlignment(.center)
 
-                    Text(Strings.composerSubtitle(
-                        count: momentCount,
-                        secondsLabel: clipLength.secondsLabel))
+                    Text(Strings.recordingStyleSubtitle)
                         .font(.system(size: 14.5, weight: .medium, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 20)
 
-                TemplateCarousel(
-                    templates: templates,
-                    secondsLabel: clipLength.secondsLabel,
-                    isOneDay: mode == .oneDay,
-                    activeIndex: $activeIndex,
-                    onEdit: onEdit,
-                    onDelete: onDelete)
+                HStack(alignment: .top, spacing: 12) {
+                    RecordingModeCard(
+                        title: Strings.timeRecordingTitle,
+                        caption: Strings.timeRecordingCaption,
+                        imageName: "TemplatePerfectDay",
+                        symbol: "point.3.connected.trianglepath.dotted",
+                        isSelected: selectedTemplate?.isTimeOnly == true,
+                        action: selectTimeOnly)
 
-                CarouselDots(count: templates.count, index: activeIndex)
-
-                VStack(spacing: 12) {
-                    PillSelector(
-                        options: [
-                            .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
-                            .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
-                        ],
-                        selection: $mode)
-
-                    PillSelector(
-                        options: Challenge.ClipLength.allCases.map {
-                            .init(value: $0, label: $0.secondsLabel)
-                        },
-                        selection: $clipLength,
-                        compact: true)
-
-                    Button(action: onBuildOwn) {
-                        Label(Strings.writeYourOwnMoments, systemImage: "square.and.pencil")
-                    }
-                    .buttonStyle(.softAction)
-                    .padding(.top, 2)
+                    RecordingModeCard(
+                        title: Strings.promptChallengeTitle,
+                        caption: Strings.promptChallengeCaption,
+                        imageName: "TemplateLockIn",
+                        symbol: "scope",
+                        isSelected: selectedTemplate?.isTimeOnly != true,
+                        action: selectPromptMode)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 4)
+                .padding(.horizontal, 20)
+
+                Button(action: onBuildOwn) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.oneDayLavender)
+                            .frame(width: 42, height: 42)
+                            .background(Color.oneDayLavender.opacity(0.16), in: RoundedRectangle(cornerRadius: 14))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(Strings.customPromptsTitle)
+                                .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(OneDay.ink)
+                            Text(Strings.customPromptsCaption)
+                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(OneDay.inkSoft)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(OneDay.inkFaint)
+                    }
+                    .padding(13)
+                    .background(OneDay.surface.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(OneDay.hairline, lineWidth: 1))
+                    .oneDaySoftShadow(strength: 0.45)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Strings.customPromptsTitle)
+                .accessibilityIdentifier("custom-prompts-entry")
+                .padding(.horizontal, 20)
+
+                HStack {
+                    SectionLabel(text: mode == .oneDay
+                        ? Strings.recommendedPrompts
+                        : Strings.sevenDayChallenges)
+                    Spacer()
+                    Button {
+                        showLibrary = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(Strings.moreTemplates)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBlue)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
+                    spacing: 12
+                ) {
+                    ForEach(recommendedTemplates) { template in
+                        PromptTemplateTile(
+                            template: template,
+                            isSelected: selectedTemplateID == template.id,
+                            onSelect: { select(template) },
+                            onEdit: template.isCustom ? { onEdit(template) } : nil,
+                            onDelete: template.isCustom ? { onDelete(template) } : nil)
+                    }
+                }
+                .padding(.horizontal, 20)
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
+        .sheet(isPresented: $showLibrary) {
+            TemplateLibraryView(
+                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
+                sevenDayTemplates: sevenDayTemplates,
+                selectedTemplateID: $selectedTemplateID,
+                mode: $mode,
+                onEdit: onEdit,
+                onDelete: onDelete)
+                .presentationDetents([.large])
+        }
+    }
+
+    private func selectTimeOnly() {
+        mode = .oneDay
+        selectedTemplateID = oneDayTemplates.first(where: \.isTimeOnly)?.id
+    }
+
+    private func selectPromptMode() {
+        if selectedTemplate?.isTimeOnly != true, selectedTemplate != nil { return }
+        mode = .oneDay
+        selectedTemplateID = oneDayTemplates.first(where: { !$0.isTimeOnly })?.id
+    }
+
+    private func select(_ template: ChallengeTemplate) {
+        if sevenDayTemplates.contains(where: { $0.id == template.id }) {
+            mode = .sevenDay
+        } else {
+            mode = .oneDay
+        }
+        selectedTemplateID = template.id
+    }
+}
+
+private struct RecordingModeCard: View {
+    let title: String
+    let caption: String
+    let imageName: String
+    let symbol: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 76)
+                        .clipped()
+
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.94)],
+                        startPoint: .top,
+                        endPoint: .bottom)
+
+                    Image(systemName: symbol)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.oneDayBlue)
+                        .frame(width: 34, height: 34)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 11))
+                        .shadow(color: OneDay.ink.opacity(0.1), radius: 7, y: 3)
+                        .padding(10)
+                }
+                .frame(height: 76)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                    Text(caption)
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(2)
+                        .frame(minHeight: 32, alignment: .topLeading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(
+                        isSelected ? Color.oneDayBlue.opacity(0.62) : OneDay.hairline,
+                        lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(OneDay.brandHorizontal, in: Circle())
+                        .padding(9)
+                }
+            }
+            .oneDaySoftShadow(strength: isSelected ? 0.85 : 0.4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct PromptTemplateTile: View {
+    let template: ChallengeTemplate
+    let isSelected: Bool
+    let onSelect: () -> Void
+    var onEdit: (() -> Void)?
+    var onDelete: (() -> Void)?
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(template.coverAssetName ?? "TemplateCustomStory")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1.6, contentMode: .fit)
+                    .clipped()
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(template.displayName)
+                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                        .lineLimit(1)
+                    Text(template.displayBlurb)
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(2)
+                        .frame(minHeight: 30, alignment: .topLeading)
+                }
+                .padding(11)
+            }
+            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(
+                        isSelected ? Color.oneDayBlue.opacity(0.65) : OneDay.hairline,
+                        lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 21, weight: .bold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color.oneDayBlue)
+                        .padding(8)
+                }
+            }
+            .oneDaySoftShadow(strength: isSelected ? 0.75 : 0.35)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .contextMenu {
+            if let onEdit {
+                Button(Strings.editTemplate, systemImage: "pencil", action: onEdit)
+            }
+            if let onDelete {
+                Button(Strings.deleteTemplate, systemImage: "trash", role: .destructive, action: onDelete)
+            }
+        }
+    }
+}
+
+private struct TemplateLibraryView: View {
+    let oneDayTemplates: [ChallengeTemplate]
+    let sevenDayTemplates: [ChallengeTemplate]
+    @Binding var selectedTemplateID: UUID?
+    @Binding var mode: Challenge.Mode
+    let onEdit: (ChallengeTemplate) -> Void
+    let onDelete: (ChallengeTemplate) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    private var templates: [ChallengeTemplate] {
+        mode == .oneDay ? oneDayTemplates : sevenDayTemplates
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                OneDayCanvas(seed: 2)
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        PillSelector(
+                            options: [
+                                .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
+                                .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
+                            ],
+                            selection: $mode)
+
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
+                            spacing: 12
+                        ) {
+                            ForEach(templates) { template in
+                                PromptTemplateTile(
+                                    template: template,
+                                    isSelected: selectedTemplateID == template.id,
+                                    onSelect: { select(template) },
+                                    onEdit: template.isCustom ? { onEdit(template) } : nil,
+                                    onDelete: template.isCustom ? { onDelete(template) } : nil)
+                            }
+                        }
+                    }
+                    .padding(20)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .navigationTitle(Strings.moreTemplates)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(Strings.done) { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func select(_ template: ChallengeTemplate) {
+        selectedTemplateID = template.id
+        dismiss()
     }
 }
 
@@ -98,6 +387,7 @@ struct SetupStep: View {
     /// picking a mood shouldn't mean accepting seven prompts sight unseen.
     @Binding var moments: [String]
     let isOneDay: Bool
+    let isTimeOnly: Bool
     let memberNames: [String]
     let errorText: String?
 
@@ -109,8 +399,12 @@ struct SetupStep: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 heading
-                nameField
-                momentsCard
+                if isTimeOnly {
+                    timeOnlyCard
+                } else {
+                    nameField
+                    momentsCard
+                }
                 companyPicker
                 if withFriends { roomExplainer }
                 setupCard
@@ -128,6 +422,28 @@ struct SetupStep: View {
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .animation(OneDay.Motion.soft, value: withFriends)
+    }
+
+    private var timeOnlyCard: some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: "clock.badge.checkmark")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.oneDayBlue)
+                .frame(width: 42, height: 42)
+                .background(Color.oneDayBlue.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(Strings.timeOnlySetupTitle)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                Text(Strings.timeOnlySetupBody)
+                    .font(.system(size: 13.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(15)
+        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBlue)
     }
 
     private var heading: some View {

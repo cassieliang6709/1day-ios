@@ -142,21 +142,33 @@ struct PlansHomeView: View {
     /// *is* the title, which is what keeps the screen feeling personal.
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
+                OneDayBrandLogo(width: 84)
                 Text(Strings.greeting(
                     name: account.account?.displayName,
                     hour: Calendar.current.component(.hour, from: .now)))
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-
-                Text(Strings.greetingQuestion)
-                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
             }
 
             Spacer(minLength: 8)
+
+            Button {
+                showComposer = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(OneDay.brandHorizontal, in: Circle())
+                    .oneDayGlow(strength: 0.72)
+            }
+            .buttonStyle(.plain)
+            .frame(width: 48, height: 48)
+            .contentShape(Rectangle())
+            .accessibilityLabel(Strings.newStory)
 
             IconBubble(systemName: "person.2.badge.plus") {
                 joinCode = ""
@@ -175,19 +187,8 @@ struct PlansHomeView: View {
 
     private func heroSection(_ challenge: Challenge) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                SectionLabel(text: Strings.todaysStory)
-                Spacer()
-                Button {
-                    showComposer = true
-                } label: {
-                    Label(Strings.newStory, systemImage: "plus")
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 20)
+            SectionLabel(text: Strings.todaysStory)
+                .padding(.horizontal, 20)
 
             StoryCard(
                 challenge: challenge,
@@ -299,8 +300,11 @@ struct PlansHomeView: View {
         let slot = slotToRecord(in: challenge, preferred: preferredDay)
         RecordClipView(
             day: slot,
-            slotTitle: ChallengePresenter(challenge: challenge).title(forSlot: slot),
+            slotTitle: challenge.isTimeOnly
+                ? nil
+                : ChallengePresenter(challenge: challenge).title(forSlot: slot),
             clipLength: challenge.resolvedClipLength,
+            showsPrompt: !challenge.isTimeOnly,
             orientation: challenge.resolvedOrientation
         ) { url, overlayText in
             store.saveClip(
@@ -335,6 +339,9 @@ struct PlansHomeView: View {
         guard let action = launchAction else { return }
         launchAction = nil
         switch action {
+        case .quickStart:
+            let challenge = store.createQuickStart()
+            path = [challenge.id]
         case .newStory:
             showComposer = true
         case .join:
