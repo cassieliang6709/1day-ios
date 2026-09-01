@@ -107,6 +107,8 @@
     body{padding:26px 16px 90px}
     .tocbox ol{columns:1}
     th,td{padding:8px 9px;font-size:12.3px}
+    /* 窄屏放弃内联的固定列宽，交给 table-layout:fixed 平分 */
+    table th[style]{width:auto!important}
     h1{font-size:22px}
   }
 </style>
@@ -138,7 +140,7 @@
   <ol>
     <li><a href="#bg">背景 —— 三笔账 + 一个新发现</a></li>
     <li><a href="#goal">目标 / 非目标</a></li>
-    <li><a href="#order">执行顺序与 PR 总表</a></li>
+    <li><a href="#order">执行顺序与 PR 总表</a>　<a href="#parallel" style="font-size:12px">↳ 3.2 并行计划</a></li>
     <li><a href="#pr4">PR-4 录完的片子不再无声消失</a></li>
     <li><a href="#pr5">PR-5 待归档的片子有个去处</a></li>
     <li><a href="#pr6">PR-6 首页挑对今天的故事</a></li>
@@ -239,7 +241,7 @@ PR 编号即执行顺序。</p>
 <tr><td><span class="pill">PR-6</span></td><td><code>fix: 首页挑对今天的故事</code></td>
     <td class="mono">新增 Presentation/HomeHeroChoice、RootShellView、PlansHomeView</td><td>—</td><td>中</td></tr>
 <tr><td><span class="pill gray">PR-7</span></td><td><code>chore: 封面不再撞脸，题目不再用过去时</code></td>
-    <td class="mono">ChallengeTemplate、GuidedMomentsView</td><td>—</td><td>小</td></tr>
+    <td class="mono">ChallengeTemplate、MomentCatalog</td><td>—</td><td>极小（2 行）</td></tr>
 <tr><td><span class="pill">PR-8</span></td><td><code>refactor: 新建故事只留一层选择</code></td>
     <td class="mono">ComposerSteps、Presentation/ComposerSelection</td><td>PR-7</td><td>中</td></tr>
 <tr><td><span class="pill">PR-9</span></td><td><code>feat: 往前翻就是过去的日子</code></td>
@@ -253,7 +255,92 @@ PR 编号即执行顺序。</p>
   <h4>为什么 PR-8 依赖 PR-7</h4>
   <p style="margin-bottom:0">PR-7 要把「和我过一天」的封面从 <code>TemplateMainCharacter</code> 换成
   <code>TemplateSoftReset</code>（解决撞脸），而 PR-8 的「按时间拍」态正好要用那张新封面做主视觉。
-  先换封面，PR-8 直接用。</p>
+  PR-7 只有 2 行，所以<b>把它们交给同一个 agent</b>（见 §3.2）。</p>
+</div>
+
+<h3 id="parallel">3.2 并行开发计划</h3>
+
+<div class="card warn">
+  <h4>先纠正一个读法 —— 上面那张表的「依赖」列会骗人</h4>
+  <p style="margin-bottom:8px">表里 PR-4 / PR-6 / PR-7 的依赖都是「—」，看起来能三个一起跑。但
+  <b>逻辑无依赖 ≠ 文件不撞</b>：PR-4 和 PR-6 都要改 <code>RootShellView.swift</code>，
+  而那个文件<b>只有 80 行</b>。</p>
+  <p style="margin-bottom:0">所以分波要按<b>文件归属</b>切，不是按依赖切。</p>
+</div>
+
+<h4>真实的文件碰撞面</h4>
+<table>
+<thead><tr><th style="width:66px">PR</th><th style="width:150px">Localization<br>(1062 行)</th>
+  <th style="width:150px">RootShellView<br>(80 行)</th><th style="width:130px">RecordClipView</th>
+  <th style="width:120px">PlansHomeView</th><th>pbxproj</th></tr></thead>
+<tbody>
+<tr><td><b>PR-4</b></td><td>录制区</td><td class="no">L47–64 tab 拦截</td><td class="no">主要战场</td><td></td><td class="no">加 2 文件</td></tr>
+<tr><td><b>PR-5</b></td><td>草稿区</td><td></td><td class="no">入口</td><td></td><td class="no">加 1 文件</td></tr>
+<tr><td><b>PR-6</b></td><td>首页区</td><td class="no">L29–42 hero</td><td></td><td class="no">空卡</td><td class="no">加 1 文件</td></tr>
+<tr><td><b>PR-7</b></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td><b>PR-8</b></td><td>composer 区</td><td></td><td></td><td></td><td></td></tr>
+<tr><td><b>PR-9</b></td><td></td><td></td><td></td><td class="no">时间轴</td><td class="no">加 1 文件</td></tr>
+<tr><td><b>PR-10</b></td><td>AI 区</td><td></td><td></td><td></td><td class="no">加 1 文件</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:var(--inkSoft)">PR-4 / PR-6 在 <code>RootShellView</code> 里的两处相隔约 5 行
+（L42 → L47）。git 用 3 行上下文合并，<b>通常能自动过，但确实有冲突可能</b>——真冲了也是 30 秒的手工活，
+不值得为它把 PR 拆得更碎。</p>
+
+<h4>三波</h4>
+<table>
+<thead><tr><th style="width:80px">波次</th><th style="width:130px">agent</th><th style="width:150px">PR</th>
+  <th style="width:170px">分配的模拟器</th><th>碰撞面</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><b>Wave 1</b><br><span style="font-size:12px;color:var(--inkSoft)">3 并行</span></td>
+    <td>A</td><td><span class="pill hot">PR-4</span></td><td class="mono">1DAY-QA-SE-A+</td>
+    <td>与 B 撞 <code>RootShellView</code>（相隔 5 行）+ <code>Localization</code>（不同区域）</td></tr>
+<tr><td>B</td><td><span class="pill">PR-6</span></td><td class="mono">1DAY-QA-V12</td>
+    <td>同上</td></tr>
+<tr><td>C</td><td><span class="pill gray">PR-7</span>+<span class="pill">PR-8</span></td>
+    <td class="mono">iPhone 17 Pro Max</td>
+    <td class="yes">与 A/B 完全不撞（只碰 Models + Views/Compose）</td></tr>
+<tr><td rowspan="2"><b>Wave 2</b><br><span style="font-size:12px;color:var(--inkSoft)">2 并行</span></td>
+    <td>D</td><td><span class="pill hot">PR-5</span></td><td class="mono">1DAY-QA-SE-A+</td>
+    <td class="yes">需要 A 的 store；与 E 不撞</td></tr>
+<tr><td>E</td><td><span class="pill">PR-9</span></td><td class="mono">1DAY-QA-V12</td>
+    <td class="yes">需要 B 的 hero；与 D 不撞</td></tr>
+<tr><td><b>Wave 3</b><br><span style="font-size:12px;color:var(--inkSoft)">不并行</span></td>
+    <td>—</td><td><span class="pill warn">PR-10</span></td><td class="mono">iPhone SE (2nd gen)</td>
+    <td>有外部依赖（后端 + 本地代理），且是唯一可能因生成质量不行而推翻自己设计的 PR。单独跑。</td></tr>
+</tbody>
+</table>
+
+<h4>并行必须交代给 agent 的四条硬约束</h4>
+<div class="card hot">
+  <ol style="margin-bottom:0">
+    <li><b>各自的 worktree。</b>不隔离就会互相踩改动。</li>
+    <li><b>各自的 <code>-derivedDataPath</code>。</b>四个 <code>xcodebuild</code> 共用同一份 DerivedData
+        会互相污染产物 —— 这是最容易忽略、症状最莫名其妙的一条。</li>
+    <li><b>各自指定的模拟器 UDID。</b>四台都已 Booted，不要让 agent 自己挑（上一轮的 10 分钟卡死就是
+        选到了未启动的机器）。</li>
+    <li><b><code>project.pbxproj</code> 不要手工合并 —— 重新生成。</b>它被 git 追踪（1016 行），
+        每个加文件的 PR 都会重写它，冲突是<b>必然</b>的。合并时
+        <code>git checkout --ours</code> 之后跑 <code>xcodegen generate</code>，因为
+        <code>project.yml</code> 用的是目录 glob，产物由文件系统决定，不由 diff 决定。</li>
+  </ol>
+</div>
+
+<div class="card warn">
+  <h4>并行的收益没有 3 倍 —— 别按 3 倍规划时间</h4>
+  <p style="margin-bottom:8px"><b>写代码不是瓶颈，build + test 是。</b>三四个 <code>xcodebuild</code>
+  抢同一台 Mac 的 CPU，实际提速大概 <b>1.8~2 倍</b>，不是 3 倍。</p>
+  <p style="margin-bottom:0">而且 <b>review 是串行的</b> —— agent 能并行写，但每个 PR 都要人看过才进 commit，
+  这一环没法并行。所以 Wave 1 的真实产出是「三份待 review 的分支同时就绪」，
+  而不是「三倍速度完成三个 PR」。</p>
+</div>
+
+<div class="card note">
+  <h4>一个可以永久解掉 pbxproj 冲突的选项（需要你拍板）</h4>
+  <p style="margin-bottom:0">把 <code>ios/AISetlog.xcodeproj/</code> 加进 <code>.gitignore</code>，
+  改成「clone 之后跑 <code>xcodegen generate</code>」。既然 <code>project.yml</code> 已经是唯一事实来源，
+  追踪产物本来就是多余的。<b>好处</b>：所有并行开发再也不会撞 pbxproj。
+  <b>代价</b>：新环境上手多一步，且必须装 xcodegen。这是仓库策略，我不替你决定。</p>
 </div>
 
 <!-- ============================================================ -->
@@ -441,15 +528,44 @@ PR 编号即执行顺序。</p>
         「我的主角日」(Main Character) 共用 <code>TemplateMainCharacter</code>，在推荐网格里长得一模一样。
         给 Live With Me 换成 <code>TemplateSoftReset</code> —— 气质上更贴「不设题目、慢慢过」。
         <b>不新增素材。</b></li>
-    <li><b>引导题目时态</b>（<code>GuidedMomentsView.swift:170</code> 附近）：「今天吃了什么？」是过去时，
-        但填写时机在这一天<b>开始之前</b>。改成「今天想吃点什么？」这类意图/未来时态。中英都要过一遍。</li>
+    <li><b>题目时态</b>：只剩 <b>2 条</b>，都在 <code>MomentCatalog.swift</code>。</li>
   </ol>
+
+  <div class="card ok">
+    <h4>更正 — 这条比上一轮 PRD 写的小得多</h4>
+    <p style="margin-bottom:8px">上一轮和本 PRD 初稿都把位置写成 <code>GuidedMomentsView.swift:170</code>，
+    <b>错了两次</b>：那行是 footnote 的 <code>OneDayBuddy</code>，跟文案无关。所有题目文案都在
+    <code>MomentCatalog.swift</code>。</p>
+    <p style="margin-bottom:0">而且<b>这一遍扫已经做过了</b> —— 90 多个题目基本都是名词短语（「晨光」「备料」「第一口」），
+    <code>MomentCatalog.swift:78</code> 还留着 <code>// Study Streak (moment-led rewrite)</code> 的注释。
+    所以本 PR 不是「过一遍所有文案」，是<b>改 2 行</b>。</p>
+  </div>
+
+  <table>
+  <thead><tr><th style="width:170px">位置</th><th style="width:100px">key</th><th style="width:170px">现在</th><th>改成</th></tr></thead>
+  <tbody>
+  <tr><td class="mono">MomentCatalog.swift:50</td><td class="mono">what_i_ate</td>
+      <td class="no">What I ate / 吃了什么</td><td class="yes">Today's plate / 今天吃点什么</td></tr>
+  <tr><td class="mono">MomentCatalog.swift:73</td><td class="mono">found_a_spot</td>
+      <td class="no">Found a spot / 找到个地方</td><td class="yes">A good spot / 找个地方坐下</td></tr>
+  </tbody>
+  </table>
+
+  <h4>明确不改的 4 条</h4>
+  <p><code>the_wall</code>「卡住了」、<code>getting_into_it</code>「进入状态了」、<code>flow</code>「顺起来了」、
+  <code>strong</code>「变强了」—— 中文带「了」但英文侧是名词或进行时（<code>The wall</code> /
+  <code>Getting into it</code> / <code>Flow</code> / <code>Strong</code>）。它们描述的是<b>拍摄那一刻的状态</b>，
+  不是回顾；而且「卡住了」比「卡住」自然。<b>不动。</b></p>
+
   <p style="font-size:13px;color:var(--inkSoft)"><code>coverAssetName</code> 是按 <code>name.en</code> switch 的
-  <b>展示逻辑，不落库</b>，换了不影响已存故事。已确认安全。</p>
+  <b>展示逻辑，不落库</b>，换了不影响已存故事。已确认安全。<br>
+  <code>momentKeys</code> 用的是<b>稳定 key</b>（<code>what_i_ate</code>），改的只是显示文本，
+  已存故事的题目会跟着变新文案 —— 这是期望行为。</p>
   <h4>验收</h4>
   <ul class="ck">
-    <li>推荐网格里两张卡封面不同。</li>
-    <li><code>GuidedMomentsView</code> 的提示语全部是「还没发生」的语气，无过去时。</li>
+    <li>推荐网格里「和我过一天」和「我的主角日」封面不同。</li>
+    <li><code>MomentCatalog</code> 里 <code>what_i_ate</code> / <code>found_a_spot</code> 中英均非过去时。</li>
+    <li>上面「不改的 4 条」保持原样（防止顺手改多）。</li>
   </ul>
   </div>
 </div>
