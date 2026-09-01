@@ -311,6 +311,42 @@ enum Strings {
         lang == .chinese ? "7 个瞬间，一支小短片。" : "7 moments. One tiny vlog."
     }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
+    static var firstRunHeadline: String {
+        lang == .chinese ? "把今天，留成一支片" : "Turn today into one film"
+    }
+    static var firstRunThreeMoments: String {
+        lang == .chinese ? "个两秒瞬间" : "two-second moments"
+    }
+    static var firstRunOneFilm: String {
+        lang == .chinese ? "支属于你的短片" : "film that is yours"
+    }
+    static var firstRunEquationAccessibility: String {
+        lang == .chinese ? "三个两秒瞬间，成为一支属于你的短片" : "Three two-second moments become one film that is yours"
+    }
+    static var firstRunGuide: String {
+        lang == .chinese
+            ? "选一个故事 · 拍 3 个瞬间 · 1Day 为你做成影片"
+            : "Choose a story · film 3 moments · 1Day makes the film"
+    }
+    static var firstRunStart: String {
+        lang == .chinese ? "开始我的第一支片" : "Start my first film"
+    }
+    static var firstRunStartHint: String {
+        lang == .chinese ? "创建一支包含三个瞬间的个人短片。" : "Creates a personal film with three moments."
+    }
+    static var firstRunJoin: String {
+        lang == .chinese ? "有邀请码？加入朋友" : "Have an invite? Join friends"
+    }
+    static var firstRunSampleFilmAccessibility: String {
+        lang == .chinese ? "1Day 示例影片预览" : "1Day sample film preview"
+    }
+    static var firstRunSampleFilmPlay: String {
+        lang == .chinese ? "播放示例影片" : "Play sample film"
+    }
+    static var firstRunSampleFilmPause: String {
+        lang == .chinese ? "暂停示例影片" : "Pause sample film"
+    }
+    static var quickStartTitle: String { lang == .chinese ? "我的一天" : "My day" }
     static var onboardingSkip: String { lang == .chinese ? "跳过" : "Skip" }
     static var onboardingNext: String { lang == .chinese ? "下一步" : "Next" }
     static func onboardingPage(_ page: Int, total: Int) -> String {
@@ -745,15 +781,72 @@ enum Strings {
     static var customTemplateBlurb: String {
         lang == .chinese ? "你自己写的小脚本。" : "Your own little script."
     }
+    static var noPrompts: String { lang == .chinese ? "无题目" : "No prompts" }
 
     // MARK: Story composer
 
     static var composerMoodStep: String { lang == .chinese ? "选个心情" : "Pick a mood" }
     static var composerSetupStep: String { lang == .chinese ? "设置" : "Set it up" }
+    static var newStoryQuestion: String {
+        lang == .chinese ? "今天会是什么故事？" : "What will today's story be?"
+    }
+    static var recordingStyleSubtitle: String {
+        lang == .chinese
+            ? "先选记录方式，再决定要不要跟着题目拍。"
+            : "Choose how to record, then decide whether to follow prompts."
+    }
+    static var timeRecordingTitle: String {
+        lang == .chinese ? "按时间记录" : "Record by time"
+    }
+    static var timeRecordingCaption: String {
+        lang == .chinese ? "Live With Me · 无题目" : "Live With Me · No prompts"
+    }
+    static var promptChallengeTitle: String {
+        lang == .chinese ? "主题挑战" : "Prompt challenge"
+    }
+    static var promptChallengeCaption: String {
+        lang == .chinese ? "选一组题目，跟着拍完" : "Pick a set of prompts and follow along"
+    }
+    static var customPromptsTitle: String {
+        lang == .chinese ? "自己写题目" : "Write your own prompts"
+    }
+    static var customPromptsCaption: String {
+        lang == .chinese
+            ? "先写几个想拍的，之后随时可以改"
+            : "Start with a few ideas. You can change them anytime."
+    }
+    static var recommendedPrompts: String {
+        lang == .chinese ? "推荐题目" : "Recommended prompts"
+    }
+    static var sevenDayChallenges: String {
+        lang == .chinese ? "七日挑战" : "Seven-day challenges"
+    }
+    static var moreTemplates: String {
+        lang == .chinese ? "更多模板" : "More templates"
+    }
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)，合成一部小影片。"
             : "\(count) moments, \(secondsLabel) each. One tiny film."
+    }
+    static var timeOnlyComposerSubtitle: String {
+        lang == .chinese ? "不设题目，按时间留住这一天。" : "No prompts. Keep the day as it happens."
+    }
+    static var timeOnlySetupTitle: String {
+        lang == .chinese ? "只记录时间" : "Time only"
+    }
+    static var timeOnlySetupBody: String {
+        lang == .chinese
+            ? "拍下当下，1Day 会自动保留拍摄时间；画面上的文字由每个人自己填写。"
+            : "Film the moment and 1Day keeps its time. Everyone can write their own caption."
+    }
+    static var timeOnlyMoment: String {
+        lang == .chinese ? "拍下这一刻" : "Film this moment"
+    }
+    static var timeOnlyReminder: String {
+        lang == .chinese
+            ? "现在的你在做什么？留两秒给这一刻。"
+            : "What are you doing right now? Keep two seconds of it."
     }
     static var next: String { lang == .chinese ? "下一步" : "Next" }
     static var back: String { lang == .chinese ? "返回" : "Back" }
@@ -789,24 +882,38 @@ enum Strings {
     static var writeYourOwn: String { lang == .chinese ? "写自己的" : "Write your own" }
     /// Entry point from the poster rack into the guided flow.
     static var writeYourOwnMoments: String {
-        lang == .chinese ? "自己写七个瞬间" : "Write your own moments"
+        lang == .chinese ? "自己写题目" : "Write your own prompts"
     }
     static var useTheseMoments: String { lang == .chinese ? "就用这些" : "Use these" }
     static var guidedHeading: String {
-        lang == .chinese ? "你的一天会是什么样？" : "What will your day look like?"
+        lang == .chinese ? "想拍什么，由你来写" : "Write what you might want to film"
     }
     static var guidedSubtitle: String {
         lang == .chinese
-            ? "回答几个小问题，答案就是你今天要拍的瞬间。不想答的可以留空。"
-            : "Answer a few small questions — your answers become the moments you'll film. Leave any of them blank to skip."
+            ? "先写两个可能遇见的画面就够了。今天真正开始以后，随时还能增加或修改。"
+            : "Start with two scenes you might encounter. Add or change them anytime once the day begins."
     }
     static var guidedNamePlaceholder: String {
         lang == .chinese ? "给这一天起个名字…" : "Name this day…"
     }
     static func guidedFootnote(filled: Int) -> String {
         lang == .chinese
-            ? "现在有 \(filled) 个瞬间。留空的会被跳过，之后也随时能改。"
-            : "\(filled) moments so far. Blank ones are skipped, and you can change any of them later."
+            ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
+            : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
+    }
+    static var yourPrompts: String { lang == .chinese ? "想拍的画面" : "Scenes to film" }
+    static var addAnotherPrompt: String {
+        lang == .chinese ? "再加一个题目" : "Add another prompt"
+    }
+    static var chooseFromPromptLibrary: String {
+        lang == .chinese ? "从提示库里选" : "Choose from the prompt library"
+    }
+    static var promptLibrary: String { lang == .chinese ? "提示库" : "Prompt library" }
+    static func customPromptPlaceholder(_ index: Int) -> String {
+        let chineseExamples = ["例如：出门前", "例如：今天这一餐", "例如：回家以后"]
+        let englishExamples = ["For example: before leaving", "For example: today's meal", "For example: back home"]
+        let examples = lang == .chinese ? chineseExamples : englishExamples
+        return examples[(index - 1) % examples.count]
     }
 
     // MARK: Timeline
