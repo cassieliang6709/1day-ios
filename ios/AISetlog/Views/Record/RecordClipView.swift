@@ -13,6 +13,7 @@ struct RecordClipView: View {
     let day: Int
     var slotTitle: String?
     var clipLength: Challenge.ClipLength = .tiny
+    var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
     /// clip is filed into a chosen plan instead of a fixed day slot.
     var isFreeform = false
@@ -136,6 +137,7 @@ struct RecordClipView: View {
                 timestamp: recorder.recordedAt,
                 overlayText: nil,
                 clipSeconds: clipSeconds,
+                showsPrompt: showsPrompt,
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
@@ -149,19 +151,39 @@ struct RecordClipView: View {
         .padding(.bottom, bottomInset)
     }
 
-    private var recordButton: some View {
+    private var recordButtonVisual: some View {
+        ZStack {
+            Circle()
+                .stroke(.white.opacity(0.55), lineWidth: 4)
+                .frame(width: 66, height: 66)
+            Circle()
+                .fill(myTint)
+                .frame(width: 50, height: 50)
+        }
+    }
+
+    /// The whole control surface starts recording. The centered layout makes
+    /// the primary camera action obvious and gives it a forgiving tap target.
+    private var idleRecordingControl: some View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            ZStack {
-                Circle()
-                    .stroke(.white.opacity(0.35), lineWidth: 4)
-                    .frame(width: 68, height: 68)
-                Circle()
-                    .fill(myTint)
-                    .frame(width: 52, height: 52)
+            VStack(spacing: 5) {
+                recordButtonVisual
+                Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
             }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.captureState(
+            recording: false,
+            secondsLabel: clipSecondsText
+        ))
     }
 
     /// While recording: a compact countdown row that leaves the camera frame
@@ -218,6 +240,7 @@ struct RecordClipView: View {
                 timestamp: recorder.recordedAt,
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
+                showsPrompt: showsPrompt,
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 ZStack {
@@ -449,15 +472,7 @@ struct RecordClipView: View {
             if recorder.state == .recording {
                 recordingControls
             } else {
-                HStack(spacing: 14) {
-                    recordButton
-                    Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.76)
-                    Spacer(minLength: 0)
-                }
+                idleRecordingControl
             }
         }
         .frame(maxWidth: .infinity)

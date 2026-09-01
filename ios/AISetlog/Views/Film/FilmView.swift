@@ -151,7 +151,7 @@ struct FilmView: View {
         do {
             var options = VideoStitcher.Options()
             options.crossfadeSeconds = fadeSeconds
-            options.showDayCaptions = includeCaptions
+            options.showDayCaptions = includeCaptions && !challenge.isTimeOnly
             options.layout = challenge.isShared ? .friendsTogether : .sequential
             options.titleCard = includeTitleCard ? titleCard : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)

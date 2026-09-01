@@ -7,6 +7,7 @@ struct TimelineHeader: View {
     let memberNames: [String]
     let myName: String?
     @Binding var viewMode: StoryViewMode
+    var showsViewModeToggle = true
     var isSyncing = false
     var syncError: String?
 
@@ -133,7 +134,9 @@ struct TimelineHeader: View {
 
             Spacer(minLength: 8)
 
-            ViewModeToggle(mode: $viewMode)
+            if showsViewModeToggle {
+                ViewModeToggle(mode: $viewMode)
+            }
         }
     }
 }

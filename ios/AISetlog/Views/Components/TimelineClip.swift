@@ -125,6 +125,7 @@ struct TimelineClip: View {
     var durationLabel: String?
     var reactions: [String] = []
     var mediaHeight: CGFloat = 130
+    var showsMomentTitle = true
     var onTap: (() -> Void)?
 
     var body: some View {
@@ -166,7 +167,7 @@ struct TimelineClip: View {
                     .foregroundStyle(Color.oneDaySky)
                     .frame(width: 22, height: 22)
                     .background(OneDay.surfaceSoft, in: Circle())
-                Text(momentTitle)
+                Text(showsMomentTitle ? momentTitle : Strings.timeOnlyMoment)
                     .font(.system(size: 13.5, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
@@ -215,14 +216,16 @@ struct TimelineClip: View {
                 .clipBox(height: mediaHeight)
                 .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
-                    Text(momentTitle)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(8)
+                    if showsMomentTitle {
+                        Text(momentTitle)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(8)
+                    }
                 }
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: "play.circle.fill")
@@ -235,14 +238,16 @@ struct TimelineClip: View {
         case .mine:
             EmptyFrame {
                 VStack(spacing: 7) {
-                    Image(systemName: momentIcon)
+                    Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(.system(size: 22, weight: .medium))
                         .foregroundStyle(Color.oneDayBlue)
                         .symbolEffect(.pulse)
-                    Text(momentTitle)
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .lineLimit(1)
+                    if showsMomentTitle {
+                        Text(momentTitle)
+                            .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                            .lineLimit(1)
+                    }
                     Text(Strings.tapToFilm)
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.oneDayBlue)

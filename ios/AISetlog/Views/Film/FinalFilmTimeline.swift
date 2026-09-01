@@ -168,7 +168,8 @@ struct FinalFilmTimeline: View {
                             authorName: clip.authorName,
                             durationLabel: challenge.resolvedClipLength.secondsLabel,
                             reactions: clip.emoji,
-                            mediaHeight: challenge.resolvedOrientation == .landscape ? 130 : 180)
+                            mediaHeight: challenge.resolvedOrientation == .landscape ? 130 : 180,
+                            showsMomentTitle: !challenge.isTimeOnly)
                     }
                 }
             }

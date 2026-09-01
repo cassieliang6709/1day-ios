@@ -22,7 +22,9 @@ struct StoryCard: View {
         challenge.cards.first { $0.clipFileName == nil }?.day
             ?? min(challenge.recordedCount + 1, max(challenge.cards.count, 1))
     }
-    private var nextMoment: String { presenter.title(forSlot: nextSlot) }
+    private var nextMoment: String {
+        challenge.isTimeOnly ? Strings.timeOnlyMoment : presenter.title(forSlot: nextSlot)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -224,6 +226,8 @@ struct StoryRowCard: View {
                 duration: StorySchedule(challenge).filmDuration)
         }
         let next = challenge.cards.first { $0.clipFileName == nil }?.day ?? 1
-        return Strings.nextUpMoment(presenter.title(forSlot: next))
+        return challenge.isTimeOnly
+            ? Strings.timeOnlyMoment
+            : Strings.nextUpMoment(presenter.title(forSlot: next))
     }
 }

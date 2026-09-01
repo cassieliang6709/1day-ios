@@ -68,7 +68,9 @@ enum ReminderService {
                         day: card.day,
                         fireDate: fireDate,
                         title: ChallengePresenter(challenge: challenge).displayTitle,
-                        body: Strings.eveningOneDayReminder(remaining: unrecorded.count)),
+                        body: challenge.isTimeOnly
+                            ? Strings.timeOnlyReminder
+                            : Strings.eveningOneDayReminder(remaining: unrecorded.count)),
                     isShared: challenge.isShared,
                     endDate: endDate,
                     progress: progress)

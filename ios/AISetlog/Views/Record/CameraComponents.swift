@@ -27,6 +27,7 @@ struct CameraShell<Content: View>: View {
     let timestamp: Date?
     let overlayText: String?
     let clipSeconds: Double
+    var showsPrompt = true
     /// nil = the classic portrait frame; set for landscape challenges.
     var aspectRatio: CGFloat? = nil
     @ViewBuilder var content: Content
@@ -46,7 +47,8 @@ struct CameraShell<Content: View>: View {
                     mode: mode,
                     timestamp: timestamp,
                     overlayText: overlayText,
-                    clipSeconds: clipSeconds
+                    clipSeconds: clipSeconds,
+                    showsPrompt: showsPrompt
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -74,6 +76,7 @@ struct MomentStampOverlay: View {
     let timestamp: Date?
     var overlayText: String?
     var clipSeconds: Double = 2
+    var showsPrompt = true
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -146,26 +149,28 @@ struct MomentStampOverlay: View {
                             if let name, !name.isEmpty {
                                 NameChip(name: name, scale: scale)
                             }
-                            Text(momentTitle)
-                                .font(.system(size: 22 * scale, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.62)
-                                .allowsTightening(true)
-                            Text(Strings.momentN(day))
-                                .font(.system(size: 12 * scale, weight: .black, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.78))
-                                .lineLimit(1)
-                            HStack(spacing: 7 * scale) {
-                                Capsule()
-                                    .fill(.white.opacity(0.42))
-                                    .frame(width: 34 * scale, height: max(3, 5 * scale))
-                                Capsule()
-                                    .fill(.white)
-                                    .frame(width: 46 * scale, height: max(3, 5 * scale))
-                                Capsule()
-                                    .fill(.white.opacity(0.42))
-                                    .frame(width: 34 * scale, height: max(3, 5 * scale))
+                            if showsPrompt {
+                                Text(momentTitle)
+                                    .font(.system(size: 22 * scale, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.62)
+                                    .allowsTightening(true)
+                                Text(Strings.momentN(day))
+                                    .font(.system(size: 12 * scale, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.78))
+                                    .lineLimit(1)
+                                HStack(spacing: 7 * scale) {
+                                    Capsule()
+                                        .fill(.white.opacity(0.42))
+                                        .frame(width: 34 * scale, height: max(3, 5 * scale))
+                                    Capsule()
+                                        .fill(.white)
+                                        .frame(width: 46 * scale, height: max(3, 5 * scale))
+                                    Capsule()
+                                        .fill(.white.opacity(0.42))
+                                        .frame(width: 34 * scale, height: max(3, 5 * scale))
+                                }
                             }
                         }
 
