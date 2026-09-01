@@ -298,6 +298,10 @@ enum Strings {
     static var startToday: String { lang == .chinese ? "开始今天" : "Start today" }
     static var enterInviteCode: String { lang == .chinese ? "输入邀请码" : "Enter invite code" }
     static var newStory: String { lang == .chinese ? "新建故事" : "New story" }
+    /// Home header progress, beside the date: "今天 1/7".
+    static func headerDateProgress(_ recorded: Int, _ total: Int) -> String {
+        lang == .chinese ? "今天 \(recorded)/\(total)" : "Today \(recorded)/\(total)"
+    }
     static var couldntJoin: String { lang == .chinese ? "无法加入" : "Couldn't join" }
     static var leaveRoom: String { lang == .chinese ? "退出房间" : "Leave room" }
     static var deleteChallenge: String { lang == .chinese ? "删除挑战" : "Delete challenge" }

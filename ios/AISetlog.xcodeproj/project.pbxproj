@@ -49,6 +49,7 @@
 		91462E380EFCCFEDDAA578AD /* CloudKitPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17D93D02F8DC097DBC7A95E /* CloudKitPaginationTests.swift */; };
 		938D7AD5D9086826F0097F4A /* VideoStitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */; };
 		94FA1CA14DC73ADCF0885E26 /* NotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B53FFB838BA4383441088A2 /* NotificationTests.swift */; };
+		9592A94F4960D646C187019A /* HomeHeaderSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0C98CC5E6DECB12A567511 /* HomeHeaderSummary.swift */; };
 		9ACA019799B6AA5A3B6CF38B /* DemoClipFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012557C7BAC9618102CA207A /* DemoClipFactoryTests.swift */; };
 		A382983CBFDA9838105E9E66 /* JoinedRoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F3CA683A65B31C86B7845A /* JoinedRoomTests.swift */; };
 		A6AAF976535B511EDABE4BBF /* AvatarStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D84D3822EA34E86397531 /* AvatarStack.swift */; };
@@ -57,6 +58,7 @@
 		ABA3F184ED9F5F221FC69467 /* ChallengeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73575490179E30D459EFDBA2 /* ChallengeRepository.swift */; };
 		B1D076EB4830B7B50BEC6B47 /* ClipPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA520086AD531DD7B14C9812 /* ClipPreviewView.swift */; };
 		B2226293963B94F0DE5E30BD /* MemberChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E29668954C7B76AF34FCD5 /* MemberChip.swift */; };
+		B3C26869172D622BF93B9838 /* HomeHeaderSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B595C1B836B816FC0E1DD54C /* HomeHeaderSummaryTests.swift */; };
 		B433A345D45D85E1B641928E /* Identity+Color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357B6A37FBB51AA264F15243 /* Identity+Color.swift */; };
 		B4B8040731E08FEF6E7CE47C /* CloudKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C8EBBAA108E0B6BAD2FF7C /* CloudKitService.swift */; };
 		B50AE57A978E1079AF2DD667 /* InviteCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990CDD78C85A0A08E3663223 /* InviteCodeTests.swift */; };
@@ -124,6 +126,7 @@
 		334D3FA26FA28D977BC50ECE /* VideoStitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStitcherTests.swift; sourceTree = "<group>"; };
 		357B6A37FBB51AA264F15243 /* Identity+Color.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Identity+Color.swift"; sourceTree = "<group>"; };
 		35CFF8D9FFA9B5BBF4505FAB /* RoomSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSyncService.swift; sourceTree = "<group>"; };
+		3A0C98CC5E6DECB12A567511 /* HomeHeaderSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHeaderSummary.swift; sourceTree = "<group>"; };
 		3B166E63A2BA6F620F69321D /* ClipFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipFileStore.swift; sourceTree = "<group>"; };
 		3B30BF702896AFF766E6DC46 /* Identity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Identity.swift; sourceTree = "<group>"; };
 		3F553DA583104CE8F17B75EC /* MomentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentCatalog.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 		B17F8C434A91C37FA23D4ADA /* StoryComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryComposerView.swift; sourceTree = "<group>"; };
 		B1A2AE0704E7AD406295107B /* DayCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCard.swift; sourceTree = "<group>"; };
 		B487D6D48C377EA89036DC9D /* StoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryCard.swift; sourceTree = "<group>"; };
+		B595C1B836B816FC0E1DD54C /* HomeHeaderSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHeaderSummaryTests.swift; sourceTree = "<group>"; };
 		B69C8214D7E4589DD44F78E8 /* sample-film.mp4 */ = {isa = PBXFileReference; path = "sample-film.mp4"; sourceTree = "<group>"; };
 		C17D93D02F8DC097DBC7A95E /* CloudKitPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitPaginationTests.swift; sourceTree = "<group>"; };
 		C77CA7B14A9377DA4208ECED /* Challenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Challenge.swift; sourceTree = "<group>"; };
@@ -444,6 +448,7 @@
 				C17D93D02F8DC097DBC7A95E /* CloudKitPaginationTests.swift */,
 				012557C7BAC9618102CA207A /* DemoClipFactoryTests.swift */,
 				C79D5F27B8576AAB79E4C5D1 /* GridTapTests.swift */,
+				B595C1B836B816FC0E1DD54C /* HomeHeaderSummaryTests.swift */,
 				990CDD78C85A0A08E3663223 /* InviteCodeTests.swift */,
 				88F3CA683A65B31C86B7845A /* JoinedRoomTests.swift */,
 				1203805BE113F00D0764E06C /* LocalizationTests.swift */,
@@ -459,6 +464,7 @@
 			isa = PBXGroup;
 			children = (
 				CAE40B9C575B80C591374DFE /* ChallengePresenter.swift */,
+				3A0C98CC5E6DECB12A567511 /* HomeHeaderSummary.swift */,
 				4B4ABC2D60D8190530746233 /* ModelDisplayText.swift */,
 				9393BC3FC31A23786C7E5543 /* StorySchedule.swift */,
 			);
@@ -633,6 +639,7 @@
 				CC5D2220CC11B1DBECE0ABA6 /* FloatingTabBar.swift in Sources */,
 				0A5FC5734BDBBDA9654D3588 /* GeneratingFilm.swift in Sources */,
 				575E54F104D80A114762C420 /* GuidedMomentsView.swift in Sources */,
+				9592A94F4960D646C187019A /* HomeHeaderSummary.swift in Sources */,
 				B433A345D45D85E1B641928E /* Identity+Color.swift in Sources */,
 				E890890209424E337E127B55 /* Identity.swift in Sources */,
 				70A01067E178AD7F0A0A3004 /* JoinInviteSheet.swift in Sources */,
@@ -678,6 +685,7 @@
 				91462E380EFCCFEDDAA578AD /* CloudKitPaginationTests.swift in Sources */,
 				9ACA019799B6AA5A3B6CF38B /* DemoClipFactoryTests.swift in Sources */,
 				F58DE78F432CEC831C3606EF /* GridTapTests.swift in Sources */,
+				B3C26869172D622BF93B9838 /* HomeHeaderSummaryTests.swift in Sources */,
 				B50AE57A978E1079AF2DD667 /* InviteCodeTests.swift in Sources */,
 				A382983CBFDA9838105E9E66 /* JoinedRoomTests.swift in Sources */,
 				1D93DD01DB9ACDB322995D4E /* LocalizationTests.swift in Sources */,

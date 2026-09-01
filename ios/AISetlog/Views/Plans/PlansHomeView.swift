@@ -138,51 +138,88 @@ struct PlansHomeView: View {
         }
     }
 
-    /// Greeting, then the two utility actions. No title bar — the greeting
-    /// *is* the title, which is what keeps the screen feeling personal.
+    /// Who you are, what day it is, how far today has got — then the two
+    /// actions. The wordmark used to sit here; it's the one fact a person
+    /// opening 1day already has, and it was crowding out the two they didn't.
+    ///
+    /// Nothing up here is allowed to outshine "continue today's story" in the
+    /// card below, so all three controls are the same 36pt and the create
+    /// button earns its emphasis from the brand gradient alone.
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                OneDayBrandLogo(width: 84)
+        HStack(spacing: 11) {
+            Button { showSettings = true } label: {
+                AvatarDot(name: account.account?.displayName, size: 42)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.settings)
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(Strings.greeting(
                     name: account.account?.displayName,
                     hour: Calendar.current.component(.hour, from: .now)))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
+                    .font(.system(size: 16.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+
+                dateline
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
 
-            Button {
-                showComposer = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(OneDay.brandHorizontal, in: Circle())
-                    .oneDayGlow(strength: 0.72)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 48, height: 48)
-            .contentShape(Rectangle())
-            .accessibilityLabel(Strings.newStory)
-
-            IconBubble(systemName: "person.2.badge.plus") {
+            IconBubble(systemName: "person.2.badge.plus", size: 36) {
                 joinCode = ""
                 showJoin = true
             }
             .accessibilityLabel(Strings.enterInviteCode)
 
-            Button { showSettings = true } label: {
-                AvatarDot(name: account.account?.displayName, size: 38)
+            Button {
+                showComposer = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(OneDay.brandHorizontal, in: Circle())
+                    .oneDaySoftShadow(strength: 0.6)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Strings.settings)
+            // Visually 36pt so it sits level with the bubble beside it, but
+            // the tap target still clears Apple's 44pt floor.
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            .accessibilityLabel(Strings.newStory)
         }
         .padding(.horizontal, 20)
+    }
+
+    /// Date, and — when there's a story in progress — how much of it is in.
+    /// The pips are the first thing to go on a narrow screen; the numbers
+    /// carry the same fact and always fit.
+    private var dateline: some View {
+        let summary = HomeHeaderSummary(challenge: hero)
+        return HStack(spacing: 6) {
+            Text(summary.dateLine)
+                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                .foregroundStyle(OneDay.inkSoft)
+                .lineLimit(1)
+                .fixedSize()
+
+            if summary.hasProgress, let recorded = summary.recorded, let total = summary.total {
+                Circle()
+                    .fill(OneDay.inkFaint)
+                    .frame(width: 3, height: 3)
+
+                Text(summary.progressLine)
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
+                    .fixedSize()
+
+                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBlue)
+                    .layoutPriority(-1)
+            }
+        }
     }
 
     private func heroSection(_ challenge: Challenge) -> some View {
