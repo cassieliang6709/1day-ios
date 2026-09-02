@@ -39,28 +39,14 @@ jobs:
             exit 1
           fi
 
-      # Ask xcodebuild which simulator it can run on, instead of naming a phone
-      # and hoping the image still has one — it stopped having `iPhone 16`, and
-      # a simulator created behind xcodebuild's back never appears in this list
-      # at all. Whichever iPhone comes back first is fine: these are unit tests,
-      # they don't care about the screen.
-      - name: Pick a simulator
-        run: |
-          simulator=$(xcodebuild -showdestinations -scheme AISetlog 2>/dev/null \
-            | grep 'platform:iOS Simulator' | grep -v placeholder \
-            | sed -n 's/.*id:\([0-9A-Fa-f-]*\).*/\1/p' | head -1)
-          if [ -z "$simulator" ]; then
-            echo "::error::this Xcode can't use any simulator on the runner"
-            xcodebuild -showdestinations -scheme AISetlog || true
-            exit 1
-          fi
-          echo "SIMULATOR_ID=$simulator" >> "$GITHUB_ENV"
-          echo "testing on $simulator"
-
+      # The runner has no iOS simulators sitting there — naming a *device type*
+      # is what makes xcodebuild create one, on the newest runtime it can use.
+      # That's why this line was never the problem, and why looking the device
+      # up first can't work: there's nothing to find until the test run asks.
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination "id=$SIMULATOR_ID" \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO
