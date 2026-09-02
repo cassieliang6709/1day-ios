@@ -93,6 +93,10 @@ struct StoryTimelineView: View {
                     challenge: challenge,
                     memberNames: members.map(\.name),
                     myName: account.account?.displayName,
+                    progress: RoomProgress(
+                        momentCount: challenge.cards.count,
+                        clips: clips,
+                        myID: account.account?.id ?? RoomProgress.soloAuthorID),
                     viewMode: $viewMode,
                     showsViewModeToggle: false,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""),

@@ -954,6 +954,11 @@ enum Strings {
             ? "大家在一天里各自拍下瞬间，1Day 把它们缝成一部影片。"
             : "Everyone captures moments through the day. 1Day stitches them into one beautiful film."
     }
+    /// Beside the room's own count, so "3/5" can mean the day and this can
+    /// mean me. Only shown when the two differ.
+    static func yourTakes(_ count: Int) -> String {
+        lang == .chinese ? "你 \(count) 个" : "you · \(count)"
+    }
     static var scriptLabel: String { lang == .chinese ? "脚本" : "Script" }
     static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
     static var createStoryCTA: String { lang == .chinese ? "创建故事" : "Create story" }

@@ -99,7 +99,7 @@ struct FinalFilmTimeline: View {
     /// Duration, moment count, people — the film's stats in one strip.
     private var facts: some View {
         HStack(spacing: 0) {
-            fact(icon: "clock", title: Strings.durationLabel, value: schedule.filmDuration)
+            fact(icon: "clock", title: Strings.durationLabel, value: schedule.filmDuration())
             divider
             fact(
                 icon: "circle.grid.2x2.fill",

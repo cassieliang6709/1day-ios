@@ -223,7 +223,7 @@ struct StoryRowCard: View {
     private var subtitle: String {
         if challenge.isComplete {
             return Strings.filmReadySubtitle(
-                duration: StorySchedule(challenge).filmDuration)
+                duration: StorySchedule(challenge).filmDuration())
         }
         let next = challenge.cards.first { $0.clipFileName == nil }?.day ?? 1
         return challenge.isTimeOnly
