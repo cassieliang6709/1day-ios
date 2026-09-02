@@ -39,10 +39,39 @@ jobs:
             exit 1
           fi
 
-      # The runner has no iOS simulators sitting there — naming a *device type*
-      # is what makes xcodebuild create one, on the newest runtime it can use.
-      # That's why this line was never the problem, and why looking the device
-      # up first can't work: there's nothing to find until the test run asks.
+      # The runner has no iOS simulator sitting there, and naming a device type
+      # only sometimes makes xcodebuild create one — same workflow, one job
+      # found an iPhone 16 and the next found nothing at all. So make it here,
+      # on the runtime that matches the SDK, and check xcodebuild can see it
+      # before the test run depends on it.
+      - name: Create a simulator
+        run: |
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          runtimes=$(xcrun simctl list runtimes -j)
+          runtime=$(jq -r --arg sdk "$sdk" \
+            '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
+             | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
+             | .[0].identifier // ""' <<<"$runtimes")
+          device=$(jq -r --arg r "$runtime" \
+            '.runtimes[] | select(.identifier == $r)
+             | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
+             | .[0].identifier // ""' <<<"$runtimes")
+          if [ -z "$runtime" ] || [ -z "$device" ]; then
+            echo "::error::no iOS simulator runtime matches SDK $sdk"
+            xcrun simctl list runtimes
+            exit 1
+          fi
+          udid=$(xcrun simctl create ci-iphone "$device" "$runtime")
+          xcrun simctl bootstatus "$udid" -b
+          echo "SDK $sdk on $runtime -> $udid"
+          if ! xcodebuild -showdestinations -scheme AISetlog 2>/dev/null \
+            | grep -q "$udid"; then
+            echo "::error::xcodebuild can't see the simulator we just made"
+            xcodebuild -showdestinations -scheme AISetlog || true
+            exit 1
+          fi
+          echo "SIMULATOR_ID=$udid" >> "$GITHUB_ENV"
+
       # The four suites below talk to the real CloudKit development database.
       # They already skip on a simulator that isn't signed into iCloud — but
       # here they can't even ask: unsigned means no iCloud entitlement, and
@@ -53,7 +82,7 @@ jobs:
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "id=$SIMULATOR_ID" \
             -derivedDataPath build/DerivedData \
             -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
             -skip-testing:AISetlogTests/CloudKitPaginationTests \
