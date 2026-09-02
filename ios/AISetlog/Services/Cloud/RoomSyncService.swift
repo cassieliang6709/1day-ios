@@ -97,4 +97,20 @@ final class RoomSyncService {
     func deleteComment(id: String) async {
         try? await CloudKitService.deleteComment(id: id)
     }
+
+#if DEBUG
+    /// Put a room's contents in place without CloudKit. See `DemoRoom` — the
+    /// only caller, and the only reason `remoteClips` isn't fully private.
+    func stubRoom(
+        code: String,
+        clips: [CloudKitService.RemoteClip],
+        reactions: [CloudKitService.RemoteReaction],
+        comments: [CloudKitService.RemoteComment]
+    ) {
+        remoteClips[code] = clips
+        remoteReactions[code] = reactions
+        remoteComments[code] = comments
+        lastError[code] = nil
+    }
+#endif
 }

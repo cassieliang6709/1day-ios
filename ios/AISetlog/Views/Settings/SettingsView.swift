@@ -123,6 +123,9 @@ struct SettingsView: View {
                 }
                 accountSection
                 aboutSection
+                #if DEBUG
+                debugSection
+                #endif
             }
             .navigationTitle(Strings.settings)
             .navigationBarTitleDisplayMode(.inline)
@@ -213,6 +216,23 @@ struct SettingsView: View {
         account.rename(to: draftName)
         draftName = account.account?.displayName ?? ""
     }
+
+#if DEBUG
+    /// Not localized, like the rest of the debug affordances: the audience is
+    /// whoever is building the thing.
+    private var debugSection: some View {
+        Section {
+            Button("Open a demo room") {
+                DemoRoom.seed(into: store)
+                dismiss()
+            }
+        } header: {
+            Text("Debug")
+        } footer: {
+            Text("A shared room with two friends, their clips and reactions already in it — made on this device. No iCloud, no second phone. It appears at the top of the home screen. Filming in it works; nothing leaves the device.")
+        }
+    }
+#endif
 
     private var aboutSection: some View {
         Section {

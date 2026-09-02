@@ -177,6 +177,15 @@ final class ChallengeStore {
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
+        #if DEBUG
+        // Nothing to fetch: this room only ever existed on this device. Its
+        // contents come back off disk instead, which is also what makes it
+        // survive a relaunch.
+        if DemoRoom.isDemo(code) {
+            DemoRoom.restore(into: self)
+            return
+        }
+        #endif
         _ = await roomSync.syncClips(code: code)
         if let interactions = await roomSync.fetchInteractions(code: code) {
             roomSync.remoteReactions[code] = interactions.reactions
@@ -338,6 +347,17 @@ final class ChallengeStore {
         // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {
             let dest = fileStore.clipURL(fileName: fileName, challengeID: challengeID)
+            #if DEBUG
+            if DemoRoom.isDemo(code) {
+                // Stands in for the upload coming back down. Without it your
+                // own clip disappears the moment you film it, because a room
+                // with remote clips shows only those.
+                Task { @MainActor in
+                    DemoRoom.absorb(clipAt: dest, day: day, authorID: me.id, into: self)
+                }
+                return
+            }
+            #endif
             Task { @MainActor in
                 if await roomSync.uploadClip(
                     code: code, day: day, authorID: me.id,
