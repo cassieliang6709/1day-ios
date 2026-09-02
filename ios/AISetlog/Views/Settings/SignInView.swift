@@ -20,7 +20,7 @@ struct SignInView: View {
             Spacer()
 
             Image(systemName: "person.2.circle.fill")
-                .font(.system(size: 64))
+                .font(.system(size: 52))
                 .foregroundStyle(Color.oneDayBlue.gradient)
 
             VStack(spacing: 8) {
@@ -30,6 +30,10 @@ struct SignInView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    // Without this the medium detent squeezes two lines into
+                    // one and truncates: the sheet asks for an Apple ID and
+                    // cuts off the sentence explaining what it's for.
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()

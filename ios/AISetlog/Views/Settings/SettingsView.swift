@@ -9,6 +9,9 @@ struct SettingsView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    /// Held locally so a half-typed name never reaches the rooms.
+    @State private var draftName = ""
+    @FocusState private var nameFocused: Bool
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
@@ -145,8 +148,18 @@ struct SettingsView: View {
     @ViewBuilder
     private var accountSection: some View {
         Section {
-            if let name = account.account?.displayName {
-                LabeledContent(Strings.signedInAs, value: name)
+            if account.isSignedIn {
+                LabeledContent(Strings.yourNameLabel) {
+                    TextField(Strings.yourNamePlaceholder, text: $draftName)
+                        .multilineTextAlignment(.trailing)
+                        .focused($nameFocused)
+                        .submitLabel(.done)
+                        .onSubmit(commitName)
+                        .accessibilityIdentifier("your-name")
+                }
+                .onChange(of: nameFocused) { _, focused in
+                    if !focused { commitName() }
+                }
                 Button(Strings.signOut) { account.signOut() }
             } else {
                 Text(Strings.notSignedIn)
@@ -160,7 +173,15 @@ struct SettingsView: View {
         } header: {
             Text(Strings.account)
         } footer: {
-            Text(Strings.deleteAccountFootnote)
+            VStack(alignment: .leading, spacing: 6) {
+                if account.isSignedIn { Text(Strings.yourNameFootnote) }
+                Text(Strings.deleteAccountFootnote)
+            }
+        }
+        .onAppear { draftName = account.account?.displayName ?? "" }
+        .onChange(of: account.account?.displayName) { _, name in
+            guard !nameFocused else { return }
+            draftName = name ?? ""
         }
         .confirmationDialog(
             Strings.deleteAccountTitle,
@@ -185,6 +206,12 @@ struct SettingsView: View {
                     .controlSize(.large)
             }
         }
+    }
+
+    /// An empty field means "I didn't mean to do that", not "call me nothing".
+    private func commitName() {
+        account.rename(to: draftName)
+        draftName = account.account?.displayName ?? ""
     }
 
     private var aboutSection: some View {

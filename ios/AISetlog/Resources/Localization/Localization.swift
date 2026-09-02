@@ -1143,6 +1143,19 @@ enum Strings {
     static var version: String { lang == .chinese ? "版本" : "Version" }
     static var privacyPolicy: String { lang == .chinese ? "隐私政策" : "Privacy Policy" }
     static var signedInAs: String { lang == .chinese ? "已登录" : "Signed in as" }
+    /// The label on the editable name row, and what a room shows for you.
+    static var yourNameLabel: String { lang == .chinese ? "你的名字" : "Your name" }
+    static var yourNamePlaceholder: String {
+        lang == .chinese ? "朋友看到的名字" : "What friends see"
+    }
+    static var yourNameFootnote: String {
+        lang == .chinese
+            ? "共享房间里，你的片段会挂在这个名字下。改名只影响以后拍的。"
+            : "This is the name on your clips in a shared room. Renaming affects clips from here on."
+    }
+    /// Apple only hands over a name on the very first sign-in. Without one,
+    /// somebody has to be called something in a room full of friends.
+    static var defaultMemberName: String { lang == .chinese ? "朋友" : "Friend" }
     static var notSignedIn: String {
         lang == .chinese ? "未登录（只有共享故事需要登录）" : "Not signed in — only shared stories need it"
     }
