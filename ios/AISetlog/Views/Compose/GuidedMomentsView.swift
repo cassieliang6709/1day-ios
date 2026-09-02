@@ -31,8 +31,12 @@ struct GuidedMomentsView: View {
         answers.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
+    private var needsName: Bool {
+        storyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var canSave: Bool {
-        filledCount >= 2 && !storyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        filledCount >= 2 && !needsName
     }
 
     var body: some View {
@@ -98,8 +102,19 @@ struct GuidedMomentsView: View {
                     .foregroundStyle(OneDay.ink)
                     .tint(Color.oneDayBlue)
                     .accessibilityIdentifier("custom-story-name")
+
+                // Only once there are prompts to save: before that the empty
+                // field is obviously unfinished and doesn't need telling on.
+                if needsName, filledCount >= 2 {
+                    Text(Strings.storyNameNeeded)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBlue)
+                        .padding(.top, 3)
+                        .transition(.opacity)
+                }
             }
         }
+        .animation(OneDay.Motion.soft, value: canSave)
     }
 
     /// A day that hasn't happened yet is hard to write prompts for, which is
@@ -229,7 +244,7 @@ struct GuidedMomentsView: View {
     private var footnote: some View {
         HStack(alignment: .top, spacing: 10) {
             OneDayBuddy(size: 30)
-            Text(Strings.guidedFootnote(filled: filledCount))
+            Text(Strings.guidedFootnote(filled: filledCount, needsName: needsName))
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -284,6 +299,11 @@ struct GuidedMomentsView: View {
                 metrics.recordGenerated()
                 offeredPrompts = prompts
                 answers = SuggestedPromptFill.apply(prompts, to: answers)
+                // The sentence already named the day. Only when the field is
+                // still blank — a name someone typed is never overwritten.
+                if needsName, let seeded = IntentStoryName.derive(from: sentence) {
+                    storyName = seeded
+                }
             } catch PromptSuggestionError.rateLimited {
                 suggestionNote = Strings.suggestRateLimited
             } catch {

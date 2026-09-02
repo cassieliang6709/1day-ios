@@ -981,10 +981,32 @@ enum Strings {
     static var guidedNamePlaceholder: String {
         lang == .chinese ? "给这一天起个名字…" : "Name this day…"
     }
-    static func guidedFootnote(filled: Int) -> String {
-        lang == .chinese
-            ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
-            : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
+    /// Says what "就用这些" is still waiting for. A grey button whose reason
+    /// lives off-screen is a dead end, and the name field scrolls away first.
+    static func guidedFootnote(filled: Int, needsName: Bool) -> String {
+        let enoughPrompts = filled >= 2
+        switch (enoughPrompts, needsName) {
+        case (false, true):
+            return lang == .chinese
+                ? "还差故事名字，和至少 2 个题目。"
+                : "Still needs a name and at least 2 prompts."
+        case (true, true):
+            return lang == .chinese
+                ? "题目够了。上面给这一天起个名字，就能保存。"
+                : "Prompts are ready. Name the day up top and you can save."
+        case (false, false):
+            return lang == .chinese
+                ? "已经写了 \(filled) 个，至少要 2 个。"
+                : "\(filled) written; 2 is the minimum."
+        case (true, false):
+            return lang == .chinese
+                ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
+                : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
+        }
+    }
+    /// Shown on the name card itself, where the fix is.
+    static var storyNameNeeded: String {
+        lang == .chinese ? "保存前得先起个名字。" : "A name is needed before saving."
     }
     // MARK: Prompts from one sentence
 
