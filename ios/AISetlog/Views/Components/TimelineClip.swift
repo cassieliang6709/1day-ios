@@ -167,10 +167,17 @@ struct TimelineClip: View {
                     .foregroundStyle(Color.oneDaySky)
                     .frame(width: 22, height: 22)
                     .background(OneDay.surfaceSoft, in: Circle())
-                Text(showsMomentTitle ? momentTitle : Strings.timeOnlyMoment)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
+                // Nothing to say when the story has no prompts. This used to
+                // fall back to "Film this moment" — which, down a record-by-time
+                // timeline, printed the same seven words seven times, under a
+                // frame that already says "tap to film". A story with no titles
+                // should look like one, not like seven identical to-dos.
+                if showsMomentTitle {
+                    Text(momentTitle)
+                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 4)
