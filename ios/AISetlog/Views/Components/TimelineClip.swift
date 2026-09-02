@@ -112,8 +112,10 @@ struct TimelineClip: View {
         case filmed(url: URL, recordedAt: Date?)
         /// Mine to film, and it's next up.
         case mine
-        /// Someone else hasn't filmed theirs yet.
-        case waiting(friend: String)
+        // No `.waiting(friend:)` any more. A friend who hasn't filmed used to
+        // get a 120pt card under every moment they hadn't filmed; who the room
+        // is waiting on is one line at the bottom of the story page now, and
+        // `RoomCast` is the only thing that decides it.
         /// A slot further down the day that nobody is on yet.
         case upcoming
     }
@@ -154,12 +156,6 @@ struct TimelineClip: View {
                 Text(authorName ?? Strings.youLabel)
                     .font(.system(size: 13.5, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                    .lineLimit(1)
-            case .waiting(let friend):
-                AvatarDot(name: friend, size: 22, isPending: true)
-                Text(friend)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkFaint)
                     .lineLimit(1)
             case .upcoming:
                 Image(systemName: momentIcon)
@@ -260,20 +256,6 @@ struct TimelineClip: View {
                         .foregroundStyle(Color.oneDayBlue)
                 }
                 .padding(.vertical, 22)
-            }
-
-        case .waiting(let friend):
-            EmptyFrame {
-                HStack(spacing: 9) {
-                    OneDayBuddy(size: 26)
-                    Text(Strings.waitingForMoment(friend))
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
-                }
-                .padding(.vertical, 16)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         case .upcoming:

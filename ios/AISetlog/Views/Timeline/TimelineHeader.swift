@@ -4,8 +4,8 @@ import SwiftUI
 /// day has got. Small on purpose — the line below it is the content.
 struct TimelineHeader: View {
     let challenge: Challenge
-    let memberNames: [String]
-    let myName: String?
+    /// Who's in the room. Nil for a solo story, which has nobody to name.
+    let cast: RoomCast?
     /// Everyone's, not just mine. See `RoomProgress`.
     let progress: RoomProgress
     @Binding var viewMode: StoryViewMode
@@ -21,8 +21,8 @@ struct TimelineHeader: View {
         VStack(alignment: .leading, spacing: 14) {
             title
 
-            if challenge.isShared, !memberNames.isEmpty {
-                roster
+            if let cast, !cast.members.isEmpty {
+                RoomRoster(cast: cast)
             }
 
             if challenge.isShared, let code = challenge.roomCode {
@@ -52,20 +52,6 @@ struct TimelineHeader: View {
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
         }
-    }
-
-    /// Faces first — a shared story should show the people before the numbers.
-    /// Pending members stay visible, hollowed out, so the group never shrinks.
-    private var roster: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 14) {
-                ForEach(memberNames, id: \.self) { name in
-                    AvatarBadge(name: name, isYou: name == myName)
-                }
-            }
-            .padding(.vertical, 2)
-        }
-        .scrollIndicators(.hidden)
     }
 
     /// The join code, in full, on the screen the owner is already looking at.

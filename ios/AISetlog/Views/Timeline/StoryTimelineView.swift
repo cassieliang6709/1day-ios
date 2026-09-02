@@ -89,13 +89,21 @@ struct StoryTimelineView: View {
         let members = store.members(for: challengeID)
         let myID = account.account?.id ?? RoomProgress.soloAuthorID
         let agenda = StoryAgenda(momentCount: challenge.cards.count, clips: clips, myID: myID)
+        // Only ever built for a shared room. Everything it draws — the roster,
+        // who filmed, who we're waiting on — is a sentence about other people,
+        // and a solo story has none to write about.
+        let cast = challenge.isShared
+            ? RoomCast(
+                members: members, clips: clips,
+                momentCount: challenge.cards.count,
+                myID: myID, myName: account.account?.displayName)
+            : nil
 
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 TimelineHeader(
                     challenge: challenge,
-                    memberNames: members.map(\.name),
-                    myName: account.account?.displayName,
+                    cast: cast,
                     progress: RoomProgress(
                         momentCount: challenge.cards.count,
                         clips: clips,
@@ -106,7 +114,9 @@ struct StoryTimelineView: View {
 
                 StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
 
-                nextCard(challenge, agenda: agenda, clipCount: clips.count)
+                nextCard(
+                    challenge, agenda: agenda, clipCount: clips.count,
+                    roomNote: cast?.filmedNote)
 
                 if !agenda.filmed.isEmpty {
                     section(Strings.filmedHeader) {
@@ -133,6 +143,18 @@ struct StoryTimelineView: View {
                     section(Strings.stillOpenHeader) {
                         quietList(challenge, agenda: agenda)
                     }
+                }
+
+                // One line about who the room is waiting on, at the bottom
+                // where what's missing belongs. It replaced a card under every
+                // moment naming the friends who hadn't filmed it — the same
+                // fact, restated once per slot per person.
+                //
+                // Silent once the day is full: the room got there, and a page
+                // that has just offered you the film shouldn't also be tapping
+                // its watch.
+                if !agenda.isComplete, let note = cast?.waitingNote {
+                    RoomNote(note: note, isPending: true)
                 }
             }
             .padding(.horizontal, 20)
@@ -173,7 +195,8 @@ struct StoryTimelineView: View {
     /// The page's one loud thing.
     @ViewBuilder
     private func nextCard(
-        _ challenge: Challenge, agenda: StoryAgenda, clipCount: Int
+        _ challenge: Challenge, agenda: StoryAgenda, clipCount: Int,
+        roomNote: RoomCast.Note?
     ) -> some View {
         switch agenda.next {
         case .film(let slot):
@@ -183,7 +206,8 @@ struct StoryTimelineView: View {
                     icon: slotIcon(challenge, slot: slot),
                     slot: slot,
                     total: max(agenda.total, slot)),
-                durationLabel: challenge.resolvedClipLength.secondsLabel
+                durationLabel: challenge.resolvedClipLength.secondsLabel,
+                roomNote: roomNote
             ) {
                 sheet = .record(day: slot)
             }
