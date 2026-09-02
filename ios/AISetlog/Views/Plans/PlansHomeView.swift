@@ -197,7 +197,7 @@ struct PlansHomeView: View {
     /// The pips are the first thing to go on a narrow screen; the numbers
     /// carry the same fact and always fit.
     private var dateline: some View {
-        let summary = HomeHeaderSummary(progress: hero.map(progress(for:)))
+        let summary = HomeHeaderSummary(progress: hero.map { cardState(for: $0).progress })
         return HStack(spacing: 6) {
             Text(summary.dateLine)
                 .font(.system(size: 11.5, weight: .bold, design: .rounded))
@@ -226,16 +226,17 @@ struct PlansHomeView: View {
     /// unfinished story from yesterday "today's story" is the kind of small lie
     /// that makes the whole screen untrustworthy.
     private func heroSection(_ challenge: Challenge, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let state = cardState(for: challenge)
+        return VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: label)
                 .padding(.horizontal, 20)
 
             StoryCard(
                 challenge: challenge,
                 memberNames: store.members(for: challenge.id).map(\.name),
-                progress: progress(for: challenge),
-                coverURL: latestClipURL(for: challenge),
-                refreshToken: latestRecordedAt(for: challenge),
+                progress: state.progress,
+                coverURL: state.coverURL,
+                refreshToken: state.refreshToken,
                 onContinue: { recordChallenge = challenge },
                 onOpen: { path.append(challenge.id) })
                 .padding(.horizontal, 20)
@@ -293,8 +294,11 @@ struct PlansHomeView: View {
     /// Everything that isn't today, newest day first. One label per day, then
     /// that day's stories — finished or not, they sit together, because "when"
     /// is the axis people actually remember by.
+    /// Lazy because each row costs a pass over its story's clips: an eager
+    /// stack rebuilt every off-screen row on every render, and this list only
+    /// grows.
     private var timelineSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        LazyVStack(alignment: .leading, spacing: 18) {
             SectionLabel(text: timeline.includesToday
                 ? Strings.yourStories
                 : Strings.scrollBack)
@@ -316,14 +320,15 @@ struct PlansHomeView: View {
     }
 
     private func storyRow(_ challenge: Challenge) -> some View {
-        Button {
+        let state = cardState(for: challenge)
+        return Button {
             path.append(challenge.id)
         } label: {
             StoryRowCard(
                 challenge: challenge,
-                progress: progress(for: challenge),
-                coverURL: latestClipURL(for: challenge),
-                refreshToken: latestRecordedAt(for: challenge),
+                progress: state.progress,
+                coverURL: state.coverURL,
+                refreshToken: state.refreshToken,
                 memberNames: store.members(for: challenge.id).map(\.name))
         }
         .buttonStyle(.plain)
@@ -374,7 +379,7 @@ struct PlansHomeView: View {
         // The first moment *nobody* has filmed. Offering one a friend already
         // covered, while an untouched one waits further down, is how a room
         // ends up with three takes of breakfast and no evening.
-        return progress(for: challenge).nextOpenMoment
+        return cardState(for: challenge).progress.nextOpenMoment
     }
 
     // MARK: - Routing
@@ -433,34 +438,37 @@ struct PlansHomeView: View {
 
     // MARK: - Progress and cover art
 
-    /// The day counted over everyone in it. The cards alone only know what I
-    /// filmed, which is the whole story on my own and a third of it in a room.
-    private func progress(for challenge: Challenge) -> RoomProgress {
-        RoomProgress(
-            momentCount: challenge.cards.count,
-            clips: store.recordedClips(for: challenge.id),
-            myID: account.account?.id ?? RoomProgress.soloAuthorID)
+    /// Everything a card needs about a story, from one pass over its clips.
+    ///
+    /// `recordedClips` is not cheap — it localises every moment title and
+    /// rebuilds a documents-directory URL per card, and in a room it filters
+    /// the whole reaction and comment list per clip. Asking for it three times
+    /// per row (progress, cover, refresh token) tripled that for nothing.
+    private struct CardState {
+        let progress: RoomProgress
+        /// The most recent clip in the story, from anyone. A room where only my
+        /// friends have filmed used to fall back to the template art, so the
+        /// card looked untouched while it was three moments in.
+        let coverURL: URL?
+        /// Re-records reuse the same file name, so a cached frame needs the
+        /// clip's `recordedAt` to notice the change.
+        let refreshToken: Date?
     }
 
-    /// The most recent clip in the story, from anyone. A room where only my
-    /// friends have filmed used to fall back to the template art, so the card
-    /// looked untouched while it was three moments in.
-    private func latestClip(for challenge: Challenge) -> DayClip? {
+    private func cardState(for challenge: Challenge) -> CardState {
+        let clips = store.recordedClips(for: challenge.id)
         // Day breaks the tie, so a clip with no timestamp still sorts sanely
         // rather than sinking to the bottom of the pile.
-        store.recordedClips(for: challenge.id).max {
+        let latest = clips.max {
             ($0.recordedAt ?? .distantPast, $0.day) < ($1.recordedAt ?? .distantPast, $1.day)
         }
-    }
-
-    private func latestClipURL(for challenge: Challenge) -> URL? {
-        latestClip(for: challenge)?.url
-    }
-
-    /// Re-records reuse the same file name, so a cached frame needs the clip's
-    /// `recordedAt` to notice the change.
-    private func latestRecordedAt(for challenge: Challenge) -> Date? {
-        latestClip(for: challenge)?.recordedAt
+        return CardState(
+            progress: RoomProgress(
+                momentCount: challenge.cards.count,
+                clips: clips,
+                myID: account.account?.id ?? RoomProgress.soloAuthorID),
+            coverURL: latest?.url,
+            refreshToken: latest?.recordedAt)
     }
 
 }
