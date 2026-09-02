@@ -16,7 +16,7 @@ import Foundation
 /// played and again when a film is exported, so turning it off gives you back
 /// exactly what the camera saw. That's the whole reason this is a value and not
 /// a step in the capture pipeline.
-struct GentleLook: Equatable, Codable, Sendable {
+struct GentleLook: Hashable, Codable, Sendable {
     /// Softens skin. 0 is the camera's own sharpness.
     let smoothing: Double
     /// Lifts the picture out of the gloom, and lets a little colour go with it.
@@ -91,6 +91,18 @@ struct GentleLook: Equatable, Codable, Sendable {
         Self.presets.first { $0.look == self }?.key
     }
 
+    /// What to call a preset on screen. Here rather than in each of the two
+    /// places that lists them, so the panel over a clip and the row in Settings
+    /// can't drift apart.
+    static func presetName(_ key: String) -> String {
+        switch key {
+        case "look_clean": Strings.lookClean
+        case "look_soft": Strings.lookSoft
+        case "look_warm": Strings.lookWarm
+        default: Strings.lookAsShot
+        }
+    }
+
     // MARK: - What a filter chain needs
 
     /// The derived numbers, in the units Core Image wants.
@@ -160,6 +172,22 @@ extension GentleLook: RawRepresentable {
     /// What the views bind to. One key, so playback and export can't disagree
     /// about what you chose.
     static let storageKey = "gentleLook.v1"
+
+    /// Whether the look outlives the app being closed.
+    ///
+    /// Two keys rather than one because "make me look softer in this clip" and
+    /// "make me look softer forever" are different requests, and the second one
+    /// deserves to be asked for rather than assumed. Off is the default: a dial
+    /// you moved once, on a day you didn't like your face, shouldn't quietly
+    /// become how you see every day after it.
+    static let stickyKey = "gentleLook.sticky.v1"
+
+    /// What the app should open on, given what was stored and whether you asked
+    /// it to stick. Pure so the rule is testable — the alternative is finding
+    /// out by quitting the app.
+    static func onLaunch(stored: GentleLook, sticky: Bool) -> GentleLook {
+        sticky ? stored : .none
+    }
 
     var rawValue: String {
         [smoothing, brightness, warmth]

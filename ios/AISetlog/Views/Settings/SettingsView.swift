@@ -16,6 +16,8 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -66,6 +68,8 @@ struct SettingsView: View {
                 } footer: {
                     Text(Strings.appearanceFootnote)
                 }
+
+                lookSection
 
                 Section {
                     Toggle(
@@ -144,6 +148,29 @@ struct SettingsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    // MARK: - How clips look
+
+    /// The same two controls the panel over a clip has, for when you want them
+    /// without opening a clip. The dials are deliberately not here — a dial you
+    /// can't see the effect of is a dial you're guessing at, so fine-tuning
+    /// stays on the screen with the picture on it.
+    private var lookSection: some View {
+        Section {
+            Picker(Strings.lookSetting, selection: $look) {
+                ForEach(GentleLook.presets, id: \.key) { preset in
+                    Text(GentleLook.presetName(preset.key)).tag(preset.look)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            Toggle(Strings.lookRemember, isOn: $lookIsSticky)
+        } header: {
+            Text(Strings.lookSetting)
+        } footer: {
+            Text("\(Strings.lookFootnote)\n\(Strings.lookRememberFootnote)")
+        }
     }
 
     // MARK: - Account

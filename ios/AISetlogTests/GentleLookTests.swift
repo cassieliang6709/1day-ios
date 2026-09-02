@@ -206,6 +206,26 @@ final class GentleLookTests: XCTestCase {
                        GentleLook(smoothing: 1, brightness: 0, warmth: 0.5))
     }
 
+    /// "Keep this from now on" off means the app opens on 原样 — a dial you
+    /// moved once, on a day you didn't like your face, shouldn't become how you
+    /// see every day after it.
+    func testTheLookIsForgottenOnLaunchUnlessYouAskedItToStay() {
+        XCTAssertEqual(GentleLook.onLaunch(stored: .soft, sticky: false), .none)
+        XCTAssertEqual(GentleLook.onLaunch(stored: .soft, sticky: true), .soft)
+        XCTAssertEqual(GentleLook.onLaunch(stored: .none, sticky: false), .none)
+
+        let custom = GentleLook(smoothing: 0.2, brightness: 0.7, warmth: 0.1)
+        XCTAssertEqual(GentleLook.onLaunch(stored: custom, sticky: true), custom)
+        XCTAssertEqual(GentleLook.onLaunch(stored: custom, sticky: false), .none)
+    }
+
+    /// The `Picker` in Settings selects by tag, which needs this.
+    func testEqualLooksHashAlike() {
+        XCTAssertEqual(GentleLook.soft.hashValue, GentleLook(
+            smoothing: 0.60, brightness: 0.50, warmth: 0.35).hashValue)
+        XCTAssertEqual(Set(GentleLook.presets.map(\.look)).count, 4)
+    }
+
     func testCodableRoundTrips() throws {
         let data = try JSONEncoder().encode(GentleLook.warm)
         XCTAssertEqual(try JSONDecoder().decode(GentleLook.self, from: data), .warm)
