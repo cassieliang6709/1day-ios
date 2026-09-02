@@ -1063,7 +1063,8 @@
 
 <div class="card note">
 <h4>成片导出要不要也带上？</h4>
-<p style="margin:0"><b>要，但要问一次。</b>存进相册的那个文件是要发出去的，滤镜写不写进去是个不该替用户决定的事。所以在 <code>FilmView</code> 的「保存到相册」上加一句：<code>带上柔光</code> / <code>用原样</code>。默认跟着你在回看里选的。</p>
+<p style="margin:0"><b>带，而且不问。</b>（2026-09-02 定，改了这一节原来的写法。）原来写的是「在保存到相册那一步问一句『带上柔光 / 用原样』」。不问了 —— 你在回看里选了柔光，就是已经用看的方式回答过一次了，保存那一步再问一遍是把同一个问题问两次。成片跟着看的设置。</p>
+<p style="margin:8px 0 0;padding-left:10px;border-left:3px solid #f0b429"><b>代价写在这里：</b>想存一份原样的，得先把回看调回「原样」再存。这是这个决定换来的简单。</p>
 </div>
 
 <h2 id="s6"><span class="n">7</span>要新写的共用零件</h2>
@@ -1150,7 +1151,8 @@
 <div class="pr">
   <div class="top"><span class="id">F</span><span class="ti"><code>feat/look-picker</code></span><span class="pill gray">依赖 E</span></div>
   <div class="bd">
-    <p style="margin:0">第 6 节那一页：sheet、四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一个开关、以及 <code>FilmView</code> 保存到相册时的「带上柔光 / 用原样」。默认全 0。</p>
+    <p style="margin:0">第 6 节那一页：四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一份。默认全 0。</p>
+    <p style="margin:8px 0 0;padding-left:10px;border-left:3px solid #f0b429"><b>写的时候改了两处：</b>①<b>不是 sheet，是压在正在播的片子底下的面板</b> —— sheet 会盖住你正要判断的那张脸。②<b>保存到相册不问</b>「带上柔光 / 用原样」，跟着看的设置（见第 6 节那条注）。另外「以后都这样看」用了第二个 key，默认关，关着的话下次开 app 回到原样。</p>
   </div>
 </div>
 
