@@ -48,6 +48,11 @@ struct ClipPreviewView: View {
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
+    /// How soft you want to look. Read here rather than passed in, because it's
+    /// a setting about you and not about this clip — every clip you look back
+    /// at gets the same one, and the film you save gets it too.
+    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+
     private var myID: String { account.account?.id ?? "local" }
 
     private var card: DayCard? {
@@ -130,7 +135,7 @@ struct ClipPreviewView: View {
     private var videoStage: some View {
         let stage = ZStack {
             if isLive {
-                LoopingClipPlayer(url: url, refreshToken: recordedAt)
+                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: look)
             } else {
                 Color.black
             }

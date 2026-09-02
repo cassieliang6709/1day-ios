@@ -95,6 +95,8 @@ struct StitchedMomentPreview: View {
         // No captions or crossfade: this is one moment, not a film.
         options.showDayCaptions = false
         options.crossfadeSeconds = 0
+        // And no look, deliberately: this file goes to `ClipPreviewView`, which
+        // filters as it plays. Baking it in here would apply it twice.
         do {
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             Self.cache[cacheKey] = url

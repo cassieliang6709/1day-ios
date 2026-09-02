@@ -11,15 +11,19 @@ struct LoopingClipPlayer: View {
     /// overwritten in place — a re-record reuses the same file name, which
     /// AVPlayer can't notice on its own.
     var refreshToken: Date? = nil
+    /// Applied as the frames come off the file. Nothing is written anywhere, so
+    /// turning it off gives back exactly what the camera saw.
+    var look: GentleLook = .none
 
     var body: some View {
-        LoopingPlayerLayerView(url: url)
+        LoopingPlayerLayerView(url: url, look: look)
             .id(refreshToken)
     }
 }
 
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
+    var look: GentleLook = .none
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -27,8 +31,18 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     final class Coordinator {
+        /// What's on screen. The look is in here with the URL because changing
+        /// either one means building a new player.
+        struct Request: Equatable {
+            let url: URL
+            let look: GentleLook
+        }
+
         var looper: AVPlayerLooper?
-        var loadedURL: URL?
+        var loaded: Request?
+        var building: Task<Void, Never>?
+
+        deinit { building?.cancel() }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -36,26 +50,55 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     func makeUIView(context: Context) -> PlayerView {
         let view = PlayerView()
         view.playerLayer.videoGravity = .resizeAspectFill
-        context.coordinator.loadedURL = url
-        let queuePlayer = AVQueuePlayer()
-        context.coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(url: url))
-        view.playerLayer.player = queuePlayer
-        queuePlayer.play()
+        start(in: view, coordinator: context.coordinator)
         return view
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
         // SwiftUI reuses the UIView when only the URL changed (same view
         // identity) — rebuild the player or the old clip keeps looping.
-        guard context.coordinator.loadedURL != url else { return }
-        context.coordinator.loadedURL = url
+        guard context.coordinator.loaded != Coordinator.Request(url: url, look: look) else { return }
+        start(in: uiView, coordinator: context.coordinator)
+    }
+
+    private func start(in view: PlayerView, coordinator: Coordinator) {
+        let request = Coordinator.Request(url: url, look: look)
+        coordinator.loaded = request
+        coordinator.building?.cancel()
+        coordinator.building = nil
+
+        // Off is the path this view has always taken: file straight to layer.
+        guard !look.isIdentity else {
+            play(request, composition: nil, in: view, coordinator: coordinator)
+            return
+        }
+
+        // A look has to be ready *before* the first frame, because
+        // `AVPlayerLooper` copies the template item for every pass — hand it an
+        // unfiltered item now and every loop after this one is unfiltered too.
+        // So the layer stays black for the moment it takes to read the tracks.
+        coordinator.building = Task { @MainActor in
+            let composition = await GentleLookFilter.playbackComposition(
+                request.look, for: AVURLAsset(url: request.url))
+            guard !Task.isCancelled, coordinator.loaded == request else { return }
+            play(request, composition: composition, in: view, coordinator: coordinator)
+        }
+    }
+
+    private func play(
+        _ request: Coordinator.Request, composition: AVVideoComposition?,
+        in view: PlayerView, coordinator: Coordinator
+    ) {
+        let item = AVPlayerItem(url: request.url)
+        item.videoComposition = composition
         let queuePlayer = AVQueuePlayer()
-        context.coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(url: url))
-        uiView.playerLayer.player = queuePlayer
+        coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+        view.playerLayer.player = queuePlayer
         queuePlayer.play()
     }
 
     static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
+        coordinator.building?.cancel()
         uiView.playerLayer.player?.pause()
     }
 }
