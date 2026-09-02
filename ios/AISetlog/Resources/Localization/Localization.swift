@@ -1164,6 +1164,9 @@ enum Strings {
     static var notSignedIn: String {
         lang == .chinese ? "未登录（只有共享故事需要登录）" : "Not signed in — only shared stories need it"
     }
+    /// The way back in. Until this existed, signing out was one-way from here:
+    /// the only other sign-in gate is the one guarding a shared story.
+    static var signIn: String { lang == .chinese ? "登录" : "Sign in" }
     static var signOut: String { lang == .chinese ? "退出登录" : "Sign out" }
     static var deleteAccount: String { lang == .chinese ? "删除账号" : "Delete account" }
     static var deleteAccountTitle: String {

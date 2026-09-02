@@ -9,6 +9,7 @@ struct SettingsView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var showSignIn = false
     /// Held locally so a half-typed name never reaches the rooms.
     @State private var draftName = ""
     @FocusState private var nameFocused: Bool
@@ -138,6 +139,12 @@ struct SettingsView: View {
                 await refreshAuthorizationStatus()
                 mutedRooms = NotificationPreferences.mutedRoomCodes
             }
+            // On the Form, not on the Section: a sheet presented from inside a
+            // Section of an already-presented sheet takes the whole settings
+            // panel down with it.
+            .sheet(isPresented: $showSignIn) {
+                SignInView { showSignIn = false }
+            }
         }
         .presentationDetents([.medium, .large])
     }
@@ -164,21 +171,32 @@ struct SettingsView: View {
                     if !focused { commitName() }
                 }
                 Button(Strings.signOut) { account.signOut() }
+
+                // Only an account that exists can be deleted. Offering this
+                // while signed out put a button that erases every story on
+                // the device under a heading nobody reads as "erase my
+                // stories" — and there was nothing there to delete anyway.
+                Button(Strings.deleteAccount, role: .destructive) {
+                    showDeleteConfirmation = true
+                }
+                .disabled(isDeleting)
             } else {
                 Text(Strings.notSignedIn)
                     .foregroundStyle(.secondary)
-            }
 
-            Button(Strings.deleteAccount, role: .destructive) {
-                showDeleteConfirmation = true
+                // Signing out used to be one-way from this screen: the only
+                // other sign-in gate is the one in front of a shared story,
+                // so getting back in meant starting one.
+                Button(Strings.signIn) { showSignIn = true }
             }
-            .disabled(isDeleting)
         } header: {
             Text(Strings.account)
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
-                if account.isSignedIn { Text(Strings.yourNameFootnote) }
-                Text(Strings.deleteAccountFootnote)
+                if account.isSignedIn {
+                    Text(Strings.yourNameFootnote)
+                    Text(Strings.deleteAccountFootnote)
+                }
             }
         }
         .onAppear { draftName = account.account?.displayName ?? "" }
