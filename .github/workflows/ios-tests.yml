@@ -16,13 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Has to be an Xcode whose iOS SDK matches a simulator runtime the runner
-      # image still ships. 16.2 stopped qualifying: the image kept the app but
-      # dropped the iOS 18.2 runtime, and `actool` fails the whole build rather
-      # than thin the asset catalog against a runtime it doesn't have an SDK
-      # for. 16.4 is the image default, so its SDK and runtime move together.
+      # Has to be an Xcode whose iOS SDK matches a simulator the runner image
+      # still ships. 16.2 stopped qualifying: the image kept the app but dropped
+      # the iOS 18.2 runtime, and `actool` fails the whole build rather than
+      # thin an asset catalog against a runtime it has no SDK for — it won't
+      # take even a newer runtime of the same iOS major. Every simulator on the
+      # image runs iOS 26 now, so the Xcode has to be a 26 as well.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Generate Xcode project
         run: |
@@ -38,35 +39,28 @@ jobs:
             exit 1
           fi
 
-      # Naming a simulator only works while the image happens to have created
-      # one. It doesn't: under this Xcode the runner lists no concrete iOS
-      # devices at all, just placeholders. So make our own, on the runtime that
-      # matches the SDK exactly — `actool` rejects even a newer runtime of the
-      # same iOS major, which is what took CI down. The phone model is
-      # irrelevant to unit tests; the runtime agreeing with the SDK is not.
-      - name: Create a simulator the SDK agrees with
+      # Ask xcodebuild which simulator it can run on, instead of naming a phone
+      # and hoping the image still has one — it stopped having `iPhone 16`, and
+      # a simulator created behind xcodebuild's back never appears in this list
+      # at all. Whichever iPhone comes back first is fine: these are unit tests,
+      # they don't care about the screen.
+      - name: Pick a simulator
         run: |
-          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
-          runtimes=$(xcrun simctl list runtimes -j)
-          runtime=$(jq -r --arg sdk "$sdk" \
-            '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
-             | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
-             | .[0].identifier // ""' <<<"$runtimes")
-          if [ -z "$runtime" ]; then
-            echo "::error::no usable iOS simulator runtime for SDK $sdk"
+          simulator=$(xcodebuild -showdestinations -scheme AISetlog 2>/dev/null \
+            | grep 'platform:iOS Simulator' | grep -v placeholder \
+            | sed -n 's/.*id:\([0-9A-Fa-f-]*\).*/\1/p' | head -1)
+          if [ -z "$simulator" ]; then
+            echo "::error::this Xcode can't use any simulator on the runner"
+            xcodebuild -showdestinations -scheme AISetlog || true
             exit 1
           fi
-          device=$(jq -r --arg r "$runtime" \
-            '.runtimes[] | select(.identifier == $r)
-             | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
-             | .[0].identifier' <<<"$runtimes")
-          echo "SDK $sdk -> $runtime -> $device"
-          xcrun simctl create ci-iphone "$device" "$runtime"
+          echo "SIMULATOR_ID=$simulator" >> "$GITHUB_ENV"
+          echo "testing on $simulator"
 
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination 'platform=iOS Simulator,name=ci-iphone' \
+            -destination "id=$SIMULATOR_ID" \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO
