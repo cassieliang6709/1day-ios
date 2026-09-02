@@ -165,6 +165,24 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    /// "Preview · 1 moments" shipped, and shipped for a while, because every
+    /// caller wrote the English plural in by hand and nobody opened a story
+    /// with exactly one moment filmed in it.
+    func testEnglishCountsAgreeWithTheirNoun() {
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+
+        XCTAssertEqual(Strings.previewTheFilm(1), "Preview · 1 moment")
+        XCTAssertEqual(Strings.previewTheFilm(2), "Preview · 2 moments")
+        XCTAssertEqual(Strings.momentsShort(1), "1 moment")
+        XCTAssertEqual(Strings.momentsShort(7), "7 moments")
+        XCTAssertEqual(Strings.momentCount(1), "1 moment in 24 hours")
+
+        // Chinese has no plural, so the same call has to stay unchanged there.
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.previewTheFilm(1), "预览 · 1 个瞬间")
+        XCTAssertEqual(Strings.momentsShort(7), "7 个瞬间")
+    }
+
     func testPromptCountAndProgressCarryTheirNumbers() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertEqual(Strings.promptCountLabel(7), "7 个题目")

@@ -268,6 +268,14 @@ enum Strings {
         return oneDay ? "moments" : "days"
     }
 
+    /// The word "moment", agreeing with a count. English needs this and Chinese
+    /// doesn't, which is exactly how "Preview · 1 moments" got shipped: every
+    /// caller wrote the plural in by hand and none of them had a story with one
+    /// moment in it to look at.
+    static func momentWord(_ count: Int) -> String {
+        lang == .chinese ? "个瞬间" : (count == 1 ? "moment" : "moments")
+    }
+
     static func storyLabel(oneDay: Bool) -> String {
         if lang == .chinese { return oneDay ? "一日影片" : "七日挑战" }
         return oneDay ? "1-day film" : "7-day challenge"
@@ -404,7 +412,7 @@ enum Strings {
     ) -> String {
         lang == .chinese
             ? "\(recorded)/\(total) 个瞬间 · 每段 \(secondsLabel) · 24 小时影片"
-            : "\(recorded)/\(total) \(secondsLabel) moments · 24-hour film"
+            : "\(recorded)/\(total) \(secondsLabel) \(momentWord(total)) · 24-hour film"
     }
     static func friendsRange(_ count: Int, _ range: String) -> String {
         lang == .chinese ? "\(count) 位朋友 · \(range)" : "\(count) friends · \(range)"
@@ -465,7 +473,7 @@ enum Strings {
     static func templateMomentCount(_ count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)"
-            : "\(count) moments, \(secondsLabel) each"
+            : "\(count) \(momentWord(count)), \(secondsLabel) each"
     }
     static var selectedLabel: String { lang == .chinese ? "已选" : "Selected" }
     static var tapToSelect: String {
@@ -539,7 +547,7 @@ enum Strings {
     }
     static var oneDayComplete: String { lang == .chinese ? "一日影片完成" : "1-day film complete" }
     static func momentCount(_ total: Int) -> String {
-        lang == .chinese ? "24 小时，\(total) 个瞬间" : "\(total) moments in 24 hours"
+        lang == .chinese ? "24 小时，\(total) 个瞬间" : "\(total) \(momentWord(total)) in 24 hours"
     }
     static var weekComplete: String { lang == .chinese ? "本周完成" : "Week complete" }
     static func dayOf(_ day: Int, total: Int) -> String {
@@ -706,7 +714,7 @@ enum Strings {
     static func titleCardSubtitleOneDay(_ recorded: Int, _ total: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "一日影片 · \(recorded)/\(total) 个瞬间 · 每段 \(secondsLabel)"
-            : "1-day film · \(recorded)/\(total) \(secondsLabel) moments"
+            : "1-day film · \(recorded)/\(total) \(secondsLabel) \(momentWord(total))"
     }
 
     // MARK: Adjust sheet
@@ -836,7 +844,7 @@ enum Strings {
     /// Chip-length moment count. `momentCount` is a full sentence and blows a
     /// capsule out to four lines.
     static func momentsShort(_ total: Int) -> String {
-        lang == .chinese ? "\(total) 个瞬间" : "\(total) moments"
+        lang == .chinese ? "\(total) 个瞬间" : "\(total) \(momentWord(total))"
     }
     /// "2s each" — the per-clip length on a template card.
     static func templateRuntime(count: Int, secondsLabel: String) -> String {
@@ -914,7 +922,7 @@ enum Strings {
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)，合成一部小影片。"
-            : "\(count) moments, \(secondsLabel) each. One tiny film."
+            : "\(count) \(momentWord(count)), \(secondsLabel) each. One tiny film."
     }
     static var timeOnlyComposerSubtitle: String {
         lang == .chinese ? "不设题目，按时间留住这一天。" : "No prompts. Keep the day as it happens."
@@ -1086,7 +1094,7 @@ enum Strings {
     static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static var makeTheFilm: String { lang == .chinese ? "生成影片" : "Make the film" }
     static func previewTheFilm(_ count: Int) -> String {
-        lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) moments"
+        lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) \(momentWord(count))"
     }
     static var timelineEmptyHint: String {
         lang == .chinese

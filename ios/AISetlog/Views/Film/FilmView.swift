@@ -212,6 +212,9 @@ struct FilmView: View {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
             }
+            // The film leaving the app is the one moment worth feeling. The
+            // toast alone is easy to miss on a screen that's already playing.
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             saveMessage = Strings.savedToPhotos
         } catch {
             saveMessage = Strings.saveFailed(error.localizedDescription)
