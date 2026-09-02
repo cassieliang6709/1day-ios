@@ -57,13 +57,31 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertTrue(ClipFiling.candidates(in: [], orientation: .portrait).isEmpty)
     }
 
+    /// The data-loss bug, as a candidate list. A full story used to be offered,
+    /// and filing into it overwrote whatever was on the day the story was on.
+    func testAFullStoryIsNotSomewhereToFile() {
+        let full = story(startDay: 1, filled: 3, total: 3)
+        let room = story(startDay: 1, filled: 2, total: 3)
+
+        XCTAssertEqual(
+            ClipFiling.candidates(in: [full, room], orientation: .portrait).map(\.id),
+            [room.id])
+    }
+
+    /// One empty slot is enough to be worth offering.
+    func testAStoryWithOneSlotLeftIsStillACandidate() {
+        let nearlyFull = story(startDay: 1, filled: 2, total: 3)
+
+        XCTAssertEqual(
+            ClipFiling.candidates(in: [nearlyFull], orientation: .portrait).count, 1)
+    }
+
     // MARK: - Target day
 
     func testClipLandsInTheFirstEmptySlot() {
         let partly = story(startDay: 1, filled: 2, total: 3)
 
-        XCTAssertEqual(
-            ClipFiling.targetDay(in: partly, now: date(1), calendar: calendar), 3)
+        XCTAssertEqual(ClipFiling.targetDay(in: partly), 3)
     }
 
     /// Gaps count: day 2 being empty means day 2, not day 4.
@@ -71,32 +89,24 @@ final class ClipFilingTests: XCTestCase {
         var gapped = story(startDay: 1, filled: 3, total: 3)
         gapped.cards[1].clipFileName = nil
 
-        XCTAssertEqual(
-            ClipFiling.targetDay(in: gapped, now: date(1), calendar: calendar), 2)
+        XCTAssertEqual(ClipFiling.targetDay(in: gapped), 2)
     }
 
-    func testAFullStoryOverwritesTheDayItIsOn() {
+    /// The whole fix in one assertion. This used to answer "day 3" — a day that
+    /// already held a clip — and the caller wrote over it.
+    func testAFullStoryHasNowhereToPutIt() {
         let full = story(startDay: 1, filled: 3, total: 3)
 
-        XCTAssertEqual(
-            ClipFiling.targetDay(in: full, now: date(3), calendar: calendar), 3)
+        XCTAssertNil(ClipFiling.targetDay(in: full))
     }
 
-    /// A full story left alone for a fortnight is on "day 15" — clamping is
-    /// what keeps that from writing to a card that doesn't exist.
-    func testALongAbandonedFullStoryClampsToItsLastDay() {
-        let full = story(startDay: 1, filled: 3, total: 3)
+    /// A story with no cards at all can't take a clip either, and mustn't
+    /// answer "day 1" for a card that doesn't exist.
+    func testAStoryWithNoSlotsHasNowhereToPutItEither() {
+        var empty = story(startDay: 1, total: 1)
+        empty.cards = []
 
-        XCTAssertEqual(
-            ClipFiling.targetDay(in: full, now: date(20), calendar: calendar), 3)
-    }
-
-    /// And a full story whose start date is somehow in the future clamps the
-    /// other way, rather than returning day 0.
-    func testAFullStoryStartingLaterClampsToItsFirstDay() {
-        let full = story(startDay: 10, filled: 3, total: 3)
-
-        XCTAssertEqual(
-            ClipFiling.targetDay(in: full, now: date(1), calendar: calendar), 1)
+        XCTAssertNil(ClipFiling.targetDay(in: empty))
+        XCTAssertTrue(ClipFiling.candidates(in: [empty], orientation: .portrait).isEmpty)
     }
 }

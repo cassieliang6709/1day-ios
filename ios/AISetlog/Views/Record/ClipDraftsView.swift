@@ -171,7 +171,14 @@ struct ClipDraftsView: View {
     /// landed. `saveClip` reports failure by doing nothing, so deleting first
     /// would throw away the only remaining copy.
     private func archive(_ draft: ClipDraft, to challenge: Challenge) {
-        let day = ClipFiling.targetDay(in: challenge)
+        // No open slot means no filing. The old code filed into the day the
+        // story was on, which for a full story is a day that already holds a
+        // clip: the draft overwrote it, and the check below — true before the
+        // save as well as after — then deleted the draft either way.
+        guard let day = ClipFiling.targetDay(in: challenge) else {
+            showToast(Strings.storyIsFull)
+            return
+        }
         store.saveClip(
             from: drafts.url(for: draft),
             day: day,

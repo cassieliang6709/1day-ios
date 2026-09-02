@@ -348,7 +348,14 @@ struct RecordClipView: View {
 
     /// Free-form: file the clip into a chosen plan's first open slot.
     private func file(_ url: URL, to challenge: Challenge) {
-        store.saveClip(from: url, day: targetDay(for: challenge), challengeID: challenge.id, overlayText: trimmedOverlayText)
+        // Unreachable through the sheet, which only lists stories with room in
+        // them — but filing into a full story used to mean overwriting a clip,
+        // so this refuses rather than trusting the caller.
+        guard let day = ClipFiling.targetDay(in: challenge) else {
+            showToast(Strings.storyIsFull)
+            return
+        }
+        store.saveClip(from: url, day: day, challengeID: challenge.id, overlayText: trimmedOverlayText)
         recorder.retake()
         ringProgress = 0
         overlayText = ""
@@ -380,10 +387,6 @@ struct RecordClipView: View {
         recorder.retake()
         ringProgress = 0
         overlayText = ""
-    }
-
-    private func targetDay(for challenge: Challenge) -> Int {
-        ClipFiling.targetDay(in: challenge)
     }
 
     private func showToast(_ text: String) {
