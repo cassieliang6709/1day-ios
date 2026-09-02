@@ -38,10 +38,35 @@ jobs:
             exit 1
           fi
 
+      # Naming a simulator only works while the image happens to have created
+      # one. It doesn't: under this Xcode the runner lists no concrete iOS
+      # devices at all, just placeholders. So make our own, on the runtime that
+      # matches the SDK exactly — `actool` rejects even a newer runtime of the
+      # same iOS major, which is what took CI down. The phone model is
+      # irrelevant to unit tests; the runtime agreeing with the SDK is not.
+      - name: Create a simulator the SDK agrees with
+        run: |
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          runtimes=$(xcrun simctl list runtimes -j)
+          runtime=$(jq -r --arg sdk "$sdk" \
+            '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
+             | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
+             | .[0].identifier // ""' <<<"$runtimes")
+          if [ -z "$runtime" ]; then
+            echo "::error::no usable iOS simulator runtime for SDK $sdk"
+            exit 1
+          fi
+          device=$(jq -r --arg r "$runtime" \
+            '.runtimes[] | select(.identifier == $r)
+             | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
+             | .[0].identifier' <<<"$runtimes")
+          echo "SDK $sdk -> $runtime -> $device"
+          xcrun simctl create ci-iphone "$device" "$runtime"
+
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=ci-iphone' \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO
