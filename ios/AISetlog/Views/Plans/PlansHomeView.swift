@@ -197,7 +197,7 @@ struct PlansHomeView: View {
     /// The pips are the first thing to go on a narrow screen; the numbers
     /// carry the same fact and always fit.
     private var dateline: some View {
-        let summary = HomeHeaderSummary(challenge: hero)
+        let summary = HomeHeaderSummary(progress: hero.map(progress(for:)))
         return HStack(spacing: 6) {
             Text(summary.dateLine)
                 .font(.system(size: 11.5, weight: .bold, design: .rounded))
@@ -233,6 +233,7 @@ struct PlansHomeView: View {
             StoryCard(
                 challenge: challenge,
                 memberNames: store.members(for: challenge.id).map(\.name),
+                progress: progress(for: challenge),
                 coverURL: latestClipURL(for: challenge),
                 refreshToken: latestRecordedAt(for: challenge),
                 onContinue: { recordChallenge = challenge },
@@ -320,6 +321,7 @@ struct PlansHomeView: View {
         } label: {
             StoryRowCard(
                 challenge: challenge,
+                progress: progress(for: challenge),
                 coverURL: latestClipURL(for: challenge),
                 refreshToken: latestRecordedAt(for: challenge),
                 memberNames: store.members(for: challenge.id).map(\.name))
@@ -369,8 +371,10 @@ struct PlansHomeView: View {
            card.clipFileName == nil {
             return card.day
         }
-        return challenge.cards.first { $0.clipFileName == nil }?.day
-            ?? min(max(preferred ?? 1, 1), max(challenge.cards.count, 1))
+        // The first moment *nobody* has filmed. Offering one a friend already
+        // covered, while an untouched one waits further down, is how a room
+        // ends up with three takes of breakfast and no evening.
+        return progress(for: challenge).nextOpenMoment
     }
 
     // MARK: - Routing
@@ -427,17 +431,36 @@ struct PlansHomeView: View {
         if account.isSignedIn { run() } else { afterSignIn = run }
     }
 
-    // MARK: - Cover art
+    // MARK: - Progress and cover art
 
-    private func latestClipURL(for challenge: Challenge) -> URL? {
-        challenge.cards.last { $0.clipFileName != nil }
-            .flatMap { store.clipURL(for: $0, in: challenge.id) }
+    /// The day counted over everyone in it. The cards alone only know what I
+    /// filmed, which is the whole story on my own and a third of it in a room.
+    private func progress(for challenge: Challenge) -> RoomProgress {
+        RoomProgress(
+            momentCount: challenge.cards.count,
+            clips: store.recordedClips(for: challenge.id),
+            myID: account.account?.id ?? RoomProgress.soloAuthorID)
     }
 
-    /// Re-records reuse the same file name, so a cached frame needs the card's
+    /// The most recent clip in the story, from anyone. A room where only my
+    /// friends have filmed used to fall back to the template art, so the card
+    /// looked untouched while it was three moments in.
+    private func latestClip(for challenge: Challenge) -> DayClip? {
+        // Day breaks the tie, so a clip with no timestamp still sorts sanely
+        // rather than sinking to the bottom of the pile.
+        store.recordedClips(for: challenge.id).max {
+            ($0.recordedAt ?? .distantPast, $0.day) < ($1.recordedAt ?? .distantPast, $1.day)
+        }
+    }
+
+    private func latestClipURL(for challenge: Challenge) -> URL? {
+        latestClip(for: challenge)?.url
+    }
+
+    /// Re-records reuse the same file name, so a cached frame needs the clip's
     /// `recordedAt` to notice the change.
     private func latestRecordedAt(for challenge: Challenge) -> Date? {
-        challenge.cards.last { $0.clipFileName != nil }?.recordedAt
+        latestClip(for: challenge)?.recordedAt
     }
 
 }

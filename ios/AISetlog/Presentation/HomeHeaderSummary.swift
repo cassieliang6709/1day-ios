@@ -25,13 +25,15 @@ struct HomeHeaderSummary {
         return Strings.headerDateProgress(recorded, total)
     }
 
-    init(date: Date = .now, challenge: Challenge?) {
+    /// - Parameter progress: the day counted over everyone in it. Nil when
+    ///   there's no story to report on.
+    init(date: Date = .now, progress: RoomProgress?) {
         self.dateLine = Self.format(date)
-        // A story with no slots can't express progress — `cards` is empty only
+        // A story with no slots can't express progress — `total` is zero only
         // for malformed data, but "0/0" would still read as a real number.
-        if let challenge, !challenge.cards.isEmpty {
-            self.recorded = challenge.recordedCount
-            self.total = challenge.cards.count
+        if let progress, progress.total > 0 {
+            self.recorded = progress.filled
+            self.total = progress.total
         } else {
             self.recorded = nil
             self.total = nil

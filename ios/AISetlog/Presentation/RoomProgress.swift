@@ -21,6 +21,10 @@ struct RoomProgress: Equatable {
     /// finished film plays all of them, so this is what runtime is made of.
     let clipCount: Int
 
+    /// Which moments have something in them. Kept so the card can point at the
+    /// next open one rather than at the next one *I* haven't done.
+    private let filledDays: Set<Int>
+
     /// The author id the composer writes for a story that was never shared.
     static let soloAuthorID = "local"
 
@@ -28,6 +32,7 @@ struct RoomProgress: Equatable {
         total = max(momentCount, 0)
         clipCount = clips.count
         let days = Set(clips.map(\.day))
+        filledDays = days
         filled = min(days.count, total)
         let myDays = Set(
             clips
@@ -39,4 +44,21 @@ struct RoomProgress: Equatable {
     /// True when the room holds work from somebody other than me — the only
     /// case where "3/5" and "you 1" say different things.
     var hasOthers: Bool { filled > mine }
+
+    /// Every moment has something in it. Not the same as *my* card being full:
+    /// in a room, the day finishes when the day finishes.
+    var isComplete: Bool { total > 0 && filled >= total }
+
+    /// The moment to offer next — the first one nobody has filmed.
+    ///
+    /// Sending someone to a moment a friend already covered is the visible half
+    /// of the same bug: the room says "Next: Morning light" while Morning light
+    /// is on screen above it and Wind down is the empty slot.
+    ///
+    /// - Returns: a slot number, or the last one when the day is full — there
+    ///   is always somewhere to point, and re-filming a moment is allowed.
+    var nextOpenMoment: Int {
+        guard total > 0 else { return 1 }
+        return (1...total).first { !filledDays.contains($0) } ?? total
+    }
 }

@@ -24,25 +24,28 @@ final class HomeHeaderSummaryTests: XCTestCase {
         return Calendar(identifier: .gregorian).date(from: components)!
     }
 
-    private func challenge(recorded: Int, total: Int) -> Challenge {
-        Challenge(
-            id: UUID(),
-            title: "Perfect day",
-            startDate: .now,
-            cards: (1...total).map {
-                DayCard(day: $0, clipFileName: $0 <= recorded ? "clip\($0).mov" : nil)
+    /// - Parameter by: who filmed them. The header counts the day, not me, so
+    ///   a room where only friends have filmed still reports progress.
+    private func progress(recorded: Int, total: Int, by author: String = "local") -> RoomProgress {
+        RoomProgress(
+            momentCount: total,
+            clips: (0..<recorded).map {
+                DayClip(
+                    day: $0 + 1,
+                    url: URL(fileURLWithPath: "/tmp/clip\($0).mov"),
+                    authorID: author)
             },
-            mode: .oneDay)
+            myID: "me")
     }
 
     func testDateLineNamesTheDayInBothLanguages() {
         setLanguage(.chinese)
-        let chinese = HomeHeaderSummary(date: september1, challenge: nil)
+        let chinese = HomeHeaderSummary(date: september1, progress: nil)
         XCTAssertTrue(chinese.dateLine.contains("9"), chinese.dateLine)
         XCTAssertTrue(chinese.dateLine.contains("1"), chinese.dateLine)
 
         setLanguage(.english)
-        let english = HomeHeaderSummary(date: september1, challenge: nil)
+        let english = HomeHeaderSummary(date: september1, progress: nil)
         XCTAssertTrue(english.dateLine.contains("Sep"), english.dateLine)
         XCTAssertTrue(english.dateLine.contains("1"), english.dateLine)
 
@@ -51,7 +54,7 @@ final class HomeHeaderSummaryTests: XCTestCase {
 
     func testNoActiveStoryLeavesProgressUnstatedRatherThanZero() {
         setLanguage(.english)
-        let summary = HomeHeaderSummary(date: september1, challenge: nil)
+        let summary = HomeHeaderSummary(date: september1, progress: nil)
         XCTAssertNil(summary.recorded)
         XCTAssertNil(summary.total)
         XCTAssertFalse(summary.hasProgress)
@@ -61,7 +64,7 @@ final class HomeHeaderSummaryTests: XCTestCase {
     func testProgressMatchesTheStorysRecordedCount() {
         setLanguage(.english)
         let summary = HomeHeaderSummary(
-            date: september1, challenge: challenge(recorded: 1, total: 7))
+            date: september1, progress: progress(recorded: 1, total: 7))
         XCTAssertEqual(summary.recorded, 1)
         XCTAssertEqual(summary.total, 7)
         XCTAssertTrue(summary.hasProgress)
@@ -69,17 +72,25 @@ final class HomeHeaderSummaryTests: XCTestCase {
 
         setLanguage(.chinese)
         let chinese = HomeHeaderSummary(
-            date: september1, challenge: challenge(recorded: 1, total: 7))
+            date: september1, progress: progress(recorded: 1, total: 7))
         XCTAssertEqual(chinese.progressLine, "今天 1/7")
+    }
+
+    /// The home screen's half of the "0/5" bug: a room three friends had been
+    /// filming in all morning greeted the fourth person with "Today 0/5".
+    func testAFriendsMomentsCountInTheHeader() {
+        setLanguage(.english)
+        let summary = HomeHeaderSummary(
+            date: september1, progress: progress(recorded: 3, total: 5, by: "ana"))
+        XCTAssertEqual(summary.progressLine, "Today 3/5")
     }
 
     /// A story with no slots would otherwise render "0/0", which reads as a
     /// real measurement of a day nobody has filmed.
     func testSlotlessStoryIsTreatedAsNoProgress() {
         setLanguage(.english)
-        let empty = Challenge(
-            id: UUID(), title: "Broken", startDate: .now, cards: [], mode: .oneDay)
-        let summary = HomeHeaderSummary(date: september1, challenge: empty)
+        let summary = HomeHeaderSummary(
+            date: september1, progress: progress(recorded: 0, total: 0))
         XCTAssertFalse(summary.hasProgress)
         XCTAssertNil(summary.recorded)
     }
@@ -87,7 +98,7 @@ final class HomeHeaderSummaryTests: XCTestCase {
     func testFinishedStoryReportsEveryMomentIn() {
         setLanguage(.english)
         let summary = HomeHeaderSummary(
-            date: september1, challenge: challenge(recorded: 7, total: 7))
+            date: september1, progress: progress(recorded: 7, total: 7))
         XCTAssertEqual(summary.progressLine, "Today 7/7")
     }
 }

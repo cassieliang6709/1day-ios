@@ -10,6 +10,9 @@ import SwiftUI
 struct StoryCard: View {
     let challenge: Challenge
     let memberNames: [String]
+    /// How far the day has got, over everyone in it. In a shared room this is
+    /// the difference between the card and the room agreeing about the day.
+    let progress: RoomProgress
     /// Most recent clip — the card's cover. Nil until the first moment lands.
     let coverURL: URL?
     /// Re-records reuse the file name; this busts the cached first frame.
@@ -18,12 +21,10 @@ struct StoryCard: View {
     let onOpen: () -> Void
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-    private var nextSlot: Int {
-        challenge.cards.first { $0.clipFileName == nil }?.day
-            ?? min(challenge.recordedCount + 1, max(challenge.cards.count, 1))
-    }
     private var nextMoment: String {
-        challenge.isTimeOnly ? Strings.timeOnlyMoment : presenter.title(forSlot: nextSlot)
+        challenge.isTimeOnly
+            ? Strings.timeOnlyMoment
+            : presenter.title(forSlot: progress.nextOpenMoment)
     }
 
     var body: some View {
@@ -64,12 +65,12 @@ struct StoryCard: View {
 
                 Text(Strings.storyCardCaption(
                     next: nextMoment,
-                    isComplete: challenge.isComplete))
+                    isComplete: progress.isComplete))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
 
-                progress
+                statusRow
             }
             .padding(18)
         }
@@ -93,7 +94,7 @@ struct StoryCard: View {
 
     /// Members on the left, a slim capacity bar on the right — the whole
     /// status line in one row, over the cover art.
-    private var progress: some View {
+    private var statusRow: some View {
         HStack(spacing: 12) {
             if memberNames.count > 1 {
                 AvatarStack(names: memberNames, maxShown: 4, size: 27)
@@ -102,10 +103,8 @@ struct StoryCard: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 8) {
-                MomentPips(
-                    filled: challenge.recordedCount,
-                    total: max(challenge.cards.count, 1))
-                Text("\(challenge.recordedCount)/\(challenge.cards.count)")
+                MomentPips(filled: progress.filled, total: max(progress.total, 1))
+                Text("\(progress.filled)/\(progress.total)")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
@@ -119,12 +118,12 @@ struct StoryCard: View {
     // MARK: Footer
 
     private var footer: some View {
-        Button(action: challenge.isComplete ? onOpen : onContinue) {
+        Button(action: progress.isComplete ? onOpen : onContinue) {
             Label(
-                challenge.isComplete
+                progress.isComplete
                     ? Strings.watchYourFilm
                     : Strings.continueTodaysStory,
-                systemImage: challenge.isComplete ? "play.fill" : "video.fill")
+                systemImage: progress.isComplete ? "play.fill" : "video.fill")
         }
         .buttonStyle(.primaryAction)
         .padding(16)
@@ -158,6 +157,7 @@ struct MomentPips: View {
 /// "your other plans" under the hero, and for finished films.
 struct StoryRowCard: View {
     let challenge: Challenge
+    let progress: RoomProgress
     let coverURL: URL?
     var refreshToken: Date?
     var memberNames: [String] = []
@@ -181,11 +181,11 @@ struct StoryRowCard: View {
 
                 HStack(spacing: 8) {
                     MomentPips(
-                        filled: challenge.recordedCount,
-                        total: max(challenge.cards.count, 1),
+                        filled: progress.filled,
+                        total: max(progress.total, 1),
                         size: 5,
                         tint: .oneDayBlue)
-                    Text("\(challenge.recordedCount)/\(challenge.cards.count)")
+                    Text("\(progress.filled)/\(progress.total)")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(Color.oneDayBlue)
@@ -221,13 +221,12 @@ struct StoryRowCard: View {
     }
 
     private var subtitle: String {
-        if challenge.isComplete {
+        if progress.isComplete {
             return Strings.filmReadySubtitle(
-                duration: StorySchedule(challenge).filmDuration())
+                duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }
-        let next = challenge.cards.first { $0.clipFileName == nil }?.day ?? 1
         return challenge.isTimeOnly
             ? Strings.timeOnlyMoment
-            : Strings.nextUpMoment(presenter.title(forSlot: next))
+            : Strings.nextUpMoment(presenter.title(forSlot: progress.nextOpenMoment))
     }
 }

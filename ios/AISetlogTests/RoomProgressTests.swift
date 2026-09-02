@@ -65,6 +65,51 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertFalse(progress.hasOthers, "same moment — the counts agree")
     }
 
+    /// The home card used to say "Next: Morning light" while Morning light was
+    /// on the screen below it, filmed by a friend an hour earlier.
+    func testTheNextMomentIsTheOneNobodyHasFilmed() {
+        let progress = RoomProgress(
+            momentCount: 5,
+            clips: [
+                clip(day: 1, author: "ana"),
+                clip(day: 2, author: "milo"),
+                clip(day: 3, author: "ana"),
+            ],
+            myID: me)
+
+        XCTAssertEqual(progress.nextOpenMoment, 4)
+    }
+
+    /// Gaps count. Filming the last moment first shouldn't send everyone past
+    /// the four that are still empty.
+    func testItPointsAtTheFirstGapNotThePileEnd() {
+        let progress = RoomProgress(
+            momentCount: 5, clips: [clip(day: 5, author: "ana")], myID: me)
+
+        XCTAssertEqual(progress.nextOpenMoment, 1)
+        XCTAssertFalse(progress.isComplete)
+    }
+
+    /// In a room the day finishes when the day finishes, not when I do.
+    func testTheDayIsCompleteWhenEveryMomentIsIn() {
+        let progress = RoomProgress(
+            momentCount: 3,
+            clips: [
+                clip(day: 1, author: "ana"),
+                clip(day: 2, author: "milo"),
+                clip(day: 3, author: me),
+            ],
+            myID: me)
+
+        XCTAssertTrue(progress.isComplete)
+        XCTAssertEqual(progress.nextOpenMoment, 3, "nowhere left to point but the end")
+    }
+
+    func testAnEmptyStoryIsNotComplete() {
+        XCTAssertFalse(RoomProgress(momentCount: 0, clips: [], myID: me).isComplete)
+        XCTAssertEqual(RoomProgress(momentCount: 0, clips: [], myID: me).nextOpenMoment, 1)
+    }
+
     /// A room can outlive an edit that shortened the prompt list. Reporting
     /// "6/5" would be a bug report about arithmetic instead of about editing.
     func testItNeverClaimsMoreMomentsThanExist() {
