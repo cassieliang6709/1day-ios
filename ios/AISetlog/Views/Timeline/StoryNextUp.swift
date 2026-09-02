@@ -73,13 +73,19 @@ struct NextSlotCard: View {
     let kind: Kind
     /// How long a clip runs, so the card can say what it's asking for.
     var durationLabel: String?
+    /// Who else in the room has filmed. Nil in a solo story, and nil in a room
+    /// nobody has joined.
+    var roomNote: RoomCast.Note?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) { card }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(headline))
-            .accessibilityHint(Text(caption))
+            // Both sentences, even though the card only has room to print one:
+            // how long the clip runs and who's already filmed are each worth
+            // hearing before you tap.
+            .accessibilityHint(Text(hint))
     }
 
     private var card: some View {
@@ -107,11 +113,7 @@ struct NextSlotCard: View {
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.leading)
 
-                Text(caption)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                smallPrint
             }
 
             Spacer(minLength: 4)
@@ -127,6 +129,28 @@ struct NextSlotCard: View {
             in: RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
         .oneDayGlow()
         .contentShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
+    }
+
+    /// In a shared room the card's last line is who else showed up, and it
+    /// takes the caption's place rather than stacking under it — the card stays
+    /// three lines tall, and "他俩拍了，就差你" is the more useful of the two
+    /// sentences by a distance. The film's own caption keeps its place: how
+    /// many clips are in it is a fact about the film, not about filming.
+    @ViewBuilder
+    private var smallPrint: some View {
+        if case .film = kind, let roomNote {
+            RoomNote(note: roomNote, tint: .white.opacity(0.9))
+        } else {
+            Text(caption)
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private var hint: String {
+        [caption, roomNote?.text].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var glyph: String {
@@ -174,6 +198,10 @@ struct ClipThumb: View {
     /// moment rather than a lookalike.
     let lanes: [MomentLane]
     var timeStamp: String?
+    /// Whose takes these are, in the order the thumbnail stacks them. Empty in
+    /// a solo story: the badge answers "whose is this", and there is only one
+    /// answer to that in a diary.
+    var authorNames: [String] = []
     var reaction: String?
     /// A friend filmed this and I haven't. It only changes the edge — adding
     /// my own take is the quiet row's job, because this thumbnail already
@@ -203,7 +231,7 @@ struct ClipThumb: View {
         Color.clear
             .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay { frames.clipped() }
-            .overlay(alignment: .topLeading) { stamp }
+            .overlay(alignment: .topLeading) { topRow }
             .overlay(alignment: .topTrailing) { playGlyph }
             .overlay(alignment: .bottom) { caption }
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
@@ -237,17 +265,27 @@ struct ClipThumb: View {
         }
     }
 
+    /// Whose take it is, and when. Both facts about the same clip, so they sit
+    /// in one cluster in one corner — the tile is 103pt wide and a second
+    /// floating label anywhere else on it starts reading as another button.
     @ViewBuilder
-    private var stamp: some View {
-        if let timeStamp {
-            Text(timeStamp)
-                .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(6)
+    private var topRow: some View {
+        if timeStamp != nil || !authorNames.isEmpty {
+            HStack(spacing: 4) {
+                if !authorNames.isEmpty {
+                    AvatarStack(names: authorNames, maxShown: 3, size: 20)
+                }
+                if let timeStamp {
+                    Text(timeStamp)
+                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+            }
+            .padding(6)
         }
     }
 
