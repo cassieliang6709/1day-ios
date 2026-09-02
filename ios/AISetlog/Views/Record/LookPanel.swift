@@ -29,9 +29,12 @@ struct LookPanel: View {
         .padding(.horizontal, 18)
         .padding(.top, 14)
         .padding(.bottom, 18)
+        // Nearly opaque, not a tint. Glass over a bright clip let the picture
+        // read straight through the panel and put whatever the video says at
+        // that moment behind "A gentler look".
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.black.opacity(0.62)))
+                .fill(.black.opacity(0.94)))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(.white.opacity(0.12), lineWidth: 1))
