@@ -43,10 +43,20 @@ jobs:
       # is what makes xcodebuild create one, on the newest runtime it can use.
       # That's why this line was never the problem, and why looking the device
       # up first can't work: there's nothing to find until the test run asks.
+      # The four suites below talk to the real CloudKit development database.
+      # They already skip on a simulator that isn't signed into iCloud — but
+      # here they can't even ask: unsigned means no iCloud entitlement, and
+      # `accountStatus()` on an unentitled container kills the test host rather
+      # than returning an error, so there's nothing left alive to skip from.
+      # Run them on a machine with an iCloud-signed simulator instead.
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             -derivedDataPath build/DerivedData \
+            -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
+            -skip-testing:AISetlogTests/CloudKitPaginationTests \
+            -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
+            -skip-testing:AISetlogTests/JoinedRoomTests \
             CODE_SIGNING_ALLOWED=NO
