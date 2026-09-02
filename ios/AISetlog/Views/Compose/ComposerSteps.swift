@@ -493,7 +493,6 @@ struct SetupStep: View {
     let isOneDay: Bool
     let isTimeOnly: Bool
     let memberNames: [String]
-    let errorText: String?
 
     @FocusState private var titleFocused: Bool
     @State private var momentsExpanded = false
@@ -512,13 +511,9 @@ struct SetupStep: View {
                 companyPicker
                 if withFriends { roomExplainer }
                 setupCard
-
-                if let errorText {
-                    Label(errorText, systemImage: "exclamationmark.circle.fill")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 4)
-                }
+                // Failures live in the footer next to the button that caused
+                // them — at the end of this scroll they were below the fold,
+                // so "Create room" looked like it did nothing at all.
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 12)

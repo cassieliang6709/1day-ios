@@ -90,8 +90,7 @@ struct StoryComposerView: View {
                         moments: $moments,
                         isOneDay: mode == .oneDay,
                         isTimeOnly: selection.style == .timeOnly,
-                        memberNames: knownFriendNames,
-                        errorText: errorText)
+                        memberNames: knownFriendNames)
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)))
@@ -128,6 +127,9 @@ struct StoryComposerView: View {
             momentsEdited = false
             syncTitleToTemplate()
         }
+        // Switching to solo answers "sign into iCloud" all by itself, so the
+        // warning shouldn't outlive the choice that caused it.
+        .onChange(of: withFriends) { _, _ in errorText = nil }
         .onChange(of: selection.mode) { _, _ in
             guard !isCustomPromptStory else { return }
             selection.reconcileTemplate(
@@ -143,6 +145,9 @@ struct StoryComposerView: View {
                 if step == .mood {
                     dismiss()
                 } else {
+                    // The warning belongs to "Create room". Carrying it back to
+                    // the poster rack makes it look like picking a story failed.
+                    errorText = nil
                     withAnimation(OneDay.Motion.soft) { step = .mood }
                 }
             }
@@ -163,6 +168,18 @@ struct StoryComposerView: View {
 
     private var footer: some View {
         VStack(spacing: 10) {
+            // Above the button, not at the bottom of the scroll: the reason a
+            // tap did nothing has to be on screen when the tap happens.
+            if let errorText {
+                Label(errorText, systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
+
             Button(action: advance) {
                 HStack(spacing: 8) {
                     if creating {
@@ -180,6 +197,7 @@ struct StoryComposerView: View {
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 8)
+        .animation(OneDay.Motion.soft, value: errorText)
     }
 
     private var primaryTitle: String {
