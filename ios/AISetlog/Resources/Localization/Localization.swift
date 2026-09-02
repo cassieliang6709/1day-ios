@@ -664,6 +664,12 @@ enum Strings {
         lang == .chinese ? "拍摄于 \(date)" : "Captured \(date)"
     }
     static var rerecord: String { lang == .chinese ? "重录这一天" : "Re-record this day" }
+    /// The same action as `rerecord`, for a chip sitting on top of the video
+    /// where "Re-record this day" wraps to two lines and stops being a chip.
+    static var rerecordShort: String { lang == .chinese ? "重拍" : "Retake" }
+    /// The chip that opens the caption editor. `addCaption` is the placeholder
+    /// *inside* the editor, which is a sentence; this is a button, which isn't.
+    static var captionAction: String { lang == .chinese ? "加字幕" : "Caption" }
     static var comments: String { lang == .chinese ? "评论" : "Comments" }
     static func commentsCount(_ count: Int) -> String {
         lang == .chinese ? "评论 · \(count)" : "Comments · \(count)"
