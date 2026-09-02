@@ -679,6 +679,39 @@ enum Strings {
     }
     static var addComment: String { lang == .chinese ? "写评论…" : "Add a comment…" }
 
+    // MARK: How you look
+
+    /// Never "美颜" and never "beauty". Both words presume something is wrong
+    /// with the face in the picture; the phone's camera is what was unkind.
+    static var lookTitle: String { lang == .chinese ? "柔和一点" : "A gentler look" }
+    /// The promise, said out loud on the screen where it matters: the file is
+    /// never touched, so this is always undoable.
+    static var lookFootnote: String {
+        lang == .chinese
+            ? "只改回看和成片。原片一直在，随时能关。"
+            : "Changes playback and the film only. The recording is untouched."
+    }
+    static var lookAction: String { lang == .chinese ? "柔和" : "Look" }
+    static var lookAsShot: String { lang == .chinese ? "原样" : "As shot" }
+    static var lookClean: String { lang == .chinese ? "干净" : "Clean" }
+    static var lookSoft: String { lang == .chinese ? "柔光" : "Soft" }
+    static var lookWarm: String { lang == .chinese ? "暖阳" : "Warm" }
+    static var lookSmoothing: String { lang == .chinese ? "细腻" : "Smooth" }
+    static var lookBrightness: String { lang == .chinese ? "提亮" : "Lift" }
+    static var lookWarmth: String { lang == .chinese ? "暖调" : "Warmth" }
+    static var lookHoldToCompare: String {
+        lang == .chinese ? "按住看原片" : "Hold to see the original"
+    }
+    static var lookRemember: String { lang == .chinese ? "以后都这样看" : "Keep this from now on" }
+    static var lookRememberFootnote: String {
+        lang == .chinese
+            ? "关掉的话，下次打开 app 就回到原样 —— 这次调的只算这次。"
+            : "With this off, the app opens on “As shot” next time — today's choice is just for today."
+    }
+    /// The Settings row. Names the effect rather than the setting, because in a
+    /// list of settings "Look" on its own says nothing.
+    static var lookSetting: String { lang == .chinese ? "回看的样子" : "How clips look" }
+
     // MARK: Final reel
 
     static var sequence: String { lang == .chinese ? "顺序" : "Sequence" }

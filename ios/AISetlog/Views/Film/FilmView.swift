@@ -28,6 +28,9 @@ struct FilmView: View {
     @State private var fadeSeconds = 0.35
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    /// The film gets whatever you've been watching your clips in. It isn't
+    /// asked again at save time: you already answered by looking.
+    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
@@ -109,7 +112,7 @@ struct FilmView: View {
     private var renderRevision: [RenderRevision] {
         clips.map(RenderRevision.init) + [
             RenderRevision(
-                options: "\(includeTitleCard)-\(includeCaptions)-\(fadeSeconds)")
+                options: "\(includeTitleCard)-\(includeCaptions)-\(fadeSeconds)-\(look.rawValue)")
         ]
     }
 
@@ -154,6 +157,7 @@ struct FilmView: View {
             options.showDayCaptions = includeCaptions && !challenge.isTimeOnly
             options.layout = challenge.isShared ? .friendsTogether : .sequential
             options.titleCard = includeTitleCard ? titleCard : nil
+            options.look = look
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             // A newer render started while this one was working.
             guard requested == renderRevision else {

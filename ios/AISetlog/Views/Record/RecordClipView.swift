@@ -45,6 +45,12 @@ struct RecordClipView: View {
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
+    /// Applied to the take you're deciding about. Not to the live camera and
+    /// not to the file — but this is the first time you see yourself back, and
+    /// deciding whether to retake off a picture the app will never show you
+    /// again is the wrong way round.
+    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+
     /// Whoever's signed in records the clip — solo challenges have no
     /// account, so this (and the identity tint it drives) falls back to a
     /// fixed default.
@@ -257,7 +263,7 @@ struct RecordClipView: View {
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 ZStack {
-                    LoopingClipPlayer(url: url)
+                    LoopingClipPlayer(url: url, look: look)
                     // The caption is typed right where it lands in the film —
                     // center of the frame, not in a bar below the video.
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
