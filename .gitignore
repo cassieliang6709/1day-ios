@@ -42,3 +42,6 @@ build-teammate/
 
 # Local Playwright QA scratch (root)
 .playwright-cli/
+
+# Wrangler local state
+.wrangler/

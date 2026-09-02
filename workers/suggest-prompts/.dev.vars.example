@@ -1,0 +1,2 @@
+# Copy to .dev.vars for `wrangler dev`.
+DEEPSEEK_API_KEY=

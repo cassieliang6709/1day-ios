@@ -4,14 +4,28 @@ import SwiftUI
 /// the user does not have to predict an entire day before anything happens.
 struct GuidedMomentsView: View {
     let onDone: ([String], String) -> Void
+    /// Injectable so previews and tests don't reach the network.
+    var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(PromptSuggestionMetrics.self) private var metrics
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     @State private var answers = ["", ""]
     @State private var storyName = ""
     @State private var showPromptLibrary = false
     @FocusState private var focused: Int?
+
+    /// The sentence about today, and what came back from it.
+    @State private var intent = ""
+    @State private var isSuggesting = false
+    @State private var suggestionNote: String?
+    /// Kept so the rewrite rate has something to compare against at save time.
+    @State private var offeredPrompts: [String] = []
+
+    /// A full day's worth. The whole point is not having to invent them one at
+    /// a time, and every row is editable afterwards.
+    private static let suggestionCount = 7
 
     private var filledCount: Int {
         answers.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
@@ -30,6 +44,7 @@ struct GuidedMomentsView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         heading
                         nameCard
+                        intentCard
                         promptEditor
                         libraryButton
                         footnote
@@ -83,6 +98,56 @@ struct GuidedMomentsView: View {
                     .foregroundStyle(OneDay.ink)
                     .tint(Color.oneDayBlue)
                     .accessibilityIdentifier("custom-story-name")
+            }
+        }
+    }
+
+    /// A day that hasn't happened yet is hard to write prompts for, which is
+    /// where the blank list loses people. But "今天要搬家" is sayable now.
+    private var intentCard: some View {
+        GlassCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.oneDayBlue)
+                    Text(Strings.intentHeading)
+                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                }
+
+                Text(Strings.intentSubtitle)
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                TextField("", text: $intent, prompt: Text(Strings.intentPlaceholder))
+                    .font(.system(size: 15.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .tint(Color.oneDayBlue)
+                    .submitLabel(.go)
+                    .onSubmit(generatePrompts)
+                    .disabled(isSuggesting)
+                    .accessibilityIdentifier("today-intent")
+
+                Button(action: generatePrompts) {
+                    HStack(spacing: 7) {
+                        if isSuggesting {
+                            ProgressView().controlSize(.small).tint(.white)
+                        }
+                        Text(isSuggesting ? Strings.suggestingPrompts : Strings.suggestPrompts)
+                    }
+                }
+                .buttonStyle(.primaryAction)
+                .disabled(isSuggesting || trimmedIntent.isEmpty)
+                .accessibilityIdentifier("suggest-prompts")
+
+                if let suggestionNote {
+                    Text(suggestionNote)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -194,11 +259,47 @@ struct GuidedMomentsView: View {
         }
     }
 
+    private var trimmedIntent: String {
+        intent.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Failure is quiet on purpose. The list underneath is still there and
+    /// still works, so there's nothing to interrupt anyone about — one line
+    /// saying why nothing appeared, and no alert.
+    private func generatePrompts() {
+        let sentence = trimmedIntent
+        guard !sentence.isEmpty, !isSuggesting else { return }
+
+        focused = nil
+        isSuggesting = true
+        suggestionNote = nil
+
+        Task {
+            defer { isSuggesting = false }
+            do {
+                let prompts = try await suggestions.suggest(
+                    intent: sentence,
+                    count: Self.suggestionCount,
+                    language: appLanguage)
+                metrics.recordGenerated()
+                offeredPrompts = prompts
+                answers = SuggestedPromptFill.apply(prompts, to: answers)
+            } catch PromptSuggestionError.rateLimited {
+                suggestionNote = Strings.suggestRateLimited
+            } catch {
+                suggestionNote = Strings.suggestFailed
+            }
+        }
+    }
+
     private func save() {
         let moments = answers
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard moments.count >= 2 else { return }
+        // Which of the generated prompts survived contact with a person. This
+        // is the number the whole feature exists to produce.
+        metrics.recordAdopted(offered: offeredPrompts, saved: moments)
         onDone(moments, storyName.trimmingCharacters(in: .whitespacesAndNewlines))
         dismiss()
     }

@@ -6,6 +6,7 @@ struct AISetlogApp: App {
     @State private var account: AccountStore
     @State private var store: ChallengeStore
     @State private var drafts = ClipDraftStore()
+    @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
 
@@ -25,6 +26,7 @@ struct AISetlogApp: App {
                 .environment(store)
                 .environment(account)
                 .environment(drafts)
+                .environment(promptMetrics)
                 .tint(Color.oneDayBlue)
                 .preferredColorScheme(appAppearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in

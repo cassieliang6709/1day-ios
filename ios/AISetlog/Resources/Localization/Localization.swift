@@ -986,6 +986,30 @@ enum Strings {
             ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
             : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
     }
+    // MARK: Prompts from one sentence
+
+    static var intentHeading: String {
+        lang == .chinese ? "说说今天要干嘛" : "What's today for?"
+    }
+    static var intentSubtitle: String {
+        lang == .chinese
+            ? "一句话就行。题目会填进下面的列表，每条都能改。"
+            : "One sentence is enough. The prompts fill the list below, and every one is editable."
+    }
+    static var intentPlaceholder: String {
+        lang == .chinese ? "比如：今天要搬家" : "For example: moving house today"
+    }
+    static var suggestPrompts: String { lang == .chinese ? "出题目" : "Suggest prompts" }
+    static var suggestingPrompts: String { lang == .chinese ? "在想…" : "Thinking…" }
+    /// Not an error dialog: the thing they were doing still works, and the list
+    /// is right there. This only explains why nothing appeared.
+    static var suggestFailed: String {
+        lang == .chinese ? "这次没出来，先自己写吧。" : "Nothing came back — write your own."
+    }
+    static var suggestRateLimited: String {
+        lang == .chinese ? "出得有点勤，等会儿再试。" : "That's a lot of asking. Try again later."
+    }
+
     static var yourPrompts: String { lang == .chinese ? "想拍的画面" : "Scenes to film" }
     static var addAnotherPrompt: String {
         lang == .chinese ? "再加一个题目" : "Add another prompt"
