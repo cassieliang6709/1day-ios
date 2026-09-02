@@ -53,7 +53,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         }
         guard !isCustom else { return nil }
         return switch name.en {
-        case Self.liveWithMeIdentityKey: "TemplateMainCharacter"
+        case Self.liveWithMeIdentityKey: "TemplateLiveWithMe"
         case "Perfect Day": "TemplatePerfectDay"
         case "Soft Reset": "TemplateSoftReset"
         case "Lock In": "TemplateLockIn"

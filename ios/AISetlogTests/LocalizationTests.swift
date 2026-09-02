@@ -70,7 +70,9 @@ final class LocalizationTests: XCTestCase {
         let template = ChallengeTemplate.liveWithMe
         XCTAssertTrue(template.isTimeOnly)
         XCTAssertNil(template.momentKeys)
-        XCTAssertEqual(template.coverAssetName, "TemplateMainCharacter")
+        // Its own cover, not Main Character's: two templates sharing one
+        // picture is how the poster rack stopped meaning anything.
+        XCTAssertEqual(template.coverAssetName, "TemplateLiveWithMe")
 
         let challenge = Challenge(
             id: UUID(),
