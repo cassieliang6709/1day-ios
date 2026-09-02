@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1Day 设计稿 — 拍完之后的三屏</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.12);
+    --red:#A7443C;--green:#158463;--amber:#A75B12;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:40px 34px 120px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       font-size:14px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;
+       background:rgba(22,119,255,.09);padding:1.5px 5px;border-radius:5px;color:#0B4FA8}
+  a{color:var(--blue)}
+
+  .hdr{background:linear-gradient(135deg,#fff,#F2F7FF);border:1px solid var(--hair);
+       border-radius:22px;padding:24px 26px;box-shadow:0 10px 28px rgba(15,46,107,.10);margin-bottom:12px}
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.5px;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:7px 9px;font-size:12.5px;color:var(--inkSoft);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;
+        padding:3px 10px;border-radius:99px;background:var(--mist);color:var(--blue)}
+  .pill.ok{background:#DFF6EC;color:var(--green)}
+  .pill.warn{background:#FFE9D6;color:var(--amber)}
+  .pill.hot{background:#FBE4E1;color:var(--red)}
+  .pill.gray{background:rgba(147,166,198,.2);color:var(--inkSoft)}
+
+  h2{font-size:20px;margin:46px 0 6px;padding-top:24px;border-top:1px solid rgba(15,46,107,.13);
+     letter-spacing:-.3px}
+  h2:first-of-type{padding-top:0;border-top:0}
+  h2 .n{color:var(--inkFaint);font-weight:800;margin-right:8px}
+  h3{font-size:16px;margin:26px 0 6px;letter-spacing:-.2px}
+  h4{font-size:13.5px;margin:18px 0 5px;color:var(--inkSoft);letter-spacing:.2px;text-transform:uppercase;
+     font-weight:900}
+  p{margin:0 0 12px;max-width:900px}
+  .sub{color:var(--inkSoft);margin-bottom:18px;max-width:900px}
+  ul,ol{margin:0 0 12px;padding-left:22px;max-width:900px}
+  li{margin-bottom:5px}
+  li::marker{color:var(--sky)}
+
+  .card{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+        padding:16px 18px;margin:14px 0;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .card.hot{border-left:4px solid var(--red);background:linear-gradient(90deg,rgba(251,228,225,.5),rgba(255,255,255,.94) 60px)}
+  .card.warn{border-left:4px solid var(--amber);background:linear-gradient(90deg,rgba(255,233,214,.5),rgba(255,255,255,.94) 60px)}
+  .card.ok{border-left:4px solid var(--green);background:linear-gradient(90deg,rgba(223,246,236,.5),rgba(255,255,255,.94) 60px)}
+  .card.note{border-left:4px solid var(--sky)}
+  .card h4{margin-top:0}
+
+  table{border-collapse:collapse;width:100%;table-layout:fixed;margin:14px 0;font-size:13px;
+        background:rgba(255,255,255,.92);border-radius:14px;overflow:hidden;
+        box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  th,td{overflow-wrap:anywhere}
+  th{background:rgba(220,235,255,.7);text-align:left;padding:10px 13px;font-size:11.5px;
+     font-weight:900;letter-spacing:.4px;color:var(--inkSoft);text-transform:uppercase;
+     border-bottom:1px solid var(--hair)}
+  td{padding:10px 13px;border-bottom:1px solid rgba(15,46,107,.07);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.8px;color:var(--inkSoft)}
+  .no{color:var(--red);font-weight:800}
+  .yes{color:var(--green);font-weight:800}
+
+  .pr{background:rgba(255,255,255,.94);border:1px solid var(--hair);border-radius:20px;
+      margin:16px 0;box-shadow:0 6px 20px rgba(15,46,107,.09);overflow:hidden}
+  .pr > .top{display:flex;align-items:center;gap:11px;padding:14px 18px;
+      background:linear-gradient(100deg,rgba(220,235,255,.6),rgba(255,255,255,.4));
+      border-bottom:1px solid var(--hair)}
+  .pr .id{font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--blue),var(--cyan));
+      padding:4px 11px;border-radius:99px;letter-spacing:.4px;flex:0 0 auto}
+  .pr .ti{font-size:15.5px;font-weight:900;letter-spacing:-.2px}
+  .pr .bd{padding:16px 18px}
+  .pr .bd > :first-child{margin-top:0}
+
+  .tocbox{background:rgba(255,255,255,.9);border:1px solid var(--hair);border-radius:18px;
+      padding:14px 18px;margin-bottom:30px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .tocbox ol{columns:2;column-gap:32px;margin:0;padding-left:20px;font-size:13px}
+  .tocbox li{margin-bottom:4px}
+  .tocbox a{text-decoration:none;font-weight:700}
+
+  /* ============ 手机原型框架 ============
+     内部一律按 iPhone 逻辑点写（375 宽），整体 scale(.84) 缩到 315px，
+     所以文档里的每个数字都是能直接抄进 SwiftUI 的点值。 */
+  .rack{display:flex;gap:22px;flex-wrap:wrap;margin:18px 0 6px;align-items:flex-start}
+  .unit{width:329px}
+  .unit > .lab{display:flex;align-items:center;gap:7px;margin-bottom:9px;font-size:12.5px;font-weight:900}
+  .unit > .lab .tag{font-size:10.5px;font-weight:900;padding:2px 8px;border-radius:99px}
+  .tag.bad{background:#FBE4E1;color:var(--red)}
+  .tag.good{background:#DFF6EC;color:var(--green)}
+  .frame{width:329px;height:652px;border:7px solid #14213D;border-radius:44px;
+         overflow:hidden;position:relative;background:#000;
+         box-shadow:0 14px 34px rgba(15,46,107,.24)}
+  .scr{width:375px;height:760px;transform:scale(.84);transform-origin:top left;
+       position:relative;overflow:hidden;background:var(--canvas);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       color:var(--ink);line-height:1.35}
+  .scr *{box-sizing:border-box}
+  .cap{font-size:12px;color:var(--inkSoft);margin-top:9px;line-height:1.5}
+
+  /* 屏内零件 */
+  .st{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;
+      justify-content:space-between;padding:0 24px;font-size:13px;font-weight:800;z-index:9}
+  .st.on-dark{color:#fff}
+  .home{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);
+        width:118px;height:4px;border-radius:99px;background:rgba(15,46,107,.28);z-index:9}
+  .home.on-dark{background:rgba(255,255,255,.55)}
+  .iosnav{position:absolute;top:44px;left:0;right:0;height:44px;background:#fff;
+      border-bottom:.5px solid #DEDEE2;display:flex;align-items:center;justify-content:center;
+      font-size:16px;font-weight:600;color:#000}
+  .iosnav .r{position:absolute;right:16px;font-size:16px;color:#1677FF;font-weight:400}
+  .bub{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);
+      display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;
+      color:var(--navy);box-shadow:0 3px 10px rgba(15,46,107,.16)}
+  .canvas{position:absolute;inset:0;background:linear-gradient(165deg,#F8FBFF,#E1EDFF 55%,#EDE9FF)}
+  .vid{position:relative;overflow:hidden;
+      background:linear-gradient(155deg,#FFD9A0 0%,#F0A268 36%,#C4707E 68%,#6E4A78 100%)}
+  .vid.night{background:linear-gradient(155deg,#4A5B9E 0%,#33406F 45%,#8B7BC4 100%)}
+  .vid.green{background:linear-gradient(150deg,#CDE8CE,#7FAF8C 55%,#3E6B57 100%)}
+  .stamp{position:absolute;background:rgba(0,0,0,.34);color:#fff;border-radius:99px;
+      padding:3px 9px;font-size:11px;font-weight:800;letter-spacing:.2px}
+  .cta{border-radius:99px;text-align:center;color:#fff;font-size:15px;font-weight:900;
+      padding:14px;background:linear-gradient(100deg,var(--blue),var(--cyan));
+      box-shadow:0 8px 20px rgba(22,119,255,.34)}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:900;
+      padding:4px 10px;border-radius:99px;background:var(--mist);color:#0B4FA8}
+  .glass{background:rgba(255,255,255,.86);border:.5px solid rgba(255,255,255,.9);
+      border-radius:18px;box-shadow:0 6px 18px rgba(15,46,107,.10)}
+  .rx{background:rgba(255,255,255,.93);border-radius:99px;padding:5px 10px;font-size:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,.16);display:inline-flex;align-items:center;gap:4px}
+  .rx b{font-size:11px;font-weight:900;color:var(--navy)}
+  .scrim{position:absolute;left:0;right:0;bottom:0;height:280px;
+      background:linear-gradient(to top,rgba(10,16,34,.78),rgba(10,16,34,.34) 45%,transparent)}
+  .dots{display:flex;gap:6px;align-items:center;justify-content:center}
+  .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.42);display:block}
+  .dots i.on{width:9px;height:9px;background:#fff}
+
+  /* 折线 / 标注 */
+  .fold{position:absolute;left:0;right:0;border-top:2px dashed #E4736A;z-index:8}
+  .foldlab{position:absolute;z-index:8;background:#A7443C;color:#fff;font-size:10.5px;
+      font-weight:900;padding:3px 9px;border-radius:8px;letter-spacing:.2px;white-space:nowrap}
+  .mk{position:absolute;z-index:10;width:21px;height:21px;border-radius:50%;
+      background:var(--blue);color:#fff;font-size:12px;font-weight:900;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 7px rgba(15,46,107,.4);border:1.5px solid #fff}
+  .legend{list-style:none;padding-left:0;margin:12px 0 0;max-width:900px}
+  .legend li{position:relative;padding-left:30px;margin-bottom:8px;font-size:13px}
+  .legend li > .num{position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;
+      background:var(--blue);color:#fff;font-size:11.5px;font-weight:900;
+      display:flex;align-items:center;justify-content:center}
+
+  @media (max-width:760px){
+    body{padding:26px 14px 90px}
+    .tocbox ol{columns:1}
+    h1{font-size:22px}
+    th,td{padding:8px 9px;font-size:12.3px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+<h1>1Day 设计稿 — 拍完之后的三屏</h1>
+<p class="sub">对应 <a href="2026-09-02-round-3-after-the-shot.html">第三轮 PRD</a>。这份是<b>设计稿，不是已写好的代码</b> —— Swift 一行还没动，先给你看长什么样，你点头我再写。左边一律是<b>现在真实的样子</b>（按源码逐个控件复刻，不是丑化），右边是提议。</p>
+<div class="meta">
+  <span class="pill">Mockups</span>
+  <span class="pill gray">2026-09-02</span>
+  <span class="pill warn">未实现</span>
+  <span><b>三屏</b> 单条回看 · 九宫格 · 单列时间线</span>
+  <span><b>比例</b> 内部按 375pt 逻辑点绘制，缩放 84%</span>
+</div>
+</div>
+
+<div class="tocbox">
+<ol>
+<li><a href="#s0">三条原则</a></li>
+<li><a href="#s1">单条回看 <code>ClipPreviewView</code></a></li>
+<li><a href="#s2">九宫格 <code>StoryGridView</code></a></li>
+<li><a href="#s3">单列时间线 <code>StoryTimelineView</code></a></li>
+<li><a href="#s4">要新写的共用零件</a></li>
+<li><a href="#s5">拆 PR</a></li>
+</ol>
+</div>
+
+<h2 id="s0"><span class="n">1</span>三条原则</h2>
+<p class="sub">三屏的所有改动都从这三条推出来，没有第四条。</p>
+
+<div class="card ok">
+<h4>一 · 画面最大，其它东西压在画面<b>上面</b>，不是下面</h4>
+<p style="margin:0">现在单条回看把视频塞进 <code>ScrollView</code> 里，视频一个人就占满整屏，于是表情、时间、评论、重拍全在折线以下 —— 需要滚动才能发现。一段 2 秒的视频不该需要滚动。改成视频铺满、控件浮在上层。</p>
+</div>
+
+<div class="card ok">
+<h4>二 · 一屏只有一个「现在该干什么」</h4>
+<p style="margin:0">九宫格里五个格子长得差不多，该拍的那格底色只有 7% 蓝，是全屏最淡的东西；单列时间线更狠，七个一模一样的「拍下这一刻」空框。改成：<b>该拍的抬成一张卡，剩下的空位退成安静的底</b>。</p>
+</div>
+
+<div class="card ok">
+<h4>三 · 社交只在共享故事里出现</h4>
+<p style="margin:0">现在表情条和评论区的显示条件是 <code>challengeID != nil</code> —— 也就是<b>只要是个故事就有</b>。自己一个人过一天，回看时下面挂着一个空的评论输入框等你跟自己说话。条件应该是 <code>challenge.isShared</code>。</p>
+</div>
+
+<h2 id="s1"><span class="n">2</span>单条回看 <code>ClipPreviewView</code></h2>
+<p class="sub">全 app 最弱的一屏，189 行，是唯一一处还在用 iOS 原生导航栏 + <code>.buttonStyle(.bordered)</code> 的地方，跟其它屏的 <code>OneDay</code> 设计系统完全不搭。</p>
+
+<div class="rack">
+
+  <div class="unit">
+    <div class="lab"><span class="tag bad">现在</span><span>共享故事 · 回看第 4 段</span></div>
+    <div class="frame"><div class="scr">
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div class="iosnav">Golden hour<span class="r">Done</span></div>
+
+      <!-- ScrollView 内容：视频 maxWidth 340 → 9:16 高 604 -->
+      <div class="vid" style="position:absolute;top:104px;left:17px;width:340px;height:604px;
+           border-radius:24px;border:3px solid #E8A0A8">
+        <div class="stamp" style="top:10px;right:12px;text-align:right;padding:5px 10px;line-height:1.3">
+          Sep 2, 2026<br>2:05 PM</div>
+        <!-- MomentStampOverlay 居中 -->
+        <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);text-align:center">
+          <div style="font-size:17px;font-weight:800;color:rgba(255,255,255,.82)">Tester</div>
+          <div style="font-size:12px;font-weight:900;letter-spacing:1.4px;color:rgba(255,255,255,.6);margin-top:3px">MOMENT 4</div>
+        </div>
+        <!-- 加字幕按钮：maxWidth/maxHeight .infinity，label 落在正中 -->
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+             background:rgba(0,0,0,.35);color:rgba(255,255,255,.85);border-radius:99px;
+             padding:9px 15px;font-size:14px;font-weight:700;white-space:nowrap;
+             outline:2px dashed #E4736A;outline-offset:3px">＋ add a caption</div>
+        <div class="mk" style="top:270px;left:246px">1</div>
+      </div>
+
+      <!-- 折线：底部评论栏顶边 -->
+      <div class="fold" style="top:704px"></div>
+      <div class="foldlab" style="top:668px;left:17px">表情 · 时间 · 评论 · 重拍 —— 全在这条线以下</div>
+      <div class="mk" style="top:672px;left:330px">2</div>
+
+      <!-- safeAreaInset: CommentInputBar -->
+      <div style="position:absolute;bottom:0;left:0;right:0;height:56px;background:#F2F2F7;
+           border-top:.5px solid #DEDEE2;display:flex;align-items:center;gap:8px;padding:0 14px">
+        <div style="flex:1;height:32px;border-radius:99px;background:#E4E4E9;display:flex;
+             align-items:center;padding:0 12px;font-size:13px;color:#8A8A8E">Add a comment…</div>
+        <div style="width:30px;height:30px;border-radius:50%;background:#C9C9CE"></div>
+      </div>
+      <div class="mk" style="top:718px;left:330px">3</div>
+    </div></div>
+    <p class="cap">视频 <code>maxWidth: 340</code> → 9:16 就是 604pt 高。加上 44 状态栏 + 44 导航栏 + 16 内边距，视频底边落在 708pt，而评论栏顶边在 704pt。折线以下的东西一屏都露不出来。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">提议</span><span>共享故事</span></div>
+    <div class="frame"><div class="scr">
+      <div class="vid" style="position:absolute;inset:0"></div>
+      <div class="scrim"></div>
+      <div class="st on-dark"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">✕</div></div>
+      <div style="position:absolute;top:52px;right:20px"><div class="bub">⋯</div></div>
+      <div class="mk" style="top:44px;left:302px">4</div>
+
+      <!-- 题目移到顶部 chip，不再压在人脸上 -->
+      <div style="position:absolute;top:58px;left:0;right:0;display:flex;justify-content:center">
+        <div style="background:rgba(0,0,0,.34);color:#fff;border-radius:99px;padding:6px 14px;
+             font-size:13px;font-weight:900;letter-spacing:.2px">
+          <span style="opacity:.62">4 / 5</span>&nbsp;&nbsp;Golden hour</div>
+      </div>
+      <div class="mk" style="top:96px;left:186px">1</div>
+
+      <!-- 底部：作者 + 表情 + 两个 chip + 页点 -->
+      <div style="position:absolute;bottom:96px;left:20px;right:20px">
+        <div style="color:#fff;font-size:16px;font-weight:900;text-shadow:0 1px 6px rgba(0,0,0,.4)">Tester</div>
+        <div style="color:rgba(255,255,255,.72);font-size:12.5px;font-weight:700;margin-top:1px">2:05 PM · 今天</div>
+
+        <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
+          <span class="rx">😍<b>2</b></span>
+          <span class="rx">🔥</span>
+          <span class="rx">🥲</span>
+          <span class="rx">👏</span>
+          <span class="rx" style="font-size:13px;font-weight:900;color:var(--navy)">＋</span>
+        </div>
+        <div class="mk" style="top:60px;left:293px">3</div>
+
+        <div style="display:flex;gap:9px;margin-top:12px">
+          <div style="flex:1;background:rgba(255,255,255,.9);border-radius:14px;padding:11px 13px;
+               font-size:13.5px;font-weight:800;color:#5B7099">＋ 加字幕</div>
+          <div style="background:rgba(255,255,255,.9);border-radius:14px;padding:11px 14px;
+               font-size:13.5px;font-weight:800;color:#5B7099">💬 2</div>
+        </div>
+        <div class="mk" style="top:150px;left:-8px">2</div>
+      </div>
+
+      <!-- 换段 -->
+      <div style="position:absolute;bottom:46px;left:0;right:0;text-align:center">
+        <div class="dots"><i></i><i></i><i></i><i class="on"></i><i></i></div>
+        <div style="color:rgba(255,255,255,.6);font-size:11.5px;font-weight:800;margin-top:8px">
+          ← 左右滑 · 看这个故事的其它段 →</div>
+      </div>
+      <div class="mk" style="top:700px;left:60px">5</div>
+      <div class="home on-dark"></div>
+    </div></div>
+    <p class="cap">视频铺满，控件浮在上层。字幕入口挪到底部一排，不再是一个盖住整块视频的透明按钮。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">提议</span><span>自己一个人的故事</span></div>
+    <div class="frame"><div class="scr">
+      <div class="vid night" style="position:absolute;inset:0"></div>
+      <div class="scrim"></div>
+      <div class="st on-dark"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">✕</div></div>
+      <div style="position:absolute;top:52px;right:20px"><div class="bub">⋯</div></div>
+
+      <div style="position:absolute;top:58px;left:0;right:0;display:flex;justify-content:center">
+        <div style="background:rgba(0,0,0,.34);color:#fff;border-radius:99px;padding:6px 14px;
+             font-size:13px;font-weight:900">
+          <span style="opacity:.62">2 / 7</span>&nbsp;&nbsp;睡前</div>
+      </div>
+
+      <div style="position:absolute;bottom:96px;left:20px;right:20px">
+        <div style="color:rgba(255,255,255,.72);font-size:12.5px;font-weight:700">22:40 · 今天</div>
+        <div style="margin-top:12px;background:rgba(255,255,255,.9);border-radius:14px;padding:11px 13px;
+             font-size:13.5px;font-weight:800;color:#5B7099">＋ 加字幕</div>
+        <div style="display:flex;gap:9px;margin-top:9px">
+          <div style="flex:1;background:rgba(255,255,255,.9);border-radius:14px;padding:11px 13px;
+               font-size:13.5px;font-weight:800;color:#5B7099;text-align:center">↺ 重拍</div>
+          <div style="flex:1;border-radius:14px;padding:11px 13px;text-align:center;
+               font-size:13.5px;font-weight:900;color:#fff;
+               background:linear-gradient(100deg,var(--blue),var(--cyan))">看成片 →</div>
+        </div>
+        <div class="mk" style="top:56px;left:-8px">6</div>
+      </div>
+
+      <div style="position:absolute;bottom:46px;left:0;right:0;text-align:center">
+        <div class="dots"><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="home on-dark"></div>
+    </div></div>
+    <p class="cap">同一个 view，<code>isShared == false</code> 的分支：表情条、评论 chip、评论输入栏全部不渲染，腾出来的位置给「重拍 / 看成片」。</p>
+  </div>
+
+</div>
+
+<ul class="legend">
+<li><span class="num">1</span><b>题目从画面正中挪到顶部。</b>现在 <code>MomentStampOverlay</code> 把 <code>Tester / MOMENT 4</code> 印在正中，而「add a caption」按钮用的是 <code>.frame(maxWidth:.infinity, maxHeight:.infinity)</code>，它的 label 也落在正中 —— 两个东西叠在一起（左图虚线框）。而且第 4 段就写 <code>MOMENT 4</code>，题目本身「Golden hour」反而只在导航栏里。改成顶部一个 chip：<code>4 / 5 · Golden hour</code>，位置和成片里烧进去的字幕不冲突。</li>
+<li><span class="num">2</span><b>字幕入口变成一个具体的按钮。</b>不再是一整块透明命中区 —— 现在你想暂停看一眼画面，手一碰就进了字幕编辑。</li>
+<li><span class="num">3</span><b>表情条浮到视频上，带计数。</b>现在它在视频<b>下面</b>，要滚才看得见；而别人给你点的表情本来是这屏最值得马上看到的东西。</li>
+<li><span class="num">4</span><b>去掉 iOS 原生导航栏，换 <code>IconBubble</code>。</b>全 app 只剩这一屏顶着白条 + 蓝色「Done」，跟 <code>FilmView</code>、<code>RecordClipView</code> 都不是一套。</li>
+<li><span class="num">5</span><b>能翻到下一段。</b>现在看完第 4 段只能 Done 回去、再点第 5 格。做成 <code>TabView(.page)</code> 横滑，页点告诉你在第几段 —— 这也是把它从「一个弹窗」变成「一次回看」的关键。</li>
+<li><span class="num">6</span><b>一个人的时候没有社交件。</b>换成「重拍 / 看成片」，把这屏接回主线。</li>
+</ul>
+
+<div class="card note">
+<h4>顺手要一起改的：评论从内联搬进 sheet</h4>
+<p style="margin:0">现在 <code>CommentsSection</code> 是内联长列表，评论一多这屏就无限长，视频被顶走。改成点 <code>💬 2</code> 开 <code>.presentationDetents([.medium])</code> 的 sheet，视频留在底下继续循环播。</p>
+</div>
+
+<h2 id="s2"><span class="n">3</span>九宫格 <code>StoryGridView</code></h2>
+<p class="sub">401 行。上一轮我已经把「该拍的那格」底色从 7% 提到 16% 并加了「点这里拍」，但那是止血，不是设计 —— 结构上的问题没动。</p>
+
+<div class="rack">
+
+  <div class="unit">
+    <div class="lab"><span class="tag bad">现在</span><span>五格 · 已拍 2</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">Main Character</div>
+        <div style="font-size:13px;font-weight:700;color:var(--inkSoft);margin-top:3px">Everyone's moments</div>
+
+        <div style="display:flex;gap:7px;margin-top:12px">
+          <span class="chip">2/5</span>
+          <span class="chip" style="background:#EDE9FF;color:#4B3FA8">2s each</span>
+          <span class="chip" style="background:#DFF6EC;color:#0F6E56">4s film</span>
+        </div>
+
+        <div style="margin-top:12px;font-size:12.5px;font-weight:700;color:var(--red);line-height:1.45">
+          Sign into iCloud (Settings ▸ your name) to record with friends.</div>
+        <div class="mk" style="top:186px;left:296px">3</div>
+
+        <!-- 3 列网格，5 格 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px">
+          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(22,119,255,.07);
+               border:1.5px solid rgba(22,119,255,.34);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px;outline:2px dashed #E4736A;outline-offset:3px">
+            <span style="font-size:22px">🌅</span>
+            <span style="font-size:10.5px;font-weight:900;text-align:center;line-height:1.2">Morning<br>light</span>
+            <span style="font-size:9px;font-weight:900;color:var(--blue)">TAP TO FILM</span>
+          </div>
+          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">☕</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft)">Coffee</span>
+          </div>
+          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">🚶</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft);text-align:center;line-height:1.2">On the<br>move</span>
+          </div>
+          <div class="vid" style="aspect-ratio:9/13;border-radius:14px">
+            <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">2:05 PM</div>
+            <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
+                 font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Golden hour</div>
+          </div>
+          <div class="vid night" style="aspect-ratio:9/13;border-radius:14px">
+            <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">10:40 PM</div>
+            <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
+                 font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Wind down</div>
+          </div>
+          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">🌙</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft)">Evening</span>
+          </div>
+        </div>
+        <div class="mk" style="top:322px;left:-10px">1</div>
+        <div class="mk" style="top:400px;left:150px">2</div>
+
+        <div class="cta" style="margin-top:18px">Preview · 2 moments</div>
+      </div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">题目图标（☕🚶🌙）和真画面混在一个网格里，一眼扫过去分不出「拍过的」和「还没拍的」。该拍的那格（虚线框）是全屏最淡的东西之一。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">提议</span><span>同一个故事</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+      <div style="position:absolute;top:52px;right:20px"><div class="bub">⋯</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">Main Character</div>
+          <span class="chip" style="font-size:10px">👥 共享</span>
+        </div>
+
+        <!-- 进度条替代 chip 三连 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+          <div style="flex:1;height:6px;border-radius:99px;background:rgba(22,119,255,.16);overflow:hidden">
+            <div style="width:40%;height:100%;border-radius:99px;
+                 background:linear-gradient(90deg,var(--blue),var(--cyan))"></div>
+          </div>
+          <span style="font-size:13px;font-weight:900;color:#0B4FA8">2/5</span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--inkSoft)">成片 4s</span>
+        </div>
+        <div class="mk" style="top:120px;left:-10px">3</div>
+
+        <!-- 该你了：一张大卡 -->
+        <div style="margin-top:16px;border-radius:20px;padding:14px 15px;display:flex;align-items:center;gap:13px;
+             background:linear-gradient(105deg,var(--blue),var(--cyan));
+             box-shadow:0 10px 24px rgba(22,119,255,.32)">
+          <div style="width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.2);
+               display:flex;align-items:center;justify-content:center;font-size:24px">🌅</div>
+          <div style="flex:1">
+            <div style="font-size:10.5px;font-weight:900;letter-spacing:1.2px;color:rgba(255,255,255,.72)">下一格 · 第 1 个</div>
+            <div style="font-size:17px;font-weight:900;color:#fff;margin-top:2px">Morning light</div>
+          </div>
+          <div style="width:38px;height:38px;border-radius:50%;background:#fff;display:flex;
+               align-items:center;justify-content:center;font-size:17px">🎬</div>
+        </div>
+        <div class="mk" style="top:172px;left:-10px">1</div>
+
+        <!-- 已拍的排前面 -->
+        <div style="font-size:11px;font-weight:900;letter-spacing:1.2px;color:var(--inkFaint);margin-top:20px">
+          已经拍下的 2 段</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:9px">
+          <div class="vid" style="aspect-ratio:9/13;border-radius:14px">
+            <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">2:05</div>
+            <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
+                 font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Golden hour</div>
+            <div style="position:absolute;bottom:7px;right:7px;color:#fff;font-size:11px">▶</div>
+          </div>
+          <div class="vid night" style="aspect-ratio:9/13;border-radius:14px">
+            <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">10:40</div>
+            <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
+                 font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Wind down</div>
+            <div style="position:absolute;bottom:7px;right:7px;color:#fff;font-size:11px">▶</div>
+          </div>
+          <div style="aspect-ratio:9/13"></div>
+        </div>
+        <div class="mk" style="top:298px;left:-10px">2</div>
+
+        <!-- 还没拍的退成安静的底 -->
+        <div style="font-size:11px;font-weight:900;letter-spacing:1.2px;color:var(--inkFaint);margin-top:18px">
+          还剩 3 格</div>
+        <div style="display:flex;gap:9px;margin-top:9px">
+          <div style="flex:1;height:56px;border-radius:14px;background:rgba(147,166,198,.13);
+               display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:17px;opacity:.4">☕</span>
+            <span style="font-size:9px;font-weight:800;color:var(--inkFaint)">Coffee</span></div>
+          <div style="flex:1;height:56px;border-radius:14px;background:rgba(147,166,198,.13);
+               display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:17px;opacity:.4">🚶</span>
+            <span style="font-size:9px;font-weight:800;color:var(--inkFaint)">On the move</span></div>
+          <div style="flex:1;height:56px;border-radius:14px;background:rgba(147,166,198,.13);
+               display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:17px;opacity:.4">🌙</span>
+            <span style="font-size:9px;font-weight:800;color:var(--inkFaint)">Evening</span></div>
+        </div>
+        <div class="mk" style="top:400px;left:-10px">4</div>
+      </div>
+
+      <!-- 成片按钮钉在底部 -->
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px 26px;
+           background:linear-gradient(to top,#EFF4FF 55%,rgba(239,244,255,0))">
+        <div class="cta">▶&nbsp; 看这 4 秒</div>
+      </div>
+      <div class="mk" style="top:678px;left:296px">5</div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">三段结构：<b>下一格</b>（一张卡）→ <b>已经拍下的</b>（真画面网格）→ <b>还剩几格</b>（安静的小格）。视觉重量和实际重要性一致。</p>
+  </div>
+
+</div>
+
+<ul class="legend">
+<li><span class="num">1</span><b>「下一格」从格子里抬出来变成一张卡。</b>它是这屏唯一的行动，就该长得像唯一的行动。带题目全名、序号、和一个拍摄按钮。</li>
+<li><span class="num">2</span><b>已拍的排前面，还没拍的排后面。</b>现在是按 <code>day</code> 顺序混排，所以你的两段真画面被夹在图标格子中间。你回到这屏，第一件想干的事是重看刚才拍的那段 —— 让它在第一屏。</li>
+<li><span class="num">3</span><b>chip 三连换成进度条。</b><code>2/5</code>、<code>2s each</code>、<code>4s film</code> 三个 chip 里，只有第一个是你关心的。iCloud 那句红字挪进 <code>⋯</code> 菜单 —— 它是一个设置问题，不该常驻在故事页顶上。</li>
+<li><span class="num">4</span><b>没拍的格子矮一半、无边框、图标降到 40% 不透明。</b>它们是「待办」，不是「内容」。现在它们和真画面一样大、还带虚线边框抢注意力。</li>
+<li><span class="num">5</span><b>成片按钮钉在底部，文案换成时长。</b>「Preview · 2 moments」说的是数量，「看这 4 秒」说的是你要得到什么。数量在进度条里已经有了。</li>
+</ul>
+
+<h2 id="s3"><span class="n">4</span>单列时间线 <code>StoryTimelineView</code></h2>
+<p class="sub">414 行。「和我过一天」这类没有题目的故事走这条路径。上一轮我修掉了重复七遍的「拍下这一刻」文案，但七个一样高的空框还在。</p>
+
+<div class="rack">
+
+  <div class="unit">
+    <div class="lab"><span class="tag bad">现在</span><span>七格 · 已拍 2</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">和我过一天</div>
+        <div style="font-size:13px;font-weight:700;color:var(--inkSoft);margin-top:3px">今天 2/7 · 每段 2s</div>
+
+        <div style="display:flex;gap:12px;margin-top:18px">
+          <!-- 时间轴 -->
+          <div style="width:16px;display:flex;flex-direction:column;align-items:center;padding-top:8px">
+            <span style="width:13px;height:13px;border-radius:50%;border:3px solid var(--blue);background:#fff"></span>
+            <span style="flex:1;width:2px;background:rgba(22,119,255,.2)"></span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+            <div class="glass" style="padding:11px">
+              <div style="font-size:12px;font-weight:900;margin-bottom:8px">You</div>
+              <div style="height:96px;border-radius:12px;border:2px dashed rgba(22,119,255,.45);
+                   background:rgba(22,119,255,.06);display:flex;align-items:center;justify-content:center;
+                   font-size:13px;font-weight:900;color:var(--blue)">点这里拍</div>
+            </div>
+            <div class="glass" style="padding:11px">
+              <div style="height:96px;border-radius:12px;border:2px dashed rgba(147,166,198,.4);
+                   background:rgba(147,166,198,.07);display:flex;align-items:center;justify-content:center;
+                   font-size:13px;font-weight:800;color:var(--inkFaint)">点这里拍</div>
+            </div>
+            <div class="glass" style="padding:11px">
+              <div style="height:96px;border-radius:12px;border:2px dashed rgba(147,166,198,.4);
+                   background:rgba(147,166,198,.07);display:flex;align-items:center;justify-content:center;
+                   font-size:13px;font-weight:800;color:var(--inkFaint)">点这里拍</div>
+            </div>
+            <div class="glass" style="padding:11px">
+              <div style="height:96px;border-radius:12px;border:2px dashed rgba(147,166,198,.4);
+                   background:rgba(147,166,198,.07);display:flex;align-items:center;justify-content:center;
+                   font-size:13px;font-weight:800;color:var(--inkFaint)">点这里拍</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fold" style="top:708px"></div>
+      <div class="foldlab" style="top:672px;left:20px">已经拍下的两段在这条线以下，第 5、6、7 格还要再滚一屏</div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">每格 <code>glassSurface</code> 卡片 + 96pt 虚线框 ≈ 120pt 高，一屏只放得下四个空框。你真正拍下的东西在两屏之外。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">提议</span><span>同一个故事</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+      <div style="position:absolute;top:52px;right:20px"><div class="bub">⋯</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">和我过一天</div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+          <div style="flex:1;height:6px;border-radius:99px;background:rgba(22,119,255,.16);overflow:hidden">
+            <div style="width:29%;height:100%;border-radius:99px;
+                 background:linear-gradient(90deg,var(--blue),var(--cyan))"></div>
+          </div>
+          <span style="font-size:13px;font-weight:900;color:#0B4FA8">2/7</span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--inkSoft)">成片 4s</span>
+        </div>
+
+        <!-- 时间轴：左侧真时间 -->
+        <div style="display:flex;gap:11px;margin-top:20px">
+          <div style="width:40px;display:flex;flex-direction:column;align-items:flex-end;padding-top:3px">
+            <span style="font-size:12px;font-weight:900;color:#0B4FA8">9:15</span>
+            <span style="height:88px"></span>
+            <span style="font-size:12px;font-weight:900;color:#0B4FA8">14:02</span>
+            <span style="height:88px"></span>
+            <span style="font-size:12px;font-weight:900;color:var(--blue)">现在</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+            <div class="vid green" style="height:100px;border-radius:16px">
+              <div style="position:absolute;bottom:8px;left:10px;color:#fff;font-size:11.5px;
+                   font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">早上第一眼</div>
+              <div style="position:absolute;top:8px;right:9px;color:rgba(255,255,255,.9);font-size:13px">▶</div>
+            </div>
+            <div class="vid" style="height:100px;border-radius:16px">
+              <div style="position:absolute;bottom:8px;left:10px;color:#fff;font-size:11.5px;
+                   font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">下午的光</div>
+              <div style="position:absolute;top:8px;right:9px;color:rgba(255,255,255,.9);font-size:13px">▶</div>
+            </div>
+            <!-- 唯一的拍摄入口 -->
+            <div style="border-radius:16px;padding:15px;display:flex;align-items:center;justify-content:center;gap:9px;
+                 background:linear-gradient(105deg,var(--blue),var(--cyan));
+                 box-shadow:0 10px 24px rgba(22,119,255,.32)">
+              <span style="font-size:19px">🎬</span>
+              <span style="font-size:15.5px;font-weight:900;color:#fff">拍下这一刻</span>
+            </div>
+            <div class="mk" style="top:236px;left:-12px">2</div>
+          </div>
+        </div>
+        <div class="mk" style="top:126px;left:-12px">1</div>
+
+        <!-- 剩余空位缩成细条 -->
+        <div style="display:flex;align-items:center;gap:9px;margin-top:20px;padding-left:51px">
+          <div style="flex:1;display:flex;gap:6px">
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+          </div>
+          <span style="font-size:11.5px;font-weight:800;color:var(--inkFaint);white-space:nowrap">今天还能拍 4 段</span>
+        </div>
+        <div class="mk" style="top:452px;left:-12px">3</div>
+      </div>
+
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px 26px;
+           background:linear-gradient(to top,#EFF4FF 55%,rgba(239,244,255,0))">
+        <div class="cta">▶&nbsp; 看这 4 秒</div>
+      </div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">一屏装下：进度、两段真画面、一个拍摄入口、剩余额度、成片按钮。不用滚。</p>
+  </div>
+
+</div>
+
+<ul class="legend">
+<li><span class="num">1</span><b>时间戳挪到左轴。</b>没有题目的故事，唯一能区分两段的东西就是时间 —— 现在它印在缩略图里面（<code>MomentStampOverlay</code>），小、压在画面上、还得一格格找。放到左边的轴上，一眼就是一天的形状。</li>
+<li><span class="num">2</span><b>七个「点这里拍」变一个。</b>时间线故事没有题目，所以七个空位彼此没有区别 —— 只有「下一个」有意义。其余六个连框都不用画。</li>
+<li><span class="num">3</span><b>剩余额度缩成四条细线 + 一句话。</b>你需要知道「今天还能拍 4 段」，不需要四个 120pt 高的空框来告诉你。</li>
+</ul>
+
+<div class="card warn">
+<h4>两个视图能不能合并？</h4>
+<p style="margin:0"><code>StoryGridView</code>（401 行）和 <code>StoryTimelineView</code>（414 行）差别只有「有题目 / 没题目」，815 行里大概 500 行是重复的头部、进度、成片入口、菜单。<b>但这一轮不合。</b>先各自改对，等新结构在两边都稳了再抽公共部分 —— 反过来做的话，我会在一个还没定型的设计上抽象，抽出来的东西大概率要拆两次。</p>
+</div>
+
+<h2 id="s4"><span class="n">5</span>要新写的共用零件</h2>
+<table>
+<tr><th style="width:26%">零件</th><th style="width:20%">放哪</th><th>做什么</th></tr>
+<tr>
+  <td class="mono">ClipDeck</td>
+  <td class="mono">Presentation/</td>
+  <td>纯逻辑，无 SwiftUI：给一个 <code>Challenge</code>，算出「可回看的段」有序列表、当前索引、左右能不能翻。<code>ClipPreviewView</code> 的横滑和三屏的排序都读它。<b>先写这个，带单测。</b></td>
+</tr>
+<tr>
+  <td class="mono">StoryProgressBar</td>
+  <td class="mono">Views/Components/</td>
+  <td>进度条 + <code>2/5</code> + 成片时长。三屏共用，替掉现在各写一遍的 chip 三连。</td>
+</tr>
+<tr>
+  <td class="mono">NextSlotCard</td>
+  <td class="mono">Views/Components/</td>
+  <td>「下一格」那张蓝卡。有题目时显示题目名，没题目时显示「拍下这一刻」—— 两屏同一个组件。</td>
+</tr>
+<tr>
+  <td class="mono">ClipThumb</td>
+  <td class="mono">Views/Components/</td>
+  <td>已拍片段的缩略图：首帧 + 时间 stamp + 题目名 + ▶。九宫格和单列都用，只是尺寸不同。</td>
+</tr>
+<tr>
+  <td class="mono">QuietSlotRow</td>
+  <td class="mono">Views/Components/</td>
+  <td>剩余空位的安静表示。九宫格版是矮格子，单列版是细线条。</td>
+</tr>
+</table>
+
+<h2 id="s5"><span class="n">6</span>拆 PR</h2>
+<p class="sub">五个 PR，每个都能单独跑起来看效果。顺序有依赖：A 必须先。</p>
+
+<div class="pr">
+  <div class="top"><span class="id">A</span><span class="ti"><code>feat/clip-deck</code></span><span class="pill">纯逻辑</span></div>
+  <div class="bd">
+    <p><code>Presentation/ClipDeck.swift</code> + <code>ClipDeckTests.swift</code>。不动任何 UI。定义「一个故事里能回看的段，按什么顺序」—— 这个顺序同时决定横滑的次序和九宫格里已拍片段的排序，两处必须一致，所以它得是一份可测的纯逻辑，不是两个视图各自的 <code>sorted</code>。</p>
+    <p style="margin:0">按房规不读 <code>.now</code>，时间从外面传进来。</p>
+  </div>
+</div>
+
+<div class="pr">
+  <div class="top"><span class="id">B</span><span class="ti"><code>feat/review-is-full-bleed</code></span><span class="pill hot">这一轮的主菜</span></div>
+  <div class="bd">
+    <p>单条回看重做：去 <code>NavigationStack</code> 原生栏、视频铺满、控件浮到上层、题目 chip 挪顶部、字幕按钮不再盖全屏。</p>
+    <p style="margin:0">不含横滑（见 C），不含社交条件（见 D）—— 拆开是因为这三件事失败的方式不一样，混在一个 PR 里出问题不好回退。</p>
+  </div>
+</div>
+
+<div class="pr">
+  <div class="top"><span class="id">C</span><span class="ti"><code>feat/swipe-between-clips</code></span><span class="pill gray">依赖 A、B</span></div>
+  <div class="bd">
+    <p style="margin:0">把 <code>ClipPreviewView</code> 包进 <code>TabView(.page)</code>，读 <code>ClipDeck</code>。要处理的是播放器复用：五段各一个 <code>LoopingClipPlayer</code> 全部驻留会吃内存，只让当前页和左右各一页活着。</p>
+  </div>
+</div>
+
+<div class="pr">
+  <div class="top"><span class="id">D</span><span class="ti"><code>fix/social-only-when-shared</code></span><span class="pill warn">小、独立</span></div>
+  <div class="bd">
+    <p style="margin:0">把三处 <code>challengeID != nil</code> 换成 <code>challenge.isShared</code>，加一个单测钉住「一个人的故事没有评论入口」。这个 PR 最小，可以第一个合。</p>
+  </div>
+</div>
+
+<div class="pr">
+  <div class="top"><span class="id">E</span><span class="ti"><code>feat/story-page-has-one-next</code></span><span class="pill">九宫格 + 单列</span></div>
+  <div class="bd">
+    <p>新写 <code>StoryProgressBar</code> / <code>NextSlotCard</code> / <code>ClipThumb</code> / <code>QuietSlotRow</code>，然后两屏各自换掉旧结构。iCloud 提示挪进 <code>⋯</code> 菜单。</p>
+    <p style="margin:0">这个 PR 最大，但风险低 —— 全是布局，没有新状态。</p>
+  </div>
+</div>
+
+<div class="card note">
+<h4>轻美颜（PRD 里的 P2）不在这五个里</h4>
+<p style="margin:0">理由写在<a href="2026-09-02-round-3-after-the-shot.html#s5">第三轮 PRD 第 5 节</a>：真成本不是滤镜本身（Core Image 三个内置滤镜，零依赖），而是要把 <code>ClipRecorder</code> 从 <code>AVCaptureMovieFileOutput</code> 换成 <code>AVAssetWriter</code> 手写管线 —— 音画同步、方向、来电中断的状态机全部重做。而且有个没定的问题：如果尴尬发生在<b>回看</b>而不是<b>拍摄</b>，那滤镜加错了地方，上面这五个 PR 才是解药。所以先做完 A–E，再看你还想不想要。</p>
+</div>
+
+</div>
+</body>
+</html>
