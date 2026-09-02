@@ -135,6 +135,28 @@
   .rx b{font-size:11px;font-weight:900;color:var(--navy)}
   .scrim{position:absolute;left:0;right:0;bottom:0;height:280px;
       background:linear-gradient(to top,rgba(10,16,34,.78),rgba(10,16,34,.34) 45%,transparent)}
+  .av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:900;color:#fff;border:2px solid #fff;flex:0 0 auto}
+  .av.me{background:linear-gradient(135deg,#1677FF,#38B6FF)}
+  .av.a{background:linear-gradient(135deg,#F0894F,#E0616B)}
+  .av.b{background:linear-gradient(135deg,#7C5CD6,#B3A4FF)}
+  .av.c{background:linear-gradient(135deg,#2FA37B,#5FD6B4)}
+  .av.wait{background:rgba(147,166,198,.45);color:rgba(255,255,255,.85)}
+  .avrow{display:flex}
+  .avrow .av{margin-left:-8px}
+  .avrow .av:first-child{margin-left:0}
+  .sl{display:flex;align-items:center;gap:11px;margin-top:13px}
+  .sl .nm{width:38px;font-size:12.5px;font-weight:900;color:var(--ink);flex:0 0 auto}
+  .sl .tr{flex:1;height:5px;border-radius:99px;background:rgba(147,166,198,.3);position:relative}
+  .sl .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;
+      background:linear-gradient(90deg,var(--blue),var(--cyan));display:block}
+  .sl .tr b{position:absolute;top:50%;width:18px;height:18px;margin-top:-9px;margin-left:-9px;
+      border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(15,46,107,.32)}
+  .sl .vv{width:30px;text-align:right;font-size:11.5px;font-weight:800;color:var(--inkSoft);flex:0 0 auto}
+  .look{filter:saturate(.9) brightness(1.07) contrast(.96) blur(.6px)}
+  .grain{position:absolute;inset:-6px;opacity:.5;mix-blend-mode:overlay;
+      background:repeating-linear-gradient(58deg,rgba(255,255,255,.5) 0 2px,rgba(0,0,0,.28) 2px 5px)}
+  .warmth{position:absolute;inset:0;background:rgba(255,176,102,.16);mix-blend-mode:soft-light}
   .dots{display:flex;gap:6px;align-items:center;justify-content:center}
   .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.42);display:block}
   .dots i.on{width:9px;height:9px;background:#fff}
@@ -172,6 +194,7 @@
   <span class="pill gray">2026-09-02</span>
   <span class="pill warn">未实现</span>
   <span><b>三屏</b> 单条回看 · 九宫格 · 单列时间线</span>
+  <span><b>加</b> 共享逻辑 · 美颜页</span>
   <span><b>比例</b> 内部按 375pt 逻辑点绘制，缩放 84%</span>
 </div>
 </div>
@@ -182,8 +205,10 @@
 <li><a href="#s1">单条回看 <code>ClipPreviewView</code></a></li>
 <li><a href="#s2">九宫格 <code>StoryGridView</code></a></li>
 <li><a href="#s3">单列时间线 <code>StoryTimelineView</code></a></li>
-<li><a href="#s4">要新写的共用零件</a></li>
-<li><a href="#s5">拆 PR</a></li>
+<li><a href="#s4">和朋友一起：第二个人往哪放</a></li>
+<li><a href="#s5">美颜页 <code>GentleLook</code></a></li>
+<li><a href="#s6">要新写的共用零件</a></li>
+<li><a href="#s7">拆 PR</a></li>
 </ol>
 </div>
 
@@ -388,36 +413,36 @@
 
         <!-- 3 列网格，5 格 -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px">
-          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(22,119,255,.07);
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(22,119,255,.07);
                border:1.5px solid rgba(22,119,255,.34);display:flex;flex-direction:column;
                align-items:center;justify-content:center;gap:5px;outline:2px dashed #E4736A;outline-offset:3px">
             <span style="font-size:22px">🌅</span>
             <span style="font-size:10.5px;font-weight:900;text-align:center;line-height:1.2">Morning<br>light</span>
             <span style="font-size:9px;font-weight:900;color:var(--blue)">TAP TO FILM</span>
           </div>
-          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
                border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
                align-items:center;justify-content:center;gap:5px">
             <span style="font-size:22px;opacity:.55">☕</span>
             <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft)">Coffee</span>
           </div>
-          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
                border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
                align-items:center;justify-content:center;gap:5px">
             <span style="font-size:22px;opacity:.55">🚶</span>
             <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft);text-align:center;line-height:1.2">On the<br>move</span>
           </div>
-          <div class="vid" style="aspect-ratio:9/13;border-radius:14px">
+          <div class="vid" style="aspect-ratio:9/12.5;border-radius:14px">
             <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">2:05 PM</div>
             <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
                  font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Golden hour</div>
           </div>
-          <div class="vid night" style="aspect-ratio:9/13;border-radius:14px">
+          <div class="vid night" style="aspect-ratio:9/12.5;border-radius:14px">
             <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">10:40 PM</div>
             <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
                  font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Wind down</div>
           </div>
-          <div style="aspect-ratio:9/13;border-radius:14px;background:rgba(147,166,198,.1);
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
                border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
                align-items:center;justify-content:center;gap:5px">
             <span style="font-size:22px;opacity:.55">🌙</span>
@@ -479,19 +504,19 @@
         <div style="font-size:11px;font-weight:900;letter-spacing:1.2px;color:var(--inkFaint);margin-top:20px">
           已经拍下的 2 段</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:9px">
-          <div class="vid" style="aspect-ratio:9/13;border-radius:14px">
+          <div class="vid" style="aspect-ratio:9/12.5;border-radius:14px">
             <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">2:05</div>
             <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
                  font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Golden hour</div>
             <div style="position:absolute;bottom:7px;right:7px;color:#fff;font-size:11px">▶</div>
           </div>
-          <div class="vid night" style="aspect-ratio:9/13;border-radius:14px">
+          <div class="vid night" style="aspect-ratio:9/12.5;border-radius:14px">
             <div class="stamp" style="top:6px;left:6px;font-size:9.5px;padding:2px 7px">10:40</div>
             <div style="position:absolute;bottom:7px;left:8px;right:8px;color:#fff;font-size:10px;
                  font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.5)">Wind down</div>
             <div style="position:absolute;bottom:7px;right:7px;color:#fff;font-size:11px">▶</div>
           </div>
-          <div style="aspect-ratio:9/13"></div>
+          <div style="aspect-ratio:9/12.5"></div>
         </div>
         <div class="mk" style="top:298px;left:-10px">2</div>
 
@@ -678,7 +703,370 @@
 <p style="margin:0"><code>StoryGridView</code>（401 行）和 <code>StoryTimelineView</code>（414 行）差别只有「有题目 / 没题目」，815 行里大概 500 行是重复的头部、进度、成片入口、菜单。<b>但这一轮不合。</b>先各自改对，等新结构在两边都稳了再抽公共部分 —— 反过来做的话，我会在一个还没定型的设计上抽象，抽出来的东西大概率要拆两次。</p>
 </div>
 
-<h2 id="s4"><span class="n">5</span>要新写的共用零件</h2>
+<h2 id="s4"><span class="n">5</span>和朋友一起：第二个人往哪放</h2>
+<p class="sub">你问的是「两个逻辑下 UI 怎么长」。我去把共享的数据结构挖了一遍，结论是：<b>不需要第二套布局。</b>上面那三段结构（下一格 / 已经拍下的 / 还剩几格）在共享下原样成立，变的只是每一段里多了「谁」。真正要改的是另一件事 —— 现在的做法把三个人塞进一个格子。</p>
+
+<div class="card hot">
+<h4>先说数据是什么形状</h4>
+<p>本地的 <code>DayCard</code> 只有一个 <code>clipFileName</code> —— 它只存<b>我</b>的。别人的从 <code>roomSync.remoteClips</code> 来，<code>recordedClips(for:)</code> 把两边合起来，按 <code>(day, authorName)</code> 排序。所以共享房间不是一列，是一张<b>表：题目 × 人</b>。5 个题目 3 个人，最多 15 段。</p>
+<p style="margin:0">而现在 <code>StoryGridCell</code> 把同一个题目的所有人塞进<b>一个格子</b>，用 <code>VideoStitcher.grid(for:)</code> 切开 —— 竖屏 3 人就是 <code>(3, 1)</code>，三条横带。一个格子在 375 屏上宽约 103pt、高 143pt，除以 3，<b>每人 103×47pt</b>。47pt 高的一张脸，认不出是谁。</p>
+</div>
+
+<div class="rack">
+
+  <div class="unit">
+    <div class="lab"><span class="tag bad">现在</span><span>共享 · 3 人 · 我漏了第 1 格</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">Main Character</div>
+        <div style="font-size:13px;font-weight:700;color:var(--inkSoft);margin-top:3px">Everyone's moments</div>
+        <div style="display:flex;gap:7px;margin-top:12px">
+          <span class="chip">2/5</span>
+          <span class="chip" style="background:#EDE9FF;color:#4B3FA8">2s each</span>
+          <span class="chip" style="background:#DFF6EC;color:#0F6E56">4s film</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px">
+          <!-- 别人拍了、我没拍：拼贴 + 虚线边 + 相机泡 + 播放角标 -->
+          <div style="aspect-ratio:9/12.5;border-radius:14px;overflow:hidden;position:relative;
+               outline:2px dashed #E4736A;outline-offset:3px">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:1px">
+              <div class="vid green" style="flex:1"></div>
+              <div class="vid night" style="flex:1"></div>
+              <div style="flex:1;background:rgba(22,119,255,.12);display:flex;align-items:center;
+                   justify-content:center;font-size:12px;color:var(--blue)">📷</div>
+            </div>
+            <div style="position:absolute;inset:0;border-radius:14px;
+                 border:1.5px dashed rgba(22,119,255,.65)"></div>
+            <!-- 相机泡（居中，34pt） -->
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                 width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.75);
+                 display:flex;align-items:center;justify-content:center;font-size:14px;
+                 box-shadow:0 3px 8px rgba(0,0,0,.18)">📷</div>
+            <!-- 播放按钮（右上，28pt，命中区 44pt） -->
+            <div style="position:absolute;top:5px;right:5px;width:28px;height:28px;border-radius:50%;
+                 background:rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center;
+                 font-size:11px;color:#fff">▶</div>
+            <div style="position:absolute;bottom:5px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Morning light</div>
+          </div>
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">☕</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft)">Coffee</span></div>
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">🚶</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft);text-align:center;line-height:1.2">On the<br>move</span></div>
+          <!-- 三人都拍了：三条 47pt 横带 -->
+          <div style="aspect-ratio:9/12.5;border-radius:14px;overflow:hidden;position:relative">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:1px">
+              <div class="vid" style="flex:1"></div>
+              <div class="vid green" style="flex:1"></div>
+              <div class="vid night" style="flex:1"></div>
+            </div>
+            <div style="position:absolute;top:5px;right:5px;color:#fff;font-size:15px">▶</div>
+            <div style="position:absolute;bottom:5px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Golden hour</div>
+          </div>
+          <div style="aspect-ratio:9/12.5;border-radius:14px;background:rgba(147,166,198,.1);
+               border:1.5px dashed rgba(127,180,255,.5);display:flex;flex-direction:column;
+               align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:22px;opacity:.55">🌙</span>
+            <span style="font-size:10.5px;font-weight:800;color:var(--inkSoft)">Evening</span></div>
+        </div>
+        <div class="mk" style="top:222px;left:-10px">1</div>
+        <div class="mk" style="top:390px;left:150px">2</div>
+
+        <div class="cta" style="margin-top:18px">Preview · 2 moments</div>
+        <div class="mk" style="top:508px;left:296px">3</div>
+      </div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">左上那格：一个虚线边 + 一个居中相机泡 + 一个右上播放角标，全压在一个「整块都是按钮」的格子上。三个可点的东西，一个 103pt 见方的格子。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">提议</span><span>同一个房间</span></div>
+    <div class="frame"><div class="scr">
+      <div class="canvas"></div>
+      <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">‹</div></div>
+      <div style="position:absolute;top:52px;right:20px"><div class="bub">⋯</div></div>
+
+      <div style="position:absolute;top:104px;left:20px;right:20px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px">Main Character</div>
+
+        <!-- 房间头部：头像 + 房号 -->
+        <div style="display:flex;align-items:center;gap:9px;margin-top:10px">
+          <div class="avrow">
+            <span class="av me">我</span><span class="av a">雨</span><span class="av b">L</span>
+          </div>
+          <span style="font-size:12.5px;font-weight:800;color:var(--inkSoft)">3 人在这个房间</span>
+          <span style="margin-left:auto;font-size:11px;font-weight:900;color:var(--inkFaint);
+                letter-spacing:1.4px">K3F9QP</span>
+        </div>
+        <div class="mk" style="top:92px;left:-10px">4</div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-top:11px">
+          <div style="flex:1;height:6px;border-radius:99px;background:rgba(22,119,255,.16);overflow:hidden">
+            <div style="width:40%;height:100%;border-radius:99px;
+                 background:linear-gradient(90deg,var(--blue),var(--cyan))"></div>
+          </div>
+          <span style="font-size:13px;font-weight:900;color:#0B4FA8">我 2/5</span>
+        </div>
+
+        <!-- 该你了：多一行「谁已经拍了」 -->
+        <div style="margin-top:13px;border-radius:20px;padding:11px 15px;display:flex;align-items:center;gap:12px;
+             background:linear-gradient(105deg,var(--blue),var(--cyan));
+             box-shadow:0 10px 24px rgba(22,119,255,.32)">
+          <div style="width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.2);
+               display:flex;align-items:center;justify-content:center;font-size:23px">🌅</div>
+          <div style="flex:1">
+            <div style="font-size:16.5px;font-weight:900;color:#fff">Morning light</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+              <div class="avrow"><span class="av a" style="width:19px;height:19px;font-size:9px">雨</span><span class="av b" style="width:19px;height:19px;font-size:9px">L</span></div>
+              <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.85)">他俩拍了，就差你</span>
+            </div>
+          </div>
+          <div style="width:38px;height:38px;border-radius:50%;background:#fff;display:flex;
+               align-items:center;justify-content:center;font-size:17px">🎬</div>
+        </div>
+        <div class="mk" style="top:170px;left:-10px">1</div>
+
+        <!-- 已拍：一格 = 一个人的一段 -->
+        <div style="font-size:11px;font-weight:900;letter-spacing:1.2px;color:var(--inkFaint);margin-top:15px">
+          房间里已经有 5 段</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:9px">
+          <div class="vid green" style="aspect-ratio:9/12.5;border-radius:14px">
+            <span class="av a" style="position:absolute;top:6px;left:6px;width:21px;height:21px;font-size:9px">雨</span>
+            <div style="position:absolute;bottom:6px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Morning light</div></div>
+          <div class="vid night" style="aspect-ratio:9/12.5;border-radius:14px">
+            <span class="av b" style="position:absolute;top:6px;left:6px;width:21px;height:21px;font-size:9px">L</span>
+            <div style="position:absolute;bottom:6px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Morning light</div></div>
+          <div class="vid" style="aspect-ratio:9/12.5;border-radius:14px;
+               box-shadow:0 0 0 2.5px var(--blue),0 0 0 4.5px rgba(255,255,255,.9)">
+            <span class="av me" style="position:absolute;top:6px;left:6px;width:21px;height:21px;font-size:9px">我</span>
+            <div style="position:absolute;bottom:6px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Golden hour</div></div>
+          <div class="vid green" style="aspect-ratio:9/12.5;border-radius:14px">
+            <span class="av a" style="position:absolute;top:6px;left:6px;width:21px;height:21px;font-size:9px">雨</span>
+            <div style="position:absolute;bottom:6px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Golden hour</div></div>
+          <div class="vid night" style="aspect-ratio:9/12.5;border-radius:14px;
+               box-shadow:0 0 0 2.5px var(--blue),0 0 0 4.5px rgba(255,255,255,.9)">
+            <span class="av me" style="position:absolute;top:6px;left:6px;width:21px;height:21px;font-size:9px">我</span>
+            <div style="position:absolute;bottom:6px;left:7px;right:7px;color:#fff;font-size:9.5px;
+                 font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.6)">Wind down</div></div>
+          <div style="aspect-ratio:9/12.5"></div>
+        </div>
+        <div class="mk" style="top:300px;left:-10px">2</div>
+
+        <!-- 还剩：共享下退成一条队列，不是格子 -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+          <div style="flex:1;display:flex;gap:5px">
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+            <span style="flex:1;height:6px;border-radius:99px;background:rgba(147,166,198,.3)"></span>
+          </div>
+          <span style="font-size:11px;font-weight:800;color:var(--inkFaint);white-space:nowrap">还剩 3 格</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span class="av wait" style="width:18px;height:18px;font-size:8px">L</span>
+          <span style="font-size:11.5px;font-weight:800;color:var(--inkFaint)">在等 Leo 拍「Coffee」</span>
+        </div>
+        <div class="mk" style="top:452px;left:-10px">5</div>
+      </div>
+
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px 26px;
+           background:linear-gradient(to top,#EFF4FF 55%,rgba(239,244,255,0))">
+        <div class="cta">▶&nbsp; 看我们仨的 10 秒</div>
+      </div>
+      <div class="mk" style="top:678px;left:296px">3</div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">和独自版<b>完全同一套三段结构</b>。多出来的只有：头部一排头像、卡上一行「他俩拍了」、格子上一个头像角标、尾部一行「在等谁」。</p>
+  </div>
+
+</div>
+
+<ul class="legend">
+<li><span class="num">1</span><b>「该你了」卡多一行社交压力，而不是多一个界面。</b>「他俩拍了，就差你」是共享房间唯一真正的驱动力，它该出现在你唯一要做的那个动作旁边。</li>
+<li><span class="num">2</span><b>一个格子 = 一个人的一段，不是拼贴。</b>这是这一节最重要的一条。三个人的脸挤在 103×47pt 里谁也认不出，而且它同时是「看」和「拍」两个动作的命中区。拆开之后：<b>格子只负责看，拍只在上面那张卡里发生</b> —— 三个重叠的可点区域一次性消失。<br><b>拼贴留给成片</b>：<code>VideoStitcher</code> 的 <code>.friendsTogether</code> 布局已经在做这件事，全屏播放时三条横带每人 280pt 高，那才是它该在的地方。</li>
+<li><span class="num">3</span><b>成片按钮说的是「我们仨」。</b>3 人 × 5 题 × 2s 是 10 秒不是 4 秒；现在的 <code>Preview · 2 moments</code> 在共享房间里数的还是我自己的格子，数字直接是错的。</li>
+<li><span class="num">4</span><b>房间成员和房号挪到标题下一行。</b>现在成员只在 <code>⋯</code> 菜单里、房号要翻两层才看得到 —— 而「谁在这个房间」是你打开共享故事第一个想知道的事。</li>
+<li><span class="num">5</span><b>「在等谁」是共享独有的一行。</b>独自版这里只写「还剩 3 格」。</li>
+</ul>
+
+<div class="card ok">
+<h4>一句话规则</h4>
+<p style="margin:0"><b>共享不改布局，只往每一段里加一个「谁」。</b>三段结构、进度条、成片按钮、回看的横滑，独自和共享共用同一批组件；<code>isShared</code> 只控制五处：头部头像行、卡上的「他俩拍了」、格子上的头像角标、尾部的「在等谁」、以及回看屏的表情和评论（PR D）。这样两个逻辑不会各自漂走 —— 那是现在这份代码 815 行里一半重复的由来。</p>
+</div>
+
+<h3>单列时间线的共享版</h3>
+<p>时间线那条路径（<code>StoryTimelineView</code>）已经把每个人拆成独立的 row 了 —— 结构上它比九宫格对。它缺的只有两件事，两件都在上面的规则里：<b>时间戳还印在缩略图里而不是左轴上</b>，以及<b>每个人的空位都渲染成一张 120pt 的卡</b>（<code>pendingMembers</code> 里三个朋友没拍就是三张空卡，加上我自己的，一个题目占掉 480pt）。改法一样：左轴放时间，我的那格是唯一的蓝色 CTA，别人的空位缩成头像 + 一行「在等 Leo」。</p>
+
+<h2 id="s5"><span class="n">6</span>美颜页 <code>GentleLook</code></h2>
+<p class="sub">你要的这一页。但我先要改一个上一轮我自己给的结论 —— 我说它贵，那是因为我默认了错的做法。</p>
+
+<div class="card hot">
+<h4>两条路线，我上一轮只算了贵的那条</h4>
+<p><b>路线 1 · 拍的时候烧进去。</b><code>ClipRecorder</code> 从 <code>AVCaptureMovieFileOutput</code> 换成 <code>AVCaptureVideoDataOutput</code> + <code>AVAssetWriter</code> 手写管线，逐帧过滤镜。好处是取景框里就能看见效果。代价是音画同步、方向、来电中断的状态机全部重做 —— 这是 app 里最脆的一段代码。而且<b>不可逆</b>：写进文件的像素改不回来。</p>
+<p style="margin:0"><b>路线 2 · 播放和成片时套上去。</b>拍摄一行不动。滤镜挂在 <code>AVPlayerItem.videoComposition</code>（单条回看）和 <code>AVMutableVideoComposition</code>（成片导出）上，两处都是系统现成的 <code>CIFilter</code> 接口。原片不动，改主意重导一次就行。<b>取景框里看不到效果</b>，这是唯一的损失。</p>
+</div>
+
+<div class="card ok">
+<h4>我选路线 2，理由不是省事</h4>
+<p style="margin:0">你原话是「为了避免大家看自己尴尬」。<b>尴尬发生在看的时候，不是拍的时候</b> —— 而路线 2 正好覆盖「看」的全部两个地方：单条回看和成片。路线 1 多给的那点（取景框预览）解决的是拍摄时的犹豫，是另一个问题。一段 2 秒的片子你拍完立刻就会看一遍，取景框里长什么样不重要。<br>所以：先做路线 2。如果用完发现「我想拍之前就看到」，再补路线 1 —— 到那时滤镜本身（<code>GentleLook</code>）已经写好测好，路线 1 只剩管线那一块。</p>
+</div>
+
+<h3>滤镜链</h3>
+<table>
+<tr><th style="width:22%">滑杆</th><th style="width:30%">Core Image</th><th>0 → 1 映射到什么</th></tr>
+<tr><td><b>磨皮</b></td><td class="mono">CIGaussianBlur + 软光混合</td>
+    <td>模糊半径 0 → 8px，混合不透明度 0 → 0.55。软光而不是直接叠，是为了保住眼睛和头发的边缘 —— 直接叠会把整张脸糊成塑料。</td></tr>
+<tr><td><b>提亮</b></td><td class="mono">CIColorControls</td>
+    <td><code>brightness</code> 0 → +0.06，<code>saturation</code> 1.0 → 0.92。降饱和是关键：只提亮会让脸发红，掉一点饱和才是「气色好」而不是「过曝」。</td></tr>
+<tr><td><b>暖</b></td><td class="mono">CITemperatureAndTint</td>
+    <td>中性点 (6500, 0) → 目标 (5200, 8)。往暖里推 1300K，室内白炽灯的方向。</td></tr>
+</table>
+
+<div class="rack">
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">默认</span><span>原样 · 装完就是这个状态</span></div>
+    <div class="frame"><div class="scr">
+      <div class="vid" style="position:absolute;top:0;left:0;right:0;height:420px">
+        <div class="grain"></div>
+        <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);text-align:center">
+          <div style="font-size:17px;font-weight:800;color:rgba(255,255,255,.8)">你自己</div>
+        </div>
+      </div>
+      <div class="st on-dark"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">✕</div></div>
+
+      <!-- sheet -->
+      <div style="position:absolute;bottom:0;left:0;right:0;height:372px;background:#F7FAFF;
+           border-radius:26px 26px 0 0;padding:18px 20px 26px;box-shadow:0 -10px 30px rgba(15,46,107,.18)">
+        <div style="width:38px;height:5px;border-radius:99px;background:rgba(147,166,198,.4);margin:0 auto 15px"></div>
+        <div style="font-size:19px;font-weight:900;letter-spacing:-.3px">柔和一点</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--inkSoft);margin-top:3px">
+          只改你看到的，不动原片</div>
+        <div class="mk" style="top:52px;left:290px">3</div>
+
+        <div style="display:flex;gap:8px;margin-top:15px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:900;padding:8px 15px;border-radius:99px;
+                background:var(--blue);color:#fff">原样</span>
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">干净</span>
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">柔光</span>
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">暖阳</span>
+        </div>
+        <div class="mk" style="top:118px;left:-10px">1</div>
+
+        <div class="sl"><span class="nm">磨皮</span>
+          <span class="tr"><i style="width:0"></i><b style="left:0"></b></span><span class="vv">0</span></div>
+        <div class="sl"><span class="nm">提亮</span>
+          <span class="tr"><i style="width:0"></i><b style="left:0"></b></span><span class="vv">0</span></div>
+        <div class="sl"><span class="nm">暖</span>
+          <span class="tr"><i style="width:0"></i><b style="left:0"></b></span><span class="vv">0</span></div>
+
+        <div style="margin-top:20px;display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:12.5px;font-weight:800;color:var(--inkSoft)">
+            以后都这样看</div>
+          <div style="width:46px;height:28px;border-radius:99px;background:rgba(147,166,198,.35);
+               display:flex;align-items:center;padding:3px">
+            <div style="width:22px;height:22px;border-radius:50%;background:#fff;
+                 box-shadow:0 1px 4px rgba(0,0,0,.2)"></div></div>
+        </div>
+        <div class="mk" style="top:290px;left:290px">4</div>
+      </div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">默认全 0 —— 装完 app 谁也没被偷偷磨过皮。四个预设是入口，三个滑杆是给想调的人的。</p>
+  </div>
+
+  <div class="unit">
+    <div class="lab"><span class="tag good">用户自己开</span><span>柔光</span></div>
+    <div class="frame"><div class="scr">
+      <div class="vid look" style="position:absolute;top:0;left:0;right:0;height:420px">
+        <div class="grain"></div>
+        <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);text-align:center">
+          <div style="font-size:17px;font-weight:800;color:rgba(255,255,255,.8)">你自己</div>
+        </div>
+      </div>
+      <div class="warmth" style="top:0;height:420px"></div>
+      <div class="st on-dark"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+      <div style="position:absolute;top:52px;left:20px"><div class="bub">✕</div></div>
+      <!-- 长按对比 -->
+      <div style="position:absolute;top:56px;right:20px;background:rgba(0,0,0,.35);color:#fff;
+           border-radius:99px;padding:7px 13px;font-size:12px;font-weight:800">按住看原样</div>
+      <div class="mk" style="top:44px;left:186px">2</div>
+
+      <div style="position:absolute;bottom:0;left:0;right:0;height:372px;background:#F7FAFF;
+           border-radius:26px 26px 0 0;padding:18px 20px 26px;box-shadow:0 -10px 30px rgba(15,46,107,.18)">
+        <div style="width:38px;height:5px;border-radius:99px;background:rgba(147,166,198,.4);margin:0 auto 15px"></div>
+        <div style="font-size:19px;font-weight:900;letter-spacing:-.3px">柔和一点</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--inkSoft);margin-top:3px">
+          只改你看到的，不动原片</div>
+
+        <div style="display:flex;gap:8px;margin-top:15px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">原样</span>
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">干净</span>
+          <span style="font-size:13px;font-weight:900;padding:8px 15px;border-radius:99px;
+                background:var(--blue);color:#fff">柔光</span>
+          <span style="font-size:13px;font-weight:800;padding:8px 15px;border-radius:99px;
+                background:rgba(147,166,198,.16);color:var(--inkSoft)">暖阳</span>
+        </div>
+
+        <div class="sl"><span class="nm">磨皮</span>
+          <span class="tr"><i style="width:60%"></i><b style="left:60%"></b></span><span class="vv">0.6</span></div>
+        <div class="sl"><span class="nm">提亮</span>
+          <span class="tr"><i style="width:50%"></i><b style="left:50%"></b></span><span class="vv">0.5</span></div>
+        <div class="sl"><span class="nm">暖</span>
+          <span class="tr"><i style="width:35%"></i><b style="left:35%"></b></span><span class="vv">0.35</span></div>
+
+        <div style="margin-top:20px;display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:12.5px;font-weight:800;color:var(--ink)">以后都这样看</div>
+          <div style="width:46px;height:28px;border-radius:99px;
+               background:linear-gradient(90deg,var(--blue),var(--cyan));
+               display:flex;align-items:center;justify-content:flex-end;padding:3px">
+            <div style="width:22px;height:22px;border-radius:50%;background:#fff;
+                 box-shadow:0 1px 4px rgba(0,0,0,.2)"></div></div>
+        </div>
+      </div>
+      <div class="home"></div>
+    </div></div>
+    <p class="cap">上面那块画面是真按滤镜参数渲染的（<code>saturate(.9) brightness(1.07) blur(.6px)</code> + 暖色软光），不是随手调的颜色 —— 强度大概就是这个量级。</p>
+  </div>
+
+</div>
+
+<ul class="legend">
+<li><span class="num">1</span><b>四个预设，第一个是「原样」且默认选中。</b>叫「柔和一点」不叫「美颜」—— 后者预设了你有问题需要修。四个档：原样 / 干净 / 柔光 / 暖阳，分别是 <code>(0,0,0)</code>、<code>(.35,.3,.15)</code>、<code>(.6,.5,.35)</code>、<code>(.45,.35,.8)</code>。</li>
+<li><span class="num">2</span><b>按住看原样。</b>没有对比就没法判断调过头没有。这个手势在任何修图工具里都是同一个。</li>
+<li><span class="num">3</span><b>「只改你看到的，不动原片」要写在标题下面。</b>这是路线 2 唯一的、也是最大的好处，用户必须知道 —— 否则他不敢开。</li>
+<li><span class="num">4</span><b>「以后都这样看」是个开关，不是自动记住。</b>关着的时候，这次调的只对这一段生效；打开才写进 <code>@AppStorage</code>，成为所有回看和成片的默认。Settings 里同一个开关再放一份。</li>
+</ul>
+
+<div class="card note">
+<h4>成片导出要不要也带上？</h4>
+<p style="margin:0"><b>要，但要问一次。</b>存进相册的那个文件是要发出去的，滤镜写不写进去是个不该替用户决定的事。所以在 <code>FilmView</code> 的「保存到相册」上加一句：<code>带上柔光</code> / <code>用原样</code>。默认跟着你在回看里选的。</p>
+</div>
+
+<h2 id="s6"><span class="n">7</span>要新写的共用零件</h2>
 <table>
 <tr><th style="width:26%">零件</th><th style="width:20%">放哪</th><th>做什么</th></tr>
 <tr>
@@ -704,55 +1092,90 @@
 <tr>
   <td class="mono">QuietSlotRow</td>
   <td class="mono">Views/Components/</td>
-  <td>剩余空位的安静表示。九宫格版是矮格子，单列版是细线条。</td>
+  <td>剩余空位的安静表示。九宫格版是矮格子，单列版是细线条。共享时多一行「在等谁」。</td>
+</tr>
+<tr>
+  <td class="mono">RoomRoster</td>
+  <td class="mono">Views/Components/</td>
+  <td>头部那排头像 + 「3 人在这个房间」+ 房号。<code>isShared</code> 才渲染。现有的 <code>AvatarDot</code> 直接复用。</td>
+</tr>
+<tr>
+  <td class="mono">GentleLook</td>
+  <td class="mono">Presentation/</td>
+  <td>三个 0–1 参数的值类型 + 四个预设 + 一个把参数变成 <code>CIFilter</code> 链的方法。无 SwiftUI、无 <code>.now</code>，可测：<code>.none</code> 必须产出恒等变换，参数必须钳在 0–1，预设值必须钉死。</td>
 </tr>
 </table>
 
-<h2 id="s5"><span class="n">6</span>拆 PR</h2>
-<p class="sub">五个 PR，每个都能单独跑起来看效果。顺序有依赖：A 必须先。</p>
+<h2 id="s7"><span class="n">8</span>拆 PR</h2>
+<p class="sub">八个。每个都能单独跑起来看效果，每个都有明确的「失败长什么样」，所以出问题回退一个就够。顺序上只有两处硬依赖：<b>A 必须在 C 之前</b>，<b>E 必须在 F 之前</b>。</p>
 
 <div class="pr">
   <div class="top"><span class="id">A</span><span class="ti"><code>feat/clip-deck</code></span><span class="pill">纯逻辑</span></div>
   <div class="bd">
-    <p><code>Presentation/ClipDeck.swift</code> + <code>ClipDeckTests.swift</code>。不动任何 UI。定义「一个故事里能回看的段，按什么顺序」—— 这个顺序同时决定横滑的次序和九宫格里已拍片段的排序，两处必须一致，所以它得是一份可测的纯逻辑，不是两个视图各自的 <code>sorted</code>。</p>
-    <p style="margin:0">按房规不读 <code>.now</code>，时间从外面传进来。</p>
+    <p><code>Presentation/ClipDeck.swift</code> + <code>ClipDeckTests.swift</code>。不动任何 UI。定义「一个故事里能回看的段，按什么顺序」。</p>
+    <p style="margin:0">这个顺序同时决定<b>横滑的次序</b>和<b>九宫格里已拍片段的排序</b>，两处必须一致，所以它得是一份可测的纯逻辑，不是两个视图各自写一遍 <code>sorted</code>。共享房间要在这里定死：先按题目、题目内我的排最前、其余按名字 —— 现在 <code>recordedClips</code> 是 <code>(day, authorName)</code>，我自己的片子会因为名字排在后面而跑到朋友后面去。按房规不读 <code>.now</code>，时间从外面传。</p>
   </div>
 </div>
 
 <div class="pr">
-  <div class="top"><span class="id">B</span><span class="ti"><code>feat/review-is-full-bleed</code></span><span class="pill hot">这一轮的主菜</span></div>
+  <div class="top"><span class="id">B</span><span class="ti"><code>fix/social-only-when-shared</code></span><span class="pill warn">最小，先合</span></div>
   <div class="bd">
-    <p>单条回看重做：去 <code>NavigationStack</code> 原生栏、视频铺满、控件浮到上层、题目 chip 挪顶部、字幕按钮不再盖全屏。</p>
-    <p style="margin:0">不含横滑（见 C），不含社交条件（见 D）—— 拆开是因为这三件事失败的方式不一样，混在一个 PR 里出问题不好回退。</p>
+    <p style="margin:0">把 <code>ClipPreviewView</code> 里三处 <code>challengeID != nil</code> 换成 <code>challenge.isShared</code>，加一个单测钉住「一个人的故事没有评论入口」。二十行以内，跟别的都不冲突，可以第一个合。</p>
   </div>
 </div>
 
 <div class="pr">
-  <div class="top"><span class="id">C</span><span class="ti"><code>feat/swipe-between-clips</code></span><span class="pill gray">依赖 A、B</span></div>
+  <div class="top"><span class="id">C</span><span class="ti"><code>feat/review-is-full-bleed</code></span><span class="pill hot">主菜</span></div>
   <div class="bd">
-    <p style="margin:0">把 <code>ClipPreviewView</code> 包进 <code>TabView(.page)</code>，读 <code>ClipDeck</code>。要处理的是播放器复用：五段各一个 <code>LoopingClipPlayer</code> 全部驻留会吃内存，只让当前页和左右各一页活着。</p>
+    <p>单条回看重做（第 2 节右边那两张）：去 <code>NavigationStack</code> 原生栏、视频铺满、控件浮到上层、题目 chip 挪顶部、字幕按钮不再是一整块透明命中区、评论从内联搬进 sheet。</p>
+    <p style="margin:0">不含横滑（D）。拆开是因为布局和播放器生命周期失败的方式完全不一样。</p>
   </div>
 </div>
 
 <div class="pr">
-  <div class="top"><span class="id">D</span><span class="ti"><code>fix/social-only-when-shared</code></span><span class="pill warn">小、独立</span></div>
+  <div class="top"><span class="id">D</span><span class="ti"><code>feat/swipe-between-clips</code></span><span class="pill gray">依赖 A + C</span></div>
   <div class="bd">
-    <p style="margin:0">把三处 <code>challengeID != nil</code> 换成 <code>challenge.isShared</code>，加一个单测钉住「一个人的故事没有评论入口」。这个 PR 最小，可以第一个合。</p>
+    <p style="margin:0">包进 <code>TabView(.page)</code>，读 <code>ClipDeck</code>。真正要处理的是播放器复用 —— 十五段各挂一个 <code>LoopingClipPlayer</code> 全驻留会吃内存，只让当前页和左右各一页活着。共享房间横滑穿过的是「题目 × 人」整张表，所以顶部那个 <code>4 / 5</code> 在共享下得是 <code>第 2 题 · 雨</code>。</p>
   </div>
 </div>
 
 <div class="pr">
-  <div class="top"><span class="id">E</span><span class="ti"><code>feat/story-page-has-one-next</code></span><span class="pill">九宫格 + 单列</span></div>
+  <div class="top"><span class="id">E</span><span class="ti"><code>feat/gentle-look</code></span><span class="pill">滤镜逻辑 + 接线</span></div>
   <div class="bd">
-    <p>新写 <code>StoryProgressBar</code> / <code>NextSlotCard</code> / <code>ClipThumb</code> / <code>QuietSlotRow</code>，然后两屏各自换掉旧结构。iCloud 提示挪进 <code>⋯</code> 菜单。</p>
-    <p style="margin:0">这个 PR 最大，但风险低 —— 全是布局，没有新状态。</p>
+    <p>路线 2。<code>Presentation/GentleLook.swift</code>（值类型 + 四个预设 + <code>CIFilter</code> 链）+ 单测，然后接两处：<code>LoopingClipPlayer</code> 的 <code>AVPlayerItem.videoComposition</code>、<code>VideoStitcher</code> 的 <code>AVMutableVideoComposition</code>。</p>
+    <p style="margin:0"><b>不含任何 UI</b> —— 这个 PR 合完，滤镜能用但没有地方能打开它，值恒为 <code>.none</code>，行为跟现在一模一样。这是故意的：滤镜链正确性和界面是两件事，分开验。</p>
   </div>
 </div>
 
-<div class="card note">
-<h4>轻美颜（PRD 里的 P2）不在这五个里</h4>
-<p style="margin:0">理由写在<a href="2026-09-02-round-3-after-the-shot.html#s5">第三轮 PRD 第 5 节</a>：真成本不是滤镜本身（Core Image 三个内置滤镜，零依赖），而是要把 <code>ClipRecorder</code> 从 <code>AVCaptureMovieFileOutput</code> 换成 <code>AVAssetWriter</code> 手写管线 —— 音画同步、方向、来电中断的状态机全部重做。而且有个没定的问题：如果尴尬发生在<b>回看</b>而不是<b>拍摄</b>，那滤镜加错了地方，上面这五个 PR 才是解药。所以先做完 A–E，再看你还想不想要。</p>
+<div class="pr">
+  <div class="top"><span class="id">F</span><span class="ti"><code>feat/look-picker</code></span><span class="pill gray">依赖 E</span></div>
+  <div class="bd">
+    <p style="margin:0">第 6 节那一页：sheet、四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一个开关、以及 <code>FilmView</code> 保存到相册时的「带上柔光 / 用原样」。默认全 0。</p>
+  </div>
 </div>
+
+<div class="pr">
+  <div class="top"><span class="id">G</span><span class="ti"><code>feat/story-page-has-one-next</code></span><span class="pill">九宫格 + 单列</span></div>
+  <div class="bd">
+    <p>新写 <code>StoryProgressBar</code> / <code>NextSlotCard</code> / <code>ClipThumb</code> / <code>QuietSlotRow</code>，两屏各自换掉旧结构。iCloud 那句红字挪进 <code>⋯</code> 菜单。</p>
+    <p style="margin:0">只做独自逻辑（第 3、4 节右边那两张）。最大，但风险低 —— 全是布局，没有新状态。</p>
+  </div>
+</div>
+
+<div class="pr">
+  <div class="top"><span class="id">H</span><span class="ti"><code>feat/one-tile-one-person</code></span><span class="pill hot">共享逻辑</span></div>
+  <div class="bd">
+    <p>第 5 节。<code>StoryGridCell</code> 从「一个格子塞 N 个人的拼贴」改成「一个格子 = 一个人的一段」，顺手拆掉那三个重叠的命中区（虚线边 + 居中相机泡 + 右上播放角标）。加 <code>RoomRoster</code>、「他俩拍了」、格子头像角标、「在等谁」。<code>StoryTimelineView</code> 的 <code>pendingMembers</code> 从三张 120pt 空卡缩成一行头像。</p>
+    <p style="margin:0">放最后，因为它依赖 G 定下来的三段结构 —— 反过来做我会在旧结构上改共享，然后 G 再把它拆一遍。</p>
+  </div>
+</div>
+
+<h3>还是不做的</h3>
+<ul>
+<li><b>不合并 <code>StoryGridView</code> 和 <code>StoryTimelineView</code></b>（815 行里约 500 行重复）。等 G 和 H 都落地、新结构在两边都稳了再抽。反过来做是在没定型的设计上抽象，抽出来的东西要拆两次。</li>
+<li><b>不做路线 1</b>（拍摄时烧进去 + 取景框预览）。等 E/F 用一阵，确认「拍之前就想看到」真的是个需求再说。到那时 <code>GentleLook</code> 已经写好测好，路线 1 只剩 <code>AVAssetWriter</code> 管线那一块。</li>
+<li><b>不做人脸检测/瘦脸/大眼。</b>那些要 <code>Vision</code> landmark + 网格变形，是另一个量级的工程，而且和这个 app 想干的事（留住今天）方向相反。</li>
+</ul>
 
 </div>
 </body>
