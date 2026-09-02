@@ -27,6 +27,14 @@ struct StoryCard: View {
             : presenter.title(forSlot: progress.nextOpenMoment)
     }
 
+    /// The film is watchable, and there's nothing left for me to add.
+    ///
+    /// The day being full isn't enough on its own: in a room where friends
+    /// filmed every moment and I filmed none, the card's only button became
+    /// "Watch your film" and there was no way to join in from the home screen
+    /// at all.
+    private var isDone: Bool { progress.isComplete && challenge.isComplete }
+
     var body: some View {
         VStack(spacing: 0) {
             cover
@@ -118,12 +126,10 @@ struct StoryCard: View {
     // MARK: Footer
 
     private var footer: some View {
-        Button(action: progress.isComplete ? onOpen : onContinue) {
+        Button(action: isDone ? onOpen : onContinue) {
             Label(
-                progress.isComplete
-                    ? Strings.watchYourFilm
-                    : Strings.continueTodaysStory,
-                systemImage: progress.isComplete ? "play.fill" : "video.fill")
+                isDone ? Strings.watchYourFilm : Strings.continueTodaysStory,
+                systemImage: isDone ? "play.fill" : "video.fill")
         }
         .buttonStyle(.primaryAction)
         .padding(16)

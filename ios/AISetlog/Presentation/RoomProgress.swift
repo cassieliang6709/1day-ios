@@ -31,14 +31,20 @@ struct RoomProgress: Equatable {
     init(momentCount: Int, clips: [DayClip], myID: String) {
         total = max(momentCount, 0)
         clipCount = clips.count
-        let days = Set(clips.map(\.day))
+        // Days outside the story are dropped rather than clamped. Counting
+        // them would let a room read "2/2, watch your film" while both real
+        // moments sat empty — a number that is wrong rather than merely stale.
+        let story = 1...max(momentCount, 1)
+        let inStory = { (day: Int) in momentCount > 0 && story.contains(day) }
+        let days = Set(clips.map(\.day).filter(inStory))
         filledDays = days
-        filled = min(days.count, total)
-        let myDays = Set(
+        filled = days.count
+        mine = Set(
             clips
                 .filter { $0.authorID == myID || $0.authorID == Self.soloAuthorID }
-                .map(\.day))
-        mine = min(myDays.count, total)
+                .map(\.day)
+                .filter(inStory)
+        ).count
     }
 
     /// True when the room holds work from somebody other than me — the only

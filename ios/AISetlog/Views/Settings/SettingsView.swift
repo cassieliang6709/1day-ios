@@ -170,7 +170,9 @@ struct SettingsView: View {
                 .onChange(of: nameFocused) { _, focused in
                     if !focused { commitName() }
                 }
-                Button(Strings.signOut) { account.signOut() }
+                // Through the store, not straight at the account: the rooms
+                // hold a cache keyed by who I am.
+                Button(Strings.signOut) { store.signOut() }
 
                 // Only an account that exists can be deleted. Offering this
                 // while signed out put a button that erases every story on

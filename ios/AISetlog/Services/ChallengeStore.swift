@@ -260,6 +260,20 @@ final class ChallengeStore {
         return seen.map { ($0.key, $0.value) }.sorted { $0.name < $1.name }
     }
 
+    /// Signs out and forgets what the rooms had downloaded.
+    ///
+    /// The cache is keyed by author id, and signing out changes who I am. Left
+    /// in place, my own uploaded clips became somebody else's: the roster still
+    /// listed me, every empty slot read "waiting for <my own name>", and the
+    /// header credited my takes to a stranger. The stories stay; only the
+    /// borrowed copy of other people's work goes.
+    func signOut() {
+        for challenge in challenges {
+            if let code = challenge.roomCode { roomSync.clearRoom(code) }
+        }
+        account?.signOut()
+    }
+
     // MARK: - Account deletion
 
     /// Removes the person from the app entirely: their clips and interactions
@@ -489,8 +503,12 @@ final class ChallengeStore {
     }
 
     /// All recorded clips in day order — the stitcher's input. For a shared
-    /// room this merges every member's clips (falling back to my local clips
-    /// if the room hasn't been synced yet).
+    /// room this merges every member's clips with my own local ones.
+    ///
+    /// The local half is not a fallback for an unsynced room: it is the only
+    /// record of a clip whose upload hasn't landed yet. Returning the remote
+    /// list alone made a moment I had just filmed offline disappear from the
+    /// room, the home card and the count, and come back only after a relaunch.
     func recordedClips(for challengeID: UUID) -> [DayClip] {
         guard let challenge = challenge(challengeID) else { return [] }
         let presenter = ChallengePresenter(challenge: challenge)
@@ -498,8 +516,13 @@ final class ChallengeStore {
            let remote = roomSync.remoteClips[code], !remote.isEmpty {
             let remoteReactions = roomSync.remoteReactions[code] ?? []
             let remoteComments = roomSync.remoteComments[code] ?? []
-            return remote
-                .sorted { ($0.day, $0.authorName) < ($1.day, $1.authorName) }
+            let myID = account?.account?.id
+            // Days of mine the room already has. Anything else I've filmed is
+            // still only on this device, and belongs in the list once.
+            let uploaded = Set(remote.filter { $0.authorID == myID }.map(\.day))
+            let pending = localClips(in: challenge, presenter: presenter)
+                .filter { !uploaded.contains($0.day) }
+            return (remote
                 .map { clip in
                     let isMe = clip.authorID == (account?.account?.id ?? "")
                     let card = isMe ? challenge.cards.first { c in c.day == clip.day } : nil
@@ -524,14 +547,23 @@ final class ChallengeStore {
                         emoji: emojis,
                         comments: commentLines,
                         key: clip.id)
-                }
+                } + pending)
+                .sorted { ($0.day, $0.authorName ?? "") < ($1.day, $1.authorName ?? "") }
         }
-        return challenge.cards.compactMap { card in
-            clipURL(for: card, in: challengeID).map {
+        return localClips(in: challenge, presenter: presenter)
+    }
+
+    /// My own clips, from the cards on this device.
+    private func localClips(
+        in challenge: Challenge, presenter: ChallengePresenter
+    ) -> [DayClip] {
+        challenge.cards.compactMap { card in
+            clipURL(for: card, in: challenge.id).map {
                 DayClip(
                     day: card.day,
                     url: $0,
-                    authorID: account?.account?.id ?? "local",
+                    authorName: account?.account?.displayName,
+                    authorID: account?.account?.id ?? RoomProgress.soloAuthorID,
                     label: challenge.isTimeOnly ? nil : presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
                     recordedAt: card.recordedAt,

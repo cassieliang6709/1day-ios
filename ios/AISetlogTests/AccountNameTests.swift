@@ -21,4 +21,49 @@ final class AccountNameTests: XCTestCase {
         XCTAssertEqual(
             AccountStore.normalized(essay)?.count, AccountStore.nameLimit)
     }
+
+    // MARK: - rename
+
+    @MainActor
+    private func signedIn(as name: String) -> AccountStore {
+        let store = AccountStore()
+        store.signInAsTester(named: name)
+        return store
+    }
+
+    @MainActor
+    func testRenamingSticksAndSurvivesAReload() {
+        let store = signedIn(as: "Old")
+        store.rename(to: "  New  ")
+
+        XCTAssertEqual(store.account?.displayName, "New")
+        XCTAssertEqual(
+            AccountStore().account?.displayName, "New",
+            "a name that doesn't survive the next launch was never saved")
+
+        store.signOut()
+    }
+
+    /// A cleared field is a slip. Renaming to nothing has to leave the old name
+    /// alone rather than blank out what a room shows for you.
+    @MainActor
+    func testRenamingToNothingChangesNothing() {
+        let store = signedIn(as: "Cassie")
+        store.rename(to: "   ")
+
+        XCTAssertEqual(store.account?.displayName, "Cassie")
+
+        store.signOut()
+    }
+
+    /// Nobody to rename. This has to be a quiet no-op, not a half-made account.
+    @MainActor
+    func testRenamingWhileSignedOutDoesNotInventAnAccount() {
+        let store = AccountStore()
+        store.signOut()
+        store.rename(to: "Nobody")
+
+        XCTAssertNil(store.account)
+        XCTAssertFalse(store.isSignedIn)
+    }
 }

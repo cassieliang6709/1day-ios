@@ -121,4 +121,39 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(progress.filled, 2)
         XCTAssertEqual(progress.clipCount, 6)
     }
+
+    /// Clamping instead of excluding would have called this "2/2, watch your
+    /// film" while both real moments sat empty — a number that is wrong, not
+    /// merely stale.
+    func testClipsPastTheEndDontFillTheMomentsBeforeThem() {
+        let progress = RoomProgress(
+            momentCount: 2,
+            clips: [clip(day: 3, author: "ana"), clip(day: 4, author: "ana")],
+            myID: me)
+
+        XCTAssertEqual(progress.filled, 0)
+        XCTAssertFalse(progress.isComplete)
+        XCTAssertEqual(progress.nextOpenMoment, 1)
+        XCTAssertEqual(progress.clipCount, 2, "they still exist, they just don't count")
+    }
+
+    /// A clip with no author is somebody's, but not demonstrably mine.
+    func testAnAuthorlessClipCountsForTheDayButNotForMe() {
+        let progress = RoomProgress(
+            momentCount: 3, clips: [clip(day: 1, author: nil)], myID: me)
+
+        XCTAssertEqual(progress.filled, 1)
+        XCTAssertEqual(progress.mine, 0)
+    }
+
+    /// Signing out changes who I am. The room cache is cleared with it now, so
+    /// this is the shape of the bug rather than a live path — but if the two
+    /// ever drift apart again, my own takes get credited to a stranger.
+    func testMyOwnClipsArentMineUnderADifferentIdentity() {
+        let clips = [clip(day: 1, author: "apple-id-123")]
+
+        XCTAssertEqual(RoomProgress(momentCount: 3, clips: clips, myID: "apple-id-123").mine, 1)
+        XCTAssertEqual(
+            RoomProgress(momentCount: 3, clips: clips, myID: RoomProgress.soloAuthorID).mine, 0)
+    }
 }
