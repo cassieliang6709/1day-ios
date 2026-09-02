@@ -605,6 +605,11 @@ enum Strings {
     static var draftArchiveFailed: String {
         lang == .chinese ? "没归档成功，片子还在这儿" : "Couldn't file it. The clip is still here."
     }
+    /// Every slot in that story already holds a clip. Filing here would have to
+    /// overwrite one, so it doesn't.
+    static var storyIsFull: String {
+        lang == .chinese ? "这个故事满了，没有空位" : "That story is full — no slot left."
+    }
     /// No matching story for this clip's frame, from inside the drafts list —
     /// where "retake" isn't an option, so it says what would help instead.
     static func noPlaceForDraft(landscape: Bool) -> String {
@@ -888,9 +893,6 @@ enum Strings {
     }
     static var sevenDayChallenges: String {
         lang == .chinese ? "七日挑战" : "Seven-day challenges"
-    }
-    static var moreTemplates: String {
-        lang == .chinese ? "更多模板" : "More templates"
     }
     /// How many prompts the chosen template will ask for, beside its name.
     static func promptCountLabel(_ count: Int) -> String {

@@ -21,12 +21,15 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(newStory.waitForExistence(timeout: 6))
         newStory.tap()
 
-        // The screen opens on prompts, so the grid and its library link are
-        // the visible half.
+        // The screen opens on prompts, so the grid and the one-day/seven-day
+        // switch above it are the visible half. That switch used to live only
+        // inside a "more templates" sheet, which made seven-day challenges
+        // unreachable whenever the sheet wouldn't open.
         let byTime = app.buttons["按时间拍"]
         XCTAssertTrue(byTime.waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["跟着题目拍"].exists)
-        XCTAssertTrue(app.buttons["更多模板"].exists)
+        XCTAssertTrue(app.buttons["一日"].exists)
+        XCTAssertTrue(app.buttons["七日"].exists)
 
         // This tap is what the test used to be missing: it asserted the
         // time-only setup page while still on a prompted story, so it had been
@@ -35,8 +38,9 @@ final class CreationFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["没有题目。拍到的每一段按时间排好，发生什么拍什么。"]
             .waitForExistence(timeout: 3))
-        // Nothing greyed out beside it — the grid is gone, not disabled.
-        XCTAssertFalse(app.buttons["更多模板"].exists)
+        // Nothing greyed out beside it — the grid is gone, not disabled, and
+        // the mode switch goes with it: a record-by-time story is always a day.
+        XCTAssertFalse(app.buttons["七日"].exists)
 
         let next = app.buttons["下一步"]
         XCTAssertTrue(next.waitForExistence(timeout: 3))

@@ -21,7 +21,6 @@ struct MoodStep: View {
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
 
-    @State private var showLibrary = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var mode: Challenge.Mode { selection.mode }
@@ -34,10 +33,11 @@ struct MoodStep: View {
         currentModeTemplates.filter { !$0.isTimeOnly }
     }
 
-    /// One more than before: the space the two mode posters used to take is
-    /// roughly a row and a half of these.
-    private var recommendedTemplates: [ChallengeTemplate] {
-        Array(promptTemplates.prefix(5))
+    /// The one-day / seven-day switch, which used to live inside the "more
+    /// templates" sheet — the only place it existed. When that sheet wouldn't
+    /// open, seven-day challenges were unreachable from the whole app.
+    private var modeSelection: Binding<Challenge.Mode> {
+        Binding(get: { selection.mode }, set: { selection.setMode($0) })
     }
 
     private var timeOnlyTemplate: ChallengeTemplate? {
@@ -62,15 +62,6 @@ struct MoodStep: View {
             page
         }
         .scrollIndicators(.hidden)
-        .sheet(isPresented: $showLibrary) {
-            TemplateLibraryView(
-                oneDayTemplates: oneDayTemplates.filter { !$0.isTimeOnly },
-                sevenDayTemplates: sevenDayTemplates,
-                selection: $selection,
-                onEdit: onEdit,
-                onDelete: onDelete)
-                .presentationDetents([.large])
-        }
     }
 
     private var page: some View {
@@ -147,20 +138,18 @@ struct MoodStep: View {
                     ? Strings.pickPromptSet
                     : Strings.sevenDayChallenges)
                 Spacer()
-                Button {
-                    showLibrary = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(Strings.moreTemplates)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBlue)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
+
+            // One day or seven. This is the question the grid below is an
+            // answer to, so it sits above the grid rather than behind a sheet.
+            PillSelector(
+                options: [
+                    .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
+                    .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
+                ],
+                selection: modeSelection)
+                .padding(.horizontal, 20)
 
             if let chosen = selectedPromptTemplate {
                 OpenTemplateCard(template: chosen) {
@@ -222,8 +211,13 @@ struct MoodStep: View {
     }
 
     /// Everything except the one already open above.
+    ///
+    /// All of them, not the first five. The cut-off was there to justify a
+    /// "more templates" sheet, and its side effect was that a template you
+    /// wrote yourself — always last in the list — could never appear on this
+    /// screen at all.
     private var alternativeTemplates: [ChallengeTemplate] {
-        recommendedTemplates.filter { $0.id != selectedPromptTemplate?.id }
+        promptTemplates.filter { $0.id != selectedPromptTemplate?.id }
     }
 
     private func selectTimeOnly() {
@@ -405,73 +399,6 @@ private struct PromptTemplateTile: View {
                 Button(Strings.deleteTemplate, systemImage: "trash", role: .destructive, action: onDelete)
             }
         }
-    }
-}
-
-private struct TemplateLibraryView: View {
-    let oneDayTemplates: [ChallengeTemplate]
-    let sevenDayTemplates: [ChallengeTemplate]
-    @Binding var selection: ComposerSelection
-    let onEdit: (ChallengeTemplate) -> Void
-    let onDelete: (ChallengeTemplate) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-
-    private var templates: [ChallengeTemplate] {
-        selection.mode == .oneDay ? oneDayTemplates : sevenDayTemplates
-    }
-
-    private var mode: Binding<Challenge.Mode> {
-        Binding(get: { selection.mode }, set: { selection.setMode($0) })
-    }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                OneDayCanvas(seed: 2)
-
-                ScrollView {
-                    VStack(spacing: 16) {
-                        PillSelector(
-                            options: [
-                                .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
-                                .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
-                            ],
-                            selection: mode)
-
-                        LazyVGrid(
-                            columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
-                            spacing: 12
-                        ) {
-                            ForEach(templates) { template in
-                                PromptTemplateTile(
-                                    template: template,
-                                    isSelected: selection.templateID == template.id,
-                                    onSelect: { select(template) },
-                                    subtitle: .blurb,
-                                    onEdit: template.isCustom ? { onEdit(template) } : nil,
-                                    onDelete: template.isCustom ? { onDelete(template) } : nil)
-                            }
-                        }
-                    }
-                    .padding(20)
-                }
-                .scrollIndicators(.hidden)
-            }
-            .navigationTitle(Strings.moreTemplates)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.done) { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func select(_ template: ChallengeTemplate) {
-        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
-        dismiss()
     }
 }
 
