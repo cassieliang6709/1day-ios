@@ -566,9 +566,15 @@ struct SetupStep: View {
         }
     }
 
+    /// - Note: every read of `moments[index]` is bounds-checked. `ForEach` over
+    ///   `indices` with `id: \.self` will evaluate a row body for an index the
+    ///   array no longer has, in the same frame the removal below animates —
+    ///   a raw subscript there traps. Deleting a prompt used to crash the app.
     private func momentRow(_ index: Int) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: MomentCatalog.icon(for: moments[index]))
+        let moment = moments.indices.contains(index) ? moments[index] : ""
+
+        return HStack(spacing: 10) {
+            Image(systemName: MomentCatalog.icon(for: moment))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.oneDaySky)
                 .frame(width: 28, height: 28)
@@ -577,15 +583,18 @@ struct SetupStep: View {
             TextField(
                 Strings.promptN(index + 1),
                 text: Binding(
-                    get: { MomentCatalog.localize(moments[index]) },
-                    set: { moments[index] = $0 }))
+                    get: { MomentCatalog.localize(moment) },
+                    set: { if moments.indices.contains(index) { moments[index] = $0 } }))
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.ink)
                 .tint(Color.oneDayBlue)
 
             if moments.count > 2 {
                 Button {
-                    withAnimation(OneDay.Motion.soft) { _ = moments.remove(at: index) }
+                    withAnimation(OneDay.Motion.soft) {
+                        guard moments.indices.contains(index) else { return }
+                        moments.remove(at: index)
+                    }
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 15))

@@ -30,7 +30,6 @@ struct StoryComposerView: View {
     /// The story's moments. Seeded from the chosen template, then editable —
     /// and replaced wholesale by the guided flow.
     @State private var moments: [String] = []
-    @State private var momentsEdited = false
     @State private var isCustomPromptStory = false
     @State private var showGuided = false
     @State private var creating = false
@@ -108,7 +107,6 @@ struct StoryComposerView: View {
                 isCustomPromptStory = true
                 selection.useCustomPrompts()
                 moments = written
-                momentsEdited = true
                 title = name
                 titleEdited = true
                 withAnimation(OneDay.Motion.soft) { step = .setup }
@@ -123,8 +121,10 @@ struct StoryComposerView: View {
         .onChange(of: selection.templateID) { _, newID in
             guard newID != nil else { return }
             isCustomPromptStory = false
-            titleEdited = false
-            momentsEdited = false
+            // `titleEdited` deliberately survives this. Zeroing it here made
+            // the flag unreadable — every call site reached `syncTitleToTemplate`
+            // with it false — so naming a story 我的搬家日 and then browsing to
+            // another template silently replaced the name with the template's.
             syncTitleToTemplate()
         }
         // Switching to solo answers "sign into iCloud" all by itself, so the
@@ -227,10 +227,14 @@ struct StoryComposerView: View {
 
     private func start() {
         let name = title.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
+        // `dismiss()` isn't instant, so a second tap inside the closing
+        // animation used to insert a second story. The shared path had this
+        // guard through `creating`; the solo path — the common one — didn't.
+        guard !name.isEmpty, !creating else { return }
         if withFriends {
             if account.isSignedIn { createSharedRoom() } else { showSignIn = true }
         } else {
+            creating = true
             let challenge = store.create(
                 title: name,
                 mode: mode,
@@ -287,9 +291,9 @@ struct StoryComposerView: View {
                 ? Strings.fullTitle7Days(selected.displayName)
                 : selected.displayName
         }
-        if !momentsEdited {
-            moments = selected.momentKeys ?? []
-        }
+        // Moments always follow the template: picking one *is* the request for
+        // its prompts. The name doesn't, because you typed that.
+        moments = selected.momentKeys ?? []
     }
 
     /// Blank rows are dropped; an entirely empty list falls back to the
