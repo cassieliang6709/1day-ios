@@ -11,7 +11,6 @@ struct TimelineHeader: View {
     @Binding var viewMode: StoryViewMode
     var showsViewModeToggle = true
     var isSyncing = false
-    var syncError: String?
 
     @State private var didCopyCode = false
 
@@ -31,12 +30,6 @@ struct TimelineHeader: View {
             }
 
             stats
-
-            if let syncError {
-                Label(syncError, systemImage: "icloud.slash")
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.red)
-            }
         }
     }
 
@@ -121,13 +114,13 @@ struct TimelineHeader: View {
 
     private var stats: some View {
         HStack(spacing: 8) {
-            OneDayChip(
-                icon: "circle.grid.2x2.fill",
-                text: "\(progress.filled)/\(progress.total)")
+            // No "3/7" chip here any more — the progress bar under the header
+            // is that number, and printing it twice on one screen is how the
+            // page ended up with nothing to look at first.
 
             // Only where it adds something. In a solo story it would repeat
-            // the chip beside it, and in a room where I'm the only one who has
-            // filmed anything it would too.
+            // the progress bar above, and in a room where I'm the only one who
+            // has filmed anything it would too.
             if challenge.isShared, progress.hasOthers {
                 OneDayChip(
                     icon: "person.fill",

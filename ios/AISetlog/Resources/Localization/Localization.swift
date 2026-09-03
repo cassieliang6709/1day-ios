@@ -1141,6 +1141,34 @@ enum Strings {
             : "Your first moment lands at the top of this line."
     }
 
+    /// The story page's progress bar, and the labels around its one next
+    /// action. The page shows exactly one thing to tap, so these are the words
+    /// that have to say where in the day it is.
+    static func momentsFilmed(_ filmed: Int, total: Int) -> String {
+        lang == .chinese ? "拍了 \(filmed)/\(total) 个瞬间" : "\(filmed) of \(total) filmed"
+    }
+    static func nextUpPosition(_ slot: Int, total: Int) -> String {
+        lang == .chinese ? "接下来 · 第 \(slot)/\(total) 个" : "Next up · \(slot) of \(total)"
+    }
+    static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
+    /// The way into the film, now that it lives on the next-up card instead of
+    /// a second button floating at the bottom of the same screen.
+    static var watchTheFilm: String { lang == .chinese ? "看成片" : "See the film" }
+    static func filmFromMoments(_ clips: Int) -> String {
+        lang == .chinese ? "\(clips) 个片段，缝成一部" : "\(clips) clips, one film"
+    }
+    static var filmedHeader: String { lang == .chinese ? "拍过的" : "Filmed" }
+    static var stillOpenHeader: String { lang == .chinese ? "还没拍的" : "Still open" }
+    static var notYetFilmed: String { lang == .chinese ? "还没拍" : "Not yet" }
+    /// A moment a friend already filmed. The thumbnail plays their take; this
+    /// row is how mine gets in.
+    static var addYourTake: String { lang == .chinese ? "加上你的" : "Add yours" }
+    static var watchThisMoment: String {
+        lang == .chinese ? "看这个瞬间" : "Watch this moment"
+    }
+    static var retrySync: String { lang == .chinese ? "重新同步" : "Retry sync" }
+    static var moreLabel: String { lang == .chinese ? "更多" : "More" }
+
     // MARK: Generating
 
     static var generatingTitle: String {
