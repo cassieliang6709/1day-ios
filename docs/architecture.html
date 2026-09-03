@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1Day 技术文档 — 系统是怎么搭的</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.12);
+    --red:#A7443C;--green:#158463;--amber:#A75B12;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:40px 34px 120px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       font-size:14px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;
+       background:rgba(22,119,255,.09);padding:1.5px 5px;border-radius:5px;color:#0B4FA8}
+  pre{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:1.55;
+      background:#0F2039;color:#CFE3FF;padding:14px 16px;border-radius:14px;overflow-x:auto;
+      margin:12px 0;box-shadow:0 5px 16px rgba(15,46,107,.14)}
+  pre code{background:none;color:inherit;padding:0}
+  a{color:var(--blue)}
+
+  .hdr{background:linear-gradient(135deg,#fff,#F2F7FF);border:1px solid var(--hair);
+       border-radius:22px;padding:24px 26px;box-shadow:0 10px 28px rgba(15,46,107,.10);margin-bottom:12px}
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.5px;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:7px 9px;font-size:12.5px;color:var(--inkSoft);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;
+        padding:3px 10px;border-radius:99px;background:var(--mist);color:var(--blue)}
+  .pill.ok{background:#DFF6EC;color:var(--green)}
+  .pill.warn{background:#FFE9D6;color:var(--amber)}
+  .pill.hot{background:#FBE4E1;color:var(--red)}
+  .pill.gray{background:rgba(147,166,198,.2);color:var(--inkSoft)}
+
+  h2{font-size:20px;margin:46px 0 6px;padding-top:24px;border-top:1px solid rgba(15,46,107,.13);
+     letter-spacing:-.3px}
+  h2:first-of-type{padding-top:0;border-top:0}
+  h2 .n{color:var(--inkFaint);font-weight:800;margin-right:8px}
+  h3{font-size:16px;margin:26px 0 6px;letter-spacing:-.2px}
+  h4{font-size:13.5px;margin:18px 0 5px;color:var(--inkSoft);letter-spacing:.2px;text-transform:uppercase;
+     font-weight:900}
+  p{margin:0 0 12px;max-width:900px}
+  .sub{color:var(--inkSoft);margin-bottom:18px;max-width:900px}
+  ul,ol{margin:0 0 12px;padding-left:22px;max-width:900px}
+  li{margin-bottom:5px}
+  li::marker{color:var(--sky)}
+
+  .card{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+        padding:16px 18px;margin:14px 0;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .card.hot{border-left:4px solid var(--red);background:linear-gradient(90deg,rgba(251,228,225,.5),rgba(255,255,255,.94) 60px)}
+  .card.warn{border-left:4px solid var(--amber);background:linear-gradient(90deg,rgba(255,233,214,.5),rgba(255,255,255,.94) 60px)}
+  .card.ok{border-left:4px solid var(--green);background:linear-gradient(90deg,rgba(223,246,236,.5),rgba(255,255,255,.94) 60px)}
+  .card.note{border-left:4px solid var(--sky)}
+  .card h4{margin-top:0}
+
+  table{border-collapse:collapse;width:100%;table-layout:fixed;margin:14px 0;font-size:13px;
+        background:rgba(255,255,255,.92);border-radius:14px;overflow:hidden;
+        box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  th,td{overflow-wrap:anywhere}
+  th{background:rgba(220,235,255,.7);text-align:left;padding:10px 13px;font-size:11.5px;
+     text-transform:uppercase;letter-spacing:.4px;color:var(--navy);font-weight:900}
+  td{padding:10px 13px;border-top:1px solid rgba(15,46,107,.08);vertical-align:top}
+  tr:hover td{background:rgba(220,235,255,.28)}
+
+  .toc{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+       padding:16px 20px;margin:16px 0 6px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .toc ol{columns:2;column-gap:34px;margin:0;padding-left:20px}
+  .toc a{text-decoration:none;font-weight:700}
+  .toc a:hover{text-decoration:underline}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr}.toc ol{columns:1}}
+  figure{margin:18px 0}
+  figcaption{font-size:12px;color:var(--inkSoft);margin-top:8px;text-align:center}
+  .diagram{background:rgba(255,255,255,.94);border:1px solid var(--hair);border-radius:18px;
+           padding:18px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .diagram svg{width:100%;height:auto;display:block}
+  .kv{font-size:13px}
+  .kv td:first-child{width:38%;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;color:#0B4FA8}
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid rgba(15,46,107,.13);
+         font-size:12.5px;color:var(--inkSoft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <h1>1Day 技术文档 — 系统是怎么搭的</h1>
+  <p class="sub">一天（或一周）拍几个两秒的片段，晚上自动拼成一条小片；也可以拉朋友进同一个房间，各拍各的，拼在一起。这份文档写的是这件事在代码里是怎么成立的：分层、数据落在哪、CloudKit 怎么同步、视频管线为什么长这样，以及哪些地方是踩过坑才变成现在这个样子的。</p>
+  <div class="meta">
+    <span class="pill">iOS 17.0+</span>
+    <span class="pill">SwiftUI</span>
+    <span class="pill">CloudKit public DB</span>
+    <span class="pill">AVFoundation</span>
+    <span class="pill gray">XcodeGen</span>
+    <b>Bundle</b> com.cassie.AISetlog ·
+    <b>版本</b> 1.2 ·
+    <b>写于</b> 2026-09-03
+  </div>
+</div>
+
+<div class="toc">
+  <ol>
+    <li><a href="#s1">一句话和一张图</a></li>
+    <li><a href="#s2">分层，和唯一一条被 CI 盯着的铁律</a></li>
+    <li><a href="#s3">数据落在哪</a></li>
+    <li><a href="#s4">共享房间：CloudKit</a></li>
+    <li><a href="#s5">视频管线</a></li>
+    <li><a href="#s6">柔和一点（GentleLook）</a></li>
+    <li><a href="#s7">提示词服务：一个只做一件事的 Worker</a></li>
+    <li><a href="#s8">通知</a></li>
+    <li><a href="#s9">双语</a></li>
+    <li><a href="#s10">测试策略</a></li>
+    <li><a href="#s11">构建与发布</a></li>
+    <li><a href="#s12">已知的坑</a></li>
+  </ol>
+</div>
+
+<h2 id="s1"><span class="n">01</span>一句话和一张图</h2>
+
+<p>一个 <b>Challenge</b>（一条故事）有 N 个 <b>DayCard</b>（槽位）。每个槽位录一段短视频，文件落在本地磁盘，卡片上只存文件名。<b>VideoStitcher</b> 把这些片段按顺序拼成一条片子。如果这条故事带 <code>roomCode</code>，它同时是一个 CloudKit 房间——每个人的片段上传到公共库，别人拉下来，同一天的几个人拼成一格一格的画面。</p>
+
+<p>没有后端服务器。除了一个只负责调 LLM 的 Cloudflare Worker，所有"服务端"能力都是 CloudKit 提供的。</p>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'SF Pro Rounded','PingFang SC',system-ui,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#7FB4FF"/>
+    </marker>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#5FD6B4"/>
+    </marker>
+  </defs>
+
+  <!-- Views -->
+  <rect x="24" y="20" width="270" height="118" rx="16" fill="#DCEBFF" stroke="#1677FF" stroke-opacity=".25"/>
+  <text x="40" y="46" font-size="14" font-weight="800" fill="#0F2E6B">Views (SwiftUI)</text>
+  <text x="40" y="70" font-size="11.5" fill="#5B7099">Home · Compose · Record</text>
+  <text x="40" y="88" font-size="11.5" fill="#5B7099">Timeline · Film · Settings</text>
+  <text x="40" y="112" font-size="11" fill="#93A6C6">@Environment 拿 store，自己不碰 I/O</text>
+
+  <!-- Presentation -->
+  <rect x="24" y="156" width="270" height="104" rx="16" fill="#EFE9FF" stroke="#B3A4FF" stroke-opacity=".5"/>
+  <text x="40" y="182" font-size="14" font-weight="800" fill="#0F2E6B">Presentation（纯函数层）</text>
+  <text x="40" y="205" font-size="11.5" fill="#5B7099">ChallengePresenter · StoryTimeline</text>
+  <text x="40" y="223" font-size="11.5" fill="#5B7099">RoomProgress · ClipDeck · GentleLook</text>
+  <text x="40" y="245" font-size="11" fill="#93A6C6">不 import SwiftUI · 不读 .now · 好测</text>
+
+  <!-- Models -->
+  <rect x="24" y="278" width="270" height="92" rx="16" fill="#FFF" stroke="#1677FF" stroke-opacity=".2"/>
+  <text x="40" y="304" font-size="14" font-weight="800" fill="#0F2E6B">Models</text>
+  <text x="40" y="327" font-size="11.5" fill="#5B7099">Challenge · DayCard · DayClip</text>
+  <text x="40" y="345" font-size="11.5" fill="#5B7099">ChallengeTemplate · MomentCatalog</text>
+  <text x="40" y="364" font-size="11" fill="#A7443C">禁止出现 Strings.（CI 检查）</text>
+
+  <!-- Stores -->
+  <rect x="346" y="20" width="250" height="118" rx="16" fill="#FFF" stroke="#1677FF" stroke-opacity=".28"/>
+  <text x="362" y="46" font-size="14" font-weight="800" fill="#0F2E6B">@Observable Stores</text>
+  <text x="362" y="70" font-size="11.5" fill="#5B7099">ChallengeStore（编排一切）</text>
+  <text x="362" y="88" font-size="11.5" fill="#5B7099">AccountStore · ClipDraftStore</text>
+  <text x="362" y="112" font-size="11" fill="#93A6C6">内存状态 + 委托给下面的服务</text>
+
+  <!-- Services -->
+  <rect x="346" y="156" width="250" height="214" rx="16" fill="#F5F8FF" stroke="#1677FF" stroke-opacity=".22"/>
+  <text x="362" y="182" font-size="14" font-weight="800" fill="#0F2E6B">Services</text>
+  <text x="362" y="206" font-size="11.5" fill="#5B7099">Persistence: ChallengeRepository</text>
+  <text x="362" y="224" font-size="11.5" fill="#5B7099">　　　　　　ClipFileStore</text>
+  <text x="362" y="248" font-size="11.5" fill="#5B7099">Media: ClipRecorder · VideoStitcher</text>
+  <text x="362" y="266" font-size="11.5" fill="#5B7099">　　　 GentleLookFilter</text>
+  <text x="362" y="290" font-size="11.5" fill="#5B7099">Cloud: CloudKitService · RoomSync</text>
+  <text x="362" y="314" font-size="11.5" fill="#5B7099">Notifications · PromptSuggestion</text>
+  <text x="362" y="345" font-size="11" fill="#93A6C6">协议 + 实现，测试里可替换</text>
+
+  <!-- Outside -->
+  <rect x="648" y="20" width="308" height="86" rx="16" fill="#FFF" stroke="#5FD6B4" stroke-opacity=".55"/>
+  <text x="664" y="46" font-size="14" font-weight="800" fill="#0F2E6B">磁盘</text>
+  <text x="664" y="68" font-size="11.5" fill="#5B7099">UserDefaults: challenges.v2 (JSON)</text>
+  <text x="664" y="88" font-size="11.5" fill="#5B7099">Documents/clips/&lt;uuid&gt;/day1.mov</text>
+
+  <rect x="648" y="124" width="308" height="112" rx="16" fill="#FFF" stroke="#5FD6B4" stroke-opacity=".55"/>
+  <text x="664" y="150" font-size="14" font-weight="800" fill="#0F2E6B">CloudKit 公共库</text>
+  <text x="664" y="172" font-size="11.5" fill="#5B7099">Room · Clip · Reaction · Comment</text>
+  <text x="664" y="192" font-size="11.5" fill="#5B7099">iCloud.com.cassie.AISetlog</text>
+  <text x="664" y="216" font-size="11" fill="#93A6C6">record name 可推导 ⇒ 重复写是幂等的</text>
+
+  <rect x="648" y="254" width="308" height="116" rx="16" fill="#FFF" stroke="#5FD6B4" stroke-opacity=".55"/>
+  <text x="664" y="280" font-size="14" font-weight="800" fill="#0F2E6B">Cloudflare Worker</text>
+  <text x="664" y="302" font-size="11.5" fill="#5B7099">/api/suggest-prompts → DeepSeek</text>
+  <text x="664" y="322" font-size="11.5" fill="#5B7099">key 只在服务端</text>
+  <text x="664" y="346" font-size="11" fill="#93A6C6">失败一律静默，退回手填</text>
+
+  <path d="M159,138 L159,156" stroke="#7FB4FF" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M159,260 L159,278" stroke="#7FB4FF" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M294,79 L346,79" stroke="#7FB4FF" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M471,138 L471,156" stroke="#7FB4FF" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M596,200 L648,90" stroke="#5FD6B4" stroke-width="2" marker-end="url(#ag)"/>
+  <path d="M596,240 L648,180" stroke="#5FD6B4" stroke-width="2" marker-end="url(#ag)"/>
+  <path d="M596,300 L648,310" stroke="#5FD6B4" stroke-width="2" marker-end="url(#ag)"/>
+</svg>
+</div>
+<figcaption>依赖只往下、往右走。View 不知道磁盘存在，Model 不知道语言存在。</figcaption>
+</figure>
+
+<h2 id="s2"><span class="n">02</span>分层，和唯一一条被 CI 盯着的铁律</h2>
+
+<table>
+  <tr><th style="width:20%">层</th><th style="width:38%">职责</th><th>约束</th></tr>
+  <tr><td><code>Models/</code></td><td>纯数据结构，<code>Codable</code>，向后兼容旧存档</td><td><b>不能出现 <code>Strings.</code></b>——展示文案属于 Presentation。CI 用 grep 直接卡住</td></tr>
+  <tr><td><code>Presentation/</code></td><td>把 Model 变成"该显示什么"的纯计算</td><td>不 import SwiftUI，不读 <code>.now</code>（时间靠参数传进来），因此可以全量单测</td></tr>
+  <tr><td><code>Services/</code></td><td>所有 I/O：磁盘、相机、CloudKit、通知、网络</td><td>先定协议再写实现，测试可替换</td></tr>
+  <tr><td><code>Views/</code></td><td>SwiftUI，只读 store、只调 store</td><td>自己不碰 FileManager / CloudKit</td></tr>
+</table>
+
+<div class="card note">
+<h4>为什么 Presentation 不许读 .now</h4>
+<p>"今天是第几天""这个槽位是过去、今天还是将来"这类判断，如果直接读系统时间，测试就只能在特定时刻通过。把当前时间作为参数传进去之后，<code>StorySchedule</code>、<code>RoomProgress</code>、<code>StoryTimeline</code> 这些东西可以在任意假时间下断言，跨午夜、跨时区的行为才有人验证过。</p>
+</div>
+
+<p><code>Challenge</code> 里大量字段是 <code>Optional</code> 且带注释写着"nil 表示旧存档"——<code>mode</code>、<code>clipLength</code>、<code>orientation</code>、<code>roomCode</code>、<code>ownerID</code>。这不是懒，是因为数据是 JSON 存在 UserDefaults 里的：老用户的存档必须能被新版本解码。对应地每个可选字段都有一个 <code>resolvedXxx</code> 兜底。</p>
+
+<h2 id="s3"><span class="n">03</span>数据落在哪</h2>
+
+<table class="kv">
+  <tr><th style="width:38%">位置</th><th>内容</th></tr>
+  <tr><td>UserDefaults <code>challenges.v2</code></td><td>全部故事（JSON 编码的 <code>[Challenge]</code>），含卡片、表情、评论</td></tr>
+  <tr><td>UserDefaults <code>customTemplates.v1</code></td><td>用户自建模板</td></tr>
+  <tr><td>UserDefaults <code>onboarding.completed.v1</code></td><td>首次启动引导是否走完</td></tr>
+  <tr><td>UserDefaults <code>appLanguage</code> / <code>appAppearance</code></td><td>语言、深浅色</td></tr>
+  <tr><td><code>Documents/clips/&lt;challengeUUID&gt;/day&lt;N&gt;.mov</code></td><td>我自己录的片段</td></tr>
+  <tr><td><code>Documents/clips/room_&lt;CODE&gt;/</code></td><td>从房间下载的别人的片段（缓存，可丢）</td></tr>
+</table>
+
+<p>视频从不进 UserDefaults，卡片上只存文件名。<code>ClipFileStore</code> 是唯一碰 <code>FileManager</code> 的地方；<code>ChallengeRepository</code> 是唯一碰 <code>UserDefaults</code> 的地方。两个都是协议，注释里写明了"今天 UserDefaults，明天 SwiftData，换实现就行"。</p>
+
+<p>v1 → v2 的迁移还留在 <code>UserDefaultsChallengeRepository.migrateLegacyIfNeeded()</code>：v1 只有一条无 id 的 challenge，片段散在 <code>clips/</code> 根目录下。迁移会补一个 UUID、把文件挪进以它命名的子目录、写回 v2、删掉旧 key。</p>
+
+<h2 id="s4"><span class="n">04</span>共享房间：CloudKit</h2>
+
+<p>用的是 <b>公共数据库</b>（public DB），不是共享库。理由很实际：一个 6 位邀请码谁拿到谁能进，不需要 CKShare 那一套邀请链路；代价是记录对整个容器公开，所以里面不放任何私密字段。</p>
+
+<h3>四种记录</h3>
+<table>
+  <tr><th style="width:16%">recordType</th><th style="width:34%">recordName</th><th>说明</th></tr>
+  <tr><td><code>Room</code></td><td>房间码本身，如 <code>K7M2XQ</code></td><td>标题、起始日、模式、片长、朝向、moment 列表、房主</td></tr>
+  <tr><td><code>Clip</code></td><td><code>&lt;code&gt;_&lt;authorID&gt;_day&lt;N&gt;</code></td><td>视频 <code>CKAsset</code> + 作者 + 字幕。名字可推导 ⇒ <b>重录就是覆盖同一条</b>，不会产生第二份</td></tr>
+  <tr><td><code>Reaction</code></td><td>由 code/day/作者/目标/emoji 拼出</td><td>append-only，同一个人对同一条按两次不会变成两条</td></tr>
+  <tr><td><code>Comment</code></td><td>本地生成的 UUID</td><td>本地和远端用同一个 id，两边各自去重</td></tr>
+</table>
+
+<div class="card ok">
+<h4>幂等是设计出来的，不是重试出来的</h4>
+<p>所有写操作的 record name 都能从"谁 + 哪个房间 + 哪一天 + 什么"推导出来。所以重试、双击、第二台设备重放同一个写入，落到的都是同一条记录。删除也不用先查询——直接按推导出的 id 删（见 <code>deleteMyRoomData</code>）。</p>
+</div>
+
+<h3>同步是本地优先的</h3>
+<p><code>ChallengeStore.recordedClips(for:)</code> 里有一段值得单独讲：一个房间的片段列表 = 远端全部 + <b>我自己还没上传成功的那些</b>。曾经这里只返回远端列表，结果是离线拍的一条会从房间、首页卡片和计数里消失，重启才回来。现在本地那一半不是"没同步时的兜底"，而是那条片段唯一的记录。</p>
+
+<p>表情和评论的合并同理：远端是真相，但要跟我刚点下去、还没被回传的那些取并集，否则手指刚离开屏幕表情就闪一下没了。</p>
+
+<div class="card warn">
+<h4>登出要清房间缓存</h4>
+<p>缓存是按 author id 存的，而登出会改变"我是谁"。不清的话，我自己上传的片段会变成别人的：名单里还列着我，每个空槽写着"在等 &lt;我自己的名字&gt;"，页头把我的镜头署了个陌生人的名。所以 <code>signOut()</code> 会逐个房间 <code>clearRoom()</code>；故事本身不动，丢的只是别人作品的借来副本。</p>
+</div>
+
+<h3>删除账号</h3>
+<p><code>deleteAccountAndAllData()</code> 是 App Store 审核 5.1.1(v) 要求的：创建账号的 app 必须能删账号，登出不算。实现上先按可推导 id 删云端我写过的一切，再无条件清本地——<b>云端失败也照删本地</b>，因为人家说的是"让我消失"，不能因为一次网络错误就把人留在已登录状态。</p>
+
+<h2 id="s5"><span class="n">05</span>视频管线</h2>
+
+<pre><code>ClipRecorder (AVCaptureSession)
+   └→ 临时文件
+        └→ ClipFileStore.storeClip()  →  Documents/clips/&lt;uuid&gt;/dayN.mov
+             ├→ （共享房间）RoomSyncService.uploadClip() → CKAsset
+             └→ VideoStitcher.stitch(clips:options:) → 成片 .mov</code></pre>
+
+<h3>两种排布</h3>
+<ul>
+  <li><b><code>.sequential</code></b>——一条接一条，带交叉淡入（默认 0.35s）。个人故事走这条。</li>
+  <li><b><code>.friendsTogether</code></b>——同一天的多个人同时播，按 <code>grid(for:in:)</code> 算行列铺成格子。房间的成片走这条。</li>
+</ul>
+
+<h3>叠加层只在真机上有</h3>
+<div class="card hot">
+<p>标题卡、DAY N 字幕、emoji 贴纸、评论气泡、时间戳、水印，全部通过 <code>AVVideoCompositionCoreAnimationTool</code> 挂 <code>CALayer</code> 实现，而这一套<b>在模拟器上导不出来</b>。所以 <code>VideoStitcher</code> 里有三处 <code>#if !targetEnvironment(simulator)</code> 把它们整段编译掉。</p>
+<p>后果要记住：<b>成片的任何叠加效果，模拟器截图证明不了</b>。改动这块只能在真机上验。模拟器上跑出来的是一条没有任何文字的干净片子，看起来"正常"，其实少了一半东西。</p>
+</div>
+
+<h2 id="s6"><span class="n">06</span>柔和一点（GentleLook）</h2>
+<p class="sub"><span class="pill ok">已在 main</span> 来自 PR #8 / #10，2026-09-03 合入。</p>
+
+<p><code>GentleLook</code> 是个纯值类型：三个 0…1 的旋钮——<code>smoothing</code>（细腻）、<code>brightness</code>（提亮）、<code>warmth</code>（暖调）。它自己不认识 CoreImage，只负责把三个数字推导成一组有上限的参数：</p>
+
+<table>
+  <tr><th style="width:34%">推导出的量</th><th style="width:16%">上限</th><th>为什么是这个上限</th></tr>
+  <tr><td>blurRadius</td><td>8.0</td><td>模糊半径</td></tr>
+  <tr><td>blurOpacity</td><td>0.35</td><td>把模糊直接混进去的比例。<b>这一档故意压低</b>——它才是让脸变塑料的那个</td></tr>
+  <tr><td>softLightOpacity</td><td>0.55</td><td>柔光叠加，只加光不动边缘，效果的大头在这</td></tr>
+  <tr><td>brightnessDelta / saturation</td><td>+0.06 / −0.08</td><td>提亮的同时降饱和，否则皮肤发橙</td></tr>
+  <tr><td>temperature / tint</td><td>6500→5200K / +8</td><td>暖 = 色温<b>降低</b>，写反了"暖阳"会变蓝</td></tr>
+</table>
+
+<div class="card note">
+<h4>一个像素测试逼出来的设计</h4>
+<p>最早只有柔光一条路径。像素测试（32×32 棋盘格 + 软件 CIContext）跑出来对比度是 0.0925，没低过要求的 0.0909（原始对比度的 0.9 倍）——因为柔光叠模糊会保住底层结构，"细腻"其实没磨到任何东西。于是拆成两条独立上限的通道：一条真的把模糊混进去（低上限），一条只加光（高上限）。这个 bug 靠看模拟器截图是发现不了的。</p>
+</div>
+
+<h3>为什么回看和导出是两条路</h3>
+<p>一个 asset 只能有一个 <code>AVVideoComposition</code>。<code>VideoStitcher</code> 已经手写了一整套 <code>instructions</code>（交叉淡入、格子排布）外加 <code>animationTool</code>；而 <code>AVMutableVideoComposition(asset:applyingCIFiltersWithHandler:)</code> 会自己生成一套 instructions。两者不能共存。所以：</p>
+<ul>
+  <li><b>回看</b>：没有叠加层，直接把 filter composition 挂到 <code>AVPlayerItem.videoComposition</code>。</li>
+  <li><b>导出</b>：先<b>逐条</b>把片段滤成临时文件，再拿滤过的文件去拼。拼完删临时文件。某一条滤失败不影响成片——那条以原样进片子。</li>
+</ul>
+
+<div class="card warn">
+<h4>AVPlayerLooper 的坑</h4>
+<p><code>AVPlayerLooper</code> 每一轮循环都会<b>复制</b>模板 item。也就是说 composition 必须在第一帧之前就建好，否则第一遍有滤镜、之后每一遍都没有。<code>LoopingPlayerLayerView</code> 因此是先 <code>await</code> 建好 composition，再开始播——而不是先播再挂。</p>
+</div>
+
+<h3>存两个 key</h3>
+<p><code>gentleLook.v1</code> 存当前的样子，<code>gentleLook.sticky.v1</code> 存"以后都这样看"。启动时 <code>AISetlogApp.init()</code> 调纯函数 <code>GentleLook.onLaunch(stored:sticky:)</code>：没勾选就还原成"原样"。在任何 view 读到这个 key 之前做完，免得闪一帧昨天的设置。</p>
+
+<h2 id="s7"><span class="n">07</span>提示词服务：一个只做一件事的 Worker</h2>
+
+<p><code>workers/suggest-prompts</code>，Cloudflare Worker，216 行。输入一句"今天要搬家"，输出七个值得对着拍的瞬间。模型是 DeepSeek，<b>API key 只在服务端</b>——打进 app 里的 key 就是别人会替你花的钱。</p>
+
+<div class="card ok">
+<h4>它是加速器，不是关卡</h4>
+<p><code>PromptSuggestionService</code> 的每一种失败都是静默的，用户被放回原来那个可以手填的列表。三种错误（<code>malformed</code> / <code>rateLimited</code> / <code>unavailable</code>）在 UI 上不区分，因为对用户来说没区别：他要做的事本来就还能做。超时 20 秒。</p>
+</div>
+
+<h2 id="s8"><span class="n">08</span>通知</h2>
+<ul>
+  <li><b><code>ReminderService</code></b>——本地通知，晚间提醒。时间在设置里可调，每次 <code>challenges</code> 变化时 <code>reconcile</code> 一次。</li>
+  <li><b><code>SharedActivityNotificationService</code></b>——CloudKit 订阅，朋友上传时推送。可以按房间静音（<code>NotificationPreferences.mutedRoomCodes</code>），也可以选择不显示朋友名字。</li>
+</ul>
+<p>两者都在 app 变为 active 时重新对账，因为通知授权和房间列表都可能在别处被改过。</p>
+
+<h2 id="s9"><span class="n">09</span>双语</h2>
+<p>中英文不走 <code>.strings</code> 文件，走一个 <code>Strings</code> 枚举，每个条目是个计算属性：</p>
+<pre><code>static var lookWarm: String { lang == .chinese ? "暖阳" : "Warm" }</code></pre>
+<p>好处是加一句话只改一个文件、编译期就知道漏没漏；<code>.lproj</code> 只留给系统权限弹窗那几句（<code>InfoPlist.strings</code>）。语言可以在设置里强制，不跟随系统。</p>
+
+<h2 id="s10"><span class="n">10</span>测试策略</h2>
+
+<table>
+  <tr><th style="width:26%">类型</th><th style="width:30%">例子</th><th>为什么这么测</th></tr>
+  <tr><td>纯逻辑单测</td><td><code>StoryTimelineTests</code> <code>RoomProgressTests</code> <code>GentleLookTests</code></td><td>Presentation 层不读时间不碰 UI，可以喂任意假状态</td></tr>
+  <tr><td>像素测试</td><td><code>GentleLookFilterTests</code></td><td>32×32 棋盘格 + 软件 CIContext，测的是对比度/亮度/色温的实际变化。抓到过一个截图看不出的 bug</td></tr>
+  <tr><td>真实素材</td><td><code>VideoStitcherTests</code> <code>DemoClipFactoryTests</code></td><td><code>DemoClipFactory</code> 现场合成一条片子，然后真的解码一帧出来断言</td></tr>
+  <tr><td>CloudKit 集成</td><td><code>CloudKitIdempotencyTests</code> 等 4 套</td><td>打的是真的开发库，需要一台登了 iCloud 的模拟器</td></tr>
+  <tr><td>UI 测试</td><td><code>CreationFlowUITests</code></td><td>创建流程走一遍</td></tr>
+</table>
+
+<div class="card warn">
+<h4>CI 上跑不了的那四套</h4>
+<p>四套 CloudKit 集成测试在 CI 里是被 <code>-skip-testing:</code> 跳掉的。它们本来就会在没登 iCloud 的模拟器上 <code>XCTSkip</code>，但 CI 用 <code>CODE_SIGNING_ALLOWED=NO</code> 构建，没有 iCloud entitlement——对一个没授权的 container 调 <code>accountStatus()</code> 会<b>直接打死 test host</b>，进程都没了，谈不上 skip。</p>
+<p>所以这块覆盖率只存在于本机：要验它们，得在一台登了 iCloud 的模拟器上跑完整套。这是真实的覆盖缺口，不是被掩盖的失败。</p>
+</div>
+
+<h2 id="s11"><span class="n">11</span>构建与发布</h2>
+
+<h3>工程文件是生成的</h3>
+<p><code>.xcodeproj</code> 不进 git，由 <code>ios/project.yml</code> 经 XcodeGen 生成，源文件用目录通配符收集。<b>增删文件之后必须重新生成</b>：</p>
+<pre><code>cd ios && xcodegen generate --spec project.yml</code></pre>
+
+<table class="kv">
+  <tr><th style="width:38%">配置</th><th>值</th></tr>
+  <tr><td>deploymentTarget</td><td>iOS 17.0</td></tr>
+  <tr><td>TARGETED_DEVICE_FAMILY</td><td>1（只 iPhone），只竖屏</td></tr>
+  <tr><td>entitlements</td><td>Sign in with Apple · CloudKit · aps-environment</td></tr>
+  <tr><td>URL scheme</td><td><code>oneday://join?code=XXXXXX</code></td></tr>
+  <tr><td>ITSAppUsesNonExemptEncryption</td><td>false（上传时不会再问出口合规）</td></tr>
+</table>
+
+<h3>CI</h3>
+<p><code>.github/workflows/ios-tests.yml</code>，GitHub Actions <code>macos-15</code>。这份 workflow 在 2026-09-02 修过一次大的，因为 runner 镜像的漂移让它整整两周没绿过一次：</p>
+<ol>
+  <li>原来钉在 <b>Xcode 16.2</b>。镜像留着这个 Xcode 却删掉了 iOS 18.2 的模拟器 runtime，<code>actool</code> 拿不到对得上的 SDK 就把整个 build 判失败——报的是 <code>Assets.xcassets: error:</code>，看起来像资源问题。<b>改成 Xcode 26.2</b>（镜像上的模拟器现在全是 iOS 26）。</li>
+  <li>然后是"找不到设备"。runner <b>一台 iOS 模拟器都不预建</b>，靠写死设备型号名让 xcodebuild 现场造一台——而这件事只在某些 job 上成功。现在的做法是按 SDK 版本挑 runtime、自己 <code>simctl create</code> 再 boot，<b>并在这一步先确认 xcodebuild 看得见它</b>，不然就在这里失败，而不是等测试跑起来才报一个含糊的错。</li>
+  <li>然后才第一次看到真正的测试结果：上面第 10 节说的那四套 CloudKit 测试把 test host 打死了。跳过。</li>
+</ol>
+<p>另外 workflow 里那条 <code>grep -rn "Strings\." AISetlog/Models/</code> 就是第 2 节那条铁律的执行者。</p>
+
+<h3>发布</h3>
+<p>Archive → <code>-exportArchive</code>（method: app-store-connect，配 <code>-allowProvisioningUpdates</code> 自动建发行证书）→ Organizer 上传 TestFlight。</p>
+<div class="card hot">
+<h4>上线前必须做的一件事</h4>
+<p><b>CloudKit 的 schema 要部署到 Production</b>（Dashboard → Deploy Schema Changes）。开发库上跑得好好的房间和邀请码，在正式包里会直接失败，因为 Production 那边根本没有这些 record type 和可查询索引。一个人用的部分（拍摄、回看、成片）不受影响。</p>
+<p>相关的错误码已经在代码里翻译过了：字段还没标成 queryable 时 CloudKit 报 <code>invalidArguments</code>，<code>CloudKitService</code> 把它转成 <code>fieldNotQueryable</code>，界面上说的是"索引还在部署中"。</p>
+</div>
+
+<h2 id="s12"><span class="n">12</span>已知的坑</h2>
+
+<div class="grid2">
+<div class="card hot">
+<h4>阻塞上线</h4>
+<ul>
+<li>CloudKit Production schema 未部署 ⇒ 正式包里共享房间必挂</li>
+</ul>
+</div>
+<div class="card warn">
+<h4>覆盖缺口</h4>
+<ul>
+<li>四套 CloudKit 集成测试只能本机跑</li>
+<li>成片叠加层（字幕/贴纸/水印）模拟器上编译掉了，只能真机验</li>
+</ul>
+</div>
+</div>
+
+<div class="card">
+<h4>零碎的债</h4>
+<ul>
+<li><code>AvatarBadge</code> 目前没人用了（#11 之后）</li>
+<li><code>Strings.makeTheFilm</code> 无引用，留着怕有在飞的分支要用</li>
+<li>时间轴的时间戳印在缩略图里，不在左侧轴上——PRD 里写过要改，没动</li>
+<li>字幕编辑目前只改本地，房间同步要等下一次片段上传才带过去</li>
+<li><code>StoryGridView</code> 和 <code>StoryTimelineView</code> 有重叠，合并过一次评估，决定不合</li>
+</ul>
+</div>
+
+<footer>
+  <p>写于 2026-09-03，对应版本 1.2。<br>
+  产品侧的决策记录在 <code>docs/prd/</code>；这份只写系统怎么搭的。两边如果打架，以代码为准，然后回来改这里。</p>
+</footer>
+
+</div>
+</body>
+</html>
