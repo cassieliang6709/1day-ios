@@ -11,6 +11,8 @@ struct StitchedMomentPreview: View {
     let clips: [DayClip]
     let day: Int
     var slotTitle: String?
+    /// How many moments the story has, so playback can say "3 / 5".
+    var momentCount = 0
     var clipLength: Challenge.ClipLength = .tiny
     var challengeID: UUID?
     var showsPrompt = true
@@ -69,6 +71,7 @@ struct StitchedMomentPreview: View {
         ClipPreviewView(
             day: day,
             slotTitle: slotTitle,
+            momentCount: momentCount,
             authorName: authorName,
             overlayText: overlayText,
             clipLength: clipLength,

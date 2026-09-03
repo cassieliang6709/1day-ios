@@ -353,6 +353,7 @@ struct StoryTimelineView: View {
                 clips: slotClips,
                 day: day,
                 slotTitle: slotTitle(for: day),
+                momentCount: challenge?.cards.count ?? 0,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
                 challengeID: challengeID,
                 showsPrompt: challenge?.isTimeOnly != true,
@@ -374,6 +375,7 @@ struct StoryTimelineView: View {
                 ClipPreviewView(
                     day: day,
                     slotTitle: slotTitle(for: day),
+                    momentCount: challenge?.cards.count ?? 0,
                     authorName: clip.authorName,
                     overlayText: clip.overlayText,
                     clipLength: challenge?.resolvedClipLength ?? .tiny,
