@@ -116,8 +116,7 @@
     <li><a href="#s9">双语</a></li>
     <li><a href="#s10">测试策略</a></li>
     <li><a href="#s11">构建与发布</a></li>
-    <li><a href="#s12">还没合进 main 的东西</a></li>
-    <li><a href="#s13">已知的坑</a></li>
+    <li><a href="#s12">已知的坑</a></li>
   </ol>
 </div>
 
@@ -293,7 +292,7 @@
 </div>
 
 <h2 id="s6"><span class="n">06</span>柔和一点（GentleLook）</h2>
-<p class="sub"><span class="pill warn">未合入 main</span> 在 PR #8 / #10，见第 12 节。</p>
+<p class="sub"><span class="pill ok">已在 main</span> 来自 PR #8 / #10，2026-09-03 合入。</p>
 
 <p><code>GentleLook</code> 是个纯值类型：三个 0…1 的旋钮——<code>smoothing</code>（细腻）、<code>brightness</code>（提亮）、<code>warmth</code>（暖调）。它自己不认识 CoreImage，只负责把三个数字推导成一组有上限的参数：</p>
 
@@ -396,21 +395,7 @@
 <p>相关的错误码已经在代码里翻译过了：字段还没标成 queryable 时 CloudKit 报 <code>invalidArguments</code>，<code>CloudKitService</code> 把它转成 <code>fieldNotQueryable</code>，界面上说的是"索引还在部署中"。</p>
 </div>
 
-<h2 id="s12"><span class="n">12</span>还没合进 main 的东西</h2>
-
-<p>写这份文档时，<code>main</code> 明显落后于在飞的分支（main 上只有 3 个 Presentation 文件、13 个测试文件；分支栈上是 11 个和 29 个）。四条 PR 全绿，等 review：</p>
-
-<table>
-  <tr><th style="width:10%">PR</th><th style="width:26%">分支</th><th style="width:16%">base</th><th>内容</th></tr>
-  <tr><td>#8</td><td><code>feat/gentle-look</code></td><td>feat/swipe-between-clips</td><td>GentleLook 值类型 + CoreImage 链 + 回看/导出两条路径</td></tr>
-  <tr><td>#10</td><td><code>feat/look-picker</code></td><td>#8</td><td>压在片子底下的调节面板、按住看原片、设置里的预设</td></tr>
-  <tr><td>#9</td><td><code>feat/story-page-has-one-next</code></td><td>feat/swipe-between-clips</td><td>故事页只留一件"下一步"的事</td></tr>
-  <tr><td>#11</td><td><code>feat/room-says-who</code></td><td>#9</td><td><code>RoomCast</code>：房间里有谁、谁拍了、在等谁</td></tr>
-</table>
-
-<p>本文第 6 节（GentleLook）描述的是 #8/#10 的代码；<code>RoomCast</code> 在 #11。合完之后这两处就是 main 的现状。</p>
-
-<h2 id="s13"><span class="n">13</span>已知的坑</h2>
+<h2 id="s12"><span class="n">12</span>已知的坑</h2>
 
 <div class="grid2">
 <div class="card hot">
