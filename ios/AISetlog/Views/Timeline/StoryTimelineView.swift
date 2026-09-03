@@ -114,7 +114,17 @@ struct StoryTimelineView: View {
                         clips: clips,
                         members: members,
                         myID: account.account?.id ?? "local",
-                        onTapFilmed: { day, _ in sheet = .moment(day: day) },
+                        // A tile in a story only you filmed is one clip, so it
+                        // opens as a page in the day and you swipe on. In a
+                        // shared room a tile is still the whole moment with
+                        // everyone stacked in it, which isn't a page — that's
+                        // what `.moment` is for, until the grid stops
+                        // collapsing people into one tile.
+                        onTapFilmed: { day, _ in
+                            sheet = challenge.isShared
+                                ? .moment(day: day)
+                                : .preview(day: day, authorID: nil)
+                        },
                         onTapEmpty: { day in sheet = .record(day: day) })
                 }
             }
@@ -366,33 +376,24 @@ struct StoryTimelineView: View {
             }
 
         case .preview(let day, let targetAuthorID):
-            let clips = store.recordedClips(for: challengeID)
-            if let clip = clips.first(where: {
-                $0.day == day && ($0.authorID == targetAuthorID
-                    || (targetAuthorID == nil
-                        && ($0.authorID == account.account?.id || $0.authorID == "local")))
-            }) {
-                ClipPreviewView(
-                    day: day,
-                    slotTitle: slotTitle(for: day),
+            // The tapped clip opens, and the rest of the story is a swipe away
+            // either side of it.
+            let deck = ClipDeck(
+                clips: store.recordedClips(for: challengeID),
+                momentCount: challenge?.cards.count ?? 0,
+                myID: account.account?.id ?? RoomProgress.soloAuthorID)
+            if let start = deck.index(ofDay: day, authorID: targetAuthorID) {
+                ClipDeckReview(
+                    deck: deck,
+                    challengeID: challengeID,
                     momentCount: challenge?.cards.count ?? 0,
-                    authorName: clip.authorName,
-                    overlayText: clip.overlayText,
                     clipLength: challenge?.resolvedClipLength ?? .tiny,
                     showsPrompt: challenge?.isTimeOnly != true,
-                    url: clip.url,
-                    recordedAt: clip.recordedAt,
-                    challengeID: challengeID,
-                    targetAuthorID: targetAuthorID
-                ) {
+                    startIndex: start
+                ) { retakeDay in
                     sheet = nil
-                    let isMe = targetAuthorID == nil
-                        || targetAuthorID == "local"
-                        || targetAuthorID == account.account?.id
-                    if isMe {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                            sheet = .record(day: day)
-                        }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        sheet = .record(day: retakeDay)
                     }
                 }
             }

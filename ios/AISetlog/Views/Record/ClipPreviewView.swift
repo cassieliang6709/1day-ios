@@ -23,6 +23,11 @@ struct ClipPreviewView: View {
     var overlayText: String?
     var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
+    /// Whether this page should hold a player at all. `ClipDeckReview` sets it
+    /// false for pages you aren't looking at: a paged `TabView` keeps every
+    /// page it has built, and a story with fifteen clips in it would otherwise
+    /// mean fifteen looping `AVPlayer`s alive at once.
+    var isLive = true
     let url: URL
     let recordedAt: Date?
     var challengeID: UUID?
@@ -124,7 +129,11 @@ struct ClipPreviewView: View {
     @ViewBuilder
     private var videoStage: some View {
         let stage = ZStack {
-            LoopingClipPlayer(url: url, refreshToken: recordedAt)
+            if isLive {
+                LoopingClipPlayer(url: url, refreshToken: recordedAt)
+            } else {
+                Color.black
+            }
             captionLayer
         }
 
