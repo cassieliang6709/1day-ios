@@ -44,6 +44,9 @@ struct ClipPreviewView: View {
     @State private var editingCaption = false
     @FocusState private var captionFocused: Bool
     @State private var showComments = false
+    @State private var showLook = false
+    /// Held down in the look panel: play the clip as it was filmed.
+    @State private var showingOriginal = false
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -52,6 +55,11 @@ struct ClipPreviewView: View {
     /// a setting about you and not about this clip — every clip you look back
     /// at gets the same one, and the film you save gets it too.
     @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
+
+    /// What the player should actually show. Holding the compare chip down puts
+    /// the original back without touching what you've chosen.
+    private var playedLook: GentleLook { showingOriginal ? .none : look }
 
     private var myID: String { account.account?.id ?? "local" }
 
@@ -113,7 +121,13 @@ struct ClipPreviewView: View {
             Color.black.ignoresSafeArea()
             videoStage
             scrim
-            if !editingCaption { chrome }
+            if editingCaption {
+                EmptyView()
+            } else if showLook {
+                lookOverlay
+            } else {
+                chrome
+            }
         }
         .statusBarHidden()
         .sheet(isPresented: $showComments) { commentsSheet }
@@ -135,7 +149,7 @@ struct ClipPreviewView: View {
     private var videoStage: some View {
         let stage = ZStack {
             if isLive {
-                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: look)
+                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: playedLook)
             } else {
                 Color.black
             }
@@ -228,8 +242,27 @@ struct ClipPreviewView: View {
             HStack {
                 IconBubble(systemName: "xmark") { dismiss() }
                 Spacer(minLength: 0)
+                // Up here rather than down with the caption and retake buttons,
+                // because it isn't a thing you do to this clip — it's how you
+                // want to see all of them.
+                IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
+                    withAnimation(OneDay.Motion.soft) { showLook = true }
+                }
             }
         }
+    }
+
+    /// The look panel, over the clip it's changing.
+    private var lookOverlay: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            LookPanel(
+                look: $look, sticky: $lookIsSticky, showingOriginal: $showingOriginal
+            ) {
+                withAnimation(OneDay.Motion.soft) { showLook = false }
+            }
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     /// Where you are in the story.

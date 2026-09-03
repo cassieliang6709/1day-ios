@@ -18,6 +18,21 @@ struct AISetlogApp: App {
         SharedActivityNotificationService.reconcileSubscriptions(for: store.challenges)
         _account = State(initialValue: account)
         _store = State(initialValue: store)
+        Self.settleGentleLook()
+    }
+
+    /// Put the look back to "as shot" unless you asked it to stick.
+    ///
+    /// Done here, before any view reads the key, so nothing gets one frame of
+    /// yesterday's setting on the way to the right one.
+    private static func settleGentleLook() {
+        let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: GentleLook.storageKey)
+            .flatMap(GentleLook.init(rawValue:)) ?? .none
+        let sticky = defaults.bool(forKey: GentleLook.stickyKey)
+        let opening = GentleLook.onLaunch(stored: stored, sticky: sticky)
+        guard opening != stored else { return }
+        defaults.set(opening.rawValue, forKey: GentleLook.storageKey)
     }
 
     var body: some Scene {

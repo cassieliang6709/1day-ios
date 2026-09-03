@@ -1069,8 +1069,9 @@
 
 <div class="card note">
 <h4>成片导出要不要也带上？<span class="pill" style="margin-left:8px">2026-09-02 定了</span></h4>
-<p><b>带上，跟着看的设置走，不额外问。</b>我原来提的是在保存那一步问一句「带上柔光 / 用原样」；定下来的是不问 —— 你在回看里选了柔光，成片就是柔光。少一次点击，代价是发出去的东西被一个看片设置决定了，这一点写在这儿备查。</p>
-<p style="margin:0"><b>导出要多一遍 pass。</b>成片的标题胶囊、字幕、贴纸都是 <code>VideoStitcher</code> 的 <code>animationTool</code>（CoreAnimation 图层），而 <code>AVMutableVideoComposition(asset:applyingCIFiltersWithHandler:)</code> 会自己造一整套 instruction，两者共存不了。直接对整条成片上滤镜也不行 —— 那会把字一起糊掉。所以导出路径是<b>逐条先滤镜、再拼</b>：每条 2 秒，多 n 次短导出，字保持清楚。</p>
+<p><b>带，而且不问。</b>原来写的是「在保存到相册那一步问一句『带上柔光 / 用原样』」。不问了 —— 你在回看里选了柔光，就是已经用看的方式回答过一次了，保存那一步再问一遍是把同一个问题问两次。成片跟着看的设置。</p>
+<p style="margin:8px 0 0;padding-left:10px;border-left:3px solid #f0b429"><b>代价写在这里：</b>想存一份原样的，得先把回看调回「原样」再存。这是这个决定换来的简单。</p>
+<p style="margin:12px 0 0"><b>导出要多一遍 pass。</b>成片的标题胶囊、字幕、贴纸都是 <code>VideoStitcher</code> 的 <code>animationTool</code>（CoreAnimation 图层），而 <code>AVMutableVideoComposition(asset:applyingCIFiltersWithHandler:)</code> 会自己造一整套 instruction，两者共存不了。直接对整条成片上滤镜也不行 —— 那会把字一起糊掉。所以导出路径是<b>逐条先滤镜、再拼</b>：每条 2 秒，多 n 次短导出，字保持清楚。</p>
 </div>
 
 <h2 id="s6"><span class="n">7</span>要新写的共用零件</h2>
@@ -1161,7 +1162,8 @@
 <div class="pr">
   <div class="top"><span class="id">F</span><span class="ti"><code>feat/look-picker</code></span><span class="pill gray">依赖 E</span></div>
   <div class="bd">
-    <p style="margin:0">第 6 节那一页：sheet、四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一个开关。默认全 0。<b>保存到相册不问</b>，跟着这个开关走。</p>
+    <p style="margin:0">第 6 节那一页：四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一份。默认全 0。</p>
+    <p style="margin:8px 0 0;padding-left:10px;border-left:3px solid #f0b429"><b>写的时候改了两处：</b>①<b>不是 sheet，是压在正在播的片子底下的面板</b> —— sheet 会盖住你正要判断的那张脸。②<b>保存到相册不问</b>「带上柔光 / 用原样」，跟着看的设置（见第 6 节那条注）。另外「以后都这样看」用了第二个 key，默认关，关着的话下次开 app 回到原样。</p>
   </div>
 </div>
 
