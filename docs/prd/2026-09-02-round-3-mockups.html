@@ -706,6 +706,12 @@
 <h2 id="s4"><span class="n">5</span>和朋友一起：第二个人往哪放</h2>
 <p class="sub">你问的是「两个逻辑下 UI 怎么长」。我去把共享的数据结构挖了一遍，结论是：<b>不需要第二套布局。</b>上面那三段结构（下一格 / 已经拍下的 / 还剩几格）在共享下原样成立，变的只是每一段里多了「谁」。真正要改的是另一件事 —— 现在的做法把三个人塞进一个格子。</p>
 
+<div class="card warn">
+<h4>2026-09-02：格子那一条否了</h4>
+<p>下面这一节我建议「一格一个人」，<b>定下来的是不改</b>：共享房间的格子还是一格一个瞬间，点开继续看所有人叠在一起拼好的那一条（<code>StitchedMomentPreview</code> 当场用成片的 <code>friendsTogether</code> 布局拼）。</p>
+<p style="margin:0">所以这一节右边那张「提议」图里，<b>格子部分不做</b>；<b>其余部分照做</b> —— 头像 roster、下一格卡片上的「他俩拍了」、格子头像角标、「在等谁」尾行、以及把 <code>pendingMembers</code> 那些 120pt 空卡缩成一行头像。代价说清楚：<b>共享房间点一格没有横滑</b>（单人有，PR D 已经落了），因为一格不是一页。下面 103×47pt 那笔账仍然成立，只是它现在是「拼贴在格子里本来就小」的说明，不是改设计的理由。</p>
+</div>
+
 <div class="card hot">
 <h4>先说数据是什么形状</h4>
 <p>本地的 <code>DayCard</code> 只有一个 <code>clipFileName</code> —— 它只存<b>我</b>的。别人的从 <code>roomSync.remoteClips</code> 来，<code>recordedClips(for:)</code> 把两边合起来，按 <code>(day, authorName)</code> 排序。所以共享房间不是一列，是一张<b>表：题目 × 人</b>。5 个题目 3 个人，最多 15 段。</p>
@@ -793,7 +799,7 @@
   </div>
 
   <div class="unit">
-    <div class="lab"><span class="tag good">提议</span><span>同一个房间</span></div>
+    <div class="lab"><span class="tag good">提议</span><span>同一个房间 · 格子那条已否，其余照做</span></div>
     <div class="frame"><div class="scr">
       <div class="canvas"></div>
       <div class="st"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
@@ -1062,8 +1068,9 @@
 </ul>
 
 <div class="card note">
-<h4>成片导出要不要也带上？</h4>
-<p style="margin:0"><b>要，但要问一次。</b>存进相册的那个文件是要发出去的，滤镜写不写进去是个不该替用户决定的事。所以在 <code>FilmView</code> 的「保存到相册」上加一句：<code>带上柔光</code> / <code>用原样</code>。默认跟着你在回看里选的。</p>
+<h4>成片导出要不要也带上？<span class="pill" style="margin-left:8px">2026-09-02 定了</span></h4>
+<p><b>带上，跟着看的设置走，不额外问。</b>我原来提的是在保存那一步问一句「带上柔光 / 用原样」；定下来的是不问 —— 你在回看里选了柔光，成片就是柔光。少一次点击，代价是发出去的东西被一个看片设置决定了，这一点写在这儿备查。</p>
+<p style="margin:0"><b>导出要多一遍 pass。</b>成片的标题胶囊、字幕、贴纸都是 <code>VideoStitcher</code> 的 <code>animationTool</code>（CoreAnimation 图层），而 <code>AVMutableVideoComposition(asset:applyingCIFiltersWithHandler:)</code> 会自己造一整套 instruction，两者共存不了。直接对整条成片上滤镜也不行 —— 那会把字一起糊掉。所以导出路径是<b>逐条先滤镜、再拼</b>：每条 2 秒，多 n 次短导出，字保持清楚。</p>
 </div>
 
 <h2 id="s6"><span class="n">7</span>要新写的共用零件</h2>
@@ -1142,7 +1149,11 @@
 <div class="pr">
   <div class="top"><span class="id">E</span><span class="ti"><code>feat/gentle-look</code></span><span class="pill">滤镜逻辑 + 接线</span></div>
   <div class="bd">
-    <p>路线 2。<code>Presentation/GentleLook.swift</code>（值类型 + 四个预设 + <code>CIFilter</code> 链）+ 单测，然后接两处：<code>LoopingClipPlayer</code> 的 <code>AVPlayerItem.videoComposition</code>、<code>VideoStitcher</code> 的 <code>AVMutableVideoComposition</code>。</p>
+    <p>路线 2。<code>Presentation/GentleLook.swift</code>（值类型 + 四个预设 + 参数映射，纯的、可测）+ 单测，滤镜链本身放 <code>Services/Media/</code>，然后接两处：</p>
+    <ul style="margin:0 0 10px">
+      <li><b>播放</b>：<code>AVPlayerItem.videoComposition = AVMutableVideoComposition(asset:applyingCIFiltersWithHandler:)</code>。播放器上没有叠加图层（字幕是 SwiftUI 画在上面的），所以直接接。</li>
+      <li><b>导出</b>：<b>逐条先滤镜、再拼</b>。不能像我上一轮写的那样「接 <code>VideoStitcher</code> 的 <code>AVMutableVideoComposition</code>」—— 那条 composition 有手写的 instruction（转场、多人网格）和 <code>animationTool</code>（标题胶囊、字幕、贴纸），而 <code>applyingCIFiltersWithHandler</code> 会自己造一整套 instruction，两者共存不了。对整条成片上滤镜也不行，那会把字糊掉。每条 2 秒，多 n 次短导出，字保持清楚。</li>
+    </ul>
     <p style="margin:0"><b>不含任何 UI</b> —— 这个 PR 合完，滤镜能用但没有地方能打开它，值恒为 <code>.none</code>，行为跟现在一模一样。这是故意的：滤镜链正确性和界面是两件事，分开验。</p>
   </div>
 </div>
@@ -1150,7 +1161,7 @@
 <div class="pr">
   <div class="top"><span class="id">F</span><span class="ti"><code>feat/look-picker</code></span><span class="pill gray">依赖 E</span></div>
   <div class="bd">
-    <p style="margin:0">第 6 节那一页：sheet、四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一个开关、以及 <code>FilmView</code> 保存到相册时的「带上柔光 / 用原样」。默认全 0。</p>
+    <p style="margin:0">第 6 节那一页：sheet、四个预设、三个滑杆、按住看原样、「以后都这样看」开关（<code>@AppStorage</code>）、Settings 里的同一个开关。默认全 0。<b>保存到相册不问</b>，跟着这个开关走。</p>
   </div>
 </div>
 
@@ -1163,10 +1174,11 @@
 </div>
 
 <div class="pr">
-  <div class="top"><span class="id">H</span><span class="ti"><code>feat/one-tile-one-person</code></span><span class="pill hot">共享逻辑</span></div>
+  <div class="top"><span class="id">H</span><span class="ti"><code>feat/room-says-who</code></span><span class="pill hot">共享逻辑</span></div>
   <div class="bd">
-    <p>第 5 节。<code>StoryGridCell</code> 从「一个格子塞 N 个人的拼贴」改成「一个格子 = 一个人的一段」，顺手拆掉那三个重叠的命中区（虚线边 + 居中相机泡 + 右上播放角标）。加 <code>RoomRoster</code>、「他俩拍了」、格子头像角标、「在等谁」。<code>StoryTimelineView</code> 的 <code>pendingMembers</code> 从三张 120pt 空卡缩成一行头像。</p>
-    <p style="margin:0">放最后，因为它依赖 G 定下来的三段结构 —— 反过来做我会在旧结构上改共享，然后 G 再把它拆一遍。</p>
+    <p style="margin:0 0 10px;padding:9px 12px;border-left:4px solid var(--amber);border-radius:0 10px 10px 0;background:linear-gradient(90deg,rgba(255,233,214,.6),rgba(255,255,255,.5) 70px)"><b>2026-09-02 改了范围：格子保持「一格一个瞬间」。</b>我原来提的是把 <code>StoryGridCell</code> 改成一格一个人；定下来的是不改 —— 共享房间点开一格，继续看所有人叠在一起拼好的那一条（<code>StitchedMomentPreview</code> 留着）。代价：<b>共享房间没有横滑</b>，单人有。</p>
+    <p>所以 H 只做外围，第 5 节里除格子语义之外的部分：加 <code>RoomRoster</code>、下一格卡片上的「他俩拍了」、格子头像角标、「在等谁」那句尾行。<code>StoryTimelineView</code> 的 <code>pendingMembers</code> 从三张 120pt 空卡缩成一行头像。</p>
+    <p style="margin:0">那三个重叠的命中区（虚线边 + 居中相机泡 + 右上播放角标）归 G —— 它们在单人故事里也一样重叠，不是共享才有的问题。放最后不变，因为要在 G 定下来的三段结构上贴。</p>
   </div>
 </div>
 
