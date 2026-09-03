@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// The other way to look at a story: a dense 3-column contact sheet.
+/// The story so far: a dense 3-column contact sheet of the moments that exist.
 ///
-/// The timeline answers "how did the day go"; the grid answers "what have I
-/// got". A whole story fits on one screen, which is the right shape when
-/// you're checking what's left rather than reading the day back.
+/// It used to hold every slot, filmed or not, at the same size and weight —
+/// which made "what's left" and "what happened" the same picture. Empty slots
+/// have moved out to the next-up card and the quiet list, so this sheet is
+/// only ever a record of the day.
 
 /// Which layout the story is being read in. Persisted, so the choice sticks
 /// across stories and launches.
@@ -75,41 +76,23 @@ struct StoryGridView: View {
     let clips: [DayClip]
     let members: [(id: String, name: String)]
     let myID: String
-    let onTapFilmed: (Int, String?) -> Void
-    let onTapEmpty: (Int) -> Void
+    /// Which slots to show, in day order. The page passes `StoryAgenda.filmed`
+    /// — the sheet doesn't decide what counts as filmed.
+    let slots: [Int]
+    let onTap: (Int) -> Void
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
-    private var nextSlot: Int? { challenge.cards.first { $0.clipFileName == nil }?.day }
 
     var body: some View {
         LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
             spacing: 8
         ) {
-            ForEach(challenge.cards) { card in
-                cell(for: card)
+            ForEach(slots, id: \.self) { slot in
+                cell(for: slot)
             }
         }
-        .padding(.horizontal, 20)
-    }
-
-    /// What tapping a tile should do.
-    ///
-    /// The grid used to open the viewer whenever *anyone* had filmed the slot,
-    /// so a moment a friend had already filmed became unreachable — there was
-    /// no way left to add your own take. The timeline never had that problem
-    /// because it asks "have *I* filmed this", and so does this.
-    enum Tap: Equatable {
-        case preview(authorID: String?)
-        case record
-    }
-
-    static func tap(slotClips: [DayClip], myID: String) -> Tap {
-        if let mine = mineAmong(slotClips, myID: myID) {
-            return .preview(authorID: mine.authorID)
-        }
-        return .record
     }
 
     static func mineAmong(_ slotClips: [DayClip], myID: String) -> DayClip? {
@@ -157,256 +140,26 @@ struct StoryGridView: View {
         }
     }
 
+    /// One filmed moment. Exactly one tap region, and it means "play this" —
+    /// the tile it replaces had three stacked on top of each other.
     @ViewBuilder
-    private func cell(for card: DayCard) -> some View {
-        let slotClips = clips.filter { $0.day == card.day }
+    private func cell(for slot: Int) -> some View {
+        let slotClips = clips.filter { $0.day == slot }
         let mine = Self.mineAmong(slotClips, myID: myID)
-        let awaitingMine = mine == nil && !slotClips.isEmpty
         let lanes = Self.lanes(slotClips: slotClips, members: members, myID: myID)
+        let shown = mine ?? slotClips.first
 
-        StoryGridCell(
-            momentTitle: presenter.title(forSlot: card.day),
-            momentIcon: MomentCatalog.icon(for: challenge.momentValue(forSlot: card.day)),
+        ClipThumb(
+            momentTitle: challenge.isTimeOnly
+                ? Strings.lockedSlot(oneDay: challenge.isOneDay, day: slot)
+                : presenter.title(forSlot: slot),
             lanes: lanes,
-            timeStamp: schedule.railLabel(
-                forSlot: card.day, recordedAt: (mine ?? slotClips.first)?.recordedAt),
-            reactions: (mine ?? slotClips.first)?.emoji ?? [],
-            isNext: card.day == nextSlot,
-            awaitingMine: awaitingMine,
-            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72,
-            onPreview: awaitingMine
-                ? { onTapFilmed(card.day, slotClips.first?.authorID) }
-                : nil
+            timeStamp: schedule.railLabel(forSlot: slot, recordedAt: shown?.recordedAt),
+            reaction: shown?.emoji.first,
+            awaitingMine: mine == nil && !slotClips.isEmpty,
+            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72
         ) {
-            switch Self.tap(slotClips: slotClips, myID: myID) {
-            case .preview(let authorID): onTapFilmed(card.day, authorID)
-            case .record: onTapEmpty(card.day)
-            }
-        }
-    }
-}
-
-/// One tile. Built as a fixed `Color.clear` box with edge-pinned overlays:
-/// overlays never resize their base, so nothing can push past the tile's clip
-/// frame the way a filling VStack does.
-struct StoryGridCell: View {
-    let momentTitle: String
-    let momentIcon: String
-    /// Everyone sharing this moment, in stacking order. Empty means nobody has
-    /// filmed it — the tile falls back to its plain empty state.
-    var lanes: [MomentLane] = []
-    var timeStamp: String?
-    var reactions: [String] = []
-    var isNext = false
-    /// A friend filmed this moment and I haven't — the tile shows their take
-    /// but is still an invitation to film mine.
-    var awaitingMine = false
-    var aspectRatio: CGFloat = 0.72
-    var onPreview: (() -> Void)?
-    let onTap: () -> Void
-
-    private let radius: CGFloat = 16
-
-    private var isFilled: Bool { lanes.contains { $0.clip != nil } }
-
-    /// Same row/column split the finished film uses, so the tile is a real
-    /// preview of the moment rather than a lookalike.
-    private var grid: (rows: Int, columns: Int) {
-        VideoStitcher.grid(for: lanes.count, in: CGSize(width: 100, height: 140))
-    }
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Button(action: onTap) {
-                tile
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(Text(awaitingMine ? Strings.record : Strings.previewSharedFilm(lanes.count)))
-
-            if isFilled, let onPreview {
-                Button(action: onPreview) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(Strings.previewSharedFilm(lanes.count)))
-            }
-        }
-        .animation(OneDay.Motion.soft, value: lanes.map(\.id).joined())
-    }
-
-    private var tile: some View {
-        Color.clear
-            .aspectRatio(aspectRatio, contentMode: .fit)
-            .overlay { background.clipped() }
-            .overlay { captureIndicator }
-            .overlay(alignment: .topLeading) { topLeading }
-            .overlay(alignment: .topTrailing) { topTrailing }
-            .overlay(alignment: .bottom) { caption }
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay { border }
-            .oneDaySoftShadow(strength: isFilled ? 0.7 : 0.35)
-            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-    }
-
-    @ViewBuilder
-    private var background: some View {
-        if isFilled {
-            let split = grid
-            VStack(spacing: 1) {
-                ForEach(Array(StoryGridView.rows(of: lanes, columns: split.columns).enumerated()),
-                        id: \.offset) { _, row in
-                    HStack(spacing: 1) {
-                        ForEach(row) { lane in laneView(lane) }
-                    }
-                }
-            }
-        } else {
-            // The next moment has to carry roughly the weight of a filled tile.
-            // At 7% tint it was the faintest thing in a grid whose other cells
-            // hold photographs, so the one cell asking you to do something was
-            // the easiest one to miss.
-            (isNext ? Color.oneDayBlue.opacity(0.16) : OneDay.surfaceSoft.opacity(0.4))
-                .overlay {
-                    VStack(spacing: 6) {
-                        Image(systemName: momentIcon)
-                            .font(.system(size: 21, weight: .medium))
-                            .foregroundStyle(isNext ? Color.oneDayBlue : Color.oneDaySky)
-                            .symbolEffect(.pulse, isActive: isNext)
-                        Text(momentTitle)
-                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(isNext ? OneDay.ink : OneDay.inkSoft)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.75)
-                            .padding(.horizontal, 8)
-                        if isNext {
-                            Text(Strings.tapToFilm)
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.oneDayBlue)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                    }
-                }
-        }
-    }
-
-    /// One person's band: their frame, or the place kept for it.
-    @ViewBuilder
-    private func laneView(_ lane: MomentLane) -> some View {
-        if let clip = lane.clip {
-            ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-        } else {
-            // Mine reads as an invitation; a friend's reads as waiting.
-            (lane.isMine ? Color.oneDayBlue.opacity(0.12) : OneDay.surfaceSoft.opacity(0.55))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay {
-                    if lane.isMine {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.oneDayBlue)
-                    } else {
-                        AvatarDot(name: lane.authorName, size: 22, isPending: true)
-                    }
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var topLeading: some View {
-        if let timeStamp {
-            Text(timeStamp)
-                .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(6)
-        }
-    }
-
-    @ViewBuilder
-    private var topTrailing: some View {
-        if isFilled, !awaitingMine {
-            Image(systemName: "play.circle.fill")
-                .font(.system(size: 17))
-                .foregroundStyle(.white.opacity(0.92))
-                .shadow(radius: 3)
-                .padding(6)
-        }
-    }
-
-    @ViewBuilder
-    private var captureIndicator: some View {
-        if awaitingMine {
-            Image(systemName: "camera.fill")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color.oneDayBlue)
-                .frame(width: 34, height: 34)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.45), lineWidth: 1))
-                .shadow(color: .black.opacity(0.16), radius: 5, y: 2)
-                .accessibilityHidden(true)
-        }
-    }
-
-    /// Only filmed tiles get a caption bar — an empty tile already shows its
-    /// moment name in the centre, and two labels in one tile is noise.
-    @ViewBuilder
-    private var caption: some View {
-        if isFilled {
-            HStack(spacing: 4) {
-                Text(momentTitle)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Spacer(minLength: 0)
-                if let first = reactions.first {
-                    Text(first).font(.system(size: 10))
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 14)
-            .padding(.bottom, 7)
-            .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.62)],
-                    startPoint: .top, endPoint: .bottom))
-        }
-    }
-
-    @ViewBuilder
-    private var border: some View {
-        if isNext, !isFilled {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(OneDay.brand, lineWidth: 2)
-        } else if awaitingMine {
-            // A friend's take is in there but mine isn't — the dashed edge says
-            // the tile is still open to me.
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(
-                    Color.oneDayBlue.opacity(0.65),
-                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-        } else if !isFilled {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(
-                    Color.oneDaySky.opacity(0.5),
-                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-        } else {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(OneDay.hairline, lineWidth: 1)
+            onTap(slot)
         }
     }
 }
