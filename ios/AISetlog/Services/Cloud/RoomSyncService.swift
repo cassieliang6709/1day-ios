@@ -7,7 +7,11 @@ import Observation
 @Observable
 final class RoomSyncService {
     /// Clips fetched per room code (all members). Transient cache.
-    private(set) var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
+    ///
+    /// Settable, like the two caches below it: the merge rules that read this
+    /// live in `ChallengeStore`, and standing a room's contents up is the only
+    /// way to check them without CloudKit on the line.
+    var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
     /// Reactions fetched per room code.
     var remoteReactions: [String: [CloudKitService.RemoteReaction]] = [:]
     /// Comments fetched per room code.

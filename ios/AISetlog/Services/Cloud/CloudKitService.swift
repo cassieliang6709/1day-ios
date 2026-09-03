@@ -75,39 +75,6 @@ enum CloudKitService {
 
     // MARK: - Rooms
 
-    /// Unambiguous alphabet (no O/0/I/1) for a friendly, dictatable code.
-    private static let codeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
-
-    private static func makeCode() -> String {
-        String((0..<6).map { _ in codeAlphabet.randomElement()! })
-    }
-
-    /// Pull a join code out of arbitrary pasted text. The share blurb is a
-    /// whole sentence with the code mid-string and a deep link at the end, so
-    /// "first six alphanumerics" used to yield `1DAY` from the product name.
-    /// Trust the deep link first, then any standalone run of exactly six
-    /// characters from the code alphabet.
-    static func extractCode(from text: String) -> String? {
-        let allowed = Set(codeAlphabet)
-        let upper = text.uppercased()
-
-        if let marker = upper.range(of: "CODE=") {
-            let candidate = String(upper[marker.upperBound...].prefix(6))
-            if candidate.count == 6, candidate.allSatisfy(allowed.contains) { return candidate }
-        }
-
-        var run = ""
-        for character in upper + " " {
-            if allowed.contains(character) {
-                run.append(character)
-            } else {
-                if run.count == 6 { return run }
-                run = ""
-            }
-        }
-        return nil
-    }
-
     struct RemoteRoom {
         let code: String
         let title: String
@@ -134,7 +101,7 @@ enum CloudKitService {
         try await ensureAccountAvailable()
         // Retry on the astronomically unlikely code collision.
         for _ in 0..<5 {
-            let code = makeCode()
+            let code = InviteCode.make()
             let record = CKRecord(recordType: "Room", recordID: .init(recordName: code))
             record["title"] = title as CKRecordValue
             record["startDate"] = Date.now as CKRecordValue
@@ -193,7 +160,11 @@ enum CloudKitService {
         let overlayText: String?
     }
 
-    private static func clipRecordName(code: String, authorID: String, day: Int) -> String {
+    /// Internal rather than private so the naming rule can be checked without a
+    /// network: "writing this again is harmless" is only true while the same
+    /// clip keeps deriving the same name, and that is a property of this
+    /// string, not of CloudKit.
+    static func clipRecordName(code: String, authorID: String, day: Int) -> String {
         "\(code)_\(authorID)_day\(day)"
     }
 
@@ -290,7 +261,8 @@ enum CloudKitService {
 
     /// Deterministic name so re-adding the same emoji is idempotent and a
     /// toggle-off deletes exactly the same record — never a read-modify-write.
-    private static func reactionRecordName(code: String, targetAuthorID: String, authorID: String, day: Int, emoji: String) -> String {
+    /// Internal for the same reason as ``clipRecordName(code:authorID:day:)``.
+    static func reactionRecordName(code: String, targetAuthorID: String, authorID: String, day: Int, emoji: String) -> String {
         "\(code)_\(targetAuthorID)_day\(day)_\(authorID)_\(emoji.unicodeScalars.map { String($0.value) }.joined(separator: "-"))"
     }
 
