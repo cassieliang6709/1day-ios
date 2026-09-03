@@ -1113,9 +1113,6 @@ enum Strings {
     /// all-caps section headers and wrap awkwardly inside an `OptionRow`.
     static var clipLengthRow: String { lang == .chinese ? "片段时长" : "Clip length" }
     static var orientationRow: String { lang == .chinese ? "画面方向" : "Frame" }
-    static func waitingForMoment(_ name: String) -> String {
-        lang == .chinese ? "等 \(name) 的瞬间…" : "Waiting for \(name)'s moment…"
-    }
     static var inviteLabel: String { lang == .chinese ? "邀请" : "Invite" }
     static var stitchingMoment: String {
         lang == .chinese ? "正在拼接这个瞬间…" : "Stitching this moment…"
@@ -1168,6 +1165,64 @@ enum Strings {
     }
     static var retrySync: String { lang == .chinese ? "重新同步" : "Retry sync" }
     static var moreLabel: String { lang == .chinese ? "更多" : "More" }
+
+    // MARK: Shared room
+
+    /// The roster's caption. A room of one is worth saying out loud — an
+    /// invite code nobody used looks exactly like a room full of friends until
+    /// somebody counts the faces.
+    static func peopleInRoom(_ count: Int) -> String {
+        guard count > 1 else {
+            return lang == .chinese ? "只有你在这个房间" : "Just you in this room"
+        }
+        return lang == .chinese ? "\(count) 人在这个房间" : "\(count) people in this room"
+    }
+
+    /// Whether anyone else showed up. Four sentences rather than a count,
+    /// because "2 filmed" answers none of the four things a room is actually
+    /// being asked: who's here, whether they've filmed, whether I have, and
+    /// whether the day is waiting on me.
+    ///
+    /// - Parameters:
+    ///   - overflow: people the line ran out of room to name.
+    ///   - mineToo: I have filmed something as well.
+    static func roomWhoFilmed(_ names: [String], overflow: Int, mineToo: Bool) -> String {
+        guard !names.isEmpty || overflow > 0 else {
+            return mineToo
+                ? (lang == .chinese ? "只有你拍了" : "You're the only one so far")
+                : (lang == .chinese ? "还没有人拍" : "Nobody has filmed yet")
+        }
+        let who = nameList(names, overflow: overflow)
+        if mineToo {
+            return lang == .chinese ? "你和\(who)拍了" : "You and \(who) have filmed"
+        }
+        return lang == .chinese ? "\(who)拍了，就差你" : "\(who) filmed — just you left"
+    }
+
+    /// Who the room is waiting on. One line about people, never a row per
+    /// moment: which moment they film is theirs to pick.
+    static func roomWaitingOn(_ names: [String], overflow: Int) -> String {
+        let who = nameList(names, overflow: overflow)
+        return lang == .chinese ? "在等 \(who)" : "Waiting on \(who)"
+    }
+
+    /// Joins names the way each language does — Chinese enumerates with "、"
+    /// and closes with "和", English with commas and "and". A capped list ends
+    /// in a count rather than a name so one long name can't push the line off
+    /// a 375pt screen.
+    private static func nameList(_ names: [String], overflow: Int) -> String {
+        var parts = names
+        if overflow > 0 {
+            parts.append(
+                lang == .chinese
+                    ? "另外 \(overflow) 人"
+                    : (overflow == 1 ? "1 other" : "\(overflow) others"))
+        }
+        guard parts.count > 1 else { return parts.first ?? "" }
+        let last = parts.removeLast()
+        let head = parts.joined(separator: lang == .chinese ? "、" : ", ")
+        return lang == .chinese ? "\(head)和\(last)" : "\(head) and \(last)"
+    }
 
     // MARK: Generating
 

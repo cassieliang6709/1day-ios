@@ -155,6 +155,10 @@ struct StoryGridView: View {
                 : presenter.title(forSlot: slot),
             lanes: lanes,
             timeStamp: schedule.railLabel(forSlot: slot, recordedAt: shown?.recordedAt),
+            // Only in a room. A tile stands for the whole moment with everyone
+            // stacked in it, so the badge is everyone in it — and in a solo
+            // story it would be my own name on every clip I own.
+            authorNames: challenge.isShared ? lanes.compactMap(\.authorName) : [],
             reaction: shown?.emoji.first,
             awaitingMine: mine == nil && !slotClips.isEmpty,
             aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72

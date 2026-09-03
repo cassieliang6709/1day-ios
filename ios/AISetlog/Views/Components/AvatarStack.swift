@@ -81,11 +81,19 @@ struct AvatarStack: View {
     var size: CGFloat = 30
     /// Names still waiting to contribute — drawn hollow.
     var pending: Set<String> = []
+    /// Which of these names is mine, so a roster can ring my own face. Nil
+    /// where the stack is a list of other people and pointing at one of them
+    /// would be pointing at nobody.
+    var you: String?
 
     var body: some View {
         HStack(spacing: -size * 0.3) {
             ForEach(Array(names.prefix(maxShown).enumerated()), id: \.offset) { _, name in
-                AvatarDot(name: name, size: size, isPending: pending.contains(name))
+                AvatarDot(
+                    name: name,
+                    size: size,
+                    isPending: pending.contains(name),
+                    isYou: name == you)
             }
             if names.count > maxShown {
                 AvatarOverflowDot(count: names.count - maxShown, size: size)
