@@ -71,6 +71,10 @@ enum VideoStitcher {
         /// nil keeps the film in the shape of its first clip — the behaviour
         /// from before aspect became a choice.
         var aspect: Aspect?
+        /// How soft you want to look, same value the review screen plays with.
+        /// Costs an extra pass over every clip when it isn't `.none` — see
+        /// `filteredClips`.
+        var look: GentleLook = .none
         static let `default` = Options()
     }
 
@@ -138,9 +142,13 @@ enum VideoStitcher {
         let titleCard = options.titleCard
         #endif
 
+        // ---- The look, one clip at a time, before anything is stitched ------
+        let (source, scratch) = try await filteredClips(clips, look: options.look)
+        defer { discard(scratch) }
+
         // ---- Load track info for every clip --------------------------------
         var loaded: [LoadedClip] = []
-        for clip in clips {
+        for clip in source {
             let asset = AVURLAsset(url: clip.url)
             guard let video = try await asset.loadTracks(withMediaType: .video).first else { continue }
             // Use each track's own timeRange, NOT the container duration —
@@ -265,6 +273,47 @@ enum VideoStitcher {
             throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
         }
         return outURL
+    }
+
+    // MARK: - The look pass
+
+    /// Filtered copies of every clip, plus the files to delete afterwards.
+    ///
+    /// The look can't ride along on the film's own composition: that one has
+    /// hand-written instructions for the crossfades and the grid, and an
+    /// `animationTool` holding the title card, the captions and the stickers,
+    /// while a Core Image composition builds an instruction set of its own —
+    /// one asset gets one. Applying the look to the finished film instead would
+    /// blur the words along with the faces. So each clip is softened on its own
+    /// first, and the stitcher never learns that anything happened.
+    ///
+    /// A clip is two seconds. Even fifteen of them is a short wait, and it only
+    /// happens when the look is on.
+    private static func filteredClips(
+        _ clips: [DayClip], look: GentleLook
+    ) async throws -> (clips: [DayClip], scratch: [URL]) {
+        guard !look.isIdentity else { return (clips, []) }
+
+        var out: [DayClip] = []
+        var scratch: [URL] = []
+        for clip in clips {
+            do {
+                let filtered = try await GentleLookFilter.filteredCopy(of: clip.url, look: look)
+                guard filtered != clip.url else { out.append(clip); continue }
+                scratch.append(filtered)
+                out.append(clip.replacingURL(filtered))
+            } catch {
+                // One clip the look couldn't handle is not a reason to lose the
+                // whole film. It goes in as the camera saw it.
+                print("[stitch] look pass failed for day \(clip.day): \(error)")
+                out.append(clip)
+            }
+        }
+        return (out, scratch)
+    }
+
+    private static func discard(_ urls: [URL]) {
+        for url in urls { try? FileManager.default.removeItem(at: url) }
     }
 
     // MARK: - Sequential layout (crossfades)
