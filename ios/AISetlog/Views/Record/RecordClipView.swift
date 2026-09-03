@@ -13,21 +13,29 @@ struct RecordClipView: View {
     let day: Int
     var slotTitle: String?
     var clipLength: Challenge.ClipLength = .tiny
+    var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
     /// clip is filed into a chosen plan instead of a fixed day slot.
     var isFreeform = false
     /// The challenge's locked frame. Free-form mode ignores this and uses its
     /// own toggleable orientation instead.
     var orientation: Challenge.Orientation = .portrait
+    /// Free-form only: lets the shell block a tab switch that would throw an
+    /// unfiled clip away.
+    var unfiledGuard: UnfiledClipGuard?
+    /// Free-form only: "there's nowhere to file this yet — make somewhere".
+    var onStartStory: (() -> Void)?
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
+    @Environment(ClipDraftStore.self) private var drafts
     @Environment(AccountStore.self) private var account
     @State private var recorder = ClipRecorder()
     @State private var ringProgress: CGFloat = 0
     @State private var overlayText = ""
     @State private var showSavePicker = false
+    @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
     @State private var showNotificationPrimer = false
@@ -119,6 +127,12 @@ struct RecordClipView: View {
                 withAnimation(.linear(duration: clipSeconds)) { ringProgress = 1 }
             }
         }
+        .onChange(of: recorder.clipURL) { _, url in
+            guard isFreeform, let unfiledGuard else { return }
+            unfiledGuard.hasUnfiledClip = url != nil
+            unfiledGuard.keep = { keepAsDraft() }
+            unfiledGuard.discard = { clearReview() }
+        }
     }
 
 
@@ -136,6 +150,7 @@ struct RecordClipView: View {
                 timestamp: recorder.recordedAt,
                 overlayText: nil,
                 clipSeconds: clipSeconds,
+                showsPrompt: showsPrompt,
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
@@ -149,19 +164,39 @@ struct RecordClipView: View {
         .padding(.bottom, bottomInset)
     }
 
-    private var recordButton: some View {
+    private var recordButtonVisual: some View {
+        ZStack {
+            Circle()
+                .stroke(.white.opacity(0.55), lineWidth: 4)
+                .frame(width: 66, height: 66)
+            Circle()
+                .fill(myTint)
+                .frame(width: 50, height: 50)
+        }
+    }
+
+    /// The whole control surface starts recording. The centered layout makes
+    /// the primary camera action obvious and gives it a forgiving tap target.
+    private var idleRecordingControl: some View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            ZStack {
-                Circle()
-                    .stroke(.white.opacity(0.35), lineWidth: 4)
-                    .frame(width: 68, height: 68)
-                Circle()
-                    .fill(myTint)
-                    .frame(width: 52, height: 52)
+            VStack(spacing: 5) {
+                recordButtonVisual
+                Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
             }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.captureState(
+            recording: false,
+            secondsLabel: clipSecondsText
+        ))
     }
 
     /// While recording: a compact countdown row that leaves the camera frame
@@ -218,6 +253,7 @@ struct RecordClipView: View {
                 timestamp: recorder.recordedAt,
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
+                showsPrompt: showsPrompt,
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 ZStack {
@@ -232,11 +268,11 @@ struct RecordClipView: View {
             HStack(spacing: 10) {
                 Button {
                     if isFreeform {
-                        let matches = filingCandidates
-                        if store.challenges.isEmpty {
-                            showToast(Strings.makePlanFirst)
-                        } else if matches.isEmpty {
-                            showToast(Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape))
+                        // Both dead ends used to end at a toast, which left
+                        // retake-or-leave as the only moves — and leaving meant
+                        // losing the clip. Now they end at a choice instead.
+                        if filingCandidates.isEmpty {
+                            showNoPlaceExits = true
                         } else {
                             showSavePicker = true
                         }
@@ -283,19 +319,43 @@ struct RecordClipView: View {
                 }
             }
         }
+        .confirmationDialog(
+            Strings.noPlaceYet,
+            isPresented: $showNoPlaceExits,
+            titleVisibility: .visible
+        ) {
+            Button(Strings.saveAsDraft) { keepAsDraft() }
+            // Keep the clip first: walking to the composer unmounts this screen,
+            // which is precisely how clips used to disappear.
+            Button(Strings.createStoryNow) { keepAsDraft(then: onStartStory) }
+        } message: {
+            Text(noPlaceMessage)
+        }
+    }
+
+    /// Why there's nowhere to file it — no stories at all, or none in this frame.
+    private var noPlaceMessage: String {
+        store.challenges.isEmpty
+            ? Strings.makePlanFirst
+            : Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape)
     }
 
     // MARK: - Free-form filing
 
-    /// Only plans matching the recorded frame can take this clip — a
-    /// challenge never mixes portrait and landscape.
     private var filingCandidates: [Challenge] {
-        store.challenges.filter { $0.resolvedOrientation == effectiveOrientation }
+        ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
     }
 
     /// Free-form: file the clip into a chosen plan's first open slot.
     private func file(_ url: URL, to challenge: Challenge) {
-        store.saveClip(from: url, day: targetDay(for: challenge), challengeID: challenge.id, overlayText: trimmedOverlayText)
+        // Unreachable through the sheet, which only lists stories with room in
+        // them — but filing into a full story used to mean overwriting a clip,
+        // so this refuses rather than trusting the caller.
+        guard let day = ClipFiling.targetDay(in: challenge) else {
+            showToast(Strings.storyIsFull)
+            return
+        }
+        store.saveClip(from: url, day: day, challengeID: challenge.id, overlayText: trimmedOverlayText)
         recorder.retake()
         ringProgress = 0
         overlayText = ""
@@ -303,11 +363,30 @@ struct RecordClipView: View {
         offerNotificationPrimer(dismissWhenFinished: false)
     }
 
-    private func targetDay(for challenge: Challenge) -> Int {
-        if let open = challenge.cards.first(where: { $0.clipFileName == nil })?.day {
-            return open
+    /// Copy the clip somewhere permanent so it survives leaving this screen.
+    ///
+    /// On failure this deliberately does **not** retake: the temp file is still
+    /// the only copy, so clearing the review would finish the job the bug used
+    /// to do. Staying put leaves a retry available.
+    private func keepAsDraft(then next: (() -> Void)? = nil) {
+        guard let url = recorder.clipURL else { return }
+        do {
+            try drafts.keep(
+                tempURL: url,
+                orientation: effectiveOrientation,
+                overlayText: trimmedOverlayText)
+            clearReview()
+            showToast(Strings.draftKept)
+            next?()
+        } catch {
+            showToast(Strings.draftSaveFailed)
         }
-        return min(max(challenge.currentDay, 1), challenge.cards.count)
+    }
+
+    private func clearReview() {
+        recorder.retake()
+        ringProgress = 0
+        overlayText = ""
     }
 
     private func showToast(_ text: String) {
@@ -354,8 +433,15 @@ struct RecordClipView: View {
                         seconds: clipSeconds,
                         orientation: effectiveOrientation)
                     else { return }
-                    onSave(demo, trimmedOverlayText)
-                    offerNotificationPrimer(dismissWhenFinished: true)
+                    // Free-form has no `onSave` — its clips are filed from the
+                    // review screen — so hand the demo to the recorder and let
+                    // it walk the same path a real take does.
+                    if isFreeform {
+                        recorder.acceptDemoClip(demo)
+                    } else {
+                        onSave(demo, trimmedOverlayText)
+                        offerNotificationPrimer(dismissWhenFinished: true)
+                    }
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -449,15 +535,7 @@ struct RecordClipView: View {
             if recorder.state == .recording {
                 recordingControls
             } else {
-                HStack(spacing: 14) {
-                    recordButton
-                    Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.76)
-                    Spacer(minLength: 0)
-                }
+                idleRecordingControl
             }
         }
         .frame(maxWidth: .infinity)

@@ -6,7 +6,10 @@ struct TimelineHeader: View {
     let challenge: Challenge
     let memberNames: [String]
     let myName: String?
+    /// Everyone's, not just mine. See `RoomProgress`.
+    let progress: RoomProgress
     @Binding var viewMode: StoryViewMode
+    var showsViewModeToggle = true
     var isSyncing = false
     var syncError: String?
 
@@ -120,20 +123,35 @@ struct TimelineHeader: View {
         HStack(spacing: 8) {
             OneDayChip(
                 icon: "circle.grid.2x2.fill",
-                text: "\(challenge.recordedCount)/\(challenge.cards.count)")
+                text: "\(progress.filled)/\(progress.total)")
+
+            // Only where it adds something. In a solo story it would repeat
+            // the chip beside it, and in a room where I'm the only one who has
+            // filmed anything it would too.
+            if challenge.isShared, progress.hasOthers {
+                OneDayChip(
+                    icon: "person.fill",
+                    text: Strings.yourTakes(progress.mine),
+                    tint: .oneDaySky)
+            }
 
             OneDayChip(
                 icon: "clock",
                 text: challenge.resolvedClipLength.secondsLabel,
                 tint: .oneDayLavender)
 
-            if challenge.recordedCount > 0 {
-                OneDayChip(icon: "film", text: schedule.filmDuration, tint: .oneDayMint)
+            if progress.filled > 0 {
+                OneDayChip(
+                    icon: "film",
+                    text: schedule.filmDuration(clipCount: progress.clipCount),
+                    tint: .oneDayMint)
             }
 
             Spacer(minLength: 8)
 
-            ViewModeToggle(mode: $viewMode)
+            if showsViewModeToggle {
+                ViewModeToggle(mode: $viewMode)
+            }
         }
     }
 }

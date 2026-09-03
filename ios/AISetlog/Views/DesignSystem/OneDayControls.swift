@@ -13,15 +13,38 @@ struct PrimaryActionStyle: ButtonStyle {
     var glow: Color = .oneDayBlue
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 17, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 17)
-            .background(tint, in: Capsule())
-            .oneDayGlow(glow, strength: configuration.isPressed ? 0.5 : 1)
-            .scaleEffect(configuration.isPressed ? 0.975 : 1)
-            .animation(OneDay.Motion.snap, value: configuration.isPressed)
+        Surface(configuration: configuration, tint: tint, glow: glow)
+    }
+
+    /// A nested view rather than a plain modifier chain: `isEnabled` lives in
+    /// the environment, and a `ButtonStyle` can't read it directly. Without
+    /// this a disabled button looks exactly like a live one, which is a button
+    /// telling the user something untrue about itself.
+    private struct Surface: View {
+        let configuration: Configuration
+        let tint: LinearGradient
+        let glow: Color
+
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 17)
+                .background(tint, in: Capsule())
+                .oneDayGlow(glow, strength: glowStrength)
+                .opacity(isEnabled ? 1 : 0.4)
+                .scaleEffect(configuration.isPressed ? 0.975 : 1)
+                .animation(OneDay.Motion.snap, value: configuration.isPressed)
+                .animation(OneDay.Motion.soft, value: isEnabled)
+        }
+
+        private var glowStrength: Double {
+            guard isEnabled else { return 0 }
+            return configuration.isPressed ? 0.5 : 1
+        }
     }
 }
 

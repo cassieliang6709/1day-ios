@@ -93,18 +93,22 @@ struct StoryTimelineView: View {
                     challenge: challenge,
                     memberNames: members.map(\.name),
                     myName: account.account?.displayName,
+                    progress: RoomProgress(
+                        momentCount: challenge.cards.count,
+                        clips: clips,
+                        myID: account.account?.id ?? RoomProgress.soloAuthorID),
                     viewMode: $viewMode,
+                    showsViewModeToggle: false,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
                     syncError: store.syncError(for: challengeID))
                     .padding(.horizontal, 20)
                     .padding(.bottom, 18)
 
-                switch viewMode {
-                case .timeline:
+                if challenge.isTimeOnly {
                     ForEach(challenge.cards) { card in
                         row(for: card, in: challenge, clips: clips, members: members)
                     }
-                case .grid:
+                } else {
                     StoryGridView(
                         challenge: challenge,
                         clips: clips,
@@ -150,8 +154,10 @@ struct StoryTimelineView: View {
         let schedule = StorySchedule(challenge)
         let presenter = ChallengePresenter(challenge: challenge)
         let slotClips = clips.filter { $0.day == card.day }
-        let momentTitle = presenter.title(forSlot: card.day)
-        let momentIcon = MomentCatalog.icon(for: challenge.momentValue(forSlot: card.day))
+        let momentTitle = challenge.isTimeOnly ? "" : presenter.title(forSlot: card.day)
+        let momentIcon = challenge.isTimeOnly
+            ? "camera.fill"
+            : MomentCatalog.icon(for: challenge.momentValue(forSlot: card.day))
         let isNext = card.day == nextSlot(in: challenge)
         let myID = account.account?.id ?? "local"
         let iHaveFilmed = slotClips.contains { $0.authorID == myID || $0.authorID == "local" }
@@ -180,6 +186,7 @@ struct StoryTimelineView: View {
                     durationLabel: challenge.resolvedClipLength.secondsLabel,
                     reactions: clip.emoji,
                     mediaHeight: mediaHeight(for: challenge),
+                    showsMomentTitle: !challenge.isTimeOnly,
                     onTap: { sheet = .preview(day: card.day, authorID: clip.authorID) })
             }
 
@@ -193,6 +200,7 @@ struct StoryTimelineView: View {
                     state: isNext ? .mine : .upcoming,
                     authorName: account.account?.displayName,
                     durationLabel: challenge.resolvedClipLength.secondsLabel,
+                    showsMomentTitle: !challenge.isTimeOnly,
                     onTap: { sheet = .record(day: card.day) })
             }
 
@@ -250,7 +258,9 @@ struct StoryTimelineView: View {
             }
 
             Menu {
-                Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
+                if !challenge.isTimeOnly {
+                    Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
+                }
                 Button(
                     challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
                     systemImage: "trash",
@@ -330,6 +340,7 @@ struct StoryTimelineView: View {
                 day: day,
                 slotTitle: slotTitle(for: day),
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
+                showsPrompt: challenge?.isTimeOnly != true,
                 orientation: challenge?.resolvedOrientation ?? .portrait
             ) { url, overlayText in
                 store.saveClip(
@@ -344,6 +355,7 @@ struct StoryTimelineView: View {
                 slotTitle: slotTitle(for: day),
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
                 challengeID: challengeID,
+                showsPrompt: challenge?.isTimeOnly != true,
                 myID: account.account?.id ?? "local"
             ) {
                 sheet = nil
@@ -365,6 +377,7 @@ struct StoryTimelineView: View {
                     authorName: clip.authorName,
                     overlayText: clip.overlayText,
                     clipLength: challenge?.resolvedClipLength ?? .tiny,
+                    showsPrompt: challenge?.isTimeOnly != true,
                     url: clip.url,
                     recordedAt: clip.recordedAt,
                     challengeID: challengeID,
@@ -385,7 +398,8 @@ struct StoryTimelineView: View {
     }
 
     private func slotTitle(for day: Int) -> String? {
-        challenge.map { ChallengePresenter(challenge: $0).title(forSlot: day) }
+        guard let challenge, !challenge.isTimeOnly else { return nil }
+        return ChallengePresenter(challenge: challenge).title(forSlot: day)
     }
 
     private func shareText(code: String, challenge: Challenge) -> String {

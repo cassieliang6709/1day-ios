@@ -116,7 +116,11 @@ struct GeneratingFilm: View {
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(clip.label ?? presenter.title(forSlot: clip.day))
+                        Text(challenge.isTimeOnly
+                            ? (schedule.railLabel(
+                                forSlot: clip.day,
+                                recordedAt: clip.recordedAt) ?? Strings.timeOnlyMoment)
+                            : (clip.label ?? presenter.title(forSlot: clip.day)))
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundStyle(OneDay.ink)
                             .lineLimit(1)

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>1Day — 新建故事重构 v3 + 按日期回看</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.10);
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:44px 30px 90px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif}
+  h1{font-size:25px;margin:0 0 6px;letter-spacing:-.4px}
+  .lede{color:var(--inkSoft);font-size:13.5px;margin:0 0 34px;max-width:860px;line-height:1.65}
+  h2{font-size:19px;margin:56px 0 4px;padding-top:18px;border-top:1px solid rgba(15,46,107,.12)}
+  h2:first-of-type{margin-top:6px;padding-top:0;border-top:0}
+  h3{font-size:15px;margin:30px 0 4px}
+  .sub{color:var(--inkSoft);font-size:13px;margin:0 0 20px;max-width:860px;line-height:1.65}
+  .row{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  .cap{font-size:12.5px;color:var(--inkSoft);margin-top:11px;line-height:1.6;max-width:330px}
+  .cap b{color:var(--ink);font-size:13.5px;display:block;margin-bottom:3px}
+  .cap .no{color:#A7443C}
+  .cap .yes{color:#158463}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;
+       background:var(--mist);color:var(--blue);margin-left:5px;vertical-align:1px}
+  .tag.rec{background:#DFF6EC;color:#158463}
+  .tag.now{background:#FFE9D6;color:#A75B12}
+
+  .screen{width:330px;height:660px;border-radius:38px;overflow:hidden;position:relative;
+        background:linear-gradient(160deg,#EEF4FF,#F5F8FF 45%,#EAF3FF);
+        border:1px solid rgba(15,46,107,.10);box-shadow:0 18px 40px rgba(15,46,107,.15)}
+  .screen.sc{overflow-y:auto}
+  .screen::-webkit-scrollbar{display:none}
+  .pad{padding:0 17px}
+  .sbar{height:34px;display:flex;align-items:center;justify-content:space-between;
+        padding:0 20px;font-size:12px;font-weight:800;opacity:.8}
+  .measure{position:absolute;right:8px;border-radius:6px;background:rgba(167,68,60,.14);
+        border:1px dashed rgba(167,68,60,.5);width:26px;
+        font-size:9px;font-weight:900;color:#A7443C;writing-mode:vertical-rl;
+        display:grid;place-items:center;letter-spacing:.5px}
+
+  .topbar{display:flex;align-items:center;gap:12px;padding:8px 17px 6px}
+  .x{width:36px;height:36px;border-radius:99px;background:rgba(255,255,255,.92);display:grid;place-items:center;
+      border:1px solid var(--hair);box-shadow:0 4px 11px rgba(15,46,107,.09)}
+  .x svg{width:14px;height:14px}
+  .dots{display:flex;gap:6px;margin:0 auto}
+  .dots i{width:7px;height:7px;border-radius:99px;background:rgba(127,180,255,.35)}
+  .dots i.on{width:22px;background:var(--blue)}
+
+  .q{font-size:23px;font-weight:900;letter-spacing:-.5px;margin:6px 0 4px}
+  .qs{font-size:13px;font-weight:600;color:var(--inkSoft);line-height:1.5;margin-bottom:14px}
+  .seclabel{font-size:11px;font-weight:900;letter-spacing:.6px;color:var(--inkFaint);
+            margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center}
+  .link{font-size:12px;font-weight:800;color:var(--blue);letter-spacing:0}
+
+  /* ---- 现状：双卡 ---- */
+  .modes{display:flex;gap:11px}
+  .mode{flex:1;border-radius:20px;background:#fff;border:1px solid var(--hair);overflow:hidden;
+        box-shadow:0 6px 16px rgba(15,46,107,.08);position:relative}
+  .mode.on{border:2px solid rgba(22,119,255,.62);box-shadow:0 10px 24px rgba(22,119,255,.2)}
+  .mode .im{height:76px;position:relative;overflow:hidden}
+  .mode .im img{width:100%;height:100%;object-fit:cover;display:block}
+  .mode .im:after{content:"";position:absolute;inset:0;
+        background:linear-gradient(to bottom,transparent,rgba(255,255,255,.94))}
+  .mode .ic{position:absolute;left:10px;bottom:10px;width:34px;height:34px;border-radius:11px;background:#fff;
+        display:grid;place-items:center;box-shadow:0 3px 8px rgba(15,46,107,.14);z-index:2}
+  .mode .ic svg{width:17px;height:17px}
+  .mode .bd{padding:0 12px 12px}
+  .mode .bd .t{font-size:15px;font-weight:900;letter-spacing:-.2px}
+  .mode .bd .c{font-size:11px;font-weight:600;color:var(--inkSoft);line-height:1.45;margin-top:4px;min-height:32px}
+  .chk{position:absolute;right:9px;top:9px;width:22px;height:22px;border-radius:99px;z-index:3;
+        background:linear-gradient(135deg,var(--blue),var(--cyan));display:grid;place-items:center}
+  .chk svg{width:10px;height:10px}
+
+  /* ---- 现状：预览条 ---- */
+  .strip{border-radius:22px;background:rgba(220,235,255,.5);border:1px solid var(--hair);
+        padding:12px;margin-top:14px}
+  .strip .hd{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:900}
+  .strip .hd .c{font-weight:700;font-size:12px;color:var(--inkSoft)}
+  .strip .hd .link{margin-left:auto}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:99px;
+        background:rgba(255,255,255,.9);font-size:12px;font-weight:700;color:var(--inkSoft)}
+  .chip b{color:var(--blue);font-size:10px;font-weight:900}
+
+  /* ---- 方案：pill ---- */
+  .pills{display:flex;gap:4px;padding:4px;border-radius:99px;background:rgba(220,235,255,.62);
+        border:1px solid var(--hair)}
+  .pills div{flex:1;text-align:center;padding:9px 0;border-radius:99px;font-size:13px;font-weight:800;
+        color:var(--inkSoft)}
+  .pills div.on{background:#fff;color:var(--blue);box-shadow:0 3px 9px rgba(15,46,107,.12)}
+
+  /* ---- 网格 ---- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .tile{border-radius:18px;background:#fff;border:1px solid var(--hair);overflow:hidden;
+        box-shadow:0 5px 14px rgba(15,46,107,.07);position:relative}
+  .tile img{width:100%;height:74px;object-fit:cover;display:block}
+  .tile .bd{padding:9px 10px 11px}
+  .tile .t{font-size:13.5px;font-weight:900;letter-spacing:-.2px}
+  .tile .s{font-size:11px;font-weight:600;color:var(--inkSoft);line-height:1.42;margin-top:3px;min-height:30px}
+  .tile.on{border:2px solid rgba(22,119,255,.65);box-shadow:0 10px 22px rgba(22,119,255,.18)}
+  .tile.wide{grid-column:1/3}
+  .tile.wide img{height:88px}
+  .tile.dim{opacity:.4}
+  .tile .open{padding:0 10px 11px}
+  .tile .open .chips{margin-top:0}
+
+  /* ---- 自己写题目 ---- */
+  .own{display:flex;align-items:center;gap:11px;padding:12px;border-radius:20px;background:rgba(255,255,255,.9);
+        border:1px solid var(--hair);box-shadow:0 5px 13px rgba(15,46,107,.07);margin-top:12px}
+  .own .ic{width:40px;height:40px;border-radius:13px;background:rgba(179,164,255,.16);display:grid;place-items:center;flex:0 0 auto}
+  .own .ic svg{width:18px;height:18px}
+  .own .t{font-size:14.5px;font-weight:900}
+  .own .c{font-size:11.5px;font-weight:600;color:var(--inkSoft);margin-top:2px}
+  .own .ch{margin-left:auto;color:var(--inkFaint)}
+  .own.ai{border:1.6px solid rgba(179,164,255,.5);background:linear-gradient(135deg,rgba(179,164,255,.10),rgba(255,255,255,.95))}
+
+  .note{border-radius:18px;background:rgba(220,235,255,.5);border:1px solid var(--hair);padding:12px;
+        display:flex;gap:9px;align-items:flex-start;font-size:12.5px;font-weight:600;color:var(--inkSoft);
+        line-height:1.5;margin-top:12px}
+  .note svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px}
+
+  .cta{position:absolute;left:17px;right:17px;bottom:12px;height:52px;border-radius:99px;
+        background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;font-size:16px;font-weight:900;
+        display:grid;place-items:center;box-shadow:0 10px 24px rgba(22,119,255,.4)}
+  .fade{position:absolute;left:0;right:0;bottom:0;height:96px;pointer-events:none;
+        background:linear-gradient(to top,#EFF4FF 40%,transparent)}
+
+  /* ---- 首页 header（复用上一轮已落地的样式） ---- */
+  .hd2{display:flex;align-items:center;gap:11px;padding:2px 17px 0}
+  .av{width:42px;height:42px;border-radius:99px;flex:0 0 auto;display:grid;place-items:center;
+      color:#fff;font-weight:900;font-size:16px;background:linear-gradient(135deg,#7FB4FF,#38B6FF);
+      box-shadow:0 5px 14px rgba(56,182,255,.4)}
+  .hdtxt{min-width:0;flex:1}
+  .hdtxt .n{font-size:16.5px;font-weight:900;letter-spacing:-.2px;line-height:1.2}
+  .hdtxt .m{font-size:11.5px;font-weight:700;color:var(--inkSoft);margin-top:3px;
+            display:flex;align-items:center;gap:6px}
+  .dot{width:3px;height:3px;border-radius:99px;background:var(--inkFaint);display:inline-block}
+  .mini{display:inline-flex;align-items:center;gap:4px}
+  .mini i{width:4.5px;height:4.5px;border-radius:99px;background:rgba(22,119,255,.28);display:inline-block}
+  .mini i.on{background:var(--blue)}
+  .acts{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  .gh{width:36px;height:36px;border-radius:99px;background:rgba(255,255,255,.92);display:grid;place-items:center;
+      border:1px solid var(--hair);box-shadow:0 4px 11px rgba(15,46,107,.09)}
+  .gh svg{width:16px;height:16px}
+  .plusS{width:36px;height:36px;border-radius:99px;display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--blue),var(--cyan));box-shadow:0 5px 13px rgba(22,119,255,.36)}
+  .plusS svg{width:16px;height:16px}
+
+  .hero{border-radius:24px;overflow:hidden;background:#fff;border:1px solid var(--hair);
+        box-shadow:0 10px 26px rgba(15,46,107,.12)}
+  .hero .im{height:150px;position:relative}
+  .hero .im img{width:100%;height:100%;object-fit:cover;display:block}
+  .hero .ov{position:absolute;left:13px;bottom:11px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .hero .ov .t{font-size:20px;font-weight:900;letter-spacing:-.3px}
+  .hero .ov .s{font-size:12px;font-weight:700;opacity:.94;margin-top:2px}
+  .hero .pg{position:absolute;right:11px;bottom:11px;display:flex;align-items:center;gap:7px;
+        background:rgba(255,255,255,.28);backdrop-filter:blur(8px);padding:5px 11px;border-radius:99px;
+        color:#fff;font-size:12.5px;font-weight:900}
+  .hero .bt{padding:11px 13px 13px}
+  .hero .bt .b{height:46px;border-radius:99px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+        color:#fff;font-size:15px;font-weight:900;display:grid;place-items:center;
+        box-shadow:0 8px 18px rgba(22,119,255,.34)}
+
+  /* ---- 空卡 ---- */
+  .empty{border-radius:24px;background:rgba(255,255,255,.82);border:1.6px dashed rgba(22,119,255,.32);
+        padding:22px 16px;text-align:center}
+  .empty .bud{width:52px;height:52px;border-radius:99px;margin:0 auto 10px;
+        background:linear-gradient(135deg,#7FB4FF,#38B6FF);display:grid;place-items:center}
+  .empty .bud svg{width:26px;height:26px}
+  .empty .t{font-size:16px;font-weight:900}
+  .empty .s{font-size:12.5px;font-weight:600;color:var(--inkSoft);margin:4px 0 13px;line-height:1.5}
+  .empty .b{height:46px;border-radius:99px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+        color:#fff;font-size:15px;font-weight:900;display:grid;place-items:center;
+        box-shadow:0 8px 18px rgba(22,119,255,.34)}
+
+  /* ---- A 日历 ---- */
+  .cal{border-radius:22px;background:rgba(255,255,255,.9);border:1px solid var(--hair);padding:13px;
+        box-shadow:0 8px 20px rgba(15,46,107,.09)}
+  .cal .mh{display:flex;align-items:center;justify-content:space-between;font-size:14.5px;font-weight:900;
+        margin-bottom:10px}
+  .cal .mh svg{width:13px;height:13px}
+  .cal .wk{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:10px;font-weight:800;
+        color:var(--inkFaint);text-align:center;margin-bottom:5px}
+  .cal .dz{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .cal .d{aspect-ratio:1;border-radius:11px;display:grid;place-items:center;font-size:12px;font-weight:800;
+        color:var(--inkSoft);position:relative}
+  .cal .d.has{background:rgba(220,235,255,.85);color:var(--ink)}
+  .cal .d.has:after{content:"";position:absolute;bottom:4px;width:4px;height:4px;border-radius:99px;
+        background:var(--blue)}
+  .cal .d.full{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff}
+  .cal .d.full:after{background:rgba(255,255,255,.85)}
+  .cal .d.today{box-shadow:inset 0 0 0 2px rgba(22,119,255,.55)}
+  .cal .d.out{opacity:.28}
+  .dayrow{display:flex;gap:10px;align-items:center;padding:10px;border-radius:18px;background:rgba(255,255,255,.9);
+        border:1px solid var(--hair);margin-top:9px;box-shadow:0 4px 12px rgba(15,46,107,.06)}
+  .dayrow img{width:52px;height:52px;border-radius:13px;object-fit:cover;flex:0 0 auto}
+  .dayrow .t{font-size:14px;font-weight:900}
+  .dayrow .s{font-size:11.5px;font-weight:600;color:var(--inkSoft);margin-top:2px}
+  .dayrow .pg{margin-left:auto;font-size:12px;font-weight:900;color:var(--blue)}
+
+  /* ---- B 时间轴 ---- */
+  .tl{position:relative;padding-left:19px;margin-top:6px}
+  .tl:before{content:"";position:absolute;left:5px;top:8px;bottom:6px;width:2px;
+        background:linear-gradient(to bottom,rgba(22,119,255,.35),rgba(22,119,255,.06))}
+  .tlday{position:relative;margin-bottom:16px}
+  .tlday:before{content:"";position:absolute;left:-18px;top:4px;width:10px;height:10px;border-radius:99px;
+        background:#fff;border:2.4px solid var(--blue)}
+  .tlday.q:before{border-color:rgba(127,180,255,.55)}
+  .tlday .dl{font-size:12.5px;font-weight:900;color:var(--ink)}
+  .tlday .dl span{font-weight:700;color:var(--inkFaint);margin-left:5px;font-size:11.5px}
+  .tlcard{display:flex;gap:9px;align-items:center;padding:9px;border-radius:16px;background:rgba(255,255,255,.92);
+        border:1px solid var(--hair);margin-top:7px;box-shadow:0 4px 12px rgba(15,46,107,.06)}
+  .tlcard img{width:46px;height:46px;border-radius:12px;object-fit:cover;flex:0 0 auto}
+  .tlcard .t{font-size:13.5px;font-weight:900}
+  .tlcard .s{font-size:11px;font-weight:600;color:var(--inkSoft);margin-top:2px}
+  .tlcard .pg{margin-left:auto;font-size:11.5px;font-weight:900;color:var(--blue)}
+  .thumbs{display:flex;gap:5px;margin-top:7px}
+  .thumbs img{width:100%;height:44px;border-radius:9px;object-fit:cover;flex:1;min-width:0}
+  .thumbs .none{flex:1;height:44px;border-radius:9px;border:1.4px dashed rgba(22,119,255,.24)}
+
+  /* ---- C 分组 ---- */
+  .grp{font-size:11px;font-weight:900;letter-spacing:.6px;color:var(--inkFaint);margin:16px 0 7px}
+  .strow{display:flex;gap:10px;align-items:center;padding:10px;border-radius:18px;background:rgba(255,255,255,.9);
+        border:1px solid var(--hair);margin-bottom:8px;box-shadow:0 4px 12px rgba(15,46,107,.06)}
+  .strow img{width:50px;height:50px;border-radius:13px;object-fit:cover;flex:0 0 auto}
+  .strow .t{font-size:14px;font-weight:900}
+  .strow .s{font-size:11.5px;font-weight:600;color:var(--inkSoft);margin-top:2px}
+  .strow .pg{margin-left:auto;font-size:12px;font-weight:900;color:var(--blue)}
+
+  .tabbar{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;display:flex;gap:3px;padding:5px;
+        border-radius:99px;background:rgba(255,255,255,.94);box-shadow:0 8px 22px rgba(15,46,107,.16);
+        border:1px solid var(--hair)}
+  .tabbar div{display:flex;align-items:center;gap:6px;padding:9px 17px;border-radius:99px;font-size:13px;
+        font-weight:800;color:var(--inkSoft)}
+  .tabbar div.on{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff}
+  .tabbar svg{width:15px;height:15px}
+</style>
+</head>
+<body>
+
+<h1>1Day — 新建故事重构 v3 &amp; 按日期回看</h1>
+<p class="lede">
+  两件事。<b>上半</b>：Cassie 指出预览条累赘 —— 题目在这一屏出现了两次，而「主题挑战」那张卡其实是个伪装成选项的分类标签，
+  底下的推荐网格本身就是主题挑战。<b>下半</b>：按日期回看的三种形式，选一个再写 spec。
+  所有封面都是仓库里的真实素材（<code>Assets.xcassets/Template*.imageset/cover.jpg</code>），没有占位图。
+</p>
+
+<h2>上半 · 新建故事：现状 vs 重构</h2>
+<p class="sub">
+  现状的问题不是"哪里画得不好"，是<b>层级多了一层</b>。真实结构只有一层：有 N 个模板，其中一个（和我过一天）没有题目，其余各有 7 个。
+  双卡把这件事表达成了两级选择。
+</p>
+
+<div class="row">
+
+  <!-- ============ 现状 ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="topbar"><div class="x"><svg viewBox="0 0 24 24" fill="none" stroke="#0F2E6B" stroke-width="3" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></div><div class="dots"><i class="on"></i><i></i></div><div style="width:36px"></div></div>
+      <div class="pad">
+        <div class="q">今天会是什么故事？</div>
+        <div class="qs">先选记录方式，再决定要不要跟着题目拍。</div>
+
+        <div class="measure" style="top:118px;height:150px">150pt</div>
+        <div class="modes">
+          <div class="mode on">
+            <div class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></div>
+            <div class="im"><img src="../../ios/AISetlog/Assets.xcassets/TemplateLockIn.imageset/cover.jpg" alt="">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.2"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div></div>
+            <div class="bd"><div class="t">主题挑战</div><div class="c">选一组题目，跟着拍完</div></div>
+          </div>
+          <div class="mode">
+            <div class="im"><img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.2"><circle cx="5" cy="12" r="2.4"/><circle cx="12" cy="7" r="2.4"/><circle cx="19" cy="14" r="2.4"/><path d="M7 11l3-2M14 8l3 4"/></svg></div></div>
+            <div class="bd"><div class="t">按时间记录</div><div class="c">Live With Me · 无题目</div></div>
+          </div>
+        </div>
+
+        <div class="measure" style="top:282px;height:112px">112pt</div>
+        <div class="strip">
+          <div class="hd"><span>完美的一天</span><span class="c">· 7 个题目</span>
+            <span class="link">换一个 ⌄</span></div>
+          <div class="chips">
+            <span class="chip"><b>1</b>起床</span><span class="chip"><b>2</b>咖啡</span>
+            <span class="chip"><b>3</b>收拾出门</span><span class="chip"><b>4</b>出门</span>
+            <span class="chip"><b>5</b>正午</span><span class="chip"><b>6</b>傍晚的光</span>
+            <span class="chip"><b>7</b>睡前放松</span>
+          </div>
+        </div>
+
+        <div class="own">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#B3A4FF" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></div>
+          <div><div class="t">自己写题目</div><div class="c">先写几个想拍的</div></div>
+          <div class="ch">›</div>
+        </div>
+
+        <div class="seclabel"><span>推荐题目</span><span class="link">更多模板 ›</span></div>
+        <div class="grid">
+          <div class="tile on"><img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">完美的一天</div><div class="s">起床 · 咖啡 · 收拾出门…</div></div></div>
+          <div class="tile"><img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">慢慢重启</div><div class="s">一团糟的开始 · 先清一样东西…</div></div></div>
+        </div>
+        <div style="height:80px"></div>
+      </div>
+      <div class="fade"></div>
+      <div class="cta">下一步 →</div>
+    </div>
+    <div class="cap"><b>现状 <span class="tag now">已上线</span></b>
+      <span class="no">✗ 题目出现两次</span>：预览条里 7 个全的，网格卡副标题里前 3 个。<br>
+      <span class="no">✗「换一个 ⌄」</span>指向同一屏下方已经存在的东西。<br>
+      <span class="no">✗「主题挑战」是假选择</span>：底下网格本身就是它。<br>
+      双卡 150pt + 预览条 112pt = <b>262pt</b> 用来表达一个二选一，而右半边只是 7 个模板里的 1 个。
+      在 SE 上这吃掉了大半屏。
+    </div>
+  </div>
+
+  <!-- ============ 方案 A ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="topbar"><div class="x"><svg viewBox="0 0 24 24" fill="none" stroke="#0F2E6B" stroke-width="3" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></div><div class="dots"><i class="on"></i><i></i></div><div style="width:36px"></div></div>
+      <div class="pad">
+        <div class="q">今天会是什么故事？</div>
+        <div class="qs">跟着题目拍，或者按时间随手拍。</div>
+
+        <div class="measure" style="top:118px;height:46px">46</div>
+        <div class="pills"><div class="on">跟着题目拍</div><div>按时间拍</div></div>
+
+        <div class="seclabel" style="margin-top:14px"><span>选一组题目</span><span class="link">更多模板 ›</span></div>
+        <div class="grid">
+          <div class="tile on wide">
+            <div class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></div>
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="bd" style="padding-bottom:6px">
+              <div class="t">完美的一天 <span style="font-size:11.5px;font-weight:700;color:var(--inkSoft)">· 7 个题目</span></div>
+              <div class="s" style="min-height:0;margin-top:3px">愿意再过一遍的一天。</div>
+            </div>
+            <div class="open"><div class="chips">
+              <span class="chip"><b>1</b>起床</span><span class="chip"><b>2</b>咖啡</span>
+              <span class="chip"><b>3</b>收拾出门</span><span class="chip"><b>4</b>出门</span>
+              <span class="chip"><b>5</b>正午</span><span class="chip"><b>6</b>傍晚的光</span>
+              <span class="chip"><b>7</b>睡前放松</span>
+            </div></div>
+          </div>
+          <div class="tile"><img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">慢慢重启</div><div class="s">一团糟的开始 · 先清一样东西…</div></div></div>
+          <div class="tile"><img src="../../ios/AISetlog/Assets.xcassets/TemplateLockIn.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">进入状态</div><div class="s">布置桌面 · 第一段冲刺…</div></div></div>
+          <div class="tile"><img src="../../ios/AISetlog/Assets.xcassets/TemplateMainCharacter.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">我的主角日</div><div class="s">晨光 · 今日穿搭 · 在路上…</div></div></div>
+          <div class="tile"><img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+            <div class="bd"><div class="t">和我做饭</div><div class="s">备料 · 处理 · 下锅那一下…</div></div></div>
+        </div>
+
+        <div class="own">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#B3A4FF" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></div>
+          <div><div class="t">自己写题目</div><div class="c">先写几个想拍的</div></div>
+          <div class="ch">›</div>
+        </div>
+        <div style="height:80px"></div>
+      </div>
+      <div class="fade"></div>
+      <div class="cta">下一步 →</div>
+    </div>
+    <div class="cap"><b>方案 A — pill + 选中就地展开 <span class="tag rec">推荐</span></b>
+      <span class="yes">✓ 题目只出现一次</span>，就在你选的那张卡上。<br>
+      <span class="yes">✓ 一层选择</span>：pill 只是筛选，不是"选项"。<br>
+      <span class="yes">✓ 省 216pt</span>（262 → 46），网格能多露一行半。<br>
+      选中的卡横跨两列，因为它要装 7 个 chip；没选中的仍是两列小卡，副标题是前三个题目。
+    </div>
+  </div>
+
+  <!-- ============ 按时间拍态 ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="topbar"><div class="x"><svg viewBox="0 0 24 24" fill="none" stroke="#0F2E6B" stroke-width="3" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></div><div class="dots"><i class="on"></i><i></i></div><div style="width:36px"></div></div>
+      <div class="pad">
+        <div class="q">今天会是什么故事？</div>
+        <div class="qs">跟着题目拍，或者按时间随手拍。</div>
+
+        <div class="pills"><div>跟着题目拍</div><div class="on">按时间拍</div></div>
+
+        <div class="seclabel" style="margin-top:14px"><span>和我过一天</span></div>
+        <div class="tile on wide" style="border-radius:20px">
+          <div class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></div>
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="" style="height:118px">
+          <div class="bd">
+            <div class="t">和我过一天</div>
+            <div class="s" style="min-height:0;margin-top:4px;font-size:12px">
+              没有题目。拍到的每一段按时间排好，<br>发生什么拍什么。
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="2.1"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span>字幕由你自己在每段片子上填写，1Day 只负责保留拍摄时间。</span>
+        </div>
+
+        <div class="own">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#B3A4FF" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></div>
+          <div><div class="t">自己写题目</div><div class="c">先写几个想拍的</div></div>
+          <div class="ch">›</div>
+        </div>
+        <div style="height:80px"></div>
+      </div>
+      <div class="fade"></div>
+      <div class="cta">下一步 →</div>
+    </div>
+    <div class="cap"><b>方案 A 的「按时间拍」态</b>
+      <span class="yes">✓ 变灰的网格没了</span>。现状是把推荐区整体 disabled + 0.4 透明 —— 那是我上一轮为了修 bug 加的补丁，
+      但"给你看一堆点不了的东西"本身就是个尴尬状态。<br>
+      这里直接换内容：一张「和我过一天」的大卡 + 一句说明。<br>
+      封面顺手改成 <code>TemplateSoftReset</code>，解决它和「我的主角日」撞脸（PRD PR-5）。
+    </div>
+  </div>
+
+</div>
+
+<h3>顺带一提：AI 生题目落在哪</h3>
+<p class="sub">Cassie 定了走极小后端代理。<b>①「一句话 → 7 个题目」</b>的入口天然就是「自己写题目」这一行 —— 不新增层级，只是给它加一个更快的开头。</p>
+<div class="row">
+  <div>
+    <div class="screen" style="height:auto;padding-bottom:16px">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="pad">
+        <div class="seclabel"><span>自己写题目</span></div>
+        <div class="own ai">
+          <div class="ic" style="background:linear-gradient(135deg,rgba(179,164,255,.9),rgba(127,180,255,.9))">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/></svg></div>
+          <div><div class="t">说说今天要干嘛</div><div class="c">「今天要搬家」→ 帮你排 7 个瞬间</div></div>
+          <div class="ch">›</div>
+        </div>
+        <div class="own" style="margin-top:9px">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#B3A4FF" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></div>
+          <div><div class="t">一个个自己写</div><div class="c">现在这条路，保留</div></div>
+          <div class="ch">›</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>入口，不是新层级</b>
+      现有的手写和题库两条路都留着 —— AI 是第三个开头，不是替代。<br>
+      生成出来的 7 个题目直接填进现有的可编辑列表，你能逐条改。生成失败 / 没网 → 静默退回手写，不弹错误。
+    </div>
+  </div>
+</div>
+
+<h2>下半 · 按日期回看：三种形式</h2>
+<p class="sub">
+  数据已经够了：<code>DayCard.recordedAt</code> 存着每段片子的拍摄时间，<code>Challenge.startDate</code> 存着故事的日子，<b>不需要迁移</b>。
+  下面三种都建立在「首页现有结构 + PR-4 的新空状态」之上。三张图里首页 header 都是上一轮已经落地的样子。
+</p>
+
+<div class="row">
+
+  <!-- ============ A 日历 ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="hd2">
+        <div class="av">C</div>
+        <div class="hdtxt"><div class="n">下午好</div>
+          <div class="m"><span>9月1日 周二</span><span class="dot"></span><span>今天 1/7</span>
+            <span class="mini"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div>
+        <div class="acts">
+          <div class="gh"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+          <div class="plusS"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div>
+      </div>
+      <div class="pad">
+        <div class="seclabel" style="margin-top:16px"><span>九月</span><span class="link">今天</span></div>
+        <div class="cal">
+          <div class="mh"><svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="3" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+            <span>2026 年 9 月</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="3" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></div>
+          <div class="wk"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="dz">
+            <div class="d out">31</div><div class="d today has">1</div><div class="d">2</div><div class="d">3</div>
+            <div class="d">4</div><div class="d">5</div><div class="d">6</div>
+            <div class="d">7</div><div class="d">8</div><div class="d">9</div><div class="d">10</div>
+            <div class="d">11</div><div class="d">12</div><div class="d">13</div>
+            <div class="d">14</div><div class="d">15</div><div class="d">16</div><div class="d">17</div>
+            <div class="d">18</div><div class="d">19</div><div class="d">20</div>
+            <div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div>
+            <div class="d">25</div><div class="d">26</div><div class="d">27</div>
+            <div class="d">28</div><div class="d">29</div><div class="d">30</div>
+            <div class="d out">1</div><div class="d out">2</div><div class="d out">3</div><div class="d out">4</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:900;color:var(--inkFaint);margin:14px 0 0;letter-spacing:.6px">
+          9月1日 · 周二</div>
+        <div class="dayrow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateMainCharacter.imageset/cover.jpg" alt="">
+          <div><div class="t">我的一天</div><div class="s">接下来：晨光</div></div>
+          <div class="pg">1/7</div>
+        </div>
+        <div style="height:74px"></div>
+      </div>
+      <div class="tabbar">
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v3M16 3v3M4 10h16"/></svg>日历</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="2.2"><rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3"/></svg>拍摄</div>
+      </div>
+    </div>
+    <div class="cap"><b>A — 月历</b>
+      有片子的日子有底色 + 一个点，全拍完的日子是实心渐变，今天有描边。点一天，下面出那天的故事。<br>
+      <span class="yes">✓</span> 「翻回 8.31」最直接：往前翻一个月就到。<br>
+      <span class="yes">✓</span> 一眼看出连续性 —— 哪几天断了很明显，这对养成习惯有用。<br>
+      <span class="no">✗</span> 月历占 260pt 左右，把「继续今天的故事」挤到折叠线以下。可能得单独一个 tab（图里画成了 tab）。<br>
+      <span class="no">✗</span> 早期用户日历一片空白，看着会有点惨。
+    </div>
+  </div>
+
+  <!-- ============ B 时间轴 ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="hd2">
+        <div class="av">C</div>
+        <div class="hdtxt"><div class="n">下午好</div>
+          <div class="m"><span>9月1日 周二</span><span class="dot"></span><span>今天 1/7</span>
+            <span class="mini"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div>
+        <div class="acts">
+          <div class="gh"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+          <div class="plusS"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div>
+      </div>
+      <div class="pad">
+        <div class="seclabel" style="margin-top:16px"><span>今天的故事</span></div>
+        <div class="hero">
+          <div class="im"><img src="../../ios/AISetlog/Assets.xcassets/TemplateMainCharacter.imageset/cover.jpg" alt="">
+            <div class="ov"><div class="t">我的一天</div><div class="s">接下来：晨光</div></div>
+            <div class="pg">1/7</div></div>
+          <div class="bt"><div class="b">继续今天的故事</div></div>
+        </div>
+
+        <div class="seclabel" style="margin-top:20px"><span>往前翻</span></div>
+        <div class="tl">
+          <div class="tlday">
+            <div class="dl">8月31日 <span>周一</span></div>
+            <div class="thumbs">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateLockIn.imageset/cover.jpg" alt="">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+              <div class="none"></div>
+            </div>
+            <div class="tlcard">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+              <div><div class="t">慢慢重启</div><div class="s">3 个瞬间 · 未拍完</div></div>
+              <div class="pg">3/7</div>
+            </div>
+          </div>
+          <div class="tlday">
+            <div class="dl">8月29日 <span>周六</span></div>
+            <div class="tlcard">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateLittleAdventure.imageset/cover.jpg" alt="">
+              <div><div class="t">出门冒险</div><div class="s">成片 · 47 秒</div></div>
+              <div class="pg">7/7</div>
+            </div>
+          </div>
+          <div class="tlday q">
+            <div class="dl">8月24日 <span>周一</span></div>
+            <div class="tlcard">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+              <div><div class="t">和我做饭</div><div class="s">成片 · 41 秒</div></div>
+              <div class="pg">7/7</div>
+            </div>
+          </div>
+        </div>
+        <div style="height:74px"></div>
+      </div>
+      <div class="tabbar">
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 9h16"/></svg>计划</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="2.2"><rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3"/></svg>拍摄</div>
+      </div>
+    </div>
+    <div class="cap"><b>B — 时间轴 <span class="tag rec">推荐</span></b>
+      「今天的故事」照旧占顶上，往下滚就是倒序的日子。每天一个日期标签 + 那天的故事；没拍完的日子额外显示已拍片子的缩略图。<br>
+      <span class="yes">✓ 不动首页的主结构</span> —— 顶上还是「继续今天的故事」，回看是<b>往下滚就有</b>，不需要新 tab。<br>
+      <span class="yes">✓ 空日子直接不出现</span>，新用户不会看见一片空白日历。<br>
+      <span class="yes">✓ 顺手替掉现在的「其他的故事 / 已完成」两个分区</span> —— 它们本来就是没有时间维度的列表。<br>
+      <span class="no">✗</span> 想跳到「三个月前」得滚很久（可以后补一个跳月的锚）。
+    </div>
+  </div>
+
+  <!-- ============ C 分组 ============ -->
+  <div>
+    <div class="screen sc">
+      <div class="sbar"><span>9:41</span><span>􀛨 􀙇</span></div>
+      <div class="hd2">
+        <div class="av">C</div>
+        <div class="hdtxt"><div class="n">下午好</div>
+          <div class="m"><span>9月1日 周二</span><span class="dot"></span><span>今天 1/7</span>
+            <span class="mini"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div>
+        <div class="acts">
+          <div class="gh"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+          <div class="plusS"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div>
+      </div>
+      <div class="pad">
+        <div class="seclabel" style="margin-top:16px"><span>今天的故事</span></div>
+        <div class="hero">
+          <div class="im"><img src="../../ios/AISetlog/Assets.xcassets/TemplateMainCharacter.imageset/cover.jpg" alt="">
+            <div class="ov"><div class="t">我的一天</div><div class="s">接下来：晨光</div></div>
+            <div class="pg">1/7</div></div>
+          <div class="bt"><div class="b">继续今天的故事</div></div>
+        </div>
+
+        <div class="grp">本周</div>
+        <div class="strow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+          <div><div class="t">慢慢重启</div><div class="s">8月31日 · 未拍完</div></div>
+          <div class="pg">3/7</div>
+        </div>
+        <div class="strow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateLittleAdventure.imageset/cover.jpg" alt="">
+          <div><div class="t">出门冒险</div><div class="s">8月29日 · 成片</div></div>
+          <div class="pg">7/7</div>
+        </div>
+
+        <div class="grp">本月</div>
+        <div class="strow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+          <div><div class="t">和我做饭</div><div class="s">8月24日 · 成片</div></div>
+          <div class="pg">7/7</div>
+        </div>
+        <div class="strow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateLockIn.imageset/cover.jpg" alt="">
+          <div><div class="t">进入状态</div><div class="s">8月18日 · 成片</div></div>
+          <div class="pg">7/7</div>
+        </div>
+
+        <div class="grp">更早</div>
+        <div class="strow">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateMorningPerson.imageset/cover.jpg" alt="">
+          <div><div class="t">早起的人</div><div class="s">7月30日 · 成片</div></div>
+          <div class="pg">7/7</div>
+        </div>
+        <div style="height:74px"></div>
+      </div>
+      <div class="tabbar">
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 9h16"/></svg>计划</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="#5B7099" stroke-width="2.2"><rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3"/></svg>拍摄</div>
+      </div>
+    </div>
+    <div class="cap"><b>C — 首页按时间分段</b>
+      保留现有结构，只把「其他的故事」拆成「本周 / 本月 / 更早」，每行加上日期。<br>
+      <span class="yes">✓ 改动最小</span>，一个 PR 就完，风险接近零。<br>
+      <span class="yes">✓</span> 每个故事终于带上日子了 —— 「9.1 那个」能靠日期认出来。<br>
+      <span class="no">✗</span> 还是"故事的列表"，不是"日子的列表"。翻到具体某天仍然靠滚。<br>
+      <span class="no">✗</span> 半年后「更早」会变成一个几十行的长坡。
+    </div>
+  </div>
+
+</div>
+
+<h3>我的看法</h3>
+<p class="sub">
+  <b>B（时间轴）</b>。理由：它不需要新 tab，也不改首页的主次 —— 顶上照旧是「继续今天的故事」，回看是往下滚就有。
+  而且它<b>顺手替掉</b>现在的「其他的故事 / 已完成影片」两个分区，这两个分区本来就是没有时间维度的列表，
+  正是「9.1 找不到」的另一半原因。C 是 B 的低配版，如果想先小步走，可以先做 C 再演进到 B（数据结构一样，只是分组键从"周/月"换成"天"）。
+  A 最适合"看连续性 / 养成打卡习惯"，但它得单独占一个 tab，是三个里最重的，建议等有了一定数据量再说。
+</p>
+
+</body>
+</html>

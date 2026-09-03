@@ -48,9 +48,15 @@ struct StorySchedule {
     }
 
     /// Total runtime of the finished film, for the "14s" chip.
-    var filmDuration: String {
+    ///
+    /// - Parameter clipCount: how many clips the film will actually contain.
+    ///   Defaults to my own cards, which is the whole film in a solo story and
+    ///   an undercount in a shared room — a friend's clip runs for the same
+    ///   two seconds as mine.
+    func filmDuration(clipCount: Int? = nil) -> String {
+        let count = clipCount ?? challenge.recordedCount
         let seconds = Int(
-            (challenge.resolvedClipLength.seconds * Double(challenge.recordedCount)).rounded())
+            (challenge.resolvedClipLength.seconds * Double(count)).rounded())
         return Strings.seconds(max(seconds, 0))
     }
 

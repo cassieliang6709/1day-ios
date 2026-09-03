@@ -268,7 +268,11 @@ struct StoryGridCell: View {
                 }
             }
         } else {
-            (isNext ? Color.oneDayBlue.opacity(0.07) : OneDay.surfaceSoft.opacity(0.4))
+            // The next moment has to carry roughly the weight of a filled tile.
+            // At 7% tint it was the faintest thing in a grid whose other cells
+            // hold photographs, so the one cell asking you to do something was
+            // the easiest one to miss.
+            (isNext ? Color.oneDayBlue.opacity(0.16) : OneDay.surfaceSoft.opacity(0.4))
                 .overlay {
                     VStack(spacing: 6) {
                         Image(systemName: momentIcon)
@@ -282,6 +286,13 @@ struct StoryGridCell: View {
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
                             .padding(.horizontal, 8)
+                        if isNext {
+                            Text(Strings.tapToFilm)
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.oneDayBlue)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
                 }
         }

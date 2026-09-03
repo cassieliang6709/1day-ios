@@ -9,6 +9,7 @@ struct ClipPreviewView: View {
     var authorName: String?
     var overlayText: String?
     var clipLength: Challenge.ClipLength = .tiny
+    var showsPrompt = true
     let url: URL
     let recordedAt: Date?
     var challengeID: UUID?
@@ -106,7 +107,7 @@ struct ClipPreviewView: View {
                 .padding()
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(localizedMomentTitle)
+            .navigationTitle(showsPrompt ? localizedMomentTitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -135,7 +136,8 @@ struct ClipPreviewView: View {
                 mode: .review,
                 timestamp: recordedAt,
                 overlayText: editingCaption ? nil : liveOverlayText,
-                clipSeconds: clipLength.seconds
+                clipSeconds: clipLength.seconds,
+                showsPrompt: showsPrompt
             )
 
             if challengeID != nil, targetAuthorID == nil || targetAuthorID == "local" || targetAuthorID == myID {

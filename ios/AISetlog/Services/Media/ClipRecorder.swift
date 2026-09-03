@@ -246,6 +246,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
+    #if DEBUG
+    /// Drop a generated clip in as if it had just been filmed, so the review
+    /// screen and everything downstream of it can be exercised on a simulator,
+    /// which has no camera.
+    func acceptDemoClip(_ url: URL) {
+        clipURL = url
+        recordedAt = .now
+    }
+    #endif
+
     /// Back to live preview after reviewing a take.
     func retake() {
         clipURL = nil

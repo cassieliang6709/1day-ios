@@ -13,6 +13,7 @@ struct StitchedMomentPreview: View {
     var slotTitle: String?
     var clipLength: Challenge.ClipLength = .tiny
     var challengeID: UUID?
+    var showsPrompt = true
     let myID: String
     let onReRecord: () -> Void
 
@@ -71,6 +72,7 @@ struct StitchedMomentPreview: View {
             authorName: authorName,
             overlayText: overlayText,
             clipLength: clipLength,
+            showsPrompt: showsPrompt,
             url: url,
             recordedAt: clips.first?.recordedAt,
             challengeID: challengeID,
