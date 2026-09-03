@@ -88,8 +88,7 @@ struct StoryComposerView: View {
                         orientation: $orientation,
                         moments: $moments,
                         isOneDay: mode == .oneDay,
-                        isTimeOnly: selection.style == .timeOnly,
-                        memberNames: knownFriendNames)
+                        isTimeOnly: selection.style == .timeOnly)
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)))
@@ -304,18 +303,6 @@ struct StoryComposerView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cleaned.isEmpty ? selected?.momentKeys : cleaned
-    }
-
-    /// Names already seen in the user's rooms — shown as suggestions on the
-    /// "with friends" card so it isn't an empty promise.
-    private var knownFriendNames: [String] {
-        var seen: [String] = []
-        for challenge in store.challenges where challenge.isShared {
-            for member in store.members(for: challenge.id) where !seen.contains(member.name) {
-                seen.append(member.name)
-            }
-        }
-        return seen
     }
 }
 
