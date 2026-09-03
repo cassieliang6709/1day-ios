@@ -43,6 +43,18 @@ struct ClipPreviewView: View {
 
     private var reactions: [ClipReaction] { interactions.reactions }
     private var comments: [ClipComment] { interactions.comments }
+
+    /// Whether anyone else can see this clip.
+    ///
+    /// Reactions, the comment thread and the comment box all used to appear
+    /// whenever `challengeID != nil` — which is true of every story, shared or
+    /// not. So filming a day by yourself and looking back at it put an empty
+    /// "Add a comment…" box under your own face, waiting for you to talk to
+    /// yourself, and a row of emoji nobody would ever see.
+    private var isShared: Bool {
+        guard let challengeID else { return false }
+        return store.challenge(challengeID)?.isShared ?? false
+    }
     private var aspectRatio: CGFloat {
         guard let challengeID else { return 9 / 16 }
         return store.challenge(challengeID)?.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16
@@ -65,7 +77,7 @@ struct ClipPreviewView: View {
                         .frame(maxWidth: 340)
                         .frame(maxWidth: .infinity)
 
-                    if challengeID != nil {
+                    if isShared {
                         ReactionBar(reactions: reactions, myID: myID) { emoji in
                             if let challengeID {
                                 store.toggleReaction(emoji, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
@@ -87,7 +99,7 @@ struct ClipPreviewView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if challengeID != nil {
+                    if isShared {
                         CommentsSection(comments: comments, myID: myID) { comment in
                             if let challengeID {
                                 store.deleteComment(comment.id, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
@@ -115,7 +127,7 @@ struct ClipPreviewView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if challengeID != nil {
+                if isShared {
                     CommentInputBar { text in
                         if let challengeID {
                             store.addComment(text, day: day, challengeID: challengeID, targetAuthorID: targetAuthorID ?? myID)
