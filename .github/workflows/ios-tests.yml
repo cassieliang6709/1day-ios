@@ -16,8 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Has to be an Xcode whose iOS SDK matches a simulator the runner image
+      # still ships. 16.2 stopped qualifying: the image kept the app but dropped
+      # the iOS 18.2 runtime, and `actool` fails the whole build rather than
+      # thin an asset catalog against a runtime it has no SDK for — it won't
+      # take even a newer runtime of the same iOS major. Every simulator on the
+      # image runs iOS 26 now, so the Xcode has to be a 26 as well.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Generate Xcode project
         run: |
@@ -33,10 +39,53 @@ jobs:
             exit 1
           fi
 
+      # The runner has no iOS simulator sitting there, and naming a device type
+      # only sometimes makes xcodebuild create one — same workflow, one job
+      # found an iPhone 16 and the next found nothing at all. So make it here,
+      # on the runtime that matches the SDK, and check xcodebuild can see it
+      # before the test run depends on it.
+      - name: Create a simulator
+        run: |
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          runtimes=$(xcrun simctl list runtimes -j)
+          runtime=$(jq -r --arg sdk "$sdk" \
+            '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
+             | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
+             | .[0].identifier // ""' <<<"$runtimes")
+          device=$(jq -r --arg r "$runtime" \
+            '.runtimes[] | select(.identifier == $r)
+             | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
+             | .[0].identifier // ""' <<<"$runtimes")
+          if [ -z "$runtime" ] || [ -z "$device" ]; then
+            echo "::error::no iOS simulator runtime matches SDK $sdk"
+            xcrun simctl list runtimes
+            exit 1
+          fi
+          udid=$(xcrun simctl create ci-iphone "$device" "$runtime")
+          xcrun simctl bootstatus "$udid" -b
+          echo "SDK $sdk on $runtime -> $udid"
+          if ! xcodebuild -showdestinations -scheme AISetlog 2>/dev/null \
+            | grep -q "$udid"; then
+            echo "::error::xcodebuild can't see the simulator we just made"
+            xcodebuild -showdestinations -scheme AISetlog || true
+            exit 1
+          fi
+          echo "SIMULATOR_ID=$udid" >> "$GITHUB_ENV"
+
+      # The four suites below talk to the real CloudKit development database.
+      # They already skip on a simulator that isn't signed into iCloud — but
+      # here they can't even ask: unsigned means no iCloud entitlement, and
+      # `accountStatus()` on an unentitled container kills the test host rather
+      # than returning an error, so there's nothing left alive to skip from.
+      # Run them on a machine with an iCloud-signed simulator instead.
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "id=$SIMULATOR_ID" \
             -derivedDataPath build/DerivedData \
+            -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
+            -skip-testing:AISetlogTests/CloudKitPaginationTests \
+            -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
+            -skip-testing:AISetlogTests/JoinedRoomTests \
             CODE_SIGNING_ALLOWED=NO
