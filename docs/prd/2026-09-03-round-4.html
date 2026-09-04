@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1Day 第四轮 — 装上手之后发现的八件事</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.12);
+    --red:#A7443C;--green:#158463;--amber:#A75B12;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:40px 34px 120px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       font-size:14px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;
+       background:rgba(22,119,255,.09);padding:1.5px 5px;border-radius:5px;color:#0B4FA8}
+  a{color:var(--blue)}
+
+  .hdr{background:linear-gradient(135deg,#fff,#F2F7FF);border:1px solid var(--hair);
+       border-radius:22px;padding:24px 26px;box-shadow:0 10px 28px rgba(15,46,107,.10);margin-bottom:12px}
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.5px;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:7px 9px;font-size:12.5px;color:var(--inkSoft);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;
+        padding:3px 10px;border-radius:99px;background:var(--mist);color:var(--blue)}
+  .pill.ok{background:#DFF6EC;color:var(--green)}
+  .pill.warn{background:#FFE9D6;color:var(--amber)}
+  .pill.hot{background:#FBE4E1;color:var(--red)}
+  .pill.gray{background:rgba(147,166,198,.2);color:var(--inkSoft)}
+
+  h2{font-size:20px;margin:46px 0 6px;padding-top:24px;border-top:1px solid rgba(15,46,107,.13);
+     letter-spacing:-.3px}
+  h2:first-of-type{padding-top:0;border-top:0}
+  h2 .n{color:var(--inkFaint);font-weight:800;margin-right:8px}
+  h3{font-size:16px;margin:26px 0 6px;letter-spacing:-.2px}
+  h4{font-size:13.5px;margin:18px 0 5px;color:var(--inkSoft);letter-spacing:.2px;text-transform:uppercase;
+     font-weight:900}
+  p{margin:0 0 12px;max-width:900px}
+  .sub{color:var(--inkSoft);margin-bottom:18px;max-width:900px}
+  ul,ol{margin:0 0 12px;padding-left:22px;max-width:900px}
+  li{margin-bottom:5px}
+  li::marker{color:var(--sky)}
+
+  .card{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+        padding:16px 18px;margin:14px 0;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .card.hot{border-left:4px solid var(--red);background:linear-gradient(90deg,rgba(251,228,225,.5),rgba(255,255,255,.94) 60px)}
+  .card.warn{border-left:4px solid var(--amber);background:linear-gradient(90deg,rgba(255,233,214,.5),rgba(255,255,255,.94) 60px)}
+  .card.ok{border-left:4px solid var(--green);background:linear-gradient(90deg,rgba(223,246,236,.5),rgba(255,255,255,.94) 60px)}
+  .card.note{border-left:4px solid var(--sky)}
+  .card h4{margin-top:0}
+
+  table{border-collapse:collapse;width:100%;table-layout:fixed;margin:14px 0;font-size:13px;
+        background:rgba(255,255,255,.92);border-radius:14px;overflow:hidden;
+        box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  th,td{overflow-wrap:anywhere}
+  th{background:rgba(220,235,255,.7);text-align:left;padding:10px 13px;font-size:11.5px;
+     font-weight:900;letter-spacing:.4px;color:var(--inkSoft);text-transform:uppercase;
+     border-bottom:1px solid var(--hair)}
+  td{padding:10px 13px;border-bottom:1px solid rgba(15,46,107,.07);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.8px;color:var(--inkSoft)}
+  .no{color:var(--red);font-weight:800}
+  .yes{color:var(--green);font-weight:800}
+
+  .pr{background:rgba(255,255,255,.94);border:1px solid var(--hair);border-radius:20px;
+      margin:16px 0;box-shadow:0 6px 20px rgba(15,46,107,.09);overflow:hidden}
+  .pr > .top{display:flex;align-items:center;gap:11px;padding:14px 18px;
+      background:linear-gradient(100deg,rgba(220,235,255,.6),rgba(255,255,255,.4));
+      border-bottom:1px solid var(--hair)}
+  .pr .id{font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--blue),var(--cyan));
+      padding:4px 11px;border-radius:99px;letter-spacing:.4px;flex:0 0 auto}
+  .pr .ti{font-size:15.5px;font-weight:900;letter-spacing:-.2px}
+  .pr .bd{padding:16px 18px}
+  .pr .bd > :first-child{margin-top:0}
+
+  .tocbox{background:rgba(255,255,255,.9);border:1px solid var(--hair);border-radius:18px;
+      padding:14px 18px;margin-bottom:30px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .tocbox ol{columns:2;column-gap:32px;margin:0;padding-left:20px;font-size:13px}
+  .tocbox li{margin-bottom:4px}
+  .tocbox a{text-decoration:none;font-weight:700}
+
+  .quote{border-left:3px solid var(--sky);padding:2px 0 2px 14px;margin:0 0 14px;
+         color:var(--navy);font-weight:700;max-width:900px}
+  .code{background:#0F2036;color:#CFE3FF;border-radius:14px;padding:14px 16px;margin:12px 0;
+        font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:1.65;
+        overflow-x:auto;max-width:900px}
+  .code .c{color:#6E86A8}
+  .code .k{color:#7FD4A0}
+  .code .s{color:#FFC98B}
+  .fp{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.8px;color:var(--inkSoft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <h1>第四轮 — 装上手之后发现的八件事</h1>
+  <p class="sub" style="margin-bottom:0">build 9 上手用了一轮，反馈回来八条。这份稿子把每条翻译成「现在的代码在做什么、为什么这么做是错的、改完之后该是什么样」，一条一条 PR。</p>
+  <div class="meta">
+    <span class="pill">2026-09-03</span>
+    <span class="pill gray">第四轮</span>
+    <span class="pill warn">基线 demo/tonight</span>
+    <span>反馈来源 <b>build 9 实机试用</b></span>
+  </div>
+</div>
+
+<div class="tocbox">
+  <ol>
+    <li><a href="#s0">这轮为什么基在 demo/tonight 上</a></li>
+    <li><a href="#s1">模板存进库，并且有封面</a></li>
+    <li><a href="#s2">没拍过的故事也得看得见</a></li>
+    <li><a href="#s3">一个故事可以跳着拍</a></li>
+    <li><a href="#s4">还没建的房间，不能说「已有 3 人」</a></li>
+    <li><a href="#s5">自由拍摄那块，三个元素里两个在说谎</a></li>
+    <li><a href="#s6">拍摄时看得见的，成片里得有</a></li>
+    <li><a href="#s7">设置页重新分类</a></li>
+    <li><a href="#s8">房间功能，得真的测一遍</a></li>
+    <li><a href="#s9">一条贯穿八件事的判据</a></li>
+  </ol>
+</div>
+
+<h2 id="s0"><span class="n">0</span>这轮为什么基在 demo/tonight 上</h2>
+
+<p>反馈是对着 build 9 提的，build 9 出自 <code>demo/tonight</code>。而 <code>main</code> 落后它 <b>56 个提交</b>——第 3 条要改的 <code>StoryNextUp.swift</code>、第 4 条相关的 <code>RoomRoster.swift</code>、滤镜的 <code>LookPanel.swift</code>，<b>在 main 上根本不存在</b>。基在 main 上等于对着一份两周前的代码修今天的 bug。</p>
+
+<p>所以这八条全部 <code>--base demo/tonight</code>。代价是 main 和 demo 的距离还会拉大。</p>
+
+<div class="card warn">
+  <h4>欠着的账</h4>
+  <p style="margin-bottom:0">#3 到 #12 共 <b>10 个 PR 全部 open，一个没合</b>。CI 从 8 月 21 日红到 9 月 2 日才修好，所以这批 PR 谁也没被真正验证过就堆在那里。这轮做完，<b>该做的是把 PR 栈合掉，不是继续往上堆</b>。</p>
+</div>
+
+<h2 id="s1"><span class="n">1</span>模板存进库，并且有封面</h2>
+
+<p class="quote">「一个是用户创建好的模版，可以保存在模版库（跟着题目拍下面），自己上传封面 或者 系统匹配封面」</p>
+
+<h4>三件事，得分开看</h4>
+<table>
+  <colgroup><col style="width:26%"><col style="width:38%"><col style="width:36%"></colgroup>
+  <thead><tr><th>要求</th><th>现状</th><th>要做的</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>自建模板存进模板库</td>
+      <td>已有 <code>customTemplates.v1</code> 这个持久化 key，和 <code>updateCustomTemplate</code>。<b>先确认是不是已经能存了</b>——如果能，说清楚，不要修一个不存在的 bug</td>
+      <td>确认后补齐缺的那一段：建完能在创建故事时再选到</td>
+    </tr>
+    <tr>
+      <td>跟着题目拍</td>
+      <td>选模板后拍摄页是否显示该模板的提示词，待确认</td>
+      <td>每个瞬间显示它自己的题目</td>
+    </tr>
+    <tr>
+      <td>封面</td>
+      <td>故事有 <code>coverURL</code>（<code>StoryCard</code> / <code>TemplateCard</code>），模板没有</td>
+      <td>两条路都要：相册上传，和按内容自动匹配</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card note">
+  <h4>自动匹配不联网</h4>
+  <p style="margin-bottom:0"><code>MomentCatalog</code> 里已经有一套「提示词 → 图标」的映射，自动封面走它就够了。这个应用已经有一处联网（提示词建议走 Cloudflare Worker），封面再加一处网络依赖不值得——封面失败会让整张卡片空掉，而提示词失败只是少几行建议。</p>
+</div>
+
+<div class="card">
+  <h4>落盘要过边界</h4>
+  <p style="margin-bottom:0">用户上传的封面存 Documents，写法照 <code>ClipFileStore</code>：<b>一个 protocol 定义目录结构，View 层不碰 <code>FileManager</code></b>。这条不是洁癖——片子的落盘就是这么做的，两套写法会让「文件到底在哪」变成没人答得上来的问题。<br>如果要读相册，<code>ios/project.yml</code> 里得补 <code>NSPhotoLibraryUsageDescription</code>（现在只有 <code>...AddUsageDescription</code>，那是「写」的权限）。</p>
+</div>
+
+<h2 id="s2"><span class="n">2</span>没拍过的故事也得看得见</h2>
+
+<p class="quote">「创建好的内容，即使没有拍，应该也能在我的故事里看到。」</p>
+
+<div class="card hot">
+  <h4>这条我没能确认根因</h4>
+  <p style="margin-bottom:0">读代码读不出来它为什么会不可见，所以这条的第一步是<b>写一个失败的测试把它复现出来</b>，不是照着猜测改。如果查下来发现故事其实一直可见、问题在别处（比如标题不对导致没找到），<b>就如实说，不要为了交差硬改一版</b>。</p>
+</div>
+
+<h4>三个嫌疑</h4>
+<table>
+  <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+  <thead><tr><th>位置</th><th>为什么可疑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">StoryTimeline.swift</td>
+      <td>本身<b>没有</b>按 clip 数过滤，理论上未拍的故事应该出现。所以问题多半不在这</td>
+    </tr>
+    <tr>
+      <td class="mono">HomeHeroChoice.swift</td>
+      <td><code>filter { !$0.isComplete &amp;&amp; !$0.cards.isEmpty }</code> — 注意是 <code>cards</code>（瞬间槽位数）不是 clip 数。什么样的故事会造出 0 个 card？time-only？自由拍摄？自建模板？</td>
+    </tr>
+    <tr>
+      <td class="mono">PlansHomeView.swift</td>
+      <td>标题是 <code>timeline.includesToday ? yourStories : scrollBack</code>。<b>「我的故事」这四个字只在列表里有今天的东西时才出现</b>，否则叫「往回翻」。而且 hero 会被从列表里 <code>excluding</code> 掉——故事被提到顶上当 hero 了，列表里自然就没有</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><b>判据：</b>任何已创建的故事，无论拍没拍，都必须在首页某处可见、可点进去，并且那块区域的标题得说人话。</p>
+
+<h2 id="s3"><span class="n">3</span>一个故事可以跳着拍</h2>
+
+<p class="quote">「进入模版页，如果是故事，可以跳着拍，所以蓝色的框的思路可以重新理（现在是下一个，我觉得逻辑不对）」</p>
+
+<p>上一轮做了 <b>#9「一天只该有一件下一步的事」</b>，产物是 <code>StoryNextUp.swift</code> + <code>StoryAgenda.swift</code>：故事页上一个蓝色高亮框，指着「下一个该拍的」。</p>
+
+<div class="card hot">
+  <h4>这是上一轮的方向做反了，不是实现有 bug</h4>
+  <p style="margin-bottom:0">「只有一件下一步的事」解决的是<b>选择过载</b>——当时屏幕上每个瞬间下面都挂着一张「等待 Leo」的卡，三个朋友五个瞬间就是十五张卡。收敛成一件事是对的。<br><br>但收敛的方式<b>把一个自由的顺序说成了一条流水线</b>。一天里的七个瞬间没有先后依赖，谁先谁后是拍的人当下的事。用最重的视觉（蓝色描边）独占一个槽位，等于告诉人「别的还不能拍」。</p>
+</div>
+
+<h4>改完该是什么样</h4>
+<ul>
+  <li>每个没拍的瞬间<b>平等可点</b>，点哪个拍哪个。没有一个看起来是锁住的</li>
+  <li>「下一个」降级成<b>弱建议</b>——一个轻提示，或者进页面时默认滚到那儿。<b>不能是唯一入口</b></li>
+  <li>拍过的和没拍的，一眼能分开</li>
+  <li><code>StoryAgenda</code> 的 API 跟着从「命令」改成「建议」，<code>StoryAgendaTests</code> 一起更新</li>
+</ul>
+
+<div class="card note">
+  <h4>代码里其实已经承认了这件事</h4>
+  <p style="margin-bottom:0"><code>RoomCast.swift</code> 的注释白纸黑字写着 <span class="fp">「Which moment they film is theirs to pick」</span>——房间里每个人自己挑拍哪个。这句话在<b>数据层</b>是对的，只是<b>界面层</b>没跟上。这次是让界面追上数据，不是改主意。</p>
+</div>
+
+<h2 id="s4"><span class="n">4</span>还没建的房间，不能说「已有 3 人」</h2>
+
+<p class="quote">「和朋友一起，为什么现在显示了有3人，（周悦林，房间已有三人）这个UI不对。」</p>
+
+<h4>根因</h4>
+<div class="code"><span class="c">// StoryComposerView.swift:311</span>
+<span class="k">private var</span> knownFriendNames: [String] {
+    <span class="k">var</span> seen: [String] = []
+    <span class="k">for</span> challenge <span class="k">in</span> store.challenges <span class="k">where</span> challenge.isShared {
+        <span class="k">for</span> member <span class="k">in</span> store.members(<span class="k">for</span>: challenge.id) <span class="k">where</span> !seen.contains(member.name) {
+            seen.append(member.name)
+        }
+    }
+    <span class="k">return</span> seen
+}</div>
+
+<p>它把你<b>已有的所有房间</b>里见过的人捞出来，传给 <code>SetupStep.memberNames</code>，渲染成一排头像 + <code>Strings.membersInRoom(count)</code> = 「房间里有 3 人」。</p>
+
+<div class="card hot">
+  <h4>意图是「建议」，措辞是「事实」</h4>
+  <p style="margin-bottom:0">原始注释写的是 <span class="fp">shown as suggestions … so it isn't an empty promise</span>——作者知道这是建议。但界面上写的是「已有」。<b>一个还没创建的房间被说成已经有三个人，而那三个人根本不知道这件事、也不会自动进来。</b>这不是措辞小问题，是界面在承诺一件不会发生的事。</p>
+</div>
+
+<h4>两条路，选一条</h4>
+<table>
+  <colgroup><col style="width:22%"><col style="width:44%"><col style="width:34%"></colgroup>
+  <thead><tr><th>方案</th><th>做法</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><b>删掉</b></td><td>新建房间时这排头像和这句话直接不出现</td><td>少一点「和朋友一起会是什么样」的暗示</td></tr>
+    <tr><td><b>说实话</b></td><td>改成「上次和你一起拍的人」，头像可点 = 真的发邀请</td><td><b>点了必须真的发出邀请</b>。做不到就别做成可点的，那只是造第二个假承诺</td></tr>
+  </tbody>
+</table>
+
+<p class="fp">注意别误伤：<code>RoomCast.rosterLine</code> 用的 <code>Strings.peopleInRoom</code> 是<b>真实房间</b>的人数，那个是对的。</p>
+
+<h2 id="s5"><span class="n">5</span>自由拍摄那块，三个元素里两个在说谎</h2>
+
+<p class="quote">「自由拍摄下面有一个瞬间1，我感觉界面不好，我下面有三个白色的横跳，这个的设计是什么，原理是什么。」</p>
+
+<h4>直接回答：它没有原理</h4>
+<div class="code"><span class="c">// CameraComponents.swift，约 163–174 行</span>
+Capsule().fill(.white.opacity(<span class="s">0.42</span>)).frame(width: <span class="s">34</span> * scale, …)
+Capsule().fill(.white)              .frame(width: <span class="s">46</span> * scale, …)
+Capsule().fill(.white.opacity(<span class="s">0.42</span>)).frame(width: <span class="s">34</span> * scale, …)</div>
+
+<p><b>三个写死的胶囊。</b>永远三条、永远中间那条亮。跟这个故事有几个瞬间、你在第几个，<b>完全无关</b>。它长得像进度指示器，但它不指示任何东西。</p>
+
+<h4>「瞬间 1」更糟</h4>
+<p>自由拍摄走 <code>RootShellView.swift</code> 的 <code>CameraTabView</code>，那里 <code>day: 1</code> 是<b>硬编码</b>的。自由拍摄的片子还没归进任何故事，「瞬间 1」是句假话。</p>
+
+<table>
+  <colgroup><col style="width:24%"><col style="width:38%"><col style="width:38%"></colgroup>
+  <thead><tr><th>元素</th><th>说的</th><th>实际</th></tr></thead>
+  <tbody>
+    <tr><td>「自由拍摄」</td><td>这是自由拍摄</td><td class="yes">真的</td></tr>
+    <tr><td>「瞬间 1」</td><td>这是第 1 个瞬间</td><td class="no">假的 — 还没归进任何故事</td></tr>
+    <tr><td>三条白杠</td><td>共 3 步，当前第 2 步</td><td class="no">假的 — 写死的装饰</td></tr>
+  </tbody>
+</table>
+
+<p><b>判据：这块区域里的每个元素，要么说真话，要么删掉。</b>进度指示器要么按真实瞬间数和当前位置画，要么删；自由拍摄模式下「瞬间 N」不该出现。</p>
+
+<h2 id="s6"><span class="n">6</span>拍摄时看得见的，成片里得有</h2>
+
+<p class="quote">「右上角的logo如果不能保存在最后渲染拼接的页面，那就没有意义。我的想法是拍摄的时候看不见，或者在拍摄页能不能做几个类似tiktok的贴纸的功能，可以切换贴纸（不过这个优先级没那么高）」</p>
+
+<h4>先纠正一个位置</h4>
+<table>
+  <colgroup><col style="width:34%"><col style="width:22%"><col style="width:44%"></colgroup>
+  <thead><tr><th>东西</th><th>在哪</th><th>进成片吗</th></tr></thead>
+  <tbody>
+    <tr><td>1Day logo 牌（<code>BrandStamp</code>）</td><td>拍摄页<b>左上</b></td><td class="no">不进</td></tr>
+    <tr><td>日期 + 时间</td><td>拍摄页<b>右上</b></td><td>待核对 <code>addCaption</code></td></tr>
+    <tr><td>「made with 1Day」水印</td><td>成片<b>左下</b></td><td class="yes">进（真机）</td></tr>
+  </tbody>
+</table>
+
+<p>用户记的位置有出入，但<b>判断是对的</b>：拍摄时看到的那个 logo 牌子，和成片左下角的水印是两个东西，前者永远不会出现在成片里。</p>
+
+<div class="card ok">
+  <h4>方向已定：拍摄时看不见</h4>
+  <p style="margin-bottom:0">贴纸功能用户自己标了「优先级没那么高」，<b>这轮不做</b>。这轮只做一件事：把拍摄页上进不了成片的装饰拿掉，并把其余元素跟 <code>VideoStitcher.addCaption</code> 逐个核对，列一张对照表。<br><br>保守优先——<b>倾向于从拍摄页拿掉说假话的元素，而不是给成片加一堆新叠加层</b>。成片的叠加层是最贵也最容易出事的一层。</p>
+</div>
+
+<div class="card hot">
+  <h4>这条在模拟器上验不了</h4>
+  <p style="margin-bottom:0"><code>VideoStitcher</code> 里所有叠加层都被 <code>#if !targetEnvironment(simulator)</code> 包着（约 140 / 178 / 223 行）——<code>AVVideoCompositionCoreAnimationTool</code> 在模拟器上不工作。<b>模拟器导出的成片本来就没有任何叠加层</b>，看到「成片很干净」不能推出「水印没生效」。<br>涉及成片外观的结论，只能靠读代码，结论里必须写明「未在真机验证」。</p>
+</div>
+
+<h2 id="s7"><span class="n">7</span>设置页重新分类</h2>
+
+<p class="quote">「设置页面太乱了，我不喜欢，重新分类。」</p>
+
+<h4>乱在哪 — 数了一遍</h4>
+<table>
+  <colgroup><col style="width:8%"><col style="width:38%"><col style="width:54%"></colgroup>
+  <thead><tr><th>#</th><th>Section</th><th>问题</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>语言</td><td rowspan="3">三个 inline Picker 把所有选项全摊开，光这三组就吃掉大半屏</td></tr>
+    <tr><td>2</td><td>外观</td></tr>
+    <tr><td>3</td><td>画面风格 + 记住</td></tr>
+    <tr><td>4</td><td>通知 — 晚间提醒 + 时间</td><td rowspan="4"><b>同一件事被拆成四段，其中三段没有标题。</b>浮空的无标题 Section 是这页最乱的部分</td></tr>
+    <tr><td>5</td><td>（无标题）朋友动态 + 显示名字</td></tr>
+    <tr><td>6</td><td>（条件）逐房间静音</td></tr>
+    <tr><td>7</td><td>（无标题）通知被拒的提示 + 跳系统设置</td></tr>
+    <tr><td>8</td><td>账号</td><td>位置靠后，但「删除账号」是审核硬要求</td></tr>
+    <tr><td>9</td><td>关于</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<p>再加上它是 <code>.presentationDetents([.medium, .large])</code> 的 sheet——medium 那档根本装不下。</p>
+
+<h4>要求</h4>
+<ul>
+  <li>相关的聚在一起：通知那四段是同一件事</li>
+  <li>inline Picker 改成 navigation / menu，每组一行显示当前值，选项进二级页</li>
+  <li>顺序按使用频率，不是按实现顺序</li>
+  <li><b>每个 Section 都有标题</b></li>
+  <li><b>一个功能都不许丢</b>。尤其「删除账号」——App Store 审核 5.1.1(v) 的硬要求</li>
+</ul>
+
+<div class="card warn">
+  <h4>两个别踩回去的坑</h4>
+  <ul style="margin-bottom:0">
+    <li><code>SignInView</code> 的 sheet 挂在 <code>Form</code> 上而不是 <code>Section</code> 上——从已弹出的 sheet 内部再弹会把整个设置页带走</li>
+    <li><code>GentleLook</code> 的微调滑块<b>故意不在设置里</b>——看不到画面的滑块是在瞎猜。这是上一轮定下的，尊重它</li>
+  </ul>
+</div>
+
+<h2 id="s8"><span class="n">8</span>房间功能，得真的测一遍</h2>
+
+<p class="quote">「测试好房间功能。」</p>
+
+<div class="card hot">
+  <h4>房间功能已经两周多没被任何自动化验证过</h4>
+  <p style="margin-bottom:0">四个 CloudKit suite（<code>CloudKitIdempotency</code> / <code>CloudKitPagination</code> / <code>RoomSyncIntegration</code> / <code>JoinedRoom</code>）在 CI 上是被 <code>-skip-testing:</code> 跳掉的。<br><br>原因是一条连锁：CI 用 <code>CODE_SIGNING_ALLOWED=NO</code> 编译 → 没有 iCloud entitlement → <code>CKContainer.accountStatus()</code> <b>直接打死 test host</b>（不是抛错，是进程没了）→ 连「跳过」的机会都没有。<br><br>叠加上 CI 从 8/21 红到 9/2，房间这块<b>确实处于无人验证状态</b>。</p>
+</div>
+
+<h4>这轮的交付，报告比代码重要</h4>
+<table>
+  <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+  <thead><tr><th>做什么</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>判断本机能否真跑那 4 个 suite</td><td>只读判断模拟器 iCloud 状态。<b>不代替用户登录 iCloud，不输入任何 Apple ID / 密码 / 验证码</b>。跑不了就说清楚卡在哪一步</td></tr>
+    <tr><td>补齐脱网可测的那一层</td><td>邀请码规范化与校验、深链 <code>oneday://join</code> 的合法与非法解析、<code>RoomCast</code>（我永远第一个且只一次；本地 clip 算我的）、<code>RoomProgress</code>、<code>recordedClips</code> 本地优先合并、<code>signOut</code> 清缓存、recordName 推导稳定</td></tr>
+    <tr><td>列出仍然没有覆盖的行为</td><td><b>这是最有价值的产出</b>——诚实列出哪些房间行为至今没有任何自动化保护</td></tr>
+    <tr><td>核实 Production schema</td><td>只读。已知阻塞项：Development 有、Production 没有，正式包的房间会全挂</td></tr>
+  </tbody>
+</table>
+
+<div class="card note">
+  <h4>不许为了变绿而放宽断言</h4>
+  <p style="margin-bottom:0">这条任务的价值全在「知道哪里没测到」。一个绿色但空心的测试套件，比一个诚实的缺口清单危险得多。</p>
+</div>
+
+<h2 id="s9"><span class="n">9</span>一条贯穿八件事的判据</h2>
+
+<p>把八条摆在一起看，第 2、4、5、6 条其实是<b>同一个毛病的四个切面</b>：</p>
+
+<table>
+  <colgroup><col style="width:10%"><col style="width:45%"><col style="width:45%"></colgroup>
+  <thead><tr><th>#</th><th>界面说的</th><th>实际</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td>（故事不在列表里 ⇒）你没有这个故事</td><td>故事在，只是没显示</td></tr>
+    <tr><td>4</td><td>房间里有 3 人</td><td>房间还不存在</td></tr>
+    <tr><td>5</td><td>瞬间 1，共 3 步</td><td>写死的装饰</td></tr>
+    <tr><td>6</td><td>你的片子上有这个 logo</td><td>成片里没有</td></tr>
+  </tbody>
+</table>
+
+<div class="card ok">
+  <h4>判据</h4>
+  <p style="margin-bottom:0"><b>界面上出现的每一个数字、每一句话、每一个进度条，在它出现的那一刻必须是真的。</b>做不到就删掉——一个空位比一句假话诚实。<br><br>这四条单看都是小 bug，凑在一起是同一件事：这个应用有几处在<b>为了看起来完整而说话</b>。装饰性的进度条、猜测性的人数、进不了成片的水印，都是同一个冲动的产物。</p>
+</div>
+
+<h4>八条的落地</h4>
+<table>
+  <colgroup><col style="width:6%"><col style="width:32%"><col style="width:34%"><col style="width:28%"></colgroup>
+  <thead><tr><th>#</th><th>分支</th><th>主要文件</th><th>性质</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td class="mono">feat/template-library-covers</td><td class="mono">BuildTemplateView / ChallengeTemplate / TemplateCard</td><td>新功能</td></tr>
+    <tr><td>2</td><td class="mono">fix/every-story-shows-up</td><td class="mono">PlansHomeView / HomeHeroChoice / StoryTimeline</td><td>先复现再修</td></tr>
+    <tr><td>3</td><td class="mono">feat/pick-any-moment</td><td class="mono">StoryNextUp / StoryAgenda</td><td>方向翻案</td></tr>
+    <tr><td>4</td><td class="mono">fix/room-count-is-not-a-promise</td><td class="mono">StoryComposerView / ComposerSteps</td><td>删假话</td></tr>
+    <tr><td>5+6</td><td class="mono">fix/camera-stamp-tells-the-truth</td><td class="mono">CameraComponents / RootShellView / VideoStitcher</td><td>删假话 + 核对</td></tr>
+    <tr><td>7</td><td class="mono">feat/settings-regrouped</td><td class="mono">SettingsView</td><td>重组</td></tr>
+    <tr><td>8</td><td class="mono">test/room-end-to-end</td><td class="mono">AISetlogTests/</td><td>补测试 + 缺口清单</td></tr>
+  </tbody>
+</table>
+
+<p class="fp" style="margin-top:26px">第 5 和第 6 合成一条 PR：两者都改 <code>CameraComponents.swift</code> 里同一块叠加层，拆开必然打架。</p>
+
+</div>
+</body>
+</html>
