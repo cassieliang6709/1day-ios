@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// The story page in three weights: how far the day has got, the one thing to
-/// do next, and quiet lists of what happened and what hasn't.
+/// The pieces the story page is built from: how far the day has got, the
+/// moments that are still yours to take, the moments that happened, and — only
+/// once there is nothing left to film — the film.
 ///
-/// It replaces a wall of equally weighted tiles. Every moment was the same
-/// size, the same shape and equally tappable, which left the page with seven
-/// invitations and no answer to "what now". `StoryAgenda` decides which moment
-/// is next; these are the shapes that decision gets drawn in.
+/// The page is deliberately weighted in that order rather than around a single
+/// next step. An earlier version put one moment on a full-width gradient card
+/// labelled "next up" and demoted the rest to a list, which reads as a queue:
+/// this one first, the others after. A day doesn't work like that. You film
+/// the walk because you're on the walk. So every open moment here is the same
+/// row, the same size and the same tap; the only thing the suggestion earns is
+/// a softer word and a tint you have to be looking for.
 
 /// How much of the day exists. The bar and the count come from the same two
 /// numbers the story itself is made of — moments in the plan, and moments
@@ -56,41 +60,29 @@ struct StoryProgressBar: View {
     }
 }
 
-/// The one thing to do next, and by a distance the heaviest object on the page.
+/// The film, once every moment holds footage — and the only object on this
+/// page that gets the loudest treatment.
 ///
-/// Once every moment holds footage there is nothing left to film, so the card
-/// becomes the way into the film. That entry point used to be a second
-/// full-width button floating at the bottom of this same screen — two loud
-/// actions, and the page never said which one was its point.
-struct NextSlotCard: View {
-    enum Kind: Equatable {
-        /// Film this moment next.
-        case film(title: String, icon: String, slot: Int, total: Int)
-        /// Nothing left to film. The day is the film now.
-        case watch(clipCount: Int)
-    }
-
-    let kind: Kind
-    /// How long a clip runs, so the card can say what it's asking for.
-    var durationLabel: String?
-    /// Who else in the room has filmed. Nil in a solo story, and nil in a room
-    /// nobody has joined.
-    var roomNote: RoomCast.Note?
+/// It earns that because by the time it appears there is genuinely nothing
+/// else to do: no moment is still open, so a full-width gradient card can't be
+/// read as a queue of one. While the day is still being filmed, nothing here
+/// looks like this. The way into the film used to be a second full-width
+/// button floating at the bottom of this same screen, competing with a card
+/// that wanted you to film instead.
+struct FilmReadyCard: View {
+    let clipCount: Int
     let action: () -> Void
 
     var body: some View {
         Button(action: action) { card }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text(headline))
-            // Both sentences, even though the card only has room to print one:
-            // how long the clip runs and who's already filmed are each worth
-            // hearing before you tap.
-            .accessibilityHint(Text(hint))
+            .accessibilityLabel(Text(Strings.watchTheFilm))
+            .accessibilityHint(Text(Strings.filmFromMoments(clipCount)))
     }
 
     private var card: some View {
         HStack(spacing: 14) {
-            Image(systemName: glyph)
+            Image(systemName: "film.stack.fill")
                 .font(.system(size: 23, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 54, height: 54)
@@ -98,7 +90,7 @@ struct NextSlotCard: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.34), lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(kicker)
+                Text(Strings.dayIsFull)
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .kerning(0.7)
                     .textCase(.uppercase)
@@ -106,14 +98,18 @@ struct NextSlotCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text(headline)
+                Text(Strings.watchTheFilm)
                     .font(.system(size: 21, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.leading)
 
-                smallPrint
+                Text(Strings.filmFromMoments(clipCount))
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer(minLength: 4)
@@ -129,59 +125,6 @@ struct NextSlotCard: View {
             in: RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
         .oneDayGlow()
         .contentShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
-    }
-
-    /// In a shared room the card's last line is who else showed up, and it
-    /// takes the caption's place rather than stacking under it — the card stays
-    /// three lines tall, and "他俩拍了，就差你" is the more useful of the two
-    /// sentences by a distance. The film's own caption keeps its place: how
-    /// many clips are in it is a fact about the film, not about filming.
-    @ViewBuilder
-    private var smallPrint: some View {
-        if case .film = kind, let roomNote {
-            RoomNote(note: roomNote, tint: .white.opacity(0.9))
-        } else {
-            Text(caption)
-                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.88))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
-
-    private var hint: String {
-        [caption, roomNote?.text].compactMap { $0 }.joined(separator: " · ")
-    }
-
-    private var glyph: String {
-        switch kind {
-        case .film(_, let icon, _, _): icon
-        case .watch: "film.stack.fill"
-        }
-    }
-
-    private var kicker: String {
-        switch kind {
-        case .film(_, _, let slot, let total): Strings.nextUpPosition(slot, total: total)
-        case .watch: Strings.dayIsFull
-        }
-    }
-
-    private var headline: String {
-        switch kind {
-        case .film(let title, _, _, _): title
-        case .watch: Strings.watchTheFilm
-        }
-    }
-
-    private var caption: String {
-        switch kind {
-        case .film:
-            guard let durationLabel else { return Strings.tapToFilm }
-            return "\(Strings.tapToFilm) · \(durationLabel)"
-        case .watch(let clipCount):
-            return Strings.filmFromMoments(clipCount)
-        }
     }
 }
 
@@ -323,49 +266,74 @@ struct ClipThumb: View {
     }
 }
 
-/// A moment that hasn't happened yet, as a line in a list.
+/// A moment that's still yours to take, as one row among equals.
 ///
-/// Every open moment stays reachable — a 1-day story never locks one — but
-/// only the next one gets the card. The rest read as what's coming, which is
-/// what they are.
-struct QuietSlotRow: View {
+/// Every row in this list is the same height, the same weight and the same
+/// tap: it opens the camera on that moment. Nothing is dimmed, nothing is
+/// numbered, and there is no order to work through — three rows down is as
+/// available as the first one.
+///
+/// Two rows say something extra, and both are one short phrase rather than a
+/// different kind of object:
+///
+/// - `isSuggested` — the place to start if you'd rather not choose. It gets a
+///   tint you have to be looking for and a question, not an instruction.
+/// - `awaitingMine` — a friend filmed this one; the thumbnail above plays
+///   their take and this row is how mine gets in.
+///
+/// The two can never both be true: a moment somebody has filmed is never the
+/// one being suggested.
+struct OpenSlotRow: View {
     let momentTitle: String
     let momentIcon: String
     /// A friend filmed this moment already; this row is how mine gets in.
     var awaitingMine = false
+    /// Somewhere to start, for a day you haven't got into yet.
+    var isSuggested = false
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 Image(systemName: momentIcon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.oneDaySky)
-                    .frame(width: 30, height: 30)
-                    .background(OneDay.surfaceSoft.opacity(0.7), in: Circle())
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.oneDayBlue)
+                    .frame(width: 34, height: 34)
+                    .background(Color.oneDayMist.opacity(0.55), in: Circle())
 
                 Text(momentTitle)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
+                    .font(.system(size: 15.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
                 Spacer(minLength: 8)
 
-                Text(awaitingMine ? Strings.addYourTake : Strings.notYetFilmed)
+                Text(trailingLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(awaitingMine ? Color.oneDayBlue : OneDay.inkFaint)
+                    .foregroundStyle(Color.oneDayBlue)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(OneDay.inkFaint)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 13)
+            // A wash rather than a border. A stroked outline reads as a
+            // selected item — as though the others were waiting their turn —
+            // and that is the exact wrong sentence for this list.
+            .background(isSuggested ? Color.oneDayMist.opacity(0.35) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHint(Text(Strings.record))
+        .accessibilityLabel(Text(momentTitle))
+        .accessibilityHint(Text(trailingLabel))
+    }
+
+    private var trailingLabel: String {
+        if awaitingMine { return Strings.addYourTake }
+        return isSuggested ? Strings.startHere : Strings.filmThisOne
     }
 }

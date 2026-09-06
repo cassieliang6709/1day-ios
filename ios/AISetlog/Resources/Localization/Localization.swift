@@ -442,7 +442,6 @@ enum Strings {
     static var todaySubtitle: String {
         lang == .chinese ? "记录两秒，拼出你的一天。" : "Capture two seconds. Build your day."
     }
-    static var nextCapture: String { lang == .chinese ? "下一个瞬间" : "Next capture" }
     static func slotOfTotal(oneDay: Bool, index: Int, total: Int) -> String {
         if lang == .chinese { return oneDay ? "第 \(index) 个瞬间，共 \(total) 个" : "第 \(index) 天，共 \(total) 天" }
         return oneDay ? "Moment \(index) of \(total)" : "Day \(index) of \(total)"
@@ -928,12 +927,18 @@ enum Strings {
     }
     static var youLabel: String { lang == .chinese ? "你" : "You" }
     static var yoursLabel: String { lang == .chinese ? "自建" : "Yours" }
-    static func nextUpMoment(_ moment: String) -> String {
-        lang == .chinese ? "接下来：\(moment)" : "Next: \(moment)"
+    /// One open moment, named on the home card so the story has a face on it.
+    ///
+    /// It says "还没拍" rather than "接下来" on purpose: the button beside it
+    /// opens this moment because a card that small has to default to
+    /// something, not because the day has to be filmed in this order. The
+    /// story page, one tap away, offers all of them at once.
+    static func openMomentLabel(_ moment: String) -> String {
+        lang == .chinese ? "还没拍：\(moment)" : "Still open: \(moment)"
     }
-    static func storyCardCaption(next: String, isComplete: Bool) -> String {
+    static func storyCardCaption(open: String, isComplete: Bool) -> String {
         if isComplete { return lang == .chinese ? "影片已经准备好了" : "Your film is ready" }
-        return nextUpMoment(next)
+        return openMomentLabel(open)
     }
     static func filmReadySubtitle(duration: String) -> String {
         lang == .chinese ? "影片完成 · \(duration)" : "Film ready · \(duration)"
@@ -1184,25 +1189,34 @@ enum Strings {
             : "Your first moment lands at the top of this line."
     }
 
-    /// The story page's progress bar, and the labels around its one next
-    /// action. The page shows exactly one thing to tap, so these are the words
-    /// that have to say where in the day it is.
+    /// The story page: how far the day has got, and the words on the list of
+    /// moments that are still yours to take.
     static func momentsFilmed(_ filmed: Int, total: Int) -> String {
         lang == .chinese ? "拍了 \(filmed)/\(total) 个瞬间" : "\(filmed) of \(total) filmed"
     }
-    static func nextUpPosition(_ slot: Int, total: Int) -> String {
-        lang == .chinese ? "接下来 · 第 \(slot)/\(total) 个" : "Next up · \(slot) of \(total)"
-    }
     static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
-    /// The way into the film, now that it lives on the next-up card instead of
-    /// a second button floating at the bottom of the same screen.
+    /// The way into the film, on the one card the page allows itself — and
+    /// only once there's nothing left to film.
     static var watchTheFilm: String { lang == .chinese ? "看成片" : "See the film" }
     static func filmFromMoments(_ clips: Int) -> String {
         lang == .chinese ? "\(clips) 个片段，缝成一部" : "\(clips) clips, one film"
     }
     static var filmedHeader: String { lang == .chinese ? "拍过的" : "Filmed" }
     static var stillOpenHeader: String { lang == .chinese ? "还没拍的" : "Still open" }
-    static var notYetFilmed: String { lang == .chinese ? "还没拍" : "Not yet" }
+    /// The sentence the open list needs to be read right. A list of rows looks
+    /// like an order to work through unless something says otherwise, and the
+    /// whole point of a one-day story is that it isn't one. The clip length
+    /// rides along because it's the other thing you'd want to know before
+    /// picking: it used to sit on the card this list replaced.
+    static func anyOrderHint(duration: String?) -> String {
+        let base = lang == .chinese ? "想拍哪个就拍哪个，不用按顺序" : "Any order you like"
+        guard let duration else { return base }
+        return lang == .chinese ? "\(base) · 每段 \(duration)" : "\(base) · \(duration) each"
+    }
+    /// The one row that's a suggestion. A question, because that's all it is —
+    /// every other row does exactly the same thing when you tap it.
+    static var startHere: String { lang == .chinese ? "先拍这个？" : "Start here?" }
+    static var filmThisOne: String { lang == .chinese ? "开拍" : "Film it" }
     /// A moment a friend already filmed. The thumbnail plays their take; this
     /// row is how mine gets in.
     static var addYourTake: String { lang == .chinese ? "加上你的" : "Add yours" }

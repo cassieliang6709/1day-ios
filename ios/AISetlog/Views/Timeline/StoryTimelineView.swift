@@ -2,12 +2,18 @@ import SwiftUI
 
 /// Screen 4 — the story page. The heart of the app.
 ///
-/// The page has exactly one next thing on it. Every moment used to be a tile
-/// of the same size, weight and tappability, so a day asked seven questions at
-/// once and answered none of them — and a film button floated over the bottom
-/// of it asking an eighth. Now the day reads top to bottom: how far it has got,
-/// the one moment to film next (or the film, once there's nothing left to
-/// film), then what happened, then what hasn't.
+/// The day reads top to bottom: how far it has got, what's still yours to
+/// take, then what happened — and once nothing is left open, the film.
+///
+/// "What's still yours to take" is a list of equals on purpose. The page began
+/// as a wall of identical tiles that asked seven questions and answered none;
+/// the answer to that was a single "next up" card carrying the loudest pixels
+/// on the screen, which overcorrected into a different lie. A story is filmed
+/// in whatever order the day happens in — you shoot the walk while you're on
+/// the walk — and a queue of one told people the rest were waiting their turn.
+/// So the open moments are back to being peers, sitting where the loud card
+/// used to sit, and the only thing left of "next" is one row wearing a tint
+/// and a question mark.
 struct StoryTimelineView: View {
     let challengeID: UUID
 
@@ -114,9 +120,32 @@ struct StoryTimelineView: View {
 
                 StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
 
-                nextCard(
-                    challenge, agenda: agenda, clipCount: clips.count,
-                    roomNote: cast?.filmedNote)
+                // Who has put something in the day, directly under the number
+                // that says how much is in it. It used to ride on the next-up
+                // card, which meant it disappeared the moment the day filled
+                // up — and "他俩拍了" is a fact about the room, not about the
+                // moment the page happened to be offering.
+                if let note = cast?.filmedNote {
+                    RoomNote(note: note)
+                }
+
+                // Only once, and only when it's the whole answer.
+                if agenda.isComplete {
+                    FilmReadyCard(clipCount: clips.count) { showFilm = true }
+                }
+
+                // Above the archive: what you can still do outranks what's
+                // already done, and this list is the page's way into the
+                // camera now that no single moment owns one.
+                if !agenda.openToMe.isEmpty {
+                    section(
+                        Strings.stillOpenHeader,
+                        note: Strings.anyOrderHint(
+                            duration: challenge.resolvedClipLength.secondsLabel)
+                    ) {
+                        openList(challenge, agenda: agenda)
+                    }
+                }
 
                 if !agenda.filmed.isEmpty {
                     section(Strings.filmedHeader) {
@@ -136,12 +165,6 @@ struct StoryTimelineView: View {
                                     ? .moment(day: day)
                                     : .preview(day: day, authorID: nil)
                             })
-                    }
-                }
-
-                if !agenda.later.isEmpty {
-                    section(Strings.stillOpenHeader) {
-                        quietList(challenge, agenda: agenda)
                     }
                 }
 
@@ -183,57 +206,51 @@ struct StoryTimelineView: View {
         }
     }
 
+    /// A header, and optionally the one sentence the section needs to be read
+    /// correctly. "还没拍的" is a list of choices, not a running order, and
+    /// nothing in a list of rows says that on its own.
     private func section<Content: View>(
-        _ title: String, @ViewBuilder content: () -> Content
+        _ title: String, note: String? = nil, @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: title)
+            VStack(alignment: .leading, spacing: 3) {
+                SectionLabel(text: title)
+                if let note {
+                    Text(note)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(2)
+                }
+            }
             content()
         }
     }
 
-    /// The page's one loud thing.
-    @ViewBuilder
-    private func nextCard(
-        _ challenge: Challenge, agenda: StoryAgenda, clipCount: Int,
-        roomNote: RoomCast.Note?
-    ) -> some View {
-        switch agenda.next {
-        case .film(let slot):
-            NextSlotCard(
-                kind: .film(
-                    title: slotHeadline(challenge, slot: slot),
-                    icon: slotIcon(challenge, slot: slot),
-                    slot: slot,
-                    total: max(agenda.total, slot)),
-                durationLabel: challenge.resolvedClipLength.secondsLabel,
-                roomNote: roomNote
-            ) {
-                sheet = .record(day: slot)
-            }
-
-        case .watchTheFilm:
-            NextSlotCard(kind: .watch(clipCount: clipCount)) { showFilm = true }
-        }
-    }
-
-    /// Everything still open to me except the one on the card, as a list of
-    /// what's coming rather than a wall of equal buttons.
-    private func quietList(_ challenge: Challenge, agenda: StoryAgenda) -> some View {
+    /// Every moment still open to me, all of them, all the same.
+    ///
+    /// Nothing is held back for a card above and nothing is skipped: the list
+    /// *is* the offer, so whichever moment is actually happening right now is
+    /// one tap away instead of three rows into a queue.
+    private func openList(_ challenge: Challenge, agenda: StoryAgenda) -> some View {
         VStack(spacing: 0) {
-            ForEach(Array(agenda.later.enumerated()), id: \.element) { index, slot in
+            ForEach(Array(agenda.openToMe.enumerated()), id: \.element) { index, slot in
                 if index > 0 {
-                    Divider().overlay(OneDay.hairline).padding(.leading, 56)
+                    Divider().overlay(OneDay.hairline).padding(.leading, 60)
                 }
-                QuietSlotRow(
+                OpenSlotRow(
                     momentTitle: slotHeadline(challenge, slot: slot),
                     momentIcon: slotIcon(challenge, slot: slot),
-                    awaitingMine: agenda.isAwaitingMine(slot: slot)
+                    awaitingMine: agenda.isAwaitingMine(slot: slot),
+                    isSuggested: agenda.isSuggested(slot: slot)
                 ) {
                     sheet = .record(day: slot)
                 }
             }
         }
+        // Clipped before the surface goes on: the suggested row's wash runs
+        // the full width of its row, and the top and bottom rows have to give
+        // it the card's rounded corners.
+        .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
         .glassSurface(radius: OneDay.Radius.card)
     }
 
@@ -281,9 +298,9 @@ struct StoryTimelineView: View {
                 // Watching an unfinished day is a real thing to want — a friend
                 // who joins late can see it before filming — but it isn't the
                 // page's answer to "what now", so it stops being a button and
-                // becomes a menu item. Once the day is full the next-up card
-                // *is* the film, and a second entry would be the same action
-                // twice.
+                // becomes a menu item. Once the day is full the page shows the
+                // film card itself, and a second entry would be the same
+                // action twice.
                 if clipCount > 0, !agenda.isComplete {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
