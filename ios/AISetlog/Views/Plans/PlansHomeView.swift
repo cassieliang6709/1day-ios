@@ -11,8 +11,9 @@ struct PlansHomeView: View {
     @Environment(AccountStore.self) private var account
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
-    /// What the shell decided to lead with, and why. See `HomeHeroChoice`.
-    let heroChoice: HomeHeroChoice
+    /// What to lead with and what to list under it, as one decision. See
+    /// `HomeStories`.
+    let stories: HomeStories
 
     @State private var path: [UUID] = []
     @State private var showComposer = false
@@ -29,11 +30,9 @@ struct PlansHomeView: View {
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var hero: Challenge? { heroChoice.challenge }
+    private var hero: Challenge? { stories.hero.challenge }
     /// Everything except the hero, by the day it was for. See `StoryTimeline`.
-    private var timeline: StoryTimeline {
-        StoryTimeline(challenges: store.challenges, excluding: hero?.id)
-    }
+    private var timeline: StoryTimeline { stories.timeline }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -105,7 +104,7 @@ struct PlansHomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
 
-                switch heroChoice {
+                switch stories.hero {
                 case .today(let challenge):
                     heroSection(challenge, label: Strings.todaysStory)
                 case .resume(let challenge):
@@ -116,7 +115,7 @@ struct PlansHomeView: View {
                     if store.challenges.isEmpty { emptyState } else { startTodayCard }
                 }
 
-                if !timeline.isEmpty {
+                if stories.showsSection {
                     timelineSection
                 }
             }
@@ -299,9 +298,7 @@ struct PlansHomeView: View {
     /// grows.
     private var timelineSection: some View {
         LazyVStack(alignment: .leading, spacing: 18) {
-            SectionLabel(text: timeline.includesToday
-                ? Strings.yourStories
-                : Strings.scrollBack)
+            SectionLabel(text: stories.sectionTitle)
                 .padding(.horizontal, 20)
 
             ForEach(timeline.days) { day in

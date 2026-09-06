@@ -893,10 +893,11 @@ enum Strings {
     /// Heads the reverse-chronological list below today's story. Replaces the
     /// old "your other plans" / "finished films" split, which sorted by state
     /// and so couldn't answer "what did I film on the 31st".
-    static var scrollBack: String { lang == .chinese ? "往前翻" : "Earlier" }
-    /// Used instead of "scroll back" when today's own stories are in the list —
-    /// "scroll back" sitting directly above a row labelled "today" reads as a
-    /// small lie about what's underneath it.
+    ///
+    /// The only heading that list ever gets. It briefly alternated with a
+    /// 「往前翻」 / "Earlier" variant for days holding nothing from today, but
+    /// the hero is lifted *out* of the list — so the day you made a story was
+    /// exactly the day the list renamed itself away from it. See `HomeStories`.
     static var yourStories: String { lang == .chinese ? "你的故事" : "Your stories" }
     static var todayLabel: String { lang == .chinese ? "今天" : "Today" }
     static var yesterdayLabel: String { lang == .chinese ? "昨天" : "Yesterday" }

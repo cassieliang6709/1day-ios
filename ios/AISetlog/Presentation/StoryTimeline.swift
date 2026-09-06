@@ -29,11 +29,6 @@ struct StoryTimeline: Equatable {
 
     var isEmpty: Bool { days.isEmpty }
 
-    /// Whether anything in here is from today. Drives the section heading: a
-    /// list headed "scroll back" whose first row says "today" isn't scrolling
-    /// back to anything.
-    let includesToday: Bool
-
     /// - Parameter heroID: the story already shown at the top of the screen.
     ///   It's excluded rather than duplicated — seeing today's story twice on
     ///   one screen is how the old home page got confusing in the first place.
@@ -56,8 +51,6 @@ struct StoryTimeline: Equatable {
                     stories: stories.sorted { Self.filmedLast($0) > Self.filmedLast($1) })
             }
             .sorted { $0.date > $1.date }
-
-        includesToday = days.contains { calendar.isDate($0.date, inSameDayAs: now) }
     }
 
     /// Which day a story belongs to.
