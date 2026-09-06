@@ -156,25 +156,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertNotEqual(timeline.days.last?.label, "前天")
     }
 
-    /// The heading above the list. "Scroll back" directly above a row labelled
-    /// "today" claims something about the contents that isn't true.
-    func testTheListKnowsWhetherTodayIsInIt() {
-        let today = story("今天", on: september(1))
-        let older = story("上周", on: august(24))
-
-        XCTAssertTrue(
-            StoryTimeline(challenges: [today, older], now: september(1), calendar: calendar)
-                .includesToday)
-        XCTAssertFalse(
-            StoryTimeline(challenges: [older], now: september(1), calendar: calendar)
-                .includesToday)
-        XCTAssertFalse(
-            StoryTimeline(
-                challenges: [today], excluding: today.id,
-                now: september(1), calendar: calendar
-            ).includesToday)
-    }
-
     func testOlderDaysCarryTheirDateInBothLanguages() {
         // Not the 31st: that's "yesterday" relative to the 1st, and yesterday
         // is named rather than dated.

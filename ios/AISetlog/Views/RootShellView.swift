@@ -32,10 +32,11 @@ struct RootShellView: View {
     /// Bound only so a language change re-renders the tab labels.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// What the home screen leads with. See `HomeHeroChoice` for why this isn't
-    /// just "the story with the fewest moments filmed".
-    private var heroChoice: HomeHeroChoice {
-        HomeHeroChoice(challenges: store.challenges)
+    /// What the home screen leads with and what it lists underneath. See
+    /// `HomeStories`; `HomeHeroChoice` covers why the lead isn't just "the
+    /// story with the fewest moments filmed".
+    private var stories: HomeStories {
+        HomeStories(challenges: store.challenges)
     }
 
     var body: some View {
@@ -43,7 +44,7 @@ struct RootShellView: View {
             PlansHomeView(
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $launchAction,
-                heroChoice: heroChoice)
+                stories: stories)
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
 
