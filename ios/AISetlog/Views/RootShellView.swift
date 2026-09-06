@@ -136,6 +136,11 @@ struct CameraTabView: View {
 
     var body: some View {
         RecordClipView(
+            // A loose take belongs to no story yet, so there is no moment
+            // number to be on and no count to be out of. `momentCount` stays 0,
+            // which is what stops the camera drawing a position it doesn't
+            // know; `day` is only a placeholder for the recorder's plumbing and
+            // is never shown here.
             day: 1,
             slotTitle: Strings.freeformSlot,
             isFreeform: true,

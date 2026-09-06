@@ -361,6 +361,7 @@ struct StoryTimelineView: View {
             RecordClipView(
                 day: day,
                 slotTitle: slotTitle(for: day),
+                momentCount: challenge?.cards.count ?? 0,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
                 showsPrompt: challenge?.isTimeOnly != true,
                 orientation: challenge?.resolvedOrientation ?? .portrait
