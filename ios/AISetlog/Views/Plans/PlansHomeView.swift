@@ -346,7 +346,7 @@ struct PlansHomeView: View {
 
     // MARK: - Recorder
 
-    /// Opens the camera on the next unfilmed slot (or a specific one, when a
+    /// Opens the camera on an unfilmed slot (or a specific one, when a
     /// notification asked for it).
     @ViewBuilder
     private func recorder(for challenge: Challenge, preferredDay: Int? = nil) -> some View {
@@ -370,15 +370,20 @@ struct PlansHomeView: View {
         }
     }
 
+    /// A default, not a decision. This shortcut skips the story page entirely,
+    /// so it has to open the camera on *something* — a home card has no room
+    /// to lay seven moments out and ask. Picking any moment yourself is one
+    /// tap further in, where `StoryAgenda` offers all of them at once and this
+    /// same slot is only the row wearing a question mark.
     private func slotToRecord(in challenge: Challenge, preferred: Int?) -> Int {
         if let preferred,
            let card = challenge.cards.first(where: { $0.day == preferred }),
            card.clipFileName == nil {
             return card.day
         }
-        // The first moment *nobody* has filmed. Offering one a friend already
-        // covered, while an untouched one waits further down, is how a room
-        // ends up with three takes of breakfast and no evening.
+        // The first moment *nobody* has filmed. Defaulting to one a friend
+        // already covered, while an untouched one waits further down, is how a
+        // room ends up with three takes of breakfast and no evening.
         return cardState(for: challenge).progress.nextOpenMoment
     }
 

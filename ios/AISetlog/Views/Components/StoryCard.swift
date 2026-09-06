@@ -21,7 +21,10 @@ struct StoryCard: View {
     let onOpen: () -> Void
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-    private var nextMoment: String {
+    /// One moment the day is still missing, named so the card has something
+    /// concrete on it. A default for the button below, not a position in a
+    /// queue — the story page lets you pick any of them.
+    private var openMoment: String {
         challenge.isTimeOnly
             ? Strings.timeOnlyMoment
             : presenter.title(forSlot: progress.nextOpenMoment)
@@ -72,7 +75,7 @@ struct StoryCard: View {
                     .lineLimit(2)
 
                 Text(Strings.storyCardCaption(
-                    next: nextMoment,
+                    open: openMoment,
                     isComplete: progress.isComplete))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
@@ -233,6 +236,6 @@ struct StoryRowCard: View {
         }
         return challenge.isTimeOnly
             ? Strings.timeOnlyMoment
-            : Strings.nextUpMoment(presenter.title(forSlot: progress.nextOpenMoment))
+            : Strings.openMomentLabel(presenter.title(forSlot: progress.nextOpenMoment))
     }
 }

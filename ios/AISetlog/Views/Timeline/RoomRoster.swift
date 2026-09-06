@@ -45,7 +45,8 @@ struct RoomRoster: View {
 /// row under every moment.
 struct RoomNote: View {
     let note: RoomCast.Note
-    /// Ink for the sentence — white inside the next-up card, quiet on canvas.
+    /// Ink for the sentence. Both of these lines live on canvas now — the
+    /// white variant belonged to the next-up card, which is gone.
     var tint: Color = OneDay.inkFaint
     /// Hollow faces, for the people the sentence is still waiting for.
     var isPending = false
