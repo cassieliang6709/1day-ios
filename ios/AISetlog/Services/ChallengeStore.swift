@@ -30,11 +30,14 @@ final class ChallengeStore {
 
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
+    private let coverStore: TemplateCoverStore
 
     init(repository: ChallengeRepository? = nil,
          fileStore: ClipFileStore = DiskClipFileStore(),
+         coverStore: TemplateCoverStore = DiskTemplateCoverStore(),
          roomSync: RoomSyncService? = nil) {
         self.fileStore = fileStore
+        self.coverStore = coverStore
         self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
         self.roomSync = roomSync ?? RoomSyncService(fileStore: fileStore)
         challenges = self.repository.loadChallenges()
@@ -53,19 +56,58 @@ final class ChallengeStore {
         challenges.first { $0.id == id }
     }
 
-    func addCustomTemplate(_ template: ChallengeTemplate) {
-        customTemplates.append(template)
+    /// Puts a template someone built into their library, filing the cover
+    /// picture (if they chose one) before the template that names it is saved
+    /// — so a template never points at a file that isn't there.
+    @discardableResult
+    func addCustomTemplate(
+        _ template: ChallengeTemplate, coverImageData: Data? = nil
+    ) -> ChallengeTemplate {
+        let filed = filing(coverImageData, into: template)
+        customTemplates.append(filed)
+        return filed
     }
 
     func deleteCustomTemplate(_ template: ChallengeTemplate) {
+        if let coverFileName = template.coverFileName {
+            coverStore.deleteCover(fileName: coverFileName)
+        }
         customTemplates.removeAll { $0.id == template.id }
     }
 
-    func updateCustomTemplate(_ template: ChallengeTemplate) {
+    /// `coverImageData` is a newly picked picture; nil leaves the cover alone.
+    /// Clearing one back to matched artwork is `template.coverFileName = nil`,
+    /// and the file it used to point at goes with it.
+    func updateCustomTemplate(
+        _ template: ChallengeTemplate, coverImageData: Data? = nil
+    ) {
         guard let index = customTemplates.firstIndex(where: { $0.id == template.id }) else {
             return
         }
-        customTemplates[index] = template
+        let previousCover = customTemplates[index].coverFileName
+        let filed = filing(coverImageData, into: template)
+        if let previousCover, previousCover != filed.coverFileName {
+            coverStore.deleteCover(fileName: previousCover)
+        }
+        customTemplates[index] = filed
+    }
+
+    /// Where a template's own cover picture lives, if it has one. Nil sends
+    /// the card back to `matchedCoverAssetName`.
+    func coverURL(for template: ChallengeTemplate) -> URL? {
+        template.coverFileName.flatMap { coverStore.coverURL(fileName: $0) }
+    }
+
+    private func filing(
+        _ imageData: Data?, into template: ChallengeTemplate
+    ) -> ChallengeTemplate {
+        guard let imageData else { return template }
+        var filed = template
+        // A failed write leaves the old cover in place rather than blanking it.
+        if let stored = coverStore.storeCover(imageData, templateID: template.id) {
+            filed.coverFileName = stored
+        }
+        return filed
     }
 
     func updatePlan(_ id: UUID, title: String, momentTitles: [String]) {
@@ -327,6 +369,9 @@ final class ChallengeStore {
         for challenge in challenges {
             fileStore.deleteClips(challengeID: challenge.id)
             if let code = challenge.roomCode { roomSync.clearRoom(code) }
+        }
+        for coverFileName in customTemplates.compactMap(\.coverFileName) {
+            coverStore.deleteCover(fileName: coverFileName)
         }
         challenges = []
         customTemplates = []

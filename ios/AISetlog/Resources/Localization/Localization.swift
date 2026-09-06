@@ -789,6 +789,31 @@ enum Strings {
         lang == .chinese ? "给模板起个名字" : "Name your template"
     }
 
+    // MARK: Template library & covers
+
+    static var saveToTemplateLibrary: String {
+        lang == .chinese ? "存进我的模板库" : "Save to my template library"
+    }
+    static var saveToTemplateLibraryNote: String {
+        lang == .chinese
+            ? "下次开新故事，这套题目还在，直接选就行。"
+            : "Next time you start a story, this set of prompts is still there."
+    }
+    static var templateCoverLabel: String {
+        lang == .chinese ? "封面" : "COVER"
+    }
+    static var chooseCoverFromPhotos: String {
+        lang == .chinese ? "从相册选一张" : "Choose from photos"
+    }
+    static var useMatchedCover: String {
+        lang == .chinese ? "还是用配好的" : "Use the matched one"
+    }
+    static var matchedCoverNote: String {
+        lang == .chinese
+            ? "不选也行，会按你写的题目配一张。"
+            : "Or leave it — we'll match one to the prompts you wrote."
+    }
+
     // MARK: Sign in
 
     static var recordTogether: String { lang == .chinese ? "一起记录" : "Record together" }

@@ -15,7 +15,11 @@ protocol ChallengeRepository {
 final class UserDefaultsChallengeRepository: ChallengeRepository {
     static let defaultsKey = "challenges.v2"
     private static let legacyKey = "challenge.v1"
-    private static let templatesKey = "customTemplates.v1"
+    static let templatesKey = "customTemplates.v2"
+    /// v1 templates predate covers. They decode into the v2 shape untouched;
+    /// the migration exists so the old key stops being written to and the
+    /// rewritten payload carries the new field from then on.
+    static let legacyTemplatesKey = "customTemplates.v1"
 
     private let defaults: UserDefaults
     private let fileStore: ClipFileStore
@@ -40,16 +44,31 @@ final class UserDefaultsChallengeRepository: ChallengeRepository {
     }
 
     func loadTemplates() -> [ChallengeTemplate] {
-        guard let data = defaults.data(forKey: Self.templatesKey),
-              let saved = try? JSONDecoder().decode([ChallengeTemplate].self, from: data)
-        else { return [] }
-        return saved
+        if let data = defaults.data(forKey: Self.templatesKey),
+           let saved = try? JSONDecoder().decode([ChallengeTemplate].self, from: data) {
+            return saved
+        }
+        return migrateLegacyTemplatesIfNeeded()
     }
 
     func saveTemplates(_ templates: [ChallengeTemplate]) {
         if let data = try? JSONEncoder().encode(templates) {
             defaults.set(data, forKey: Self.templatesKey)
         }
+    }
+
+    /// Templates a user built before covers existed. Nothing about their shape
+    /// changed — the new field is optional — so the migration is a straight
+    /// re-file under the new key. The old key is only cleared once the new one
+    /// has been written, so a crash between the two loses nothing.
+    private func migrateLegacyTemplatesIfNeeded() -> [ChallengeTemplate] {
+        guard let data = defaults.data(forKey: Self.legacyTemplatesKey),
+              let saved = try? JSONDecoder().decode([ChallengeTemplate].self, from: data)
+        else { return [] }
+        saveTemplates(saved)
+        guard defaults.data(forKey: Self.templatesKey) != nil else { return saved }
+        defaults.removeObject(forKey: Self.legacyTemplatesKey)
+        return saved
     }
 
     /// v1 stored a single challenge without an id, clips directly in clips/.
