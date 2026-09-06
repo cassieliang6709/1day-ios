@@ -382,7 +382,8 @@
 <p><code>.github/workflows/ios-tests.yml</code>，GitHub Actions <code>macos-15</code>。这份 workflow 在 2026-09-02 修过一次大的，因为 runner 镜像的漂移让它整整两周没绿过一次：</p>
 <ol>
   <li>原来钉在 <b>Xcode 16.2</b>。镜像留着这个 Xcode 却删掉了 iOS 18.2 的模拟器 runtime，<code>actool</code> 拿不到对得上的 SDK 就把整个 build 判失败——报的是 <code>Assets.xcassets: error:</code>，看起来像资源问题。<b>改成 Xcode 26.2</b>（镜像上的模拟器现在全是 iOS 26）。</li>
-  <li>然后是"找不到设备"。runner <b>一台 iOS 模拟器都不预建</b>，靠写死设备型号名让 xcodebuild 现场造一台——而这件事只在某些 job 上成功。现在的做法是按 SDK 版本挑 runtime、自己 <code>simctl create</code> 再 boot，<b>并在这一步先确认 xcodebuild 看得见它</b>，不然就在这里失败，而不是等测试跑起来才报一个含糊的错。</li>
+  <li>然后是"找不到设备"。当时 runner 一台 iOS 模拟器都不预建，靠写死设备型号名让 xcodebuild 现场造一台——这件事只在某些 job 上成功。改成了按 SDK 版本挑 runtime、自己 <code>simctl create</code> 再 boot。</li>
+  <li>2026-09-03 又改了一次，因为上一条里我顺手加的一个自检把每次构建都卡死在 55 秒：造完 boot 完之后，它要求 <code>xcodebuild -showdestinations</code> 能列出这个 udid，列不出就 <code>exit 1</code>。<b>这个自检本身是错的</b>——<code>-showdestinations</code> 漏掉的模拟器，把 udid 直接递给 <code>-destination</code> 照样跑得动（本地开发机上它一台具体模拟器都不列，测试却全过）。所以它挡掉的全是本来会通过的构建。同一份失败日志还顺带说明镜像现在自带 iPhone 16 到 17 Pro Max（iOS 18.5–26.2），造一台本来就多余。现在的做法是<b>问 <code>simctl</code> 要一台现成的</b>（优先匹配 SDK 版本），实在没有才造，不再对可见性设闸门。</li>
   <li>然后才第一次看到真正的测试结果：上面第 10 节说的那四套 CloudKit 测试把 test host 打死了。跳过。</li>
 </ol>
 <p>另外 workflow 里那条 <code>grep -rn "Strings\." AISetlog/Models/</code> 就是第 2 节那条铁律的执行者。</p>
