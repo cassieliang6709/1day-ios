@@ -153,10 +153,18 @@ final class ChallengeStore {
     @discardableResult
     func joinRoom(code: String) async throws -> Challenge {
         guard account?.account != nil else { throw RoomError.notSignedIn }
-        let normalized = code.uppercased().trimmingCharacters(in: .whitespaces)
+        let normalized = InviteCode.normalize(code)
         // Already joined? Jump to it.
         if let existing = challenges.first(where: { $0.roomCode == normalized }) {
             return existing
+        }
+        // A code with an O in it, or five characters, isn't a room that exists
+        // somewhere — it's a room that cannot exist. Say so here rather than
+        // spending a round trip to be told the same thing, or worse, telling
+        // someone to sign into iCloud because that's the error the trip hit
+        // first.
+        guard InviteCode.isValid(normalized) else {
+            throw CloudKitService.CKServiceError.roomNotFound
         }
         let room = try await CloudKitService.fetchRoom(code: normalized)
         let challenge = Challenge(

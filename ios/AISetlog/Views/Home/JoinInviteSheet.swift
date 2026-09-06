@@ -10,9 +10,7 @@ struct JoinInviteSheet: View {
 
     @FocusState private var codeFocused: Bool
 
-    private var normalizedCode: String {
-        String(code.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(6))
-    }
+    private var normalizedCode: String { InviteCode.normalize(code) }
 
     var body: some View {
         ZStack {
@@ -37,7 +35,7 @@ struct JoinInviteSheet: View {
                     Spacer()
                     Button(Strings.paste) {
                         if let pasted = UIPasteboard.general.string,
-                           let found = CloudKitService.extractCode(from: pasted) {
+                           let found = InviteCode.extract(from: pasted) {
                             code = found
                         }
                     }
@@ -90,7 +88,7 @@ struct JoinInviteSheet: View {
                         .opacity(0.01)
                         .frame(height: 52)
                         .onChange(of: code) { _, newValue in
-                            let cleaned = String(newValue.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(6))
+                            let cleaned = InviteCode.normalize(newValue)
                             if cleaned != newValue { code = cleaned }
                         }
                 }

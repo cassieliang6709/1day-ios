@@ -95,10 +95,7 @@ struct RootView: View {
             }
         }
         .onOpenURL { url in
-            guard url.scheme == "oneday", url.host == "join",
-                  let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                      .queryItems?.first(where: { $0.name == "code" })?.value
-            else { return }
+            guard let code = InviteCode.fromDeepLink(url) else { return }
             hasCompletedOnboarding = true
             pendingJoinCode = code
         }
