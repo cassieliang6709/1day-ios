@@ -16,8 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Has to be an Xcode whose iOS SDK matches a simulator the runner image
+      # still ships. 16.2 stopped qualifying: the image kept the app but dropped
+      # the iOS 18.2 runtime, and `actool` fails the whole build rather than
+      # thin an asset catalog against a runtime it has no SDK for — it won't
+      # take even a newer runtime of the same iOS major. Every simulator on the
+      # image runs iOS 26 now, so the Xcode has to be a 26 as well.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Generate Xcode project
         run: |
@@ -33,10 +39,68 @@ jobs:
             exit 1
           fi
 
+      # Prefer an iPhone the image already ships, on the runtime matching the
+      # SDK; only build one when there's nothing to take. Ask simctl, not
+      # `xcodebuild -showdestinations` — that list omits simulators xcodebuild
+      # will happily run on when handed their udid, so gating on it fails runs
+      # that would have passed.
+      - name: Pick a simulator
+        run: |
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          pick() {
+            xcrun simctl list devices available -j | jq -r --arg sdk "$sdk" '
+              [ .devices | to_entries[]
+                | select(.key | test("SimRuntime\\.iOS-"))
+                | (.key | capture("iOS-(?<v>[0-9-]+)$").v | gsub("-";".")) as $ver
+                | .value[] | select(.isAvailable and (.name | test("iPhone")))
+                | {ver: $ver, udid: .udid, name: .name} ]
+              | (map(select(.ver == $sdk))
+                 + (sort_by(.ver | split(".") | map(tonumber)) | reverse))
+              | .[0] // {} | "\(.udid // "")\t\(.ver // "")\t\(.name // "")"'
+          }
+          found=$(pick)
+          if [ -z "${found%%$'\t'*}" ]; then
+            runtimes=$(xcrun simctl list runtimes -j)
+            runtime=$(jq -r --arg sdk "$sdk" \
+              '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
+               | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
+               | .[0].identifier // ""' <<<"$runtimes")
+            device=$(jq -r --arg r "$runtime" \
+              '.runtimes[] | select(.identifier == $r)
+               | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
+               | .[0].identifier // ""' <<<"$runtimes")
+            if [ -z "$runtime" ] || [ -z "$device" ]; then
+              echo "::error::no iOS simulator runtime matches SDK $sdk"
+              xcrun simctl list runtimes
+              exit 1
+            fi
+            xcrun simctl create ci-iphone "$device" "$runtime" >/dev/null
+            found=$(pick)
+          fi
+          udid=${found%%$'\t'*}
+          if [ -z "$udid" ]; then
+            echo "::error::no usable iPhone simulator for SDK $sdk"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          xcrun simctl bootstatus "$udid" -b
+          printf 'SDK %s -> %s\n' "$sdk" "$found"
+          echo "SIMULATOR_ID=$udid" >> "$GITHUB_ENV"
+
+      # The four suites below talk to the real CloudKit development database.
+      # They already skip on a simulator that isn't signed into iCloud — but
+      # here they can't even ask: unsigned means no iCloud entitlement, and
+      # `accountStatus()` on an unentitled container kills the test host rather
+      # than returning an error, so there's nothing left alive to skip from.
+      # Run them on a machine with an iCloud-signed simulator instead.
       - name: Run tests
         run: |
           xcodebuild test \
             -scheme AISetlog \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "id=$SIMULATOR_ID" \
             -derivedDataPath build/DerivedData \
+            -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
+            -skip-testing:AISetlogTests/CloudKitPaginationTests \
+            -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
+            -skip-testing:AISetlogTests/JoinedRoomTests \
             CODE_SIGNING_ALLOWED=NO
