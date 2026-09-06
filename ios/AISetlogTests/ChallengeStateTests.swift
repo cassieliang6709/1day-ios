@@ -67,6 +67,26 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(presenter.title(forSlot: 3), "Day 3")
     }
 
+    func testQuickStartCreatesAndPersistsThreeMomentPersonalFilm() throws {
+        let repository = MemoryChallengeRepository()
+        let store = ChallengeStore(
+            repository: repository,
+            fileStore: MigrationClipFileStore())
+
+        let challenge = store.createQuickStart()
+
+        XCTAssertEqual(challenge.title, "My day")
+        XCTAssertEqual(challenge.cards.count, 3)
+        XCTAssertEqual(challenge.resolvedMode, .oneDay)
+        XCTAssertEqual(challenge.resolvedClipLength, .tiny)
+        XCTAssertEqual(challenge.resolvedOrientation, .portrait)
+        XCTAssertEqual(
+            challenge.momentTitles,
+            ["morning_light", "on_the_move", "golden_hour"])
+        XCTAssertEqual(try XCTUnwrap(repository.savedChallenges.first).id, challenge.id)
+        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 3)
+    }
+
     func testPresenterUnitNamesFollowMode() {
         func make(mode: Challenge.Mode) -> Challenge {
             Challenge(

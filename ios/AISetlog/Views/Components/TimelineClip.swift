@@ -112,8 +112,10 @@ struct TimelineClip: View {
         case filmed(url: URL, recordedAt: Date?)
         /// Mine to film, and it's next up.
         case mine
-        /// Someone else hasn't filmed theirs yet.
-        case waiting(friend: String)
+        // No `.waiting(friend:)` any more. A friend who hasn't filmed used to
+        // get a 120pt card under every moment they hadn't filmed; who the room
+        // is waiting on is one line at the bottom of the story page now, and
+        // `RoomCast` is the only thing that decides it.
         /// A slot further down the day that nobody is on yet.
         case upcoming
     }
@@ -125,6 +127,7 @@ struct TimelineClip: View {
     var durationLabel: String?
     var reactions: [String] = []
     var mediaHeight: CGFloat = 130
+    var showsMomentTitle = true
     var onTap: (() -> Void)?
 
     var body: some View {
@@ -154,22 +157,23 @@ struct TimelineClip: View {
                     .font(.system(size: 13.5, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
-            case .waiting(let friend):
-                AvatarDot(name: friend, size: 22, isPending: true)
-                Text(friend)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkFaint)
-                    .lineLimit(1)
             case .upcoming:
                 Image(systemName: momentIcon)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.oneDaySky)
                     .frame(width: 22, height: 22)
                     .background(OneDay.surfaceSoft, in: Circle())
-                Text(momentTitle)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
+                // Nothing to say when the story has no prompts. This used to
+                // fall back to "Film this moment" — which, down a record-by-time
+                // timeline, printed the same seven words seven times, under a
+                // frame that already says "tap to film". A story with no titles
+                // should look like one, not like seven identical to-dos.
+                if showsMomentTitle {
+                    Text(momentTitle)
+                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 4)
@@ -215,14 +219,16 @@ struct TimelineClip: View {
                 .clipBox(height: mediaHeight)
                 .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
-                    Text(momentTitle)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(8)
+                    if showsMomentTitle {
+                        Text(momentTitle)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(8)
+                    }
                 }
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: "play.circle.fill")
@@ -235,33 +241,21 @@ struct TimelineClip: View {
         case .mine:
             EmptyFrame {
                 VStack(spacing: 7) {
-                    Image(systemName: momentIcon)
+                    Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(.system(size: 22, weight: .medium))
                         .foregroundStyle(Color.oneDayBlue)
                         .symbolEffect(.pulse)
-                    Text(momentTitle)
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .lineLimit(1)
+                    if showsMomentTitle {
+                        Text(momentTitle)
+                            .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                            .lineLimit(1)
+                    }
                     Text(Strings.tapToFilm)
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.oneDayBlue)
                 }
                 .padding(.vertical, 22)
-            }
-
-        case .waiting(let friend):
-            EmptyFrame {
-                HStack(spacing: 9) {
-                    OneDayBuddy(size: 26)
-                    Text(Strings.waitingForMoment(friend))
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
-                }
-                .padding(.vertical, 16)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         case .upcoming:

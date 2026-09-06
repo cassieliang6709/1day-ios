@@ -110,7 +110,11 @@ struct TemplateCard: View {
             // width, and it's already stated by the heading and the selector
             // directly below the rack.
             HStack(spacing: 8) {
-                OneDayChip(icon: "circle.grid.2x2.fill", text: Strings.momentsShort(momentCount))
+                if template.isTimeOnly {
+                    OneDayChip(icon: "text.badge.xmark", text: Strings.noPrompts)
+                } else {
+                    OneDayChip(icon: "circle.grid.2x2.fill", text: Strings.momentsShort(momentCount))
+                }
                 OneDayChip(
                     icon: "clock",
                     text: Strings.templateRuntime(

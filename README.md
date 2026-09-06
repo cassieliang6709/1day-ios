@@ -192,10 +192,11 @@ AVFoundation MP4 export with real media fixtures.
 
 ## Project status
 
-1Day is an independent iOS project in private beta, not an App Store release.
-The testing protocol and privacy-safe results template live in
-[docs/BETA_TESTING.md](docs/BETA_TESTING.md). No adoption or completion metrics
-are claimed before those sessions take place.
+1Day is available on the
+[App Store](https://apps.apple.com/us/app/1-day/id6794565199). The testing
+protocol and privacy-safe results template remain in
+[docs/BETA_TESTING.md](docs/BETA_TESTING.md); the repository does not claim
+adoption or completion metrics that have not been measured.
 
 ## License
 

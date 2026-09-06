@@ -129,7 +129,9 @@ stories never leave the device.
       同时确认 Production 里 `Clip` 的 `roomCode` 和 `day` 是 **queryable**,
       否则 `fetchClips` 抛 `.fieldNotQueryable`(索引不会随 schema 自动创建)。
 - [ ] **隐私政策 URL** 填进 App Store Connect(与 App 内 Settings 里的一致)
-- [ ] **截图**:`docs/appstore/` 下四张 1320×2868(6.9" 必需尺寸)
+- [ ] **截图本地化**:不要把 `docs/appstore/` 现有中文截图继续用于美国区。
+      按 `ios/release/1.2/AppStoreMetadata.md` 的顺序分别导出英文和简体中文两套
+      1320×2868 截图;美国区前三张必须是英文,并优先展示「三个瞬间 → 自动成片」
 - [ ] **年龄分级**问卷
 - [ ] **导出合规**:已在 `project.yml` 设 `ITSAppUsesNonExemptEncryption: false`
       (只用 HTTPS/CloudKit,属豁免),上传时不会再问

@@ -4,11 +4,13 @@ import SwiftUI
 /// day has got. Small on purpose — the line below it is the content.
 struct TimelineHeader: View {
     let challenge: Challenge
-    let memberNames: [String]
-    let myName: String?
+    /// Who's in the room. Nil for a solo story, which has nobody to name.
+    let cast: RoomCast?
+    /// Everyone's, not just mine. See `RoomProgress`.
+    let progress: RoomProgress
     @Binding var viewMode: StoryViewMode
+    var showsViewModeToggle = true
     var isSyncing = false
-    var syncError: String?
 
     @State private var didCopyCode = false
 
@@ -19,8 +21,8 @@ struct TimelineHeader: View {
         VStack(alignment: .leading, spacing: 14) {
             title
 
-            if challenge.isShared, !memberNames.isEmpty {
-                roster
+            if let cast, !cast.members.isEmpty {
+                RoomRoster(cast: cast)
             }
 
             if challenge.isShared, let code = challenge.roomCode {
@@ -28,12 +30,6 @@ struct TimelineHeader: View {
             }
 
             stats
-
-            if let syncError {
-                Label(syncError, systemImage: "icloud.slash")
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.red)
-            }
         }
     }
 
@@ -56,20 +52,6 @@ struct TimelineHeader: View {
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
         }
-    }
-
-    /// Faces first — a shared story should show the people before the numbers.
-    /// Pending members stay visible, hollowed out, so the group never shrinks.
-    private var roster: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 14) {
-                ForEach(memberNames, id: \.self) { name in
-                    AvatarBadge(name: name, isYou: name == myName)
-                }
-            }
-            .padding(.vertical, 2)
-        }
-        .scrollIndicators(.hidden)
     }
 
     /// The join code, in full, on the screen the owner is already looking at.
@@ -118,22 +100,37 @@ struct TimelineHeader: View {
 
     private var stats: some View {
         HStack(spacing: 8) {
-            OneDayChip(
-                icon: "circle.grid.2x2.fill",
-                text: "\(challenge.recordedCount)/\(challenge.cards.count)")
+            // No "3/7" chip here any more — the progress bar under the header
+            // is that number, and printing it twice on one screen is how the
+            // page ended up with nothing to look at first.
+
+            // Only where it adds something. In a solo story it would repeat
+            // the progress bar above, and in a room where I'm the only one who
+            // has filmed anything it would too.
+            if challenge.isShared, progress.hasOthers {
+                OneDayChip(
+                    icon: "person.fill",
+                    text: Strings.yourTakes(progress.mine),
+                    tint: .oneDaySky)
+            }
 
             OneDayChip(
                 icon: "clock",
                 text: challenge.resolvedClipLength.secondsLabel,
                 tint: .oneDayLavender)
 
-            if challenge.recordedCount > 0 {
-                OneDayChip(icon: "film", text: schedule.filmDuration, tint: .oneDayMint)
+            if progress.filled > 0 {
+                OneDayChip(
+                    icon: "film",
+                    text: schedule.filmDuration(clipCount: progress.clipCount),
+                    tint: .oneDayMint)
             }
 
             Spacer(minLength: 8)
 
-            ViewModeToggle(mode: $viewMode)
+            if showsViewModeToggle {
+                ViewModeToggle(mode: $viewMode)
+            }
         }
     }
 }

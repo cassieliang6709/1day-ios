@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1Day PRD — 第三轮：拍完之后的那半个 app</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.12);
+    --red:#A7443C;--green:#158463;--amber:#A75B12;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:40px 34px 120px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       font-size:14px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;
+       background:rgba(22,119,255,.09);padding:1.5px 5px;border-radius:5px;color:#0B4FA8}
+  pre{background:#0F2E6B;color:#DCEBFF;padding:14px 16px;border-radius:14px;overflow-x:auto;
+      font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.62}
+  pre code{background:none;color:inherit;padding:0}
+  a{color:var(--blue)}
+
+  /* ---------- doc chrome ---------- */
+  .hdr{background:linear-gradient(135deg,#fff,#F2F7FF);border:1px solid var(--hair);
+       border-radius:22px;padding:24px 26px;box-shadow:0 10px 28px rgba(15,46,107,.10);margin-bottom:12px}
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.5px;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:7px 9px;font-size:12.5px;color:var(--inkSoft);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;
+        padding:3px 10px;border-radius:99px;background:var(--mist);color:var(--blue)}
+  .pill.ok{background:#DFF6EC;color:var(--green)}
+  .pill.warn{background:#FFE9D6;color:var(--amber)}
+  .pill.hot{background:#FBE4E1;color:var(--red)}
+  .pill.gray{background:rgba(147,166,198,.2);color:var(--inkSoft)}
+
+  h2{font-size:20px;margin:44px 0 6px;padding-top:22px;border-top:1px solid rgba(15,46,107,.13);
+     letter-spacing:-.3px}
+  h2:first-of-type{padding-top:0;border-top:0}
+  h2 .n{color:var(--inkFaint);font-weight:800;margin-right:8px}
+  h3{font-size:16px;margin:26px 0 6px;letter-spacing:-.2px}
+  h4{font-size:13.5px;margin:18px 0 5px;color:var(--inkSoft);letter-spacing:.2px;text-transform:uppercase;
+     font-weight:900}
+  p{margin:0 0 12px;max-width:900px}
+  .sub{color:var(--inkSoft);margin-bottom:18px;max-width:900px}
+  ul,ol{margin:0 0 12px;padding-left:22px;max-width:900px}
+  li{margin-bottom:5px}
+  li::marker{color:var(--sky)}
+
+  .card{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+        padding:16px 18px;margin:14px 0;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .card.hot{border-left:4px solid var(--red);background:linear-gradient(90deg,rgba(251,228,225,.5),rgba(255,255,255,.94) 60px)}
+  .card.warn{border-left:4px solid var(--amber);background:linear-gradient(90deg,rgba(255,233,214,.5),rgba(255,255,255,.94) 60px)}
+  .card.ok{border-left:4px solid var(--green);background:linear-gradient(90deg,rgba(223,246,236,.5),rgba(255,255,255,.94) 60px)}
+  .card.note{border-left:4px solid var(--sky)}
+  .card h4{margin-top:0}
+
+  table{border-collapse:collapse;width:100%;table-layout:fixed;margin:14px 0;font-size:13px;
+        background:rgba(255,255,255,.92);border-radius:14px;overflow:hidden;
+        box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  th,td{overflow-wrap:anywhere}
+  th{background:rgba(220,235,255,.7);text-align:left;padding:10px 13px;font-size:11.5px;
+     font-weight:900;letter-spacing:.4px;color:var(--inkSoft);text-transform:uppercase;
+     border-bottom:1px solid var(--hair)}
+  td{padding:10px 13px;border-bottom:1px solid rgba(15,46,107,.07);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.8px;color:var(--inkSoft)}
+  .no{color:var(--red);font-weight:800}
+  .yes{color:var(--green);font-weight:800}
+
+  .prlist{counter-reset:pr}
+  .pr{background:rgba(255,255,255,.94);border:1px solid var(--hair);border-radius:20px;
+      margin:16px 0;box-shadow:0 6px 20px rgba(15,46,107,.09);overflow:hidden}
+  .pr > .top{display:flex;align-items:center;gap:11px;padding:14px 18px;
+      background:linear-gradient(100deg,rgba(220,235,255,.6),rgba(255,255,255,.4));
+      border-bottom:1px solid var(--hair)}
+  .pr .id{font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--blue),var(--cyan));
+      padding:4px 11px;border-radius:99px;letter-spacing:.4px;flex:0 0 auto}
+  .pr .ti{font-size:15.5px;font-weight:900;letter-spacing:-.2px}
+  .pr .ti code{font-size:.94em}
+  .pr .bd{padding:16px 18px}
+  .pr .bd > :first-child{margin-top:0}
+
+  .ck{list-style:none;padding-left:0;margin:8px 0 0}
+  .ck li{position:relative;padding-left:26px;margin-bottom:7px;font-size:13px}
+  .ck li:before{content:"";position:absolute;left:0;top:2px;width:15px;height:15px;border-radius:5px;
+      border:1.8px solid rgba(22,119,255,.4);background:rgba(255,255,255,.9)}
+
+  .cols{display:flex;gap:18px;flex-wrap:wrap}
+  .cols > *{flex:1;min-width:280px}
+
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:800;margin:10px 0}
+  .flow span{padding:6px 12px;border-radius:10px;background:rgba(220,235,255,.75);color:var(--ink)}
+  .flow span.bad{background:#FBE4E1;color:var(--red)}
+  .flow span.good{background:#DFF6EC;color:var(--green)}
+  .flow em{color:var(--inkFaint);font-style:normal;font-weight:900}
+
+  .tocbox{background:rgba(255,255,255,.9);border:1px solid var(--hair);border-radius:18px;
+      padding:14px 18px;margin-bottom:30px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .tocbox ol{columns:2;column-gap:32px;margin:0;padding-left:20px;font-size:13px}
+  .tocbox li{margin-bottom:4px}
+  .tocbox a{text-decoration:none;font-weight:700}
+  .tocbox a:hover{text-decoration:underline}
+
+  @media (max-width:700px){
+    body{padding:26px 16px 90px}
+    .tocbox ol{columns:1}
+    th,td{padding:8px 9px;font-size:12.3px}
+    /* 窄屏放弃内联的固定列宽，交给 table-layout:fixed 平分 */
+    table th[style]{width:auto!important}
+    h1{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+<h1>1Day PRD — 第三轮：拍完之后的那半个 app</h1>
+<p class="sub">前两轮修的都是「拍之前」和「拍的时候」。这一轮只做一件事：<b>片子拍完之后，你看它的每一屏</b>。附带一个用户提的新功能：轻美颜。</p>
+<div class="meta">
+  <span class="pill">Round 3</span>
+  <span class="pill gray">2026-09-02</span>
+  <span><b>范围</b> 单条回看 · 故事详情 · 成片</span>
+  <span><b>基线</b> app 15,549 行 / 74 文件</span>
+</div>
+</div>
+
+<div class="tocbox">
+<ol>
+<li><a href="#s1">为什么是这一块</a></li>
+<li><a href="#s2">现状：三屏体检</a></li>
+<li><a href="#s3">P0 单条回看重做</a></li>
+<li><a href="#s4">P1 成片与详情页收尾</a></li>
+<li><a href="#s5">P2 轻美颜</a></li>
+<li><a href="#s6">拆 PR</a></li>
+<li><a href="#s7">不做什么</a></li>
+</ol>
+</div>
+
+<h2 id="s1"><span class="n">1</span>为什么是这一块</h2>
+
+<p>1Day 的承诺是「一天结束的时候你有一条片子」。前两轮把「怎么开始」和「怎么拍」修顺了，但用户真正会反复回到的是<b>拍完之后</b>——看自己刚拍的那两秒、翻今天已经有的几格、最后看成片。</p>
+
+<p>这三屏目前的完成度差得很远：成片页（<code>FilmView</code> + <code>FinalFilmTimeline</code>）是照着设计系统认真做的；故事详情（<code>StoryGridView</code> / <code>StoryTimelineView</code>）中等；<b>单条回看（<code>ClipPreviewView</code>，189 行）几乎没被设计过</b>，是全 app 唯一一屏完全用 SwiftUI 默认控件、不在 <code>OneDay</code> 设计语言里的界面。</p>
+
+<h2 id="s2"><span class="n">2</span>现状：三屏体检</h2>
+
+<h3>2.1 单条回看 <code>ClipPreviewView</code> — 最弱的一屏</h3>
+
+<div class="card hot">
+<h4>① 视觉上不属于这个 app</h4>
+<p>白色导航栏、系统蓝的 <code>Done</code>、<code>.buttonStyle(.bordered)</code>、<code>.font(.footnote)</code> + <code>.secondary</code>。旁边每一屏都是 <code>OneDayCanvas</code> 渐变 + <code>IconBubble</code> + rounded 粗体 + <code>GlassCard</code>。从网格点进来的一瞬间像是切到了另一个 app。</p>
+</div>
+
+<div class="card hot">
+<h4>② 「加字幕」按钮压在烧录进画面的文字上</h4>
+<p><code>add a caption</code> 的胶囊按钮居中铺满整个播放区（<code>.frame(maxWidth:.infinity,maxHeight:.infinity)</code>），正好盖住 <code>MomentStampOverlay</code> 已经画在中间的 <code>MOMENT 4</code>。截图里两行字直接叠在一起。</p>
+</div>
+
+<div class="card warn">
+<h4>③ 表情、时间、评论、重拍全在首屏之外</h4>
+<p>视频按 <code>maxWidth: 340</code> 撑满，375pt 宽的机器上竖屏视频高度约 600pt——<b>点个表情都要先滚动</b>。而评论输入框用 <code>safeAreaInset</code> 永久钉在底部，一条两秒的片子，屏幕被社交组件占掉一大块。</p>
+</div>
+
+<div class="card warn">
+<h4>④ 看完这条，没有办法看下一条</h4>
+<p>只能 <code>Done</code> → 回网格 → 再点下一格。一天七格就是七次开关。这是回看体验里最贵的一次交互缺失。</p>
+</div>
+
+<div class="card note">
+<h4>⑤ 独自拍的故事里，社交组件是空的</h4>
+<p><code>challengeID != nil</code> 就渲染表情栏和评论区。单人故事永远不会有别人来评论，但这两块一直占着位置。</p>
+</div>
+
+<h3>2.2 故事详情 <code>StoryGridView</code></h3>
+
+<div class="card warn">
+<h4>⑥ 英文复数错误：<code>Preview · 1 moments</code></h4>
+<p>截图实拍。文案函数没有分单复数。</p>
+</div>
+
+<div class="card note">
+<h4>⑦ 下一格的高亮是图标，不是画面</h4>
+<p>已拍的格子显示真实帧 + 时间戳 + 播放键，很好；未拍的格子只有一个题目图标。当前该拍的那格（Morning light）只是加了个实线边框，和「已拍」的视觉重量差太多。</p>
+</div>
+
+<h3>2.3 成片 <code>FilmView</code> — 基本健康</h3>
+
+<p>分阶段的生成动画、渲染失败有明确出口和重试、<code>renderRevision</code> 把所有会烧进画面的字段都算进了失效判断（这个做得很对）、「调整」表单克制。<b>这一屏这轮基本不动</b>，只补两处：保存到相册后没有触觉反馈；<code>AdjustFilmSheet</code> 是全 app 另一处没上设计系统的地方，但它是设置表单，按注释说的「不打扮」是合理的，保留。</p>
+
+<h2 id="s3"><span class="n">3</span>P0：单条回看重做</h2>
+
+<p>目标一句话：<b>让它看起来像 1Day，并且能一条条往下翻。</b></p>
+
+<h4>布局</h4>
+<ul>
+<li>整屏 <code>OneDayCanvas</code> 背景，去掉 <code>NavigationStack</code> 的白条，改用左上 <code>IconBubble</code> 关闭 —— 和 <code>FilmView</code> 一致。</li>
+<li>视频不再放进 <code>ScrollView</code>，改为占据首屏主体；表情栏浮在视频<b>下沿之上</b>，永远可见，不需要滚动。</li>
+<li>时间戳从底部的 <code>.footnote</code> 挪到视频左上角的胶囊里 —— 网格缩略图上已经是这个位置，两处一致。</li>
+<li>评论区收进一个「N 条评论」的按钮，点开才是 sheet。评论输入框不再常驻。</li>
+</ul>
+
+<h4>翻页</h4>
+<ul>
+<li>改成 <code>TabView(.page)</code>，左右滑在同一个故事的已拍片段之间移动。</li>
+<li>需要新的 <code>Presentation</code> 类型 <code>ClipDeck</code>：给定故事 + 当前 day + 我的 id，算出可翻的片子顺序和当前位置。纯逻辑、可测、不读时钟。</li>
+</ul>
+
+<h4>字幕编辑</h4>
+<ul>
+<li>「加字幕」按钮不再铺满播放区。没有字幕时显示在<b>视频下方</b>的操作行里；已有字幕时点字幕本身进入编辑。</li>
+<li>修掉和 <code>MomentStampOverlay</code> 的重叠。</li>
+</ul>
+
+<h4>重拍</h4>
+<ul>
+<li>从底部的大 <code>.bordered</code> 按钮降级到右上角 <code>...</code> 菜单里。它是这屏最有破坏性的操作，不该是最显眼的控件。</li>
+</ul>
+
+<h4>单人故事</h4>
+<ul>
+<li>表情栏和评论区的条件从 <code>challengeID != nil</code> 改成 <code>challenge.isShared</code>。</li>
+</ul>
+
+<h2 id="s4"><span class="n">4</span>P1：详情页与成片收尾</h2>
+<ul>
+<li>修 <code>Preview · 1 moments</code> 的复数。补一条本地化测试 —— 现有的 <code>LocalizationTests</code> 没有覆盖任何带数量的英文文案。</li>
+<li>网格里「该你拍的那格」给出和已拍格子相当的视觉重量（虚线 → 实心 + 主色）。</li>
+<li>保存到相册成功后加触觉反馈。</li>
+</ul>
+
+<h2 id="s5"><span class="n">5</span>P2：轻美颜</h2>
+
+<div class="card hot">
+<h4>先说代价：这不是加一个滤镜，是重写取景管线</h4>
+<p><code>ClipRecorder</code>（312 行）现在用 <code>AVCaptureMovieFileOutput</code> + <code>AVCaptureVideoPreviewLayer</code>。这两个都是硬件直通——预览层是摄像头到屏幕的直连，文件输出是硬件直接编码写盘，<b>中间没有任何地方能拿到每一帧</b>。</p>
+<p>要加美颜必须换成：<code>AVCaptureVideoDataOutput</code> + <code>AVCaptureAudioDataOutput</code> → 每帧过滤镜 → <code>MTKView</code> 预览 → <code>AVAssetWriter</code> 手写音视频轨。难的不是滤镜，是音画同步、旋转方向、来电打断时 writer 的状态机——全是 <code>MovieFileOutput</code> 现在替我们扛着的。</p>
+</div>
+
+<h4>技术选型：Core Image，不引第三方</h4>
+<p>调研了三个开源框架：<b>MetalPetal</b>（Metal / MIT / 在维护 / 有现成的 <code>MTIHighPassSkinSmoothingFilter</code>）、<b>GPUPixel</b>（C++ 跨平台 / 磨皮瘦脸都有 / 但带预编译人脸模型二进制，上架隐私清单要额外确认）、<b>GPUImage3</b>（2021 年后停更，排除）。</p>
+<p>结论是<b>先不引</b>：贵的那部分（管线重写）用不用框架都一样贵，装依赖一分钟也省不了。而目标是「别看着自己尴尬」，不是抖音级美颜，系统自带的 Core Image 够用：</p>
+<pre><code>CIGaussianBlur + 软光混合   → 磨皮
+CIColorControls             → 提亮、降饱和
+CITemperatureAndTint        → 加点暖</code></pre>
+<p>零依赖、零授权、不增加包体积。真觉得磨皮质感不够，再换 MetalPetal——管线是现成的，换的只是中间一段。</p>
+
+<h4>产品决定（已定）</h4>
+<ul>
+<li><b>默认关</b>。1Day 的前提是记录真实的一天，默认开美颜和这个前提打架。</li>
+<li>用户可开，强度可调，选择记住。</li>
+<li><b>不做瘦脸大眼。</b>那需要人脸关键点，而且对一个讲「真实」的 app 是另一个方向的产品决定。</li>
+</ul>
+
+<h4>没解决的疑问</h4>
+<div class="card note">
+<p>用户原话是「避免大家看自己尴尬」。如果尴尬主要发生在<b>回放</b>而不是<b>拍摄</b>，那滤镜是在错的地方使劲，成本却是整个管线重写。P0 做完之后重新评估一次再动手。</p>
+</div>
+
+<h2 id="s6"><span class="n">6</span>拆 PR</h2>
+
+<table>
+<tr><th style="width:30%">分支</th><th style="width:14%">优先级</th><th>内容</th></tr>
+<tr><td><code>fix/preview-plural-and-next-slot</code></td><td><span class="pill hot">P1</span></td><td>复数 bug + 网格高亮 + 触觉，三个小改动，先合</td></tr>
+<tr><td><code>feat/clip-deck</code></td><td><span class="pill">P0</span></td><td><code>Presentation/ClipDeck.swift</code> + 测试。纯逻辑，不动 UI</td></tr>
+<tr><td><code>feat/review-looks-like-1day</code></td><td><span class="pill">P0</span></td><td><code>ClipPreviewView</code> 上设计系统、修字幕按钮重叠、重拍降级</td></tr>
+<tr><td><code>feat/swipe-between-clips</code></td><td><span class="pill">P0</span></td><td>接上 <code>ClipDeck</code>，左右翻页</td></tr>
+<tr><td><code>feat/social-only-when-shared</code></td><td><span class="pill">P0</span></td><td>表情/评论只在共享故事出现；评论收进 sheet</td></tr>
+<tr><td><code>feat/gentle-filter</code></td><td><span class="pill warn">P2</span></td><td>管线重写 + Core Image。单独一轮，做完 P0 再评估</td></tr>
+</table>
+
+<h2 id="s7"><span class="n">7</span>不做什么</h2>
+<ul>
+<li><b>不重做 <code>FilmView</code>。</b>它是目前质量最高的一屏。</li>
+<li><b>不做视频剪辑</b>（裁剪、调速、配乐）。1Day 的卖点是「不用剪」。</li>
+<li><b>不改 <code>AdjustFilmSheet</code> 的表单外观。</b>它是设置，不是内容。</li>
+<li><b>不碰 CloudKit</b>。schema 部署是独立的发布阻塞项，不混进这一轮。</li>
+</ul>
+
+<div class="card note">
+<h4>遗留：多人拍摄暂时无法本地测试</h4>
+<p>示范房间这轮已经拆掉（用户要求）。在 CloudKit schema 部署到 Production 之前，多人相关的改动只能靠单测覆盖，没有可点的验证路径。</p>
+</div>
+
+</div>
+</body>
+</html>

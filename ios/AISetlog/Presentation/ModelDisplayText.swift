@@ -9,6 +9,8 @@ extension Challenge.ClipLength {
 extension ChallengeTemplate {
     /// Emotional line, falling back to a generic one for user-built scripts.
     var displayBlurb: String {
-        blurb?.resolved() ?? Strings.customTemplateBlurb
+        blurb?.resolved()
+            ?? Self.legacyCompatibility(matching: name.en)?.blurb?.resolved()
+            ?? Strings.customTemplateBlurb
     }
 }

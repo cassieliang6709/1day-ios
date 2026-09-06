@@ -40,4 +40,15 @@ struct DayClip: Identifiable {
         self.comments = comments
         self.id = key ?? "day\(day)"
     }
+
+    /// The same clip, read from somewhere else. For handing a processed copy of
+    /// the footage onward without the rest of the app noticing: the `id` is
+    /// carried over, so this is still that moment by that person and not a new
+    /// one that happens to look the same.
+    func replacingURL(_ url: URL) -> DayClip {
+        DayClip(
+            day: day, url: url, authorName: authorName, authorID: authorID,
+            label: label, overlayText: overlayText, recordedAt: recordedAt,
+            emoji: emoji, comments: comments, key: id)
+    }
 }

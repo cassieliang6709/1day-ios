@@ -9,9 +9,15 @@ struct SettingsView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var showSignIn = false
+    /// Held locally so a half-typed name never reaches the rooms.
+    @State private var draftName = ""
+    @FocusState private var nameFocused: Bool
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -62,6 +68,8 @@ struct SettingsView: View {
                 } footer: {
                     Text(Strings.appearanceFootnote)
                 }
+
+                lookSection
 
                 Section {
                     Toggle(
@@ -132,8 +140,37 @@ struct SettingsView: View {
                 await refreshAuthorizationStatus()
                 mutedRooms = NotificationPreferences.mutedRoomCodes
             }
+            // On the Form, not on the Section: a sheet presented from inside a
+            // Section of an already-presented sheet takes the whole settings
+            // panel down with it.
+            .sheet(isPresented: $showSignIn) {
+                SignInView { showSignIn = false }
+            }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    // MARK: - How clips look
+
+    /// The same two controls the panel over a clip has, for when you want them
+    /// without opening a clip. The dials are deliberately not here — a dial you
+    /// can't see the effect of is a dial you're guessing at, so fine-tuning
+    /// stays on the screen with the picture on it.
+    private var lookSection: some View {
+        Section {
+            Picker(Strings.lookSetting, selection: $look) {
+                ForEach(GentleLook.presets, id: \.key) { preset in
+                    Text(GentleLook.presetName(preset.key)).tag(preset.look)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            Toggle(Strings.lookRemember, isOn: $lookIsSticky)
+        } header: {
+            Text(Strings.lookSetting)
+        } footer: {
+            Text("\(Strings.lookFootnote)\n\(Strings.lookRememberFootnote)")
+        }
     }
 
     // MARK: - Account
@@ -145,22 +182,53 @@ struct SettingsView: View {
     @ViewBuilder
     private var accountSection: some View {
         Section {
-            if let name = account.account?.displayName {
-                LabeledContent(Strings.signedInAs, value: name)
-                Button(Strings.signOut) { account.signOut() }
+            if account.isSignedIn {
+                LabeledContent(Strings.yourNameLabel) {
+                    TextField(Strings.yourNamePlaceholder, text: $draftName)
+                        .multilineTextAlignment(.trailing)
+                        .focused($nameFocused)
+                        .submitLabel(.done)
+                        .onSubmit(commitName)
+                        .accessibilityIdentifier("your-name")
+                }
+                .onChange(of: nameFocused) { _, focused in
+                    if !focused { commitName() }
+                }
+                // Through the store, not straight at the account: the rooms
+                // hold a cache keyed by who I am.
+                Button(Strings.signOut) { store.signOut() }
+
+                // Only an account that exists can be deleted. Offering this
+                // while signed out put a button that erases every story on
+                // the device under a heading nobody reads as "erase my
+                // stories" — and there was nothing there to delete anyway.
+                Button(Strings.deleteAccount, role: .destructive) {
+                    showDeleteConfirmation = true
+                }
+                .disabled(isDeleting)
             } else {
                 Text(Strings.notSignedIn)
                     .foregroundStyle(.secondary)
-            }
 
-            Button(Strings.deleteAccount, role: .destructive) {
-                showDeleteConfirmation = true
+                // Signing out used to be one-way from this screen: the only
+                // other sign-in gate is the one in front of a shared story,
+                // so getting back in meant starting one.
+                Button(Strings.signIn) { showSignIn = true }
             }
-            .disabled(isDeleting)
         } header: {
             Text(Strings.account)
         } footer: {
-            Text(Strings.deleteAccountFootnote)
+            VStack(alignment: .leading, spacing: 6) {
+                if account.isSignedIn {
+                    Text(Strings.yourNameFootnote)
+                    Text(Strings.deleteAccountFootnote)
+                }
+            }
+        }
+        .onAppear { draftName = account.account?.displayName ?? "" }
+        .onChange(of: account.account?.displayName) { _, name in
+            guard !nameFocused else { return }
+            draftName = name ?? ""
         }
         .confirmationDialog(
             Strings.deleteAccountTitle,
@@ -186,6 +254,13 @@ struct SettingsView: View {
             }
         }
     }
+
+    /// An empty field means "I didn't mean to do that", not "call me nothing".
+    private func commitName() {
+        account.rename(to: draftName)
+        draftName = account.account?.displayName ?? ""
+    }
+
 
     private var aboutSection: some View {
         Section {

@@ -11,8 +11,8 @@ struct PlansHomeView: View {
     @Environment(AccountStore.self) private var account
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
-    /// The story the shell considers "today's" — the least-finished active one.
-    let featuredChallengeID: UUID?
+    /// What the shell decided to lead with, and why. See `HomeHeroChoice`.
+    let heroChoice: HomeHeroChoice
 
     @State private var path: [UUID] = []
     @State private var showComposer = false
@@ -29,12 +29,11 @@ struct PlansHomeView: View {
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var active: [Challenge] { store.challenges.filter { !$0.isComplete } }
-    private var finished: [Challenge] { store.challenges.filter(\.isComplete) }
-    private var hero: Challenge? {
-        featuredChallengeID.flatMap(store.challenge) ?? active.first
+    private var hero: Challenge? { heroChoice.challenge }
+    /// Everything except the hero, by the day it was for. See `StoryTimeline`.
+    private var timeline: StoryTimeline {
+        StoryTimeline(challenges: store.challenges, excluding: hero?.id)
     }
-    private var others: [Challenge] { active.filter { $0.id != hero?.id } }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -106,18 +105,19 @@ struct PlansHomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
 
-                if let hero {
-                    heroSection(hero)
-                } else {
-                    emptyState
+                switch heroChoice {
+                case .today(let challenge):
+                    heroSection(challenge, label: Strings.todaysStory)
+                case .resume(let challenge):
+                    heroSection(challenge, label: Strings.resumeStory)
+                case .startToday:
+                    // First run gets the mascot; someone who already has
+                    // finished films just needs the one button.
+                    if store.challenges.isEmpty { emptyState } else { startTodayCard }
                 }
 
-                if !others.isEmpty {
-                    otherPlansSection
-                }
-
-                if !finished.isEmpty {
-                    finishedSection
+                if !timeline.isEmpty {
+                    timelineSection
                 }
             }
             .padding(.top, 8)
@@ -138,65 +138,131 @@ struct PlansHomeView: View {
         }
     }
 
-    /// Greeting, then the two utility actions. No title bar — the greeting
-    /// *is* the title, which is what keeps the screen feeling personal.
+    /// Who you are, what day it is, how far today has got — then the two
+    /// actions. The wordmark used to sit here; it's the one fact a person
+    /// opening 1day already has, and it was crowding out the two they didn't.
+    ///
+    /// Nothing up here is allowed to outshine "continue today's story" in the
+    /// card below, so all three controls are the same 36pt and the create
+    /// button earns its emphasis from the brand gradient alone.
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 11) {
+            Button { showSettings = true } label: {
+                AvatarDot(name: account.account?.displayName, size: 42)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.settings)
+
             VStack(alignment: .leading, spacing: 3) {
                 Text(Strings.greeting(
                     name: account.account?.displayName,
                     hour: Calendar.current.component(.hour, from: .now)))
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .font(.system(size: 16.5, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text(Strings.greetingQuestion)
-                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
+                dateline
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
 
-            IconBubble(systemName: "person.2.badge.plus") {
+            IconBubble(systemName: "person.2.badge.plus", size: 36) {
                 joinCode = ""
                 showJoin = true
             }
             .accessibilityLabel(Strings.enterInviteCode)
 
-            Button { showSettings = true } label: {
-                AvatarDot(name: account.account?.displayName, size: 38)
+            Button {
+                showComposer = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(OneDay.brandHorizontal, in: Circle())
+                    .oneDaySoftShadow(strength: 0.6)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Strings.settings)
+            // Visually 36pt so it sits level with the bubble beside it, but
+            // the tap target still clears Apple's 44pt floor.
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            .accessibilityLabel(Strings.newStory)
         }
         .padding(.horizontal, 20)
     }
 
-    private func heroSection(_ challenge: Challenge) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                SectionLabel(text: Strings.todaysStory)
-                Spacer()
-                Button {
-                    showComposer = true
-                } label: {
-                    Label(Strings.newStory, systemImage: "plus")
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
-                }
-                .buttonStyle(.plain)
+    /// Date, and — when there's a story in progress — how much of it is in.
+    /// The pips are the first thing to go on a narrow screen; the numbers
+    /// carry the same fact and always fit.
+    private var dateline: some View {
+        let summary = HomeHeaderSummary(progress: hero.map { cardState(for: $0).progress })
+        return HStack(spacing: 6) {
+            Text(summary.dateLine)
+                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                .foregroundStyle(OneDay.inkSoft)
+                .lineLimit(1)
+                .fixedSize()
+
+            if summary.hasProgress, let recorded = summary.recorded, let total = summary.total {
+                Circle()
+                    .fill(OneDay.inkFaint)
+                    .frame(width: 3, height: 3)
+
+                Text(summary.progressLine)
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
+                    .fixedSize()
+
+                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBlue)
+                    .layoutPriority(-1)
             }
-            .padding(.horizontal, 20)
+        }
+    }
+
+    /// `label` varies because the card isn't always today's story — calling an
+    /// unfinished story from yesterday "today's story" is the kind of small lie
+    /// that makes the whole screen untrustworthy.
+    private func heroSection(_ challenge: Challenge, label: String) -> some View {
+        let state = cardState(for: challenge)
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: label)
+                .padding(.horizontal, 20)
 
             StoryCard(
                 challenge: challenge,
                 memberNames: store.members(for: challenge.id).map(\.name),
-                coverURL: latestClipURL(for: challenge),
-                refreshToken: latestRecordedAt(for: challenge),
+                progress: state.progress,
+                coverURL: state.coverURL,
+                refreshToken: state.refreshToken,
                 onContinue: { recordChallenge = challenge },
                 onOpen: { path.append(challenge.id) })
                 .padding(.horizontal, 20)
+        }
+    }
+
+    /// Nothing to lead with, but this isn't a first run — there are films
+    /// behind this screen, just nothing going on today. Compact on purpose:
+    /// the timeline below it is the interesting part.
+    private var startTodayCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: Strings.startTodayLabel)
+                .padding(.horizontal, 20)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(Strings.startTodayBody)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+
+                Button(Strings.startTodayCTA) { showComposer = true }
+                    .buttonStyle(.primaryAction)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .glassSurface(radius: OneDay.Radius.card)
+            .padding(.horizontal, 20)
         }
     }
 
@@ -225,70 +291,58 @@ struct PlansHomeView: View {
         .padding(.horizontal, 20)
     }
 
-    private var otherPlansSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            SectionLabel(text: Strings.yourOtherPlans)
+    /// Everything that isn't today, newest day first. One label per day, then
+    /// that day's stories — finished or not, they sit together, because "when"
+    /// is the axis people actually remember by.
+    /// Lazy because each row costs a pass over its story's clips: an eager
+    /// stack rebuilt every off-screen row on every render, and this list only
+    /// grows.
+    private var timelineSection: some View {
+        LazyVStack(alignment: .leading, spacing: 18) {
+            SectionLabel(text: timeline.includesToday
+                ? Strings.yourStories
+                : Strings.scrollBack)
                 .padding(.horizontal, 20)
 
-            ForEach(others) { challenge in
-                Button {
-                    path.append(challenge.id)
-                } label: {
-                    StoryRowCard(
-                        challenge: challenge,
-                        coverURL: latestClipURL(for: challenge),
-                        refreshToken: latestRecordedAt(for: challenge),
-                        memberNames: store.members(for: challenge.id).map(\.name))
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(
-                        challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
-                        role: .destructive
-                    ) {
-                        store.delete(challenge.id)
+            ForEach(timeline.days) { day in
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(day.label)
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.inkFaint)
+                        .padding(.horizontal, 20)
+
+                    ForEach(day.stories) { challenge in
+                        storyRow(challenge)
                     }
                 }
-                .padding(.horizontal, 20)
             }
         }
     }
 
-    /// Finished films as a horizontal shelf of posters — a small archive,
-    /// not another list to work through.
-    private var finishedSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            SectionLabel(text: Strings.finishedFilms)
-                .padding(.horizontal, 20)
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 13) {
-                    ForEach(finished) { challenge in
-                        Button {
-                            path.append(challenge.id)
-                        } label: {
-                            FilmPoster(
-                                challenge: challenge,
-                                coverURL: firstClipURL(for: challenge),
-                                refreshToken: firstRecordedAt(for: challenge))
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button(
-                                challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
-                                role: .destructive
-                            ) {
-                                store.delete(challenge.id)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 4)
-            }
-            .scrollIndicators(.hidden)
+    private func storyRow(_ challenge: Challenge) -> some View {
+        let state = cardState(for: challenge)
+        return Button {
+            path.append(challenge.id)
+        } label: {
+            StoryRowCard(
+                challenge: challenge,
+                progress: state.progress,
+                coverURL: state.coverURL,
+                refreshToken: state.refreshToken,
+                memberNames: store.members(for: challenge.id).map(\.name))
         }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(
+                challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
+                role: .destructive
+            ) {
+                store.delete(challenge.id)
+            }
+        }
+        .padding(.horizontal, 20)
     }
+
 
     // MARK: - Recorder
 
@@ -299,8 +353,11 @@ struct PlansHomeView: View {
         let slot = slotToRecord(in: challenge, preferred: preferredDay)
         RecordClipView(
             day: slot,
-            slotTitle: ChallengePresenter(challenge: challenge).title(forSlot: slot),
+            slotTitle: challenge.isTimeOnly
+                ? nil
+                : ChallengePresenter(challenge: challenge).title(forSlot: slot),
             clipLength: challenge.resolvedClipLength,
+            showsPrompt: !challenge.isTimeOnly,
             orientation: challenge.resolvedOrientation
         ) { url, overlayText in
             store.saveClip(
@@ -319,8 +376,10 @@ struct PlansHomeView: View {
            card.clipFileName == nil {
             return card.day
         }
-        return challenge.cards.first { $0.clipFileName == nil }?.day
-            ?? min(max(preferred ?? 1, 1), max(challenge.cards.count, 1))
+        // The first moment *nobody* has filmed. Offering one a friend already
+        // covered, while an untouched one waits further down, is how a room
+        // ends up with three takes of breakfast and no evening.
+        return cardState(for: challenge).progress.nextOpenMoment
     }
 
     // MARK: - Routing
@@ -335,6 +394,9 @@ struct PlansHomeView: View {
         guard let action = launchAction else { return }
         launchAction = nil
         switch action {
+        case .quickStart:
+            let challenge = store.createQuickStart()
+            path = [challenge.id]
         case .newStory:
             showComposer = true
         case .join:
@@ -374,82 +436,39 @@ struct PlansHomeView: View {
         if account.isSignedIn { run() } else { afterSignIn = run }
     }
 
-    // MARK: - Cover art
+    // MARK: - Progress and cover art
 
-    private func firstClipURL(for challenge: Challenge) -> URL? {
-        challenge.cards.first { $0.clipFileName != nil }
-            .flatMap { store.clipURL(for: $0, in: challenge.id) }
+    /// Everything a card needs about a story, from one pass over its clips.
+    ///
+    /// `recordedClips` is not cheap — it localises every moment title and
+    /// rebuilds a documents-directory URL per card, and in a room it filters
+    /// the whole reaction and comment list per clip. Asking for it three times
+    /// per row (progress, cover, refresh token) tripled that for nothing.
+    private struct CardState {
+        let progress: RoomProgress
+        /// The most recent clip in the story, from anyone. A room where only my
+        /// friends have filmed used to fall back to the template art, so the
+        /// card looked untouched while it was three moments in.
+        let coverURL: URL?
+        /// Re-records reuse the same file name, so a cached frame needs the
+        /// clip's `recordedAt` to notice the change.
+        let refreshToken: Date?
     }
 
-    private func latestClipURL(for challenge: Challenge) -> URL? {
-        challenge.cards.last { $0.clipFileName != nil }
-            .flatMap { store.clipURL(for: $0, in: challenge.id) }
-    }
-
-    /// Re-records reuse the same file name, so a cached first frame needs the
-    /// card's `recordedAt` to notice the change.
-    private func firstRecordedAt(for challenge: Challenge) -> Date? {
-        challenge.cards.first { $0.clipFileName != nil }?.recordedAt
-    }
-
-    private func latestRecordedAt(for challenge: Challenge) -> Date? {
-        challenge.cards.last { $0.clipFileName != nil }?.recordedAt
-    }
-
-}
-
-/// A finished film on the shelf: cover frame, title, and the date it happened.
-struct FilmPoster: View {
-    let challenge: Challenge
-    let coverURL: URL?
-    var refreshToken: Date?
-
-    private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-
-    private var dateStamp: String {
-        challenge.startDate.formatted(
-            .dateTime.month(.abbreviated).day().locale(AppLanguage.effective.locale))
-    }
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let coverURL {
-                    ClipThumbnail(url: coverURL, refreshToken: refreshToken)
-                } else {
-                    Image(presenter.coverAssetName)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 132, height: 186)
-            .clipped()
-
-            OneDay.scrim
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(presenter.displayTitle)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                Text(dateStamp)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            .padding(11)
+    private func cardState(for challenge: Challenge) -> CardState {
+        let clips = store.recordedClips(for: challenge.id)
+        // Day breaks the tie, so a clip with no timestamp still sorts sanely
+        // rather than sinking to the bottom of the pile.
+        let latest = clips.max {
+            ($0.recordedAt ?? .distantPast, $0.day) < ($1.recordedAt ?? .distantPast, $1.day)
         }
-        .frame(width: 132, height: 186)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            if challenge.isShared {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(6)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .padding(8)
-            }
-        }
-        .oneDaySoftShadow(strength: 0.8)
+        return CardState(
+            progress: RoomProgress(
+                momentCount: challenge.cards.count,
+                clips: clips,
+                myID: account.account?.id ?? RoomProgress.soloAuthorID),
+            coverURL: latest?.url,
+            refreshToken: latest?.recordedAt)
     }
+
 }

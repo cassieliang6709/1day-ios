@@ -66,6 +66,24 @@ final class LocalizationTests: XCTestCase {
         XCTAssertNil(ChallengeTemplate.builtIn(matching: "My own story"))
     }
 
+    func testLiveWithMeIsAStablePromptFreeTemplate() {
+        let template = ChallengeTemplate.liveWithMe
+        XCTAssertTrue(template.isTimeOnly)
+        XCTAssertNil(template.momentKeys)
+        // Its own cover, not Main Character's: two templates sharing one
+        // picture is how the poster rack stopped meaning anything.
+        XCTAssertEqual(template.coverAssetName, "TemplateLiveWithMe")
+
+        let challenge = Challenge(
+            id: UUID(),
+            title: template.identityKey,
+            startDate: .now,
+            cards: [DayCard(day: 1)],
+            mode: .oneDay,
+            templateName: template.identityKey)
+        XCTAssertTrue(challenge.isTimeOnly)
+    }
+
     func testBuiltInDefaultTitleSwitchesIndependentlyBetweenLanguages() {
         let challenge = Challenge(
             id: UUID(),
@@ -118,6 +136,61 @@ final class LocalizationTests: XCTestCase {
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertEqual(Strings.startToday, "Start today")
         XCTAssertEqual(Strings.dayN(3), "Day 3")
+    }
+
+    /// The composer's new copy. Shipping any of it in one language only would
+    /// leave the other with a grey grid, or a count, and no words around it.
+    func testComposerPromptCopyIsWrittenInBothLanguages() {
+        func inBothLanguages(_ string: () -> String) -> (String, String) {
+            UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+            let chinese = string()
+            UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+            return (chinese, string())
+        }
+
+        let pairs = [
+            inBothLanguages { Strings.followPrompts },
+            inBothLanguages { Strings.recordByTime },
+            inBothLanguages { Strings.pickPromptSet },
+            inBothLanguages { Strings.timeOnlyCardBody },
+            inBothLanguages { Strings.timeOnlyCaptionNote },
+            inBothLanguages { Strings.promptCountLabel(7) },
+            inBothLanguages { Strings.headerDateProgress(1, 7) },
+        ]
+
+        for (chinese, english) in pairs {
+            XCTAssertFalse(chinese.isEmpty)
+            XCTAssertFalse(english.isEmpty)
+            XCTAssertNotEqual(chinese, english)
+        }
+    }
+
+    /// "Preview · 1 moments" shipped, and shipped for a while, because every
+    /// caller wrote the English plural in by hand and nobody opened a story
+    /// with exactly one moment filmed in it.
+    func testEnglishCountsAgreeWithTheirNoun() {
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+
+        XCTAssertEqual(Strings.previewTheFilm(1), "Preview · 1 moment")
+        XCTAssertEqual(Strings.previewTheFilm(2), "Preview · 2 moments")
+        XCTAssertEqual(Strings.momentsShort(1), "1 moment")
+        XCTAssertEqual(Strings.momentsShort(7), "7 moments")
+        XCTAssertEqual(Strings.momentCount(1), "1 moment in 24 hours")
+
+        // Chinese has no plural, so the same call has to stay unchanged there.
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.previewTheFilm(1), "预览 · 1 个瞬间")
+        XCTAssertEqual(Strings.momentsShort(7), "7 个瞬间")
+    }
+
+    func testPromptCountAndProgressCarryTheirNumbers() {
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.promptCountLabel(7), "7 个题目")
+        XCTAssertEqual(Strings.headerDateProgress(1, 7), "今天 1/7")
+
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.promptCountLabel(7), "7 prompts")
+        XCTAssertEqual(Strings.headerDateProgress(1, 7), "Today 1/7")
     }
 
     func testForcedLanguageUsesMatchingLocaleAndPureCopy() throws {

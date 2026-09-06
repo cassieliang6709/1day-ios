@@ -16,8 +16,10 @@ struct StoryComposerView: View {
     enum Step: Int { case mood, setup }
 
     @State private var step: Step = .mood
-    @State private var activeIndex = 0
-    @State private var mode: Challenge.Mode = .oneDay
+    /// Style, template and mode as one value — see `ComposerSelection` for why
+    /// the style can't be inferred from the template.
+    @State private var selection = ComposerSelection.initial(
+        oneDay: ChallengeTemplate.oneDayBuiltins)
     @State private var clipLength: Challenge.ClipLength = .tiny
     @State private var orientation: Challenge.Orientation = .portrait
     @State private var withFriends = false
@@ -28,25 +30,32 @@ struct StoryComposerView: View {
     /// The story's moments. Seeded from the chosen template, then editable —
     /// and replaced wholesale by the guided flow.
     @State private var moments: [String] = []
-    @State private var momentsEdited = false
+    @State private var isCustomPromptStory = false
     @State private var showGuided = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
-    @State private var showBuildTemplate = false
     @State private var editingTemplate: ChallengeTemplate?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var templates: [ChallengeTemplate] {
-        let builtins = mode == .oneDay
-            ? ChallengeTemplate.oneDayBuiltins
-            : ChallengeTemplate.sevenDayBuiltins
-        return builtins + store.customTemplates
+    private var oneDayTemplates: [ChallengeTemplate] {
+        ChallengeTemplate.oneDayBuiltins + store.customTemplates
     }
 
+    private var sevenDayTemplates: [ChallengeTemplate] {
+        ChallengeTemplate.sevenDayBuiltins
+    }
+
+    private var allTemplates: [ChallengeTemplate] {
+        oneDayTemplates + sevenDayTemplates
+    }
+
+    private var mode: Challenge.Mode { selection.mode }
+
     private var selected: ChallengeTemplate? {
-        templates.indices.contains(activeIndex) ? templates[activeIndex] : nil
+        guard let templateID = selection.templateID else { return nil }
+        return allTemplates.first { $0.id == templateID }
     }
 
     var body: some View {
@@ -59,11 +68,10 @@ struct StoryComposerView: View {
                 switch step {
                 case .mood:
                     MoodStep(
-                        templates: templates,
-                        activeIndex: $activeIndex,
-                        mode: $mode,
-                        clipLength: $clipLength,
-                        onBuildOwn: { showGuided = true },
+                        oneDayTemplates: oneDayTemplates,
+                        sevenDayTemplates: sevenDayTemplates,
+                        selection: $selection,
+                        onBuildOwn: beginCustomPromptFlow,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate)
                         .transition(.asymmetric(
@@ -80,8 +88,8 @@ struct StoryComposerView: View {
                         orientation: $orientation,
                         moments: $moments,
                         isOneDay: mode == .oneDay,
-                        memberNames: knownFriendNames,
-                        errorText: errorText)
+                        isTimeOnly: selection.style == .timeOnly,
+                        memberNames: knownFriendNames)
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)))
@@ -96,21 +104,12 @@ struct StoryComposerView: View {
         }
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView { written, name in
+                isCustomPromptStory = true
+                selection.useCustomPrompts()
                 moments = written
-                momentsEdited = true
-                if !name.isEmpty {
-                    title = name
-                    titleEdited = true
-                }
-                // Straight to setup: the moments question is already answered,
-                // so sending them back to the poster rack would be a detour.
+                title = name
+                titleEdited = true
                 withAnimation(OneDay.Motion.soft) { step = .setup }
-            }
-        }
-        .sheet(isPresented: $showBuildTemplate) {
-            BuildTemplateView { template in
-                store.addCustomTemplate(template)
-                activeIndex = max(templates.count - 1, 0)
             }
         }
         .sheet(item: $editingTemplate) { template in
@@ -119,12 +118,22 @@ struct StoryComposerView: View {
             }
         }
         .onAppear(perform: syncTitleToTemplate)
-        .onChange(of: activeIndex) { _, _ in syncTitleToTemplate() }
-        .onChange(of: mode) { _, _ in
-            activeIndex = 0
-            titleEdited = false
-            momentsEdited = false
+        .onChange(of: selection.templateID) { _, newID in
+            guard newID != nil else { return }
+            isCustomPromptStory = false
+            // `titleEdited` deliberately survives this. Zeroing it here made
+            // the flag unreadable — every call site reached `syncTitleToTemplate`
+            // with it false — so naming a story 我的搬家日 and then browsing to
+            // another template silently replaced the name with the template's.
             syncTitleToTemplate()
+        }
+        // Switching to solo answers "sign into iCloud" all by itself, so the
+        // warning shouldn't outlive the choice that caused it.
+        .onChange(of: withFriends) { _, _ in errorText = nil }
+        .onChange(of: selection.mode) { _, _ in
+            guard !isCustomPromptStory else { return }
+            selection.reconcileTemplate(
+                oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
         }
     }
 
@@ -136,6 +145,9 @@ struct StoryComposerView: View {
                 if step == .mood {
                     dismiss()
                 } else {
+                    // The warning belongs to "Create room". Carrying it back to
+                    // the poster rack makes it look like picking a story failed.
+                    errorText = nil
                     withAnimation(OneDay.Motion.soft) { step = .mood }
                 }
             }
@@ -156,6 +168,18 @@ struct StoryComposerView: View {
 
     private var footer: some View {
         VStack(spacing: 10) {
+            // Above the button, not at the bottom of the scroll: the reason a
+            // tap did nothing has to be on screen when the tap happens.
+            if let errorText {
+                Label(errorText, systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
+
             Button(action: advance) {
                 HStack(spacing: 8) {
                     if creating {
@@ -173,6 +197,7 @@ struct StoryComposerView: View {
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 8)
+        .animation(OneDay.Motion.soft, value: errorText)
     }
 
     private var primaryTitle: String {
@@ -184,7 +209,7 @@ struct StoryComposerView: View {
 
     private var canAdvance: Bool {
         switch step {
-        case .mood: return selected != nil
+        case .mood: return selected != nil || isCustomPromptStory
         case .setup: return !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
         }
     }
@@ -202,10 +227,14 @@ struct StoryComposerView: View {
 
     private func start() {
         let name = title.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
+        // `dismiss()` isn't instant, so a second tap inside the closing
+        // animation used to insert a second story. The shared path had this
+        // guard through `creating`; the solo path — the common one — didn't.
+        guard !name.isEmpty, !creating else { return }
         if withFriends {
             if account.isSignedIn { createSharedRoom() } else { showSignIn = true }
         } else {
+            creating = true
             let challenge = store.create(
                 title: name,
                 mode: mode,
@@ -240,8 +269,15 @@ struct StoryComposerView: View {
     }
 
     private func deleteTemplate(_ template: ChallengeTemplate) {
+        let wasSelected = selection.templateID == template.id
         store.deleteCustomTemplate(template)
-        activeIndex = min(activeIndex, max(templates.count - 2, 0))
+        if wasSelected {
+            selection.clearTemplate(fallingBackTo: ChallengeTemplate.oneDayBuiltins)
+        }
+    }
+
+    private func beginCustomPromptFlow() {
+        showGuided = true
     }
 
     // MARK: - Derived state
@@ -255,14 +291,15 @@ struct StoryComposerView: View {
                 ? Strings.fullTitle7Days(selected.displayName)
                 : selected.displayName
         }
-        if !momentsEdited {
-            moments = selected.momentKeys ?? []
-        }
+        // Moments always follow the template: picking one *is* the request for
+        // its prompts. The name doesn't, because you typed that.
+        moments = selected.momentKeys ?? []
     }
 
     /// Blank rows are dropped; an entirely empty list falls back to the
     /// template's own moments so a story can never be created with none.
     private var resolvedMoments: [String]? {
+        if selected?.isTimeOnly == true { return nil }
         let cleaned = moments
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }

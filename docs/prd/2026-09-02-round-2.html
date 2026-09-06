@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>1Day PRD — 第二轮：不丢片、挑对今天、一层选择、往前翻</title>
+<style>
+  :root{
+    --blue:#1677FF;--cyan:#38B6FF;--sky:#7FB4FF;--navy:#0F2E6B;
+    --mist:#DCEBFF;--canvas:#F5F8FF;--lav:#B3A4FF;--mint:#5FD6B4;
+    --ink:#0F2E6B;--inkSoft:#5B7099;--inkFaint:#93A6C6;--hair:rgba(22,119,255,.12);
+    --red:#A7443C;--green:#158463;--amber:#A75B12;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;padding:40px 34px 120px;background:#E9EDF5;color:var(--ink);
+       font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+       font-size:14px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;
+       background:rgba(22,119,255,.09);padding:1.5px 5px;border-radius:5px;color:#0B4FA8}
+  pre{background:#0F2E6B;color:#DCEBFF;padding:14px 16px;border-radius:14px;overflow-x:auto;
+      font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.62}
+  pre code{background:none;color:inherit;padding:0}
+  a{color:var(--blue)}
+
+  /* ---------- doc chrome ---------- */
+  .hdr{background:linear-gradient(135deg,#fff,#F2F7FF);border:1px solid var(--hair);
+       border-radius:22px;padding:24px 26px;box-shadow:0 10px 28px rgba(15,46,107,.10);margin-bottom:12px}
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.5px;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:7px 9px;font-size:12.5px;color:var(--inkSoft);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;
+        padding:3px 10px;border-radius:99px;background:var(--mist);color:var(--blue)}
+  .pill.ok{background:#DFF6EC;color:var(--green)}
+  .pill.warn{background:#FFE9D6;color:var(--amber)}
+  .pill.hot{background:#FBE4E1;color:var(--red)}
+  .pill.gray{background:rgba(147,166,198,.2);color:var(--inkSoft)}
+
+  h2{font-size:20px;margin:44px 0 6px;padding-top:22px;border-top:1px solid rgba(15,46,107,.13);
+     letter-spacing:-.3px}
+  h2:first-of-type{padding-top:0;border-top:0}
+  h2 .n{color:var(--inkFaint);font-weight:800;margin-right:8px}
+  h3{font-size:16px;margin:26px 0 6px;letter-spacing:-.2px}
+  h4{font-size:13.5px;margin:18px 0 5px;color:var(--inkSoft);letter-spacing:.2px;text-transform:uppercase;
+     font-weight:900}
+  p{margin:0 0 12px;max-width:900px}
+  .sub{color:var(--inkSoft);margin-bottom:18px;max-width:900px}
+  ul,ol{margin:0 0 12px;padding-left:22px;max-width:900px}
+  li{margin-bottom:5px}
+  li::marker{color:var(--sky)}
+
+  .card{background:rgba(255,255,255,.92);border:1px solid var(--hair);border-radius:18px;
+        padding:16px 18px;margin:14px 0;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .card.hot{border-left:4px solid var(--red);background:linear-gradient(90deg,rgba(251,228,225,.5),rgba(255,255,255,.94) 60px)}
+  .card.warn{border-left:4px solid var(--amber);background:linear-gradient(90deg,rgba(255,233,214,.5),rgba(255,255,255,.94) 60px)}
+  .card.ok{border-left:4px solid var(--green);background:linear-gradient(90deg,rgba(223,246,236,.5),rgba(255,255,255,.94) 60px)}
+  .card.note{border-left:4px solid var(--sky)}
+  .card h4{margin-top:0}
+
+  table{border-collapse:collapse;width:100%;table-layout:fixed;margin:14px 0;font-size:13px;
+        background:rgba(255,255,255,.92);border-radius:14px;overflow:hidden;
+        box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  th,td{overflow-wrap:anywhere}
+  th{background:rgba(220,235,255,.7);text-align:left;padding:10px 13px;font-size:11.5px;
+     font-weight:900;letter-spacing:.4px;color:var(--inkSoft);text-transform:uppercase;
+     border-bottom:1px solid var(--hair)}
+  td{padding:10px 13px;border-bottom:1px solid rgba(15,46,107,.07);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.8px;color:var(--inkSoft)}
+  .no{color:var(--red);font-weight:800}
+  .yes{color:var(--green);font-weight:800}
+
+  .prlist{counter-reset:pr}
+  .pr{background:rgba(255,255,255,.94);border:1px solid var(--hair);border-radius:20px;
+      margin:16px 0;box-shadow:0 6px 20px rgba(15,46,107,.09);overflow:hidden}
+  .pr > .top{display:flex;align-items:center;gap:11px;padding:14px 18px;
+      background:linear-gradient(100deg,rgba(220,235,255,.6),rgba(255,255,255,.4));
+      border-bottom:1px solid var(--hair)}
+  .pr .id{font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--blue),var(--cyan));
+      padding:4px 11px;border-radius:99px;letter-spacing:.4px;flex:0 0 auto}
+  .pr .ti{font-size:15.5px;font-weight:900;letter-spacing:-.2px}
+  .pr .ti code{font-size:.94em}
+  .pr .bd{padding:16px 18px}
+  .pr .bd > :first-child{margin-top:0}
+
+  .ck{list-style:none;padding-left:0;margin:8px 0 0}
+  .ck li{position:relative;padding-left:26px;margin-bottom:7px;font-size:13px}
+  .ck li:before{content:"";position:absolute;left:0;top:2px;width:15px;height:15px;border-radius:5px;
+      border:1.8px solid rgba(22,119,255,.4);background:rgba(255,255,255,.9)}
+
+  .cols{display:flex;gap:18px;flex-wrap:wrap}
+  .cols > *{flex:1;min-width:280px}
+
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:800;margin:10px 0}
+  .flow span{padding:6px 12px;border-radius:10px;background:rgba(220,235,255,.75);color:var(--ink)}
+  .flow span.bad{background:#FBE4E1;color:var(--red)}
+  .flow span.good{background:#DFF6EC;color:var(--green)}
+  .flow em{color:var(--inkFaint);font-style:normal;font-weight:900}
+
+  .tocbox{background:rgba(255,255,255,.9);border:1px solid var(--hair);border-radius:18px;
+      padding:14px 18px;margin-bottom:30px;box-shadow:0 5px 16px rgba(15,46,107,.07)}
+  .tocbox ol{columns:2;column-gap:32px;margin:0;padding-left:20px;font-size:13px}
+  .tocbox li{margin-bottom:4px}
+  .tocbox a{text-decoration:none;font-weight:700}
+  .tocbox a:hover{text-decoration:underline}
+
+  @media (max-width:700px){
+    body{padding:26px 16px 90px}
+    .tocbox ol{columns:1}
+    th,td{padding:8px 9px;font-size:12.3px}
+    /* 窄屏放弃内联的固定列宽，交给 table-layout:fixed 平分 */
+    table th[style]{width:auto!important}
+    h1{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <h1>PRD 第二轮 — 不丢片、挑对今天、一层选择、往前翻</h1>
+  <p class="sub" style="margin-bottom:0">
+    第一轮（<a href="2026-09-01-home-header-and-composer.md">首页 header &amp; 新建故事</a>，PR-0~PR-3）已全部落地。
+    这一轮清掉它留下的三笔账，加上 Cassie 在 review 里发现的「预览条累赘」，再把回看和 AI 的第一步排进来。
+  </p>
+  <div class="meta">
+    <span class="pill">日期 2026-09-02</span>
+    <span class="pill gray">提出人 Cassie</span>
+    <span class="pill warn">状态 待确认</span>
+    <span class="pill ok">形式已选定 · 新建故事 A / 回看 B</span>
+    <span class="pill ok">key 策略已定 · 极小后端代理</span>
+  </div>
+  <div class="meta" style="margin-top:8px">
+    <span>设计稿：<a href="../mockups/composer-v3-and-dates.html">composer-v3-and-dates.html</a></span>
+    <span>·</span>
+    <span>上一轮 PRD：<a href="2026-09-01-home-header-and-composer.md">2026-09-01</a></span>
+  </div>
+</div>
+
+<div class="tocbox">
+  <ol>
+    <li><a href="#bg">背景 —— 三笔账 + 一个新发现</a></li>
+    <li><a href="#goal">目标 / 非目标</a></li>
+    <li><a href="#order">执行顺序与 PR 总表</a>　<a href="#parallel" style="font-size:12px">↳ 3.2 并行计划</a></li>
+    <li><a href="#pr4">PR-4 录完的片子不再无声消失</a></li>
+    <li><a href="#pr5">PR-5 待归档的片子有个去处</a></li>
+    <li><a href="#pr6">PR-6 首页挑对今天的故事</a></li>
+    <li><a href="#pr7">PR-7 封面撞脸 + 题目时态</a></li>
+    <li><a href="#pr8">PR-8 新建故事只留一层选择</a></li>
+    <li><a href="#pr9">PR-9 往前翻就是过去的日子</a></li>
+    <li><a href="#pr10">PR-10 说一句今天要干嘛</a></li>
+    <li><a href="#risk">风险</a></li>
+    <li><a href="#later">继续挂账 / 新产品的判断</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="bg"><span class="n">1</span>背景</h2>
+
+<h3>① 自由拍摄会真的丢片 <span class="pill hot">严重度最高</span></h3>
+
+<div class="card hot">
+  <h4>先更正一条我上一轮写错的判断</h4>
+  <p style="margin-bottom:8px">上一轮 PRD 把原因写成「<code>onSave</code> 是空闭包」——<b>这是错的</b>。自由拍摄走的是
+  <code>showSavePicker</code> → <code>store.saveClip</code>（<code>RecordClipView.swift:255</code>），
+  <code>CameraTabView</code> 里那个空 <code>onSave</code> 在这条路径上从不被调用。</p>
+  <p style="margin-bottom:0">真正的机制是：片子先录进 <code>FileManager.default.temporaryDirectory</code>
+  （<code>ClipRecorder.swift:215</code>），<b>只有归档成功才落盘</b>。</p>
+</div>
+
+<p>两条路会走进死胡同，各自只弹一句 toast 就没有下文：</p>
+<div class="flow">
+  <span>录完</span><em>→</em><span class="bad">一个计划都没有</span><em>→</em><span>toast「先建个计划」</span><em>→</em>
+  <span class="bad">只能重拍或离开</span><em>→</em><span class="bad">片子没了</span>
+</div>
+<div class="flow">
+  <span>录完</span><em>→</em><span class="bad">画幅跟所有计划都不匹配</span><em>→</em><span>toast 提示</span><em>→</em>
+  <span class="bad">同上</span>
+</div>
+<p><code>CameraTabView</code> 一 unmount，<code>recorder.clipURL</code> 就没了，temp 文件被系统回收。
+<b>没有草稿箱，也没有离开前的挽留。</b></p>
+
+<h3>② 首页挑错「今天的故事」</h3>
+<p><code>RootShellView.swift:31</code> 用 <code>.min { $0.recordedCount &lt; $1.recordedCount }</code> 选 hero
+——<b>谁拍得最少谁赢</b>。于是一个躺了三天没动的空故事，永远压着今天真正在拍的那个。</p>
+<p>Cassie 最早那条「9.1 的内容没在首页看到」就是这行造成的：真机截图里「和我过一天 0/7」占着
+「今天的故事」，9.1 那个（1/7）被挤到「其他的故事」。上一轮加的日期行只让人<b>看得出</b>今天是几号，
+没解决<b>选谁</b>。</p>
+
+<h3>③ 首页没有按天回看的入口</h3>
+<p>只按「进行中 / 已完成」分组。上一轮的日期行回答了「今天是几号」，没回答「怎么翻回 8.31」。</p>
+
+<h3>④ 新建故事页层级多了一层 <span class="pill">Cassie review 发现</span></h3>
+<p>上一轮 PR-3 加的题目预览条，让题目在同一屏出现了<b>两次</b>；而「主题挑战」那张卡其实是个
+<b>伪装成选项的分类标签</b>——底下的推荐网格本身就是主题挑战。</p>
+<div class="card note">
+  <h4>真实结构只有一层</h4>
+  <p style="margin-bottom:0">有 N 个模板。其中一个（和我过一天）没有题目，其余的各有 7 个。<br>
+  双卡把这件事表达成了两级选择。这是上一轮「两套选择器」问题的更深版本——PR-2 让两套<b>互相一致</b>了，
+  但没问该不该有两套。那是个局部最优。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="goal"><span class="n">2</span>目标 / 非目标</h2>
+
+<div class="cols">
+<div>
+<h4>目标</h4>
+<ol>
+  <li>录完的片子不会无声消失 —— 任何路径上，用户都得<b>先做个决定</b>才可能丢掉它。</li>
+  <li>首页顶上那块永远是「此刻最该动的那件事」，且它说的话跟它显示的东西一致。</li>
+  <li>新建故事页只有<b>一层</b>选择，题目只出现一次。</li>
+  <li>能按日期翻回过去的故事。</li>
+  <li>用 AI 解掉「这天还没过完，我怎么知道该写哪 7 个题目」——Cassie 最早提的第 5 条。</li>
+</ol>
+</div>
+<div>
+<h4>非目标</h4>
+<ul>
+  <li>不做云端草稿同步（草稿只在本机）。</li>
+  <li>不改录制本身（画幅、时长、水印都不动）。</li>
+  <li>不做跨故事的片子搬家。</li>
+  <li>不做 AI 剪辑、不做视频内容理解（vision）。</li>
+  <li>不做草稿自动过期清理（本轮只手动删）。</li>
+  <li>不做新产品（多人同场景按脚本拍）——判断见 <a href="#later">§12</a>。</li>
+</ul>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="order"><span class="n">3</span>执行顺序与 PR 总表</h2>
+<p class="sub">按<b>严重度</b>而不是按编号顺序排。丢片排第一：丢掉的片子回不来，其他都是体验问题。
+PR 编号即执行顺序。</p>
+
+<table>
+<thead><tr><th style="width:76px">PR</th><th>标题</th><th style="width:230px">主要文件</th><th style="width:88px">依赖</th><th style="width:78px">量级</th></tr></thead>
+<tbody>
+<tr><td><span class="pill hot">PR-4</span></td><td><code>fix: 录完的片子不再无声消失</code></td>
+    <td class="mono">新增 Models/ClipDraft、Services/ClipDraftStore、RecordClipView、RootShellView</td><td>—</td><td>大</td></tr>
+<tr><td><span class="pill hot">PR-5</span></td><td><code>feat: 待归档的片子有个去处</code></td>
+    <td class="mono">新增 Views/Record/ClipDraftsView、RecordClipView</td><td>PR-4</td><td>中</td></tr>
+<tr><td><span class="pill">PR-6</span></td><td><code>fix: 首页挑对今天的故事</code></td>
+    <td class="mono">新增 Presentation/HomeHeroChoice、RootShellView、PlansHomeView</td><td>—</td><td>中</td></tr>
+<tr><td><span class="pill gray">PR-7</span></td><td><code>chore: 封面不再撞脸，题目不再用过去时</code></td>
+    <td class="mono">ChallengeTemplate、MomentCatalog</td><td>—</td><td>极小（2 行）</td></tr>
+<tr><td><span class="pill">PR-8</span></td><td><code>refactor: 新建故事只留一层选择</code></td>
+    <td class="mono">ComposerSteps、Presentation/ComposerSelection</td><td>PR-7</td><td>中</td></tr>
+<tr><td><span class="pill">PR-9</span></td><td><code>feat: 往前翻就是过去的日子</code></td>
+    <td class="mono">新增 Presentation/StoryTimeline、PlansHomeView</td><td>PR-6</td><td>中</td></tr>
+<tr><td><span class="pill warn">PR-10</span></td><td><code>feat: 说一句今天要干嘛，题目自己出来</code></td>
+    <td class="mono">新增 Services/PromptSuggestionService、GuidedMomentsView + 后端</td><td>PR-8</td><td>大</td></tr>
+</tbody>
+</table>
+
+<div class="card ok">
+  <h4>PR-8 其实不依赖 PR-7 了</h4>
+  <p style="margin-bottom:0">原来的依赖来自「PR-8 的按时间拍卡要用 PR-7 换的新封面」。但封面这条本轮
+  做不了（<a href="#pr7">§7</a>：没有空闲素材，需要新画），PR-7 缩成 2 行文案。两者<b>完全无关</b>了 ——
+  不过 PR-7 太小，单独开一个 agent 不值得，仍然跟 PR-8 捆给同一个 agent（见 §3.2）。</p>
+</div>
+
+<h3 id="parallel">3.2 并行开发计划</h3>
+
+<div class="card warn">
+  <h4>先纠正一个读法 —— 上面那张表的「依赖」列会骗人</h4>
+  <p style="margin-bottom:8px">表里 PR-4 / PR-6 / PR-7 的依赖都是「—」，看起来能三个一起跑。但
+  <b>逻辑无依赖 ≠ 文件不撞</b>：PR-4 和 PR-6 都要改 <code>RootShellView.swift</code>，
+  而那个文件<b>只有 80 行</b>。</p>
+  <p style="margin-bottom:0">所以分波要按<b>文件归属</b>切，不是按依赖切。</p>
+</div>
+
+<h4>真实的文件碰撞面</h4>
+<table>
+<thead><tr><th style="width:66px">PR</th><th style="width:150px">Localization<br>(1062 行)</th>
+  <th style="width:150px">RootShellView<br>(80 行)</th><th style="width:130px">RecordClipView</th>
+  <th style="width:120px">PlansHomeView</th><th>pbxproj<br><span style="font-size:10px">已不追踪</span></th></tr></thead>
+<tbody>
+<tr><td><b>PR-4</b></td><td>录制区</td><td class="no">L47–64 tab 拦截</td><td class="no">主要战场</td><td></td><td class="yes">不再冲突</td></tr>
+<tr><td><b>PR-5</b></td><td>草稿区</td><td></td><td class="no">入口</td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-6</b></td><td>首页区</td><td class="no">L29–42 hero</td><td></td><td class="no">空卡</td><td class="yes">—</td></tr>
+<tr><td><b>PR-7</b></td><td></td><td></td><td></td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-8</b></td><td>composer 区</td><td></td><td></td><td></td><td class="yes">—</td></tr>
+<tr><td><b>PR-9</b></td><td></td><td></td><td></td><td class="no">时间轴</td><td class="yes">—</td></tr>
+<tr><td><b>PR-10</b></td><td>AI 区</td><td></td><td></td><td></td><td class="yes">—</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:var(--inkSoft)">PR-4 / PR-6 在 <code>RootShellView</code> 里的两处相隔约 5 行
+（L42 → L47）。git 用 3 行上下文合并，<b>通常能自动过，但确实有冲突可能</b>——真冲了也是 30 秒的手工活，
+不值得为它把 PR 拆得更碎。</p>
+
+<h4>三波</h4>
+<table>
+<thead><tr><th style="width:80px">波次</th><th style="width:130px">agent</th><th style="width:150px">PR</th>
+  <th style="width:170px">分配的模拟器</th><th>碰撞面</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><b>Wave 1</b><br><span style="font-size:12px;color:var(--inkSoft)">3 并行</span></td>
+    <td>A</td><td><span class="pill hot">PR-4</span></td><td class="mono">1DAY-QA-SE-A+</td>
+    <td>与 B 撞 <code>RootShellView</code>（相隔 5 行）+ <code>Localization</code>（不同区域）</td></tr>
+<tr><td>B</td><td><span class="pill">PR-6</span></td><td class="mono">1DAY-QA-V12</td>
+    <td>同上</td></tr>
+<tr><td>C</td><td><span class="pill gray">PR-7</span>+<span class="pill">PR-8</span></td>
+    <td class="mono">iPhone 17 Pro Max</td>
+    <td class="yes">与 A/B 完全不撞（只碰 Models + Views/Compose）</td></tr>
+<tr><td rowspan="2"><b>Wave 2</b><br><span style="font-size:12px;color:var(--inkSoft)">2 并行</span></td>
+    <td>D</td><td><span class="pill hot">PR-5</span></td><td class="mono">1DAY-QA-SE-A+</td>
+    <td class="yes">需要 A 的 store；与 E 不撞</td></tr>
+<tr><td>E</td><td><span class="pill">PR-9</span></td><td class="mono">1DAY-QA-V12</td>
+    <td class="yes">需要 B 的 hero；与 D 不撞</td></tr>
+<tr><td><b>Wave 3</b><br><span style="font-size:12px;color:var(--inkSoft)">不并行</span></td>
+    <td>—</td><td><span class="pill warn">PR-10</span></td><td class="mono">iPhone SE (2nd gen)</td>
+    <td>有外部依赖（后端 + 本地代理），且是唯一可能因生成质量不行而推翻自己设计的 PR。单独跑。</td></tr>
+</tbody>
+</table>
+
+<h4>并行必须交代给 agent 的四条硬约束</h4>
+<div class="card hot">
+  <ol style="margin-bottom:0">
+    <li><b>各自的 worktree。</b>不隔离就会互相踩改动。</li>
+    <li><b>各自的 <code>-derivedDataPath</code>。</b>四个 <code>xcodebuild</code> 共用同一份 DerivedData
+        会互相污染产物 —— 这是最容易忽略、症状最莫名其妙的一条。</li>
+    <li><b>各自指定的模拟器 UDID。</b>四台都已 Booted，不要让 agent 自己挑（上一轮的 10 分钟卡死就是
+        选到了未启动的机器）。</li>
+    <li><b>新增文件后各自 <code>xcodegen generate</code>。</b><code>.xcodeproj</code> 已不再被 git 追踪
+        （见下），所以它不会冲突了 —— 但每个 worktree 都得自己生成一份才能 build。</li>
+  </ol>
+</div>
+
+<div class="card ok">
+  <h4 style="margin-bottom:8px">✓ 已执行 —— <code>.xcodeproj</code> 不再被 git 追踪（<code>1f4365d</code>）</h4>
+  <p style="margin-bottom:8px">原来这里列的是「pbxproj 冲突是必然的，合并时要重生成」。Cassie 2026-09-02 拍板
+  直接从 git 里拿掉，<b>这条约束消失了</b>。</p>
+  <p style="margin-bottom:0">动手前验过一遍：<code>xcodegen generate</code> 的输出和被追踪的那份
+  <b>逐字节相同</b>（<code>diff</code> 0 行），说明没有手工改动会丢失，xcodegen 的 UUID 也是确定性的。
+  README 本来就把 <code>xcodegen generate --spec project.yml</code> 写成必需步骤，
+  仓库布局图里也从没列过 <code>.xcodeproj</code> —— 拿掉之后仓库反而跟自己的文档一致了。</p>
+</div>
+
+<div class="card warn">
+  <h4>并行的收益没有 3 倍 —— 别按 3 倍规划时间</h4>
+  <p style="margin-bottom:8px"><b>写代码不是瓶颈，build + test 是。</b>三四个 <code>xcodebuild</code>
+  抢同一台 Mac 的 CPU，实际提速大概 <b>1.8~2 倍</b>，不是 3 倍。</p>
+  <p style="margin-bottom:0">而且 <b>review 是串行的</b> —— agent 能并行写，但每个 PR 都要人看过才进 commit，
+  这一环没法并行。所以 Wave 1 的真实产出是「三份待 review 的分支同时就绪」，
+  而不是「三倍速度完成三个 PR」。</p>
+</div>
+
+
+<!-- ============================================================ -->
+<h2 id="pr4"><span class="n">4</span>PR-4 · 录完的片子不再无声消失</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-4</span><span class="ti"><code>fix: 录完的片子不再无声消失</code></span>
+    <span class="pill hot" style="margin-left:auto">数据丢失</span></div>
+  <div class="bd">
+
+  <h4>4.1 新增草稿模型与仓储</h4>
+  <p>新增 <code>Models/ClipDraft.swift</code> 与 <code>Services/ClipDraftStore.swift</code>：</p>
+<pre><code>struct ClipDraft: Codable, Identifiable {
+    let id: UUID
+    /// 正式目录里的文件名（不是 temp 路径）。
+    var fileName: String
+    var recordedAt: Date
+    var orientation: Challenge.Orientation
+    var overlayText: String?
+    /// 字节数，草稿列表要显示占用，让人能自己决定删哪个。
+    var byteSize: Int64
+}</code></pre>
+  <ul>
+    <li>片子从 <code>temporaryDirectory</code> <b>复制</b>进正式目录（复用 <code>fileStore</code> 现有写法）。</li>
+    <li>持久化沿用 <code>UserDefaultsChallengeRepository</code> 的模式，与 <code>ChallengeStore</code> 一致。</li>
+    <li><code>ClipDraftStore</code> 用 <code>@Observable</code>，<code>didSet</code> 落盘 —— 跟
+        <code>ChallengeStore</code> 一个套路，不引入新的状态管理方式。</li>
+  </ul>
+
+  <h4>4.2 两条死胡同改成有出口</h4>
+  <table>
+  <thead><tr><th style="width:200px">情况</th><th>现在</th><th>改成</th></tr></thead>
+  <tbody>
+  <tr><td>一个计划都没有</td><td class="no">toast「先建个计划」，无下文</td>
+      <td class="yes">「先存起来」+「现在就建个故事」两个出口</td></tr>
+  <tr><td>画幅跟所有计划都不匹配</td><td class="no">toast 提示，无下文</td>
+      <td class="yes">同上</td></tr>
+  <tr><td>切走 tab（有未归档片子）</td><td class="no">静默丢弃</td>
+      <td class="yes">弹「保留这段 / 丢弃」，<b>丢弃是明确动作</b></td></tr>
+  </tbody>
+  </table>
+
+  <div class="card hot">
+    <h4>存草稿失败必须响 —— 这条比功能本身重要</h4>
+    <p style="margin-bottom:0"><code>ClipDraftStore</code> 写文件失败时<b>不能静默</b>。要是「存草稿」这个动作本身
+    悄悄失败了，那比现在还糟——现在至少还弹个 toast。所以写失败必须明确告诉用户「这段没保住」，
+    并且<b>保持在 review 屏不要 retake</b>，让人还有机会重试或截屏。</p>
+  </div>
+
+  <h4>4.3 新增本地化字符串</h4>
+  <table>
+  <thead><tr><th style="width:190px">key</th><th style="width:230px">中文</th><th>English</th></tr></thead>
+  <tbody>
+  <tr><td class="mono">saveAsDraft</td><td>先存起来</td><td>Keep it for now</td></tr>
+  <tr><td class="mono">createStoryNow</td><td>现在就建个故事</td><td>Start a story now</td></tr>
+  <tr><td class="mono">keepClipQuestion</td><td>这段还没归档</td><td>This clip isn't filed yet</td></tr>
+  <tr><td class="mono">keepClip</td><td>保留</td><td>Keep</td></tr>
+  <tr><td class="mono">discardClip</td><td>丢弃</td><td>Discard</td></tr>
+  <tr><td class="mono">draftSaveFailed</td><td>这段没保住，再试一次？</td><td>Couldn't keep this clip. Try again?</td></tr>
+  </tbody>
+  </table>
+
+  <h4>验收</h4>
+  <ul class="ck">
+    <li><code>ClipDraftStoreTests</code>：存草稿后文件在正式目录且可读；归档后草稿被移除且片子进了目标故事；
+        删除草稿会同时删文件不留孤儿；<b>写失败时抛错而不是静默返回</b>。</li>
+    <li>真机：无计划状态下录一段 → 存草稿 → 建故事 → 从草稿归档进去，片子在。</li>
+    <li>真机：录一段后直接切 tab → 有挽留弹窗；选「丢弃」才真的没。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr5"><span class="n">5</span>PR-5 · 待归档的片子有个去处</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-5</span><span class="ti"><code>feat: 待归档的片子有个去处</code></span>
+    <span class="pill gray" style="margin-left:auto">依赖 PR-4</span></div>
+  <div class="bd">
+  <p>入口位置 Cassie 无偏好，取推荐方案：<b>放拍摄 tab 里</b>——离录完的现场最近，也不给首页再加一个分区。</p>
+  <ul>
+    <li>拍摄 tab 顶部一个「<b>N 段待归档</b>」入口，只在有草稿时出现。</li>
+    <li>点开是草稿列表：缩略图 + 拍摄时间 + 画幅 + <b>占用大小</b>；每条可「归档到…」或「删除」。</li>
+    <li>归档复用现有 <code>filingCandidates</code> / <code>file(_:to:)</code> 逻辑，不另写一套。</li>
+    <li>空态直接引导建故事。</li>
+  </ul>
+  <h4>新增本地化字符串</h4>
+  <p class="mono" style="color:var(--inkSoft);font-size:12.5px">
+    draftsPending(_:) 「N 段待归档」 · draftsEmpty · archiveDraft 「归档到…」 · deleteDraft · draftSize(_:)</p>
+  <h4>验收</h4>
+  <ul class="ck">
+    <li>有草稿时入口显示正确数量；归档 / 删除后数量同步，归零时入口消失。</li>
+    <li>草稿列表显示的占用大小与实际文件字节数一致。</li>
+    <li>真机：连录三段存草稿 → 列表三条 → 归档一条、删一条 → 剩一条，文件目录里也只剩一个。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr6"><span class="n">6</span>PR-6 · 首页挑对今天的故事</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-6</span><span class="ti"><code>fix: 首页挑对今天的故事</code></span></div>
+  <div class="bd">
+
+  <p>新增可测类型 <code>Presentation/HomeHeroChoice.swift</code>，把「顶上显示谁」从 View 里抽出来：</p>
+<pre><code>enum HomeHeroChoice: Equatable {
+    /// 今天该拍的故事。标题「今天的故事」。
+    case today(Challenge)
+    /// 今天没建，但有没拍完的。标题「接着拍」。
+    case resume(Challenge)
+    /// 什么都没有。一张「开始今天」的空卡。
+    case startToday
+}</code></pre>
+
+  <h4>6.1 选择规则（按顺序，第一条命中即止）</h4>
+  <table>
+  <thead><tr><th style="width:44px">#</th><th>条件</th><th style="width:190px">结果</th></tr></thead>
+  <tbody>
+  <tr><td><b>1</b></td><td>未完成，且满足其一：<br>
+      · <b>一日故事</b>：<code>startDate</code> 是今天<br>
+      · <b>七日挑战</b>：<code>currentDay</code> 落在 <code>1...cards.count</code> 内<br>
+      <span style="color:var(--inkSoft);font-size:12.5px">多个命中时取最近活动的
+      （<code>cards.compactMap(\.recordedAt).max()</code>，都没拍过则按 <code>startDate</code> 新的优先）</span></td>
+      <td><code>.today</code></td></tr>
+  <tr><td><b>2a</b></td><td><b>12:00 前</b>，且存在「昨天开始且没拍完」的故事</td><td><code>.resume(它)</code></td></tr>
+  <tr><td><b>2b</b></td><td><b>12:00 前</b>，无昨日残留</td><td><code>.startToday</code></td></tr>
+  <tr><td><b>2c</b></td><td><b>12:00 及以后</b>，有未完成的</td><td><code>.resume(最近活动的)</code></td></tr>
+  <tr><td><b>3</b></td><td>都不命中</td><td><code>.startToday</code></td></tr>
+  </tbody>
+  </table>
+
+  <div class="card note">
+    <h4>两个容易搞错的地方</h4>
+    <p style="margin-bottom:6px"><b>① 七日挑战跨天是常态。</b>它 <code>startDate</code> 在一周前，但今天正是第 4 天
+    ——这种<b>不能</b>算旧故事，它就是今天该拍的。所以规则先按 <code>currentDay</code> 判七日，再按
+    <code>startDate</code> 判一日。</p>
+    <p style="margin-bottom:0"><b>② 「12:00 前有昨日残留就 resume」是 Cassie 定的。</b>
+    理由：昨天的事没做完，早上不该假装是新的一天。</p>
+  </div>
+
+  <h4>6.2 View 侧改动</h4>
+  <table>
+  <thead><tr><th style="width:130px">状态</th><th style="width:230px">SectionLabel</th><th>卡片</th></tr></thead>
+  <tbody>
+  <tr><td><code>.today</code></td><td><code>Strings.todaysStory</code>（现有）</td><td>现有 StoryCard，不变</td></tr>
+  <tr><td><code>.resume</code></td><td><code>Strings.resumeStory</code>（新增）</td><td>同上，主按钮沿用「继续」</td></tr>
+  <tr><td><code>.startToday</code></td><td><code>Strings.startTodayLabel</code>（新增）</td>
+      <td>新空卡：一句话 + 「开始今天的故事」直接开 composer</td></tr>
+  </tbody>
+  </table>
+  <p style="font-size:13px;color:var(--inkSoft)">空卡沿用现有 <code>GlassCard</code> + <code>.primaryAction</code>，不引入新控件。</p>
+
+  <h4>6.3 新增本地化字符串</h4>
+  <table>
+  <thead><tr><th style="width:190px">key</th><th style="width:230px">中文</th><th>English</th></tr></thead>
+  <tbody>
+  <tr><td class="mono">resumeStory</td><td>接着拍</td><td>Pick it back up</td></tr>
+  <tr><td class="mono">startTodayLabel</td><td>今天</td><td>Today</td></tr>
+  <tr><td class="mono">startTodayBody</td><td>还没开始今天的故事</td><td>Today's story hasn't started</td></tr>
+  <tr><td class="mono">startTodayCTA</td><td>开始今天的故事</td><td>Start today's story</td></tr>
+  </tbody>
+  </table>
+
+  <h4>验收</h4>
+  <ul class="ck">
+    <li><code>HomeHeroChoiceTests</code>：今天建的一日故事优先于任何旧故事；七日挑战在第 4 天仍算
+        <code>.today</code>；12:00 前无昨日残留 → <code>.startToday</code>；12:00 前有昨日残留 →
+        <code>.resume</code>；12:00 后有未完成 → <code>.resume</code>；全空 → <code>.startToday</code>。</li>
+    <li><code>HomeHeroChoice</code> 必须接受注入的 <code>now: Date</code>（见 <a href="#risk">§11</a>）。</li>
+    <li>真机：造一个昨天的空故事 + 一个今天拍了 1/7 的，首页顶上是今天那个。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr7"><span class="n">7</span>PR-7 · 封面撞脸 + 题目时态</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-7</span><span class="ti"><code>chore: 封面不再撞脸，题目不再用过去时</code></span>
+    <span class="pill gray" style="margin-left:auto">搭车小修</span></div>
+  <div class="bd">
+  <ol>
+    <li><b>封面撞脸</b>（<code>ChallengeTemplate.swift:56,60</code>）：「和我过一天」(Live With Me) 和
+        「我的主角日」(Main Character) 共用 <code>TemplateMainCharacter</code>，在推荐网格里长得一模一样。
+        <b>需要新素材才能修，见下。</b></li>
+    <li><b>题目时态</b>：只剩 <b>2 条</b>，都在 <code>MomentCatalog.swift</code>。</li>
+  </ol>
+
+  <div class="card hot">
+    <h4>更正 — 我原来推荐的 <code>TemplateSoftReset</code> 是错的，封面这条本轮做不了</h4>
+    <p style="margin-bottom:8px">我原本写「给 Live With Me 换成 <code>TemplateSoftReset</code>，不新增素材」。
+    查过代码：<code>"Soft Reset"</code> <b>自己就映射到 <code>TemplateSoftReset</code></b>
+    （<code>ChallengeTemplate.swift</code>）。这么换只是把撞脸从 Main Character 搬到 Soft Reset，没修好。</p>
+    <p style="margin-bottom:8px">而 13 张 <code>Template*.imageset</code> <b>全部有主</b>：12 张在
+    <code>coverAssetName</code> 的 switch 里，剩下的 <code>TemplateCustomStory</code> 是自定义模板的兜底
+    （<code>ChallengePresenter.swift:25</code>、<code>TemplateCard.swift:45</code>、
+    <code>ComposerSteps.swift:383,594</code>）。<b>没有空闲封面</b>，所以「不新增素材」这个前提让这个 bug
+    无解。</p>
+    <p style="margin-bottom:0"><b>结论：</b>封面撞脸要新画一张（建议命名 <code>TemplateLiveWithMe</code>），
+    这是设计活不是代码活。本轮 PR-7 <b>只做时态那 2 行</b>；封面等素材到位再补一个一行 PR。<br>
+    <span style="color:var(--inkSoft)">顺带说一句：<code>TemplatePerfectDay</code> 和
+    <code>TemplateSoftReset</code> 的 <code>cover-v2.jpg</code> 今天已经在工作区里了（未提交），
+    看起来封面正在重做 —— 那批里加一张 Live With Me 最省事。</span></p>
+  </div>
+
+  <div class="card ok">
+    <h4>时态这条也比上一轮 PRD 写的小得多</h4>
+    <p style="margin-bottom:8px">上一轮和本 PRD 初稿都把位置写成 <code>GuidedMomentsView.swift:170</code>，
+    <b>错了两次</b>：那行是 footnote 的 <code>OneDayBuddy</code>，跟文案无关。所有题目文案都在
+    <code>MomentCatalog.swift</code>。</p>
+    <p style="margin-bottom:0">而且<b>这一遍扫已经做过了</b> —— 90 多个题目基本都是名词短语（「晨光」「备料」「第一口」），
+    <code>MomentCatalog.swift:78</code> 还留着 <code>// Study Streak (moment-led rewrite)</code> 的注释。
+    所以本 PR 不是「过一遍所有文案」，是<b>改 2 行</b>。</p>
+  </div>
+
+  <table>
+  <thead><tr><th style="width:170px">位置</th><th style="width:100px">key</th><th style="width:170px">现在</th><th>改成</th></tr></thead>
+  <tbody>
+  <tr><td class="mono">MomentCatalog.swift:50</td><td class="mono">what_i_ate</td>
+      <td class="no">What I ate / 吃了什么</td><td class="yes">Today's plate / 今天吃点什么</td></tr>
+  <tr><td class="mono">MomentCatalog.swift:73</td><td class="mono">found_a_spot</td>
+      <td class="no">Found a spot / 找到个地方</td><td class="yes">A good spot / 找个地方坐下</td></tr>
+  </tbody>
+  </table>
+
+  <h4>明确不改的 4 条</h4>
+  <p><code>the_wall</code>「卡住了」、<code>getting_into_it</code>「进入状态了」、<code>flow</code>「顺起来了」、
+  <code>strong</code>「变强了」—— 中文带「了」但英文侧是名词或进行时（<code>The wall</code> /
+  <code>Getting into it</code> / <code>Flow</code> / <code>Strong</code>）。它们描述的是<b>拍摄那一刻的状态</b>，
+  不是回顾；而且「卡住了」比「卡住」自然。<b>不动。</b></p>
+
+  <p style="font-size:13px;color:var(--inkSoft)"><code>coverAssetName</code> 是按 <code>name.en</code> switch 的
+  <b>展示逻辑，不落库</b>，换了不影响已存故事。已确认安全。<br>
+  <code>momentKeys</code> 用的是<b>稳定 key</b>（<code>what_i_ate</code>），改的只是显示文本，
+  已存故事的题目会跟着变新文案 —— 这是期望行为。</p>
+  <h4>验收</h4>
+  <ul class="ck">
+    <li><code>MomentCatalog</code> 里 <code>what_i_ate</code> / <code>found_a_spot</code> 中英均非过去时。</li>
+    <li>上面「不改的 4 条」保持原样（防止顺手改多）。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr8"><span class="n">8</span>PR-8 · 新建故事只留一层选择</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-8</span><span class="ti"><code>refactor: 新建故事只留一层选择</code></span>
+    <span class="pill ok" style="margin-left:auto">采用 mockup 方案 A</span></div>
+  <div class="bd">
+
+  <p>设计稿：<a href="../mockups/composer-v3-and-dates.html">composer-v3-and-dates.html</a> 上半，方案 A。</p>
+
+  <h4>8.1 改什么</h4>
+  <table>
+  <thead><tr><th style="width:190px">元素</th><th>现在</th><th>改成</th></tr></thead>
+  <tbody>
+  <tr><td>双卡 <code>RecordingModeCard</code> ×2</td><td class="no">150pt，两张带封面的大卡</td>
+      <td class="yes">一行 pill「跟着题目拍 / 按时间拍」，<b>44pt</b></td></tr>
+  <tr><td><code>PromptPreviewStrip</code></td><td class="no">112pt，重复展示选中模板的题目</td>
+      <td class="yes"><b>删掉</b>。题目改由选中的网格卡就地展开</td></tr>
+  <tr><td>选中的网格卡</td><td class="no">跟其他一样的小卡，副标题前 3 个题目</td>
+      <td class="yes">横跨两列，展开全部 7 个序号 chip</td></tr>
+  <tr><td>「按时间拍」态</td><td class="no">推荐网格整体 <code>.disabled</code> + 0.4 透明</td>
+      <td class="yes">直接换内容：一张「和我过一天」大卡 + 一句说明</td></tr>
+  </tbody>
+  </table>
+
+  <div class="card ok">
+    <h4>净收益</h4>
+    <p style="margin-bottom:0">262pt → 46pt，<b>省 216pt</b>，网格能多露一行半。在 iPhone SE 上这是大半屏的差别。<br>
+    同时「变灰的网格」这个尴尬状态消失了 —— 那本来是我上一轮为修 bug 加的补丁，
+    「给你看一堆点不了的东西」本身就不该存在。</p>
+  </div>
+
+  <h4>8.2 <code>ComposerSelection</code> 怎么动</h4>
+  <p>PR-2 建的 <code>ComposerSelection</code> <b>基本不用改</b> —— <code>style</code>（<code>.timeOnly</code> /
+  <code>.prompted</code>）正好就是 pill 的两个值，<code>promptGridEnabled</code> 从「要不要变灰」变成
+  「网格显示模板列表还是显示那张大卡」。这是这个抽象当初就该有的用法。</p>
+  <p style="font-size:13px;color:var(--inkSoft)">要删的是 View 层的 <code>PromptPreviewStrip</code> 和
+  <code>RecordingModeCard</code>；<code>PromptTemplateTile</code> 加一个「展开」态。
+  <code>Subtitle.prompts / .blurb</code> 的区分保留（库页面仍用 blurb）。</p>
+
+  <h4>8.3 字符串处理</h4>
+  <p>PR-3 加的 <code>swapTemplate</code>（「换一个」）和 <code>timeOnlyPreviewBody</code> 随预览条一起<b>移除</b>。
+  <code>promptCountLabel(_:)</code> 保留（展开卡的标题要用）。<code>promptsNotNeeded</code> 保留但改用在说明卡上。
+  pill 两个文案新增：</p>
+  <table>
+  <thead><tr><th style="width:190px">key</th><th style="width:230px">中文</th><th>English</th></tr></thead>
+  <tbody>
+  <tr><td class="mono">followPrompts</td><td>跟着题目拍</td><td>Follow prompts</td></tr>
+  <tr><td class="mono">recordByTime</td><td>按时间拍</td><td>By time</td></tr>
+  </tbody>
+  </table>
+
+  <h4>验收</h4>
+  <ul class="ck">
+    <li>题目在这一屏<b>只出现一次</b>，在选中的那张卡上。</li>
+    <li>切到「按时间拍」不再有变灰的网格；换成「和我过一天」大卡。</li>
+    <li>iPhone SE 上双卡区域高度 ≤ 50pt（回归测量）。</li>
+    <li><code>ComposerSelectionTests</code> 全部仍然通过（这是个 refactor，行为不该变）。</li>
+    <li>被删的 <code>swapTemplate</code> / <code>timeOnlyPreviewBody</code> 在
+        <code>LocalizationTests</code> 里的断言同步移除。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr9"><span class="n">9</span>PR-9 · 往前翻就是过去的日子</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-9</span><span class="ti"><code>feat: 往前翻就是过去的日子</code></span>
+    <span class="pill ok" style="margin-left:auto">采用 mockup 方案 B · 时间轴</span></div>
+  <div class="bd">
+
+  <p>设计稿：<a href="../mockups/composer-v3-and-dates.html">composer-v3-and-dates.html</a> 下半，方案 B。</p>
+
+  <div class="card ok">
+    <h4>不需要数据迁移</h4>
+    <p style="margin-bottom:0"><code>DayCard.recordedAt</code> 已经存着每段片子的拍摄时间，
+    <code>Challenge.startDate</code> 存着故事的日子。现有数据直接够用。</p>
+  </div>
+
+  <h4>9.1 结构</h4>
+  <ul>
+    <li>「今天的故事」（PR-6 的三态）照旧占顶上，<b>不动主次</b>。</li>
+    <li>往下是「往前翻」：<b>倒序</b>的日子。每天一个日期标签 + 那天的故事卡。</li>
+    <li>没拍完的日子额外显示已拍片子的缩略图行（空槽画虚线框）。</li>
+    <li><b>顺手替掉</b>现在的「其他的故事」和「已完成影片」两个分区 —— 它们本来就是没有时间维度的列表，
+        正是「9.1 找不到」的另一半原因。</li>
+    <li>空日子<b>不出现</b>，新用户不会看见一片空白。</li>
+  </ul>
+
+  <h4>9.2 新增可测类型</h4>
+<pre><code>/// 把故事按「那一天」分组、倒序排好 —— 首页往下翻的数据源。
+struct StoryTimeline {
+    struct Day: Identifiable, Equatable {
+        var id: Date          // startOfDay
+        var date: Date
+        var label: String     // "8月31日 周一" / "Mon, Aug 31"
+        var stories: [Challenge]
+    }
+    let days: [Day]
+
+    /// 一个故事归属哪一天：一日故事按 startDate；
+    /// 七日挑战按它自己的 startDate（整段挂在开始那天）。
+    init(challenges: [Challenge], excluding heroID: UUID?, now: Date = .now)
+}</code></pre>
+  <p style="font-size:13px;color:var(--inkSoft)">日期串用 <code>AppLanguage.effective.locale</code> 格式化，
+  与 <code>HomeHeaderSummary</code> / <code>StorySchedule</code> 一致。</p>
+
+  <h4>9.3 已知取舍</h4>
+  <p>想跳到「三个月前」得滚很久。本轮<b>不做</b>跳月锚点，等真有那么多数据再说 —— 见
+  <a href="#later">§12 挂账</a>。</p>
+
+  <h4>验收</h4>
+  <ul class="ck">
+    <li><code>StoryTimelineTests</code>：同一天的多个故事归到一组；分组按日期<b>倒序</b>；
+        hero 故事被排除不重复出现；跨语言日期串正确；空列表返回空 <code>days</code> 而不是崩。</li>
+    <li>「其他的故事」「已完成影片」两个旧分区已移除，故事没有丢失（数量对得上）。</li>
+    <li>真机：造 8/24、8/29、8/31 三天的故事，首页往下翻按 31 → 29 → 24 的顺序出现。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pr10"><span class="n">10</span>PR-10 · 说一句今天要干嘛，题目自己出来</h2>
+
+<div class="pr">
+  <div class="top"><span class="id">PR-10</span><span class="ti"><code>feat: 说一句今天要干嘛，题目自己出来</code></span>
+    <span class="pill warn" style="margin-left:auto">第一个 AI feature</span></div>
+  <div class="bd">
+
+  <p>解的是 Cassie 最早提的第 5 条：<b>「自己写 7 个瞬间，如果没经历今天的这一天，写的会不会很突兀」</b>。
+  突兀感的来源是「这天还没发生，我怎么知道会有哪 7 个瞬间」—— 而「今天要搬家」这句话现在就说得出来。</p>
+
+  <h4>10.1 交互</h4>
+  <div class="flow">
+    <span>自己写题目</span><em>→</em><span class="good">说说今天要干嘛</span><em>→</em>
+    <span>「今天要搬家」</span><em>→</em><span class="good">7 个题目填进可编辑列表</span><em>→</em><span>逐条改</span>
+  </div>
+  <ul>
+    <li><b>入口，不是新层级</b>：挂在现有「自己写题目」下，现有的手写和题库两条路<b>都留着</b>
+        —— AI 是第三个开头，不是替代。</li>
+    <li>生成结果直接填进 <code>GuidedMomentsView</code> 现有的可编辑列表，用户能逐条改。</li>
+    <li><b>失败要静默降级</b>：没网 / 超时 / 后端挂了 → 直接退回手写，<b>不弹错误</b>。
+        这个 feature 是个加速器，不是必经之路。</li>
+  </ul>
+
+  <h4>10.2 key 策略：极小后端代理 <span class="pill ok">Cassie 已定</span></h4>
+  <div class="card warn">
+    <h4>为什么不能把 key 打进 app</h4>
+    <p style="margin-bottom:8px">打进 app 的 key 会被扒出来。所以走一个<b>只转发一种请求</b>的函数：</p>
+    <ul style="margin-bottom:0">
+      <li>端点只接受「一句意图」，只返回「N 个题目字符串」。不做通用 LLM 代理。</li>
+      <li>带速率限制（按设备标识，不需要账号）。</li>
+      <li>调用量天然极低 —— 只在<b>建故事时</b>调一次，不是每次打开 app。成本可控。</li>
+      <li>后端不存用户输入（那句话可能很私人）。</li>
+    </ul>
+  </div>
+  <div class="card note">
+    <h4>本地开发的地理限制</h4>
+    <p style="margin-bottom:0">Anthropic API 在 Cassie 本地需要走代理（403 geo-block）。这影响<b>开发调试</b>，
+    不影响线上用户（服务器不在这儿）。实施时本地测试要记得开代理。</p>
+  </div>
+
+  <h4>10.3 埋点 —— 这个 PR 真正的产出</h4>
+  <p>PR-10 除了功能，还要验证一个假设：<b>AI 生成的拍摄指令，人愿意照着拍吗？</b>
+  这是 Cassie 那个新产品想法的核心前提（见 <a href="#later">§12</a>）。所以要记：</p>
+  <ul>
+    <li>生成了几次 / 采纳了几次（进到 setup step 算采纳）</li>
+    <li>7 条里改了几条（改写率）</li>
+    <li>改的是哪几个位置（前面的还是后面的）</li>
+  </ul>
+  <p style="font-size:13px;color:var(--inkSoft)">本地统计即可，不需要上报服务器。</p>
+
+  <h4>验收</h4>
+  <ul class="ck">
+    <li><code>PromptSuggestionServiceTests</code>：正常响应解析出 N 条；返回畸形 JSON 时抛错不崩；
+        超时按失败处理；<b>失败路径不改动用户已填内容</b>。</li>
+    <li>飞行模式下点「说说今天要干嘛」→ 静默退回手写，无错误弹窗。</li>
+    <li>后端：同一设备高频调用被限流；请求体不落日志。</li>
+    <li>真机：输「今天要搬家」，出来的 7 个题目是搬家相关且按一天的时间顺序排。</li>
+  </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="risk"><span class="n">11</span>风险</h2>
+
+<table>
+<thead><tr><th style="width:130px">PR</th><th>风险</th><th style="width:300px">对策</th></tr></thead>
+<tbody>
+<tr><td><span class="pill hot">PR-4</span></td>
+    <td><b>碰存储层</b>，是这批里唯一可能「出问题时让情况变得更糟」的。存草稿失败若静默，
+        比现在只弹 toast 还糟。</td>
+    <td>写失败必须报错并<b>保持在 review 屏不 retake</b>；单测覆盖失败路径抛错。</td></tr>
+<tr><td><span class="pill hot">PR-4/5</span></td>
+    <td><b>草稿会悄悄吃满手机</b>，没有上限。</td>
+    <td>本轮不做自动清理，但草稿列表<b>显示占用大小</b>，让人能自己删。自动过期另开。</td></tr>
+<tr><td><span class="pill">PR-6</span></td>
+    <td><b>时间切规则难测</b>：<code>12:00</code> 阈值和「昨天」判定都依赖当前时间，
+        测试会在中午前后表现不同。</td>
+    <td><code>HomeHeroChoice</code> 必须接受注入的 <code>now: Date</code>，<b>不能内部读
+        <code>.now</code></b>。<code>HomeHeaderSummary</code> 已经是这个写法，照抄。</td></tr>
+<tr><td><span class="pill">PR-8</span></td>
+    <td>要<b>撤掉上一轮刚上线的 PR-3</b> 的一部分（预览条）。</td>
+    <td>不心疼 —— 那是搭在错结构上的补丁。<code>ComposerSelection</code> 的抽象本身是对的，留着。</td></tr>
+<tr><td><span class="pill">PR-9</span></td>
+    <td><b>要删两个现有分区</b>（其他的故事 / 已完成影片），有丢故事的风险。</td>
+    <td>验收里明确要数「故事数量对得上」。</td></tr>
+<tr><td><span class="pill warn">PR-10</span></td>
+    <td>引入<b>第一个外部依赖</b>和第一笔运营成本。后端挂了不能拖累建故事流程。</td>
+    <td>静默降级设计；调用只发生在建故事时；后端只做单一用途端点 + 限流。</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="later"><span class="n">12</span>继续挂账</h2>
+
+<table>
+<thead><tr><th style="width:190px">项</th><th style="width:230px">位置</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>草稿自动过期</td><td>—</td><td>本轮草稿只手动删。多久该提醒清理需要单独想。</td></tr>
+<tr><td>时间轴跳月锚点</td><td><code>StoryTimeline</code></td><td>数据量上来再说。</td></tr>
+<tr><td>日历视图（mockup 方案 A）</td><td>—</td><td>最适合看连续性 / 养成打卡，但要单独占一个 tab，是最重的。等有数据量。</td></tr>
+<tr><td>AI 成片标题</td><td>—</td><td>7 段拍完，拿用户自己打的字幕生成一个标题。便宜、落在有情绪的时刻。</td></tr>
+<tr><td>AI 月度回顾</td><td>—</td><td>「这个月拍了 12 天，最常出现的是咖啡和傍晚的光」。只吃 metadata，不碰视频。跟 PR-9 是一对。</td></tr>
+<tr><td>CloudKit 测试跑不过</td><td><code>CloudKitIdempotencyTests</code><br><code>CloudKitPaginationTests</code></td>
+    <td><code>CKError 10/2007 CREATE operation not permitted</code>。容器 schema 权限问题，需去 CloudKit Dashboard 查。见上一轮 PRD §9。</td></tr>
+</tbody>
+</table>
+
+<h3>关于那个新产品想法</h3>
+<div class="card note">
+  <p style="margin-bottom:8px">Cassie 提到：<b>用户说想拍什么 → AI 生成脚本 → 大家一起去拍 → AI 剪辑</b>，
+  并自己判断「可能不是一个产品」。<b>这个判断是对的。</b></p>
+  <table style="box-shadow:none;margin:10px 0">
+  <thead><tr><th style="width:110px"></th><th>1Day</th><th>新想法</th></tr></thead>
+  <tbody>
+  <tr><td><b>动机</b></td><td>把今天留下来（记录）</td><td>我想做一支片子（创作）</td></tr>
+  <tr><td><b>尺度</b></td><td>一天，被动等瞬间发生</td><td>一次拍摄，主动安排</td></tr>
+  <tr><td><b>拍砸代价</b></td><td>无所谓，反正是日常</td><td>浪费了所有人的时间</td></tr>
+  <tr><td><b>「一起」</b></td><td>各拍各的，同一天的拼在一起</td><td>同一个现场，按脚本分工</td></tr>
+  <tr><td><b>成片形态</b></td><td><b>固定</b>：7 段按顺序接起来</td><td><b>脚本决定</b>：有长有短、有镜头语言</td></tr>
+  </tbody>
+  </table>
+  <p style="margin-bottom:8px">最后一行是根本区别。<code>VideoStitcher</code> 现在是确定性的顺序拼接。</p>
+  <p style="margin-bottom:8px"><b>两个反直觉的判断：</b></p>
+  <ul style="margin-bottom:8px">
+    <li>最可能死掉的一环<b>不是 AI，是「大家一起去拍摄」</b>。约几个人在同一时间同一地点照着脚本拍东西，
+        社交协调成本极高。这是第一个该验证的假设，不是最后一个。</li>
+    <li><b>AI 剪辑可能根本不需要 AI</b>。如果脚本是结构化的（第几个镜头拍什么），
+        「剪辑」就退化成按脚本顺序拼 —— 正是 1Day 已经在做的事。</li>
+  </ul>
+  <p style="margin-bottom:0"><b>路径：</b>PR-10 就是这个新产品的最小验证。它测的正是核心假设
+  「AI 生成的拍摄指令，人愿意照着拍吗」。假设不成立 → 只花一个 feature 的成本就知道了；
+  成立 → 手上有真实的采纳率和改写率数据，做新产品时不是在猜。</p>
+</div>
+
+</div>
+</body>
+</html>

@@ -4,6 +4,10 @@ import SwiftUI
 /// thread. Stateless: the parent owns the store calls.
 
 /// Row of toggleable emoji reactions; the viewer's own reactions light up.
+///
+/// It sits on top of the video, which is the only place it's ever mounted, so
+/// the untouched state is dark glass rather than the light grey it used to
+/// be — grey at 12% over a picture is a shape you can't find.
 struct ReactionBar: View {
     let reactions: [ClipReaction]
     let myID: String
@@ -24,13 +28,14 @@ struct ReactionBar: View {
                         if count > 0 {
                             Text("\(count)")
                                 .font(.caption.bold())
-                                .foregroundStyle(mine ? Color.oneDayBlue : .secondary)
+                                .foregroundStyle(mine ? Color.oneDayNavy : .white)
                         }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
                     .background(
-                        Capsule().fill(mine ? Color.oneDaySky.opacity(0.5) : Color.gray.opacity(0.12)))
+                        Capsule().fill(
+                            mine ? Color.oneDaySky.opacity(0.85) : Color.black.opacity(0.34)))
                     .overlay(
                         Capsule().strokeBorder(
                             mine ? Color.oneDayBlue.opacity(0.6) : .clear, lineWidth: 1.5))
@@ -43,6 +48,10 @@ struct ReactionBar: View {
 }
 
 /// The comment list, or a "be the first" placeholder when empty.
+///
+/// No header of its own — it's presented in a sheet whose title already says
+/// "Comments", and saying it twice in the same 60 points was how the sheet
+/// looked when it was still an inline section under the video.
 struct CommentsSection: View {
     let comments: [ClipComment]
     let myID: String
@@ -50,10 +59,6 @@ struct CommentsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(comments.isEmpty ? Strings.comments : Strings.commentsCount(comments.count))
-                .font(.subheadline.bold())
-                .foregroundStyle(.secondary)
-
             if comments.isEmpty {
                 Text(Strings.firstComment)
                     .font(.footnote)

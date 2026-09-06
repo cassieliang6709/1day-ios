@@ -74,11 +74,37 @@ final class AccountStore {
             let name = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }
                 .joined(separator: " ")
-            let resolved = name.isEmpty ? (account?.displayName ?? "Friend") : name
+            let resolved = name.isEmpty ? (account?.displayName ?? Strings.defaultMemberName) : name
             let acct = Account(id: credential.user, displayName: resolved)
             persist(acct)
             return acct
         }
+    }
+
+    /// Longer than this isn't a name, it's a caption — and it has to fit in a
+    /// chip next to a clip.
+    static let nameLimit = 24
+
+    /// Apple sends the name exactly once, ever. Anyone who signed in before
+    /// that stuck, or who declined to share it, is stuck being called whatever
+    /// we guessed — in a room where their friends can see it. So it has to be
+    /// editable, and that has been the whole reason to store it locally.
+    ///
+    /// Renaming is forward-only: clips already uploaded carry the name they
+    /// were uploaded with, because rewriting other people's copies of the past
+    /// is a bigger promise than a text field should make.
+    func rename(to newName: String) {
+        guard var updated = account, let name = Self.normalized(newName) else { return }
+        updated.displayName = name
+        persist(updated)
+    }
+
+    /// - Returns: the name to store, or `nil` when there's nothing usable in
+    ///   the field. A cleared box means "never mind", not "call me nothing".
+    static func normalized(_ raw: String) -> String? {
+        let trimmed = String(
+            raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(nameLimit))
+        return trimmed.isEmpty ? nil : trimmed
     }
 
 #if DEBUG

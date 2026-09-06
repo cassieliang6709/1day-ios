@@ -268,6 +268,14 @@ enum Strings {
         return oneDay ? "moments" : "days"
     }
 
+    /// The word "moment", agreeing with a count. English needs this and Chinese
+    /// doesn't, which is exactly how "Preview · 1 moments" got shipped: every
+    /// caller wrote the plural in by hand and none of them had a story with one
+    /// moment in it to look at.
+    static func momentWord(_ count: Int) -> String {
+        lang == .chinese ? "个瞬间" : (count == 1 ? "moment" : "moments")
+    }
+
     static func storyLabel(oneDay: Bool) -> String {
         if lang == .chinese { return oneDay ? "一日影片" : "七日挑战" }
         return oneDay ? "1-day film" : "7-day challenge"
@@ -298,6 +306,10 @@ enum Strings {
     static var startToday: String { lang == .chinese ? "开始今天" : "Start today" }
     static var enterInviteCode: String { lang == .chinese ? "输入邀请码" : "Enter invite code" }
     static var newStory: String { lang == .chinese ? "新建故事" : "New story" }
+    /// Home header progress, beside the date: "今天 1/7".
+    static func headerDateProgress(_ recorded: Int, _ total: Int) -> String {
+        lang == .chinese ? "今天 \(recorded)/\(total)" : "Today \(recorded)/\(total)"
+    }
     static var couldntJoin: String { lang == .chinese ? "无法加入" : "Couldn't join" }
     static var leaveRoom: String { lang == .chinese ? "退出房间" : "Leave room" }
     static var deleteChallenge: String { lang == .chinese ? "删除挑战" : "Delete challenge" }
@@ -311,6 +323,42 @@ enum Strings {
         lang == .chinese ? "7 个瞬间，一支小短片。" : "7 moments. One tiny vlog."
     }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
+    static var firstRunHeadline: String {
+        lang == .chinese ? "把今天，留成一支片" : "Turn today into one film"
+    }
+    static var firstRunThreeMoments: String {
+        lang == .chinese ? "个两秒瞬间" : "two-second moments"
+    }
+    static var firstRunOneFilm: String {
+        lang == .chinese ? "支属于你的短片" : "film that is yours"
+    }
+    static var firstRunEquationAccessibility: String {
+        lang == .chinese ? "三个两秒瞬间，成为一支属于你的短片" : "Three two-second moments become one film that is yours"
+    }
+    static var firstRunGuide: String {
+        lang == .chinese
+            ? "选一个故事 · 拍 3 个瞬间 · 1Day 为你做成影片"
+            : "Choose a story · film 3 moments · 1Day makes the film"
+    }
+    static var firstRunStart: String {
+        lang == .chinese ? "开始我的第一支片" : "Start my first film"
+    }
+    static var firstRunStartHint: String {
+        lang == .chinese ? "创建一支包含三个瞬间的个人短片。" : "Creates a personal film with three moments."
+    }
+    static var firstRunJoin: String {
+        lang == .chinese ? "有邀请码？加入朋友" : "Have an invite? Join friends"
+    }
+    static var firstRunSampleFilmAccessibility: String {
+        lang == .chinese ? "1Day 示例影片预览" : "1Day sample film preview"
+    }
+    static var firstRunSampleFilmPlay: String {
+        lang == .chinese ? "播放示例影片" : "Play sample film"
+    }
+    static var firstRunSampleFilmPause: String {
+        lang == .chinese ? "暂停示例影片" : "Pause sample film"
+    }
+    static var quickStartTitle: String { lang == .chinese ? "我的一天" : "My day" }
     static var onboardingSkip: String { lang == .chinese ? "跳过" : "Skip" }
     static var onboardingNext: String { lang == .chinese ? "下一步" : "Next" }
     static func onboardingPage(_ page: Int, total: Int) -> String {
@@ -364,7 +412,7 @@ enum Strings {
     ) -> String {
         lang == .chinese
             ? "\(recorded)/\(total) 个瞬间 · 每段 \(secondsLabel) · 24 小时影片"
-            : "\(recorded)/\(total) \(secondsLabel) moments · 24-hour film"
+            : "\(recorded)/\(total) \(secondsLabel) \(momentWord(total)) · 24-hour film"
     }
     static func friendsRange(_ count: Int, _ range: String) -> String {
         lang == .chinese ? "\(count) 位朋友 · \(range)" : "\(count) friends · \(range)"
@@ -425,7 +473,7 @@ enum Strings {
     static func templateMomentCount(_ count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)"
-            : "\(count) moments, \(secondsLabel) each"
+            : "\(count) \(momentWord(count)), \(secondsLabel) each"
     }
     static var selectedLabel: String { lang == .chinese ? "已选" : "Selected" }
     static var tapToSelect: String {
@@ -499,7 +547,7 @@ enum Strings {
     }
     static var oneDayComplete: String { lang == .chinese ? "一日影片完成" : "1-day film complete" }
     static func momentCount(_ total: Int) -> String {
-        lang == .chinese ? "24 小时，\(total) 个瞬间" : "\(total) moments in 24 hours"
+        lang == .chinese ? "24 小时，\(total) 个瞬间" : "\(total) \(momentWord(total)) in 24 hours"
     }
     static var weekComplete: String { lang == .chinese ? "本周完成" : "Week complete" }
     static func dayOf(_ day: Int, total: Int) -> String {
@@ -537,6 +585,59 @@ enum Strings {
             : (lang == .chinese ? "竖屏" : "portrait")
         return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
     }
+
+    // Drafts: what a clip does when there's nowhere to file it yet.
+    static var saveAsDraft: String { lang == .chinese ? "先存起来" : "Keep it for now" }
+    static var createStoryNow: String { lang == .chinese ? "现在就建个故事" : "Start a story now" }
+    static var noPlaceYet: String { lang == .chinese ? "这段还没有地方放" : "Nowhere to put this yet" }
+    static var keepClipQuestion: String { lang == .chinese ? "这段还没归档" : "This clip isn't filed yet" }
+    static var keepClip: String { lang == .chinese ? "保留" : "Keep" }
+    static var discardClip: String { lang == .chinese ? "丢弃" : "Discard" }
+    static var draftSaveFailed: String {
+        lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
+    }
+    static var draftKept: String { lang == .chinese ? "已存起来" : "Kept for later" }
+
+    // Drafts: the list they live in until they're filed.
+    static func draftsPending(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 段待归档" : "\(count) waiting to be filed"
+    }
+    static var draftsTitle: String { lang == .chinese ? "待归档" : "Waiting to be filed" }
+    static var draftsEmpty: String {
+        lang == .chinese
+            ? "没有待归档的片子。录完找不到地方放的时候，会先存到这里。"
+            : "Nothing waiting. Clips with nowhere to go get kept here."
+    }
+    static var archiveDraft: String { lang == .chinese ? "归档到…" : "File to…" }
+    static var deleteDraft: String { lang == .chinese ? "删除" : "Delete" }
+    static var draftArchiveFailed: String {
+        lang == .chinese ? "没归档成功，片子还在这儿" : "Couldn't file it. The clip is still here."
+    }
+    /// Every slot in that story already holds a clip. Filing here would have to
+    /// overwrite one, so it doesn't.
+    static var storyIsFull: String {
+        lang == .chinese ? "这个故事满了，没有空位" : "That story is full — no slot left."
+    }
+    /// No matching story for this clip's frame, from inside the drafts list —
+    /// where "retake" isn't an option, so it says what would help instead.
+    static func noPlaceForDraft(landscape: Bool) -> String {
+        let kind = lang == .chinese
+            ? (landscape ? "横屏" : "竖屏")
+            : (landscape ? "landscape" : "portrait")
+        return lang == .chinese
+            ? "还没有\(kind)的故事能放这段"
+            : "No \(kind) story can take this yet"
+    }
+    /// Rounded file size, so someone can see which drafts are worth deleting.
+    static func draftSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useKB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    static var draftsTotalSize: String {
+        lang == .chinese ? "共占用" : "Using"
+    }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static var retryCamera: String { lang == .chinese ? "重新打开相机" : "Try camera again" }
     static func useDemoClip(_ title: String) -> String {
@@ -563,6 +664,12 @@ enum Strings {
         lang == .chinese ? "拍摄于 \(date)" : "Captured \(date)"
     }
     static var rerecord: String { lang == .chinese ? "重录这一天" : "Re-record this day" }
+    /// The same action as `rerecord`, for a chip sitting on top of the video
+    /// where "Re-record this day" wraps to two lines and stops being a chip.
+    static var rerecordShort: String { lang == .chinese ? "重拍" : "Retake" }
+    /// The chip that opens the caption editor. `addCaption` is the placeholder
+    /// *inside* the editor, which is a sentence; this is a button, which isn't.
+    static var captionAction: String { lang == .chinese ? "加字幕" : "Caption" }
     static var comments: String { lang == .chinese ? "评论" : "Comments" }
     static func commentsCount(_ count: Int) -> String {
         lang == .chinese ? "评论 · \(count)" : "Comments · \(count)"
@@ -571,6 +678,39 @@ enum Strings {
         lang == .chinese ? "抢个沙发，说点什么吧。" : "Be the first to say something."
     }
     static var addComment: String { lang == .chinese ? "写评论…" : "Add a comment…" }
+
+    // MARK: How you look
+
+    /// Never "美颜" and never "beauty". Both words presume something is wrong
+    /// with the face in the picture; the phone's camera is what was unkind.
+    static var lookTitle: String { lang == .chinese ? "柔和一点" : "A gentler look" }
+    /// The promise, said out loud on the screen where it matters: the file is
+    /// never touched, so this is always undoable.
+    static var lookFootnote: String {
+        lang == .chinese
+            ? "只改回看和成片。原片一直在，随时能关。"
+            : "Changes playback and the film only. The recording is untouched."
+    }
+    static var lookAction: String { lang == .chinese ? "柔和" : "Look" }
+    static var lookAsShot: String { lang == .chinese ? "原样" : "As shot" }
+    static var lookClean: String { lang == .chinese ? "干净" : "Clean" }
+    static var lookSoft: String { lang == .chinese ? "柔光" : "Soft" }
+    static var lookWarm: String { lang == .chinese ? "暖阳" : "Warm" }
+    static var lookSmoothing: String { lang == .chinese ? "细腻" : "Smooth" }
+    static var lookBrightness: String { lang == .chinese ? "提亮" : "Lift" }
+    static var lookWarmth: String { lang == .chinese ? "暖调" : "Warmth" }
+    static var lookHoldToCompare: String {
+        lang == .chinese ? "按住看原片" : "Hold to see the original"
+    }
+    static var lookRemember: String { lang == .chinese ? "以后都这样看" : "Keep this from now on" }
+    static var lookRememberFootnote: String {
+        lang == .chinese
+            ? "关掉的话，下次打开 app 就回到原样 —— 这次调的只算这次。"
+            : "With this off, the app opens on “As shot” next time — today's choice is just for today."
+    }
+    /// The Settings row. Names the effect rather than the setting, because in a
+    /// list of settings "Look" on its own says nothing.
+    static var lookSetting: String { lang == .chinese ? "回看的样子" : "How clips look" }
 
     // MARK: Final reel
 
@@ -613,7 +753,7 @@ enum Strings {
     static func titleCardSubtitleOneDay(_ recorded: Int, _ total: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "一日影片 · \(recorded)/\(total) 个瞬间 · 每段 \(secondsLabel)"
-            : "1-day film · \(recorded)/\(total) \(secondsLabel) moments"
+            : "1-day film · \(recorded)/\(total) \(secondsLabel) \(momentWord(total))"
     }
 
     // MARK: Adjust sheet
@@ -703,8 +843,27 @@ enum Strings {
         lang == .chinese ? "今天会是什么故事？" : "What story will today be?"
     }
     static var todaysStory: String { lang == .chinese ? "今天的故事" : "Today's story" }
-    static var yourOtherPlans: String { lang == .chinese ? "其他的故事" : "Your other plans" }
-    static var finishedFilms: String { lang == .chinese ? "完成的影片" : "Finished films" }
+    /// Used instead of `todaysStory` when nothing was started today but
+    /// something is still unfinished — saying "today's story" then would be a
+    /// lie about what the card is.
+    static var resumeStory: String { lang == .chinese ? "接着拍" : "Pick it back up" }
+    static var startTodayLabel: String { lang == .chinese ? "今天" : "Today" }
+    static var startTodayBody: String {
+        lang == .chinese ? "还没开始今天的故事" : "Today's story hasn't started"
+    }
+    static var startTodayCTA: String {
+        lang == .chinese ? "开始今天的故事" : "Start today's story"
+    }
+    /// Heads the reverse-chronological list below today's story. Replaces the
+    /// old "your other plans" / "finished films" split, which sorted by state
+    /// and so couldn't answer "what did I film on the 31st".
+    static var scrollBack: String { lang == .chinese ? "往前翻" : "Earlier" }
+    /// Used instead of "scroll back" when today's own stories are in the list —
+    /// "scroll back" sitting directly above a row labelled "today" reads as a
+    /// small lie about what's underneath it.
+    static var yourStories: String { lang == .chinese ? "你的故事" : "Your stories" }
+    static var todayLabel: String { lang == .chinese ? "今天" : "Today" }
+    static var yesterdayLabel: String { lang == .chinese ? "昨天" : "Yesterday" }
     static var continueTodaysStory: String {
         lang == .chinese ? "继续今天的故事" : "Continue today's story"
     }
@@ -724,7 +883,7 @@ enum Strings {
     /// Chip-length moment count. `momentCount` is a full sentence and blows a
     /// capsule out to four lines.
     static func momentsShort(_ total: Int) -> String {
-        lang == .chinese ? "\(total) 个瞬间" : "\(total) moments"
+        lang == .chinese ? "\(total) 个瞬间" : "\(total) \(momentWord(total))"
     }
     /// "2s each" — the per-clip length on a template card.
     static func templateRuntime(count: Int, secondsLabel: String) -> String {
@@ -745,15 +904,83 @@ enum Strings {
     static var customTemplateBlurb: String {
         lang == .chinese ? "你自己写的小脚本。" : "Your own little script."
     }
+    static var noPrompts: String { lang == .chinese ? "无题目" : "No prompts" }
 
     // MARK: Story composer
 
     static var composerMoodStep: String { lang == .chinese ? "选个心情" : "Pick a mood" }
     static var composerSetupStep: String { lang == .chinese ? "设置" : "Set it up" }
+    static var newStoryQuestion: String {
+        lang == .chinese ? "今天会是什么故事？" : "What will today's story be?"
+    }
+    static var recordingStyleSubtitle: String {
+        lang == .chinese
+            ? "跟着题目拍，或者按时间随手拍。"
+            : "Follow prompts, or just record as the day goes."
+    }
+    /// The two halves of the one pill selector at the top of the screen. They
+    /// filter what's below; they are not themselves a thing you "pick", which
+    /// is why they're pills and not two posters the size of the templates.
+    static var followPrompts: String {
+        lang == .chinese ? "跟着题目拍" : "Follow prompts"
+    }
+    static var recordByTime: String {
+        lang == .chinese ? "按时间拍" : "Record by time"
+    }
+    static var customPromptsTitle: String {
+        lang == .chinese ? "自己写题目" : "Write your own prompts"
+    }
+    static var customPromptsCaption: String {
+        lang == .chinese
+            ? "先写几个想拍的，之后随时可以改"
+            : "Start with a few ideas. You can change them anytime."
+    }
+    static var pickPromptSet: String {
+        lang == .chinese ? "选一组题目" : "Pick a set of prompts"
+    }
+    static var sevenDayChallenges: String {
+        lang == .chinese ? "七日挑战" : "Seven-day challenges"
+    }
+    /// How many prompts the chosen template will ask for, beside its name.
+    static func promptCountLabel(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 个题目" : "\(count) prompts"
+    }
+    /// The whole of the "record by time" state. It replaces the grid rather
+    /// than dimming it — showing a wall of things you can't tap was a patch,
+    /// not an answer.
+    static var timeOnlyCardBody: String {
+        lang == .chinese
+            ? "没有题目。拍到的每一段按时间排好，发生什么拍什么。"
+            : "No prompts. Every clip lands in the order you filmed it."
+    }
+    static var timeOnlyCaptionNote: String {
+        lang == .chinese
+            ? "字幕由你自己在每段片子上填写，1Day 只负责保留拍摄时间。"
+            : "You write the captions on each clip; 1Day just keeps the time."
+    }
     static func composerSubtitle(count: Int, secondsLabel: String) -> String {
         lang == .chinese
             ? "\(count) 个瞬间，每个 \(secondsLabel)，合成一部小影片。"
-            : "\(count) moments, \(secondsLabel) each. One tiny film."
+            : "\(count) \(momentWord(count)), \(secondsLabel) each. One tiny film."
+    }
+    static var timeOnlyComposerSubtitle: String {
+        lang == .chinese ? "不设题目，按时间留住这一天。" : "No prompts. Keep the day as it happens."
+    }
+    static var timeOnlySetupTitle: String {
+        lang == .chinese ? "只记录时间" : "Time only"
+    }
+    static var timeOnlySetupBody: String {
+        lang == .chinese
+            ? "拍下当下，1Day 会自动保留拍摄时间；画面上的文字由每个人自己填写。"
+            : "Film the moment and 1Day keeps its time. Everyone can write their own caption."
+    }
+    static var timeOnlyMoment: String {
+        lang == .chinese ? "拍下这一刻" : "Film this moment"
+    }
+    static var timeOnlyReminder: String {
+        lang == .chinese
+            ? "现在的你在做什么？留两秒给这一刻。"
+            : "What are you doing right now? Keep two seconds of it."
     }
     static var next: String { lang == .chinese ? "下一步" : "Next" }
     static var back: String { lang == .chinese ? "返回" : "Back" }
@@ -776,6 +1003,11 @@ enum Strings {
             ? "大家在一天里各自拍下瞬间，1Day 把它们缝成一部影片。"
             : "Everyone captures moments through the day. 1Day stitches them into one beautiful film."
     }
+    /// Beside the room's own count, so "3/5" can mean the day and this can
+    /// mean me. Only shown when the two differ.
+    static func yourTakes(_ count: Int) -> String {
+        lang == .chinese ? "你 \(count) 个" : "you · \(count)"
+    }
     static var scriptLabel: String { lang == .chinese ? "脚本" : "Script" }
     static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
     static var createStoryCTA: String { lang == .chinese ? "创建故事" : "Create story" }
@@ -789,24 +1021,84 @@ enum Strings {
     static var writeYourOwn: String { lang == .chinese ? "写自己的" : "Write your own" }
     /// Entry point from the poster rack into the guided flow.
     static var writeYourOwnMoments: String {
-        lang == .chinese ? "自己写七个瞬间" : "Write your own moments"
+        lang == .chinese ? "自己写题目" : "Write your own prompts"
     }
     static var useTheseMoments: String { lang == .chinese ? "就用这些" : "Use these" }
     static var guidedHeading: String {
-        lang == .chinese ? "你的一天会是什么样？" : "What will your day look like?"
+        lang == .chinese ? "想拍什么，由你来写" : "Write what you might want to film"
     }
     static var guidedSubtitle: String {
         lang == .chinese
-            ? "回答几个小问题，答案就是你今天要拍的瞬间。不想答的可以留空。"
-            : "Answer a few small questions — your answers become the moments you'll film. Leave any of them blank to skip."
+            ? "先写两个可能遇见的画面就够了。今天真正开始以后，随时还能增加或修改。"
+            : "Start with two scenes you might encounter. Add or change them anytime once the day begins."
     }
     static var guidedNamePlaceholder: String {
         lang == .chinese ? "给这一天起个名字…" : "Name this day…"
     }
-    static func guidedFootnote(filled: Int) -> String {
+    /// Says what "就用这些" is still waiting for. A grey button whose reason
+    /// lives off-screen is a dead end, and the name field scrolls away first.
+    static func guidedFootnote(filled: Int, needsName: Bool) -> String {
+        let enoughPrompts = filled >= 2
+        switch (enoughPrompts, needsName) {
+        case (false, true):
+            return lang == .chinese
+                ? "还差故事名字，和至少 2 个题目。"
+                : "Still needs a name and at least 2 prompts."
+        case (true, true):
+            return lang == .chinese
+                ? "题目够了。上面给这一天起个名字，就能保存。"
+                : "Prompts are ready. Name the day up top and you can save."
+        case (false, false):
+            return lang == .chinese
+                ? "已经写了 \(filled) 个，至少要 2 个。"
+                : "\(filled) written; 2 is the minimum."
+        case (true, false):
+            return lang == .chinese
+                ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
+                : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
+        }
+    }
+    /// Shown on the name card itself, where the fix is.
+    static var storyNameNeeded: String {
+        lang == .chinese ? "保存前得先起个名字。" : "A name is needed before saving."
+    }
+    // MARK: Prompts from one sentence
+
+    static var intentHeading: String {
+        lang == .chinese ? "说说今天要干嘛" : "What's today for?"
+    }
+    static var intentSubtitle: String {
         lang == .chinese
-            ? "现在有 \(filled) 个瞬间。留空的会被跳过，之后也随时能改。"
-            : "\(filled) moments so far. Blank ones are skipped, and you can change any of them later."
+            ? "一句话就行。题目会填进下面的列表，每条都能改。"
+            : "One sentence is enough. The prompts fill the list below, and every one is editable."
+    }
+    static var intentPlaceholder: String {
+        lang == .chinese ? "比如：今天要搬家" : "For example: moving house today"
+    }
+    static var suggestPrompts: String { lang == .chinese ? "出题目" : "Suggest prompts" }
+    static var suggestingPrompts: String { lang == .chinese ? "在想…" : "Thinking…" }
+    /// Not an error dialog: the thing they were doing still works, and the list
+    /// is right there. This only explains why nothing appeared.
+    static var suggestFailed: String {
+        lang == .chinese ? "这次没出来，先自己写吧。" : "Nothing came back — write your own."
+    }
+    static var suggestRateLimited: String {
+        lang == .chinese ? "出得有点勤，等会儿再试。" : "That's a lot of asking. Try again later."
+    }
+
+    static var yourPrompts: String { lang == .chinese ? "想拍的画面" : "Scenes to film" }
+    static var addAnotherPrompt: String {
+        lang == .chinese ? "再加一个题目" : "Add another prompt"
+    }
+    static var chooseFromPromptLibrary: String {
+        lang == .chinese ? "从提示库里选" : "Choose from the prompt library"
+    }
+    static var promptLibrary: String { lang == .chinese ? "提示库" : "Prompt library" }
+    static func customPromptPlaceholder(_ index: Int) -> String {
+        let chineseExamples = ["例如：出门前", "例如：今天这一餐", "例如：回家以后"]
+        let englishExamples = ["For example: before leaving", "For example: today's meal", "For example: back home"]
+        let examples = lang == .chinese ? chineseExamples : englishExamples
+        return examples[(index - 1) % examples.count]
     }
 
     // MARK: Timeline
@@ -821,9 +1113,6 @@ enum Strings {
     /// all-caps section headers and wrap awkwardly inside an `OptionRow`.
     static var clipLengthRow: String { lang == .chinese ? "片段时长" : "Clip length" }
     static var orientationRow: String { lang == .chinese ? "画面方向" : "Frame" }
-    static func waitingForMoment(_ name: String) -> String {
-        lang == .chinese ? "等 \(name) 的瞬间…" : "Waiting for \(name)'s moment…"
-    }
     static var inviteLabel: String { lang == .chinese ? "邀请" : "Invite" }
     static var stitchingMoment: String {
         lang == .chinese ? "正在拼接这个瞬间…" : "Stitching this moment…"
@@ -841,12 +1130,98 @@ enum Strings {
     static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static var makeTheFilm: String { lang == .chinese ? "生成影片" : "Make the film" }
     static func previewTheFilm(_ count: Int) -> String {
-        lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) moments"
+        lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) \(momentWord(count))"
     }
     static var timelineEmptyHint: String {
         lang == .chinese
             ? "第一个瞬间会出现在这条时间线的顶端。"
             : "Your first moment lands at the top of this line."
+    }
+
+    /// The story page's progress bar, and the labels around its one next
+    /// action. The page shows exactly one thing to tap, so these are the words
+    /// that have to say where in the day it is.
+    static func momentsFilmed(_ filmed: Int, total: Int) -> String {
+        lang == .chinese ? "拍了 \(filmed)/\(total) 个瞬间" : "\(filmed) of \(total) filmed"
+    }
+    static func nextUpPosition(_ slot: Int, total: Int) -> String {
+        lang == .chinese ? "接下来 · 第 \(slot)/\(total) 个" : "Next up · \(slot) of \(total)"
+    }
+    static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
+    /// The way into the film, now that it lives on the next-up card instead of
+    /// a second button floating at the bottom of the same screen.
+    static var watchTheFilm: String { lang == .chinese ? "看成片" : "See the film" }
+    static func filmFromMoments(_ clips: Int) -> String {
+        lang == .chinese ? "\(clips) 个片段，缝成一部" : "\(clips) clips, one film"
+    }
+    static var filmedHeader: String { lang == .chinese ? "拍过的" : "Filmed" }
+    static var stillOpenHeader: String { lang == .chinese ? "还没拍的" : "Still open" }
+    static var notYetFilmed: String { lang == .chinese ? "还没拍" : "Not yet" }
+    /// A moment a friend already filmed. The thumbnail plays their take; this
+    /// row is how mine gets in.
+    static var addYourTake: String { lang == .chinese ? "加上你的" : "Add yours" }
+    static var watchThisMoment: String {
+        lang == .chinese ? "看这个瞬间" : "Watch this moment"
+    }
+    static var retrySync: String { lang == .chinese ? "重新同步" : "Retry sync" }
+    static var moreLabel: String { lang == .chinese ? "更多" : "More" }
+
+    // MARK: Shared room
+
+    /// The roster's caption. A room of one is worth saying out loud — an
+    /// invite code nobody used looks exactly like a room full of friends until
+    /// somebody counts the faces.
+    static func peopleInRoom(_ count: Int) -> String {
+        guard count > 1 else {
+            return lang == .chinese ? "只有你在这个房间" : "Just you in this room"
+        }
+        return lang == .chinese ? "\(count) 人在这个房间" : "\(count) people in this room"
+    }
+
+    /// Whether anyone else showed up. Four sentences rather than a count,
+    /// because "2 filmed" answers none of the four things a room is actually
+    /// being asked: who's here, whether they've filmed, whether I have, and
+    /// whether the day is waiting on me.
+    ///
+    /// - Parameters:
+    ///   - overflow: people the line ran out of room to name.
+    ///   - mineToo: I have filmed something as well.
+    static func roomWhoFilmed(_ names: [String], overflow: Int, mineToo: Bool) -> String {
+        guard !names.isEmpty || overflow > 0 else {
+            return mineToo
+                ? (lang == .chinese ? "只有你拍了" : "You're the only one so far")
+                : (lang == .chinese ? "还没有人拍" : "Nobody has filmed yet")
+        }
+        let who = nameList(names, overflow: overflow)
+        if mineToo {
+            return lang == .chinese ? "你和\(who)拍了" : "You and \(who) have filmed"
+        }
+        return lang == .chinese ? "\(who)拍了，就差你" : "\(who) filmed — just you left"
+    }
+
+    /// Who the room is waiting on. One line about people, never a row per
+    /// moment: which moment they film is theirs to pick.
+    static func roomWaitingOn(_ names: [String], overflow: Int) -> String {
+        let who = nameList(names, overflow: overflow)
+        return lang == .chinese ? "在等 \(who)" : "Waiting on \(who)"
+    }
+
+    /// Joins names the way each language does — Chinese enumerates with "、"
+    /// and closes with "和", English with commas and "and". A capped list ends
+    /// in a count rather than a name so one long name can't push the line off
+    /// a 375pt screen.
+    private static func nameList(_ names: [String], overflow: Int) -> String {
+        var parts = names
+        if overflow > 0 {
+            parts.append(
+                lang == .chinese
+                    ? "另外 \(overflow) 人"
+                    : (overflow == 1 ? "1 other" : "\(overflow) others"))
+        }
+        guard parts.count > 1 else { return parts.first ?? "" }
+        let last = parts.removeLast()
+        let head = parts.joined(separator: lang == .chinese ? "、" : ", ")
+        return lang == .chinese ? "\(head)和\(last)" : "\(head) and \(last)"
     }
 
     // MARK: Generating
@@ -905,9 +1280,25 @@ enum Strings {
     static var version: String { lang == .chinese ? "版本" : "Version" }
     static var privacyPolicy: String { lang == .chinese ? "隐私政策" : "Privacy Policy" }
     static var signedInAs: String { lang == .chinese ? "已登录" : "Signed in as" }
+    /// The label on the editable name row, and what a room shows for you.
+    static var yourNameLabel: String { lang == .chinese ? "你的名字" : "Your name" }
+    static var yourNamePlaceholder: String {
+        lang == .chinese ? "朋友看到的名字" : "What friends see"
+    }
+    static var yourNameFootnote: String {
+        lang == .chinese
+            ? "共享房间里，你的片段会挂在这个名字下。改名只影响以后拍的。"
+            : "This is the name on your clips in a shared room. Renaming affects clips from here on."
+    }
+    /// Apple only hands over a name on the very first sign-in. Without one,
+    /// somebody has to be called something in a room full of friends.
+    static var defaultMemberName: String { lang == .chinese ? "朋友" : "Friend" }
     static var notSignedIn: String {
         lang == .chinese ? "未登录（只有共享故事需要登录）" : "Not signed in — only shared stories need it"
     }
+    /// The way back in. Until this existed, signing out was one-way from here:
+    /// the only other sign-in gate is the one guarding a shared story.
+    static var signIn: String { lang == .chinese ? "登录" : "Sign in" }
     static var signOut: String { lang == .chinese ? "退出登录" : "Sign out" }
     static var deleteAccount: String { lang == .chinese ? "删除账号" : "Delete account" }
     static var deleteAccountTitle: String {

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1Day — 新建故事 UI 方案</title>
+<style>
+  :root{
+    --blue:#1677FF; --cyan:#38B6FF; --sky:#7FB4FF; --navy:#0F2E6B;
+    --mist:#DCEBFF; --canvas:#F5F8FF; --surface:#FFFFFF;
+    --lavender:#B3A4FF; --mint:#5FD6B4; --butter:#FFCE73;
+    --ink:#0F2E6B; --inkSoft:#5B7099; --inkFaint:#93A6C6;
+    --hairline:rgba(22,119,255,.10);
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{
+    margin:0;padding:48px 32px 96px;background:#E9EDF5;color:var(--ink);
+    font-family:-apple-system,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+  }
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.4px}
+  .lede{color:var(--inkSoft);font-size:14px;margin:0 0 40px;max-width:760px;line-height:1.6}
+  h2{font-size:19px;margin:56px 0 4px;letter-spacing:-.2px}
+  h2:first-of-type{margin-top:8px}
+  .sub{color:var(--inkSoft);font-size:13.5px;margin:0 0 22px;max-width:760px;line-height:1.6}
+
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+
+  /* ---- phone shell ---- */
+  .phone{width:330px;flex:0 0 auto}
+  .screen{
+    width:330px;height:700px;border-radius:42px;overflow:hidden;position:relative;
+    background:linear-gradient(160deg,#EEF4FF 0%,#F5F8FF 42%,#EAF3FF 100%);
+    border:1px solid rgba(15,46,107,.10);
+    box-shadow:0 20px 44px rgba(15,46,107,.16);
+  }
+  .screen.scroll{overflow-y:auto}
+  .screen::-webkit-scrollbar{display:none}
+  .cap{font-size:12.5px;color:var(--inkSoft);margin-top:12px;line-height:1.55}
+  .cap b{color:var(--ink);font-size:13.5px;display:block;margin-bottom:3px}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;
+       background:var(--mist);color:var(--blue);margin-left:6px;vertical-align:2px}
+  .tag.rec{background:#DFF6EC;color:#158463}
+  .tag.no{background:#FFE4E9;color:#C2325A}
+
+  .pad{padding:0 18px}
+  .statusbar{height:42px;display:flex;align-items:center;justify-content:space-between;
+             padding:0 22px;font-size:12.5px;font-weight:700;color:var(--ink);opacity:.85}
+
+  /* ---- home header ---- */
+  .brand{display:flex;align-items:flex-start;gap:10px;justify-content:space-between;padding-top:4px}
+  .logo{display:flex;align-items:center;gap:5px}
+  .logo img{width:74px}
+  .greet{font-size:12px;font-weight:800;color:var(--inkSoft);margin-top:1px}
+  .bubbles{display:flex;gap:8px}
+  .bub{width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.9);
+       display:grid;place-items:center;box-shadow:0 4px 12px rgba(15,46,107,.10);
+       border:1px solid var(--hairline)}
+  .bub.primary{background:linear-gradient(135deg,var(--blue),var(--cyan));border:none;
+       box-shadow:0 6px 16px rgba(22,119,255,.42)}
+  .bub svg{width:17px;height:17px}
+
+  .seclabel{font-size:11.5px;font-weight:900;letter-spacing:.6px;color:var(--inkFaint);
+            text-transform:uppercase;margin:20px 0 9px;display:flex;align-items:center;justify-content:space-between}
+  .linkbtn{font-size:12.5px;font-weight:800;color:var(--blue);text-transform:none;letter-spacing:0}
+
+  /* ---- hero story card ---- */
+  .hero{border-radius:26px;overflow:hidden;background:var(--surface);
+        box-shadow:0 14px 30px rgba(15,46,107,.13);border:1px solid var(--hairline)}
+  .hero .cover{height:150px;position:relative;overflow:hidden}
+  .hero .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .hero .scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(6,22,54,.72),rgba(6,22,54,0) 62%)}
+  .hero .meta{position:absolute;left:14px;right:14px;bottom:12px;color:#fff}
+  .hero .meta h3{margin:0 0 4px;font-size:20px;font-weight:900;letter-spacing:-.3px}
+  .hero .meta p{margin:0;font-size:11.5px;opacity:.88;font-weight:600}
+  .pips{display:flex;gap:4px;margin-top:8px}
+  .pips i{width:5px;height:5px;border-radius:99px;background:rgba(255,255,255,.34)}
+  .pips i.on{background:#fff}
+  .cta{margin:13px;padding:13px;border-radius:99px;text-align:center;color:#fff;font-weight:900;
+       font-size:14.5px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+       box-shadow:0 8px 18px rgba(22,119,255,.34)}
+
+  /* ---- row card ---- */
+  .rowcard{display:flex;gap:11px;align-items:center;background:rgba(255,255,255,.86);
+           border:1px solid var(--hairline);border-radius:20px;padding:10px;margin-bottom:9px}
+  .rowcard img{width:48px;height:54px;object-fit:cover;border-radius:13px;flex:0 0 auto}
+  .rowcard .t{font-size:14px;font-weight:800}
+  .rowcard .s{font-size:11.5px;color:var(--inkSoft);font-weight:600;margin-top:2px}
+  .chev{margin-left:auto;color:var(--inkFaint);font-weight:900;font-size:14px}
+
+  /* ---- option B: dashed new card ---- */
+  .newcard{display:flex;gap:11px;align-items:center;border-radius:20px;padding:10px;
+           border:2px dashed rgba(22,119,255,.34);background:rgba(220,235,255,.34);margin-bottom:9px}
+  .newcard .plusbox{width:48px;height:54px;border-radius:13px;flex:0 0 auto;display:grid;place-items:center;
+           background:linear-gradient(135deg,rgba(22,119,255,.14),rgba(56,182,255,.14))}
+  .newcard .plusbox svg{width:22px;height:22px}
+  .newcard .t{font-size:14px;font-weight:800;color:var(--blue)}
+  .newcard .s{font-size:11.5px;color:var(--inkSoft);font-weight:600;margin-top:2px}
+
+  /* ---- option C: tab bar ---- */
+  .tabbar{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;display:flex;align-items:center;gap:6px;
+          background:rgba(255,255,255,.82);backdrop-filter:blur(18px);border-radius:99px;padding:6px;
+          box-shadow:0 10px 26px rgba(15,46,107,.16);border:1px solid rgba(255,255,255,.7)}
+  .tabbar .tab{display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:99px;
+               font-size:13px;font-weight:800;color:var(--inkSoft)}
+  .tabbar .tab.on{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;
+                  box-shadow:0 6px 14px rgba(22,119,255,.36)}
+  .tabbar .tab svg{width:16px;height:16px}
+  .fab{width:46px;height:46px;border-radius:99px;display:grid;place-items:center;
+       background:linear-gradient(135deg,var(--blue),var(--cyan));
+       box-shadow:0 8px 20px rgba(22,119,255,.46);margin:0 2px}
+  .fab svg{width:22px;height:22px}
+
+  /* ---- composer ---- */
+  .comp-h1{font-size:25px;font-weight:900;letter-spacing:-.5px;margin:14px 0 4px}
+  .comp-sub{font-size:13px;color:var(--inkSoft);font-weight:600;margin:0 0 16px;line-height:1.5}
+  .modewrap{display:flex;gap:10px}
+  .mode{flex:1;border-radius:20px;padding:0;overflow:hidden;position:relative;
+        border:1px solid var(--hairline);background:var(--surface);
+        box-shadow:0 6px 16px rgba(15,46,107,.08)}
+  .mode.on{border:2px solid rgba(22,119,255,.55);box-shadow:0 10px 22px rgba(22,119,255,.22)}
+  .mode .art{height:62px;position:relative;overflow:hidden}
+  .mode .art img{width:100%;height:100%;object-fit:cover;display:block}
+  .mode .art .veil{position:absolute;inset:0;background:linear-gradient(to top,rgba(255,255,255,.94),rgba(255,255,255,.30))}
+  .mode .art .ico{position:absolute;left:11px;bottom:8px;width:30px;height:30px;border-radius:10px;
+        display:grid;place-items:center;background:#fff;box-shadow:0 4px 10px rgba(15,46,107,.14)}
+  .mode .art .ico svg{width:17px;height:17px}
+  .mode .body{padding:9px 12px 12px;min-height:62px}
+  .mode .body .t{font-size:15px;font-weight:900;letter-spacing:-.2px}
+  .mode .body .s{font-size:11px;color:var(--inkSoft);font-weight:600;margin-top:3px;line-height:1.45}
+  .mode .check{position:absolute;top:9px;right:9px;width:21px;height:21px;border-radius:99px;
+        background:linear-gradient(135deg,var(--blue),var(--cyan));display:grid;place-items:center;
+        box-shadow:0 3px 8px rgba(22,119,255,.4)}
+  .mode .check svg{width:12px;height:12px}
+
+  .writecard{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.9);
+        border:1px solid var(--hairline);border-radius:20px;padding:12px;margin-top:12px;
+        box-shadow:0 6px 16px rgba(15,46,107,.07)}
+  .writecard .ic{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;
+        background:linear-gradient(135deg,rgba(179,164,255,.22),rgba(127,180,255,.22))}
+  .writecard .ic svg{width:19px;height:19px}
+  .writecard .t{font-size:14.5px;font-weight:800}
+  .writecard .s{font-size:11.5px;color:var(--inkSoft);font-weight:600;margin-top:2px}
+
+  /* poster shelf */
+  .shelf{display:flex;gap:11px;overflow-x:auto;padding:2px 0 4px;margin:0 -18px;padding-left:18px}
+  .shelf::-webkit-scrollbar{display:none}
+  .poster{flex:0 0 auto;width:126px;border-radius:20px;overflow:hidden;position:relative;
+          box-shadow:0 10px 22px rgba(15,46,107,.14)}
+  .poster img{width:100%;height:150px;object-fit:cover;display:block}
+  .poster .sc{position:absolute;inset:0;background:linear-gradient(to top,rgba(6,22,54,.78),rgba(6,22,54,0) 58%)}
+  .poster .lb{position:absolute;left:11px;right:11px;bottom:10px;color:#fff}
+  .poster .lb b{display:block;font-size:13px;font-weight:900}
+  .poster .lb span{font-size:10.5px;opacity:.85;font-weight:600}
+  .poster.sel{outline:2.5px solid var(--blue);outline-offset:-2.5px}
+
+  .bottomcta{position:sticky;bottom:0;padding:14px 18px 18px;
+        background:linear-gradient(to top,#EAF3FF 68%,rgba(234,243,255,0))}
+  .bottomcta .b{padding:15px;border-radius:99px;text-align:center;color:#fff;font-weight:900;font-size:15.5px;
+        background:linear-gradient(135deg,var(--blue),var(--cyan));box-shadow:0 10px 22px rgba(22,119,255,.36)}
+
+  .dots{display:flex;gap:5px;justify-content:center;align-items:center}
+  .dots i{width:6px;height:6px;border-radius:99px;background:rgba(127,180,255,.4)}
+  .dots i.on{width:20px;background:var(--blue)}
+  .topbar{display:flex;align-items:center;gap:10px;padding-top:2px}
+  .xbtn{width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.92);display:grid;place-items:center;
+        box-shadow:0 4px 12px rgba(15,46,107,.10);border:1px solid var(--hairline)}
+  .xbtn svg{width:14px;height:14px}
+
+  /* wording variants */
+  .variants{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .vcard{background:#fff;border:1px solid var(--hairline);border-radius:18px;padding:14px 16px;width:300px;
+         box-shadow:0 8px 20px rgba(15,46,107,.08)}
+  .vcard h4{margin:0 0 10px;font-size:13px;color:var(--inkFaint);font-weight:900;letter-spacing:.4px}
+  .vrow{display:flex;gap:9px}
+  .vhalf{flex:1;border:1px solid var(--hairline);border-radius:13px;padding:9px 10px;background:var(--canvas)}
+  .vhalf .t{font-size:13.5px;font-weight:900}
+  .vhalf .s{font-size:10.5px;color:var(--inkSoft);font-weight:600;margin-top:3px;line-height:1.4}
+  .vnote{font-size:11.5px;color:var(--inkSoft);margin-top:10px;line-height:1.5}
+
+  .note{background:#fff;border-radius:18px;padding:18px 20px;border:1px solid var(--hairline);
+        max-width:520px;box-shadow:0 8px 20px rgba(15,46,107,.07)}
+  .note ul{margin:0;padding-left:18px}
+  .note li{font-size:13px;line-height:1.75;color:var(--inkSoft)}
+  .note li b{color:var(--ink)}
+  .note h4{margin:0 0 10px;font-size:14px}
+</style>
+</head>
+<body>
+
+<h1>1Day — 新建故事 UI 方案</h1>
+<p class="lede">
+  上半部分是「新建故事」<b>入口按钮</b>的三个方案（首页已有故事时的状态）。
+  下半部分是「新建故事」<b>页面</b>，对照 codex 那张图重做，全部用仓库里已有的封面素材。
+  所有配色取自 <code>Theme.swift</code>（#1677FF / #38B6FF / #0F2E6B / #DCEBFF）。
+</p>
+
+<!-- ============ PART 1 ============ -->
+<h2>一、入口按钮：三个方案</h2>
+<p class="sub">
+  现状是「今天的故事」标题右边一个 13.5pt 的蓝色文字链（<code>PlansHomeView.swift:178</code>）。
+  新用户拿到一颗全宽大按钮，老用户只剩一行小字——下面三个方案都在解决这个倒挂。
+</p>
+
+<div class="row">
+
+  <!-- A -->
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>􀙇 􀛨</span></div>
+      <div class="pad">
+        <div class="brand">
+          <div>
+            <div class="logo"><img src="../../ios/AISetlog/Assets.xcassets/OneDayBrandLockup.imageset/1day-logo-lockup.png" alt="1day"></div>
+            <div class="greet">早上好</div>
+          </div>
+          <div class="bubbles">
+            <div class="bub primary"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div class="bub"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+            <div class="bub" style="background:linear-gradient(135deg,#7FB4FF,#38B6FF)"></div>
+          </div>
+        </div>
+
+        <div class="seclabel">今天的故事</div>
+        <div class="hero">
+          <div class="cover">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="scrim"></div>
+            <div class="meta">
+              <h3>完美的一天</h3>
+              <p>下一个瞬间 · 金色时刻</p>
+              <div class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="cta">继续今天的故事</div>
+        </div>
+
+        <div class="seclabel">其他的故事</div>
+        <div class="rowcard">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+          <div><div class="t">和我做饭</div><div class="s">下一个 · 备料</div></div>
+          <div class="chev">›</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>方案 A · 顶部第三颗圆泡</b>
+      把 <code>+</code> 做成 38pt IconBubble，和「加好友 / 头像」并排，用主色实心区分。常驻、不随滚动消失、零新组件。
+      代价：纯图标没有文案。<span class="tag rec">改动最小</span></div>
+  </div>
+
+  <!-- B -->
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>􀙇 􀛨</span></div>
+      <div class="pad">
+        <div class="brand">
+          <div>
+            <div class="logo"><img src="../../ios/AISetlog/Assets.xcassets/OneDayBrandLockup.imageset/1day-logo-lockup.png" alt="1day"></div>
+            <div class="greet">早上好</div>
+          </div>
+          <div class="bubbles">
+            <div class="bub"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+            <div class="bub" style="background:linear-gradient(135deg,#7FB4FF,#38B6FF)"></div>
+          </div>
+        </div>
+
+        <div class="seclabel">今天的故事</div>
+        <div class="hero">
+          <div class="cover">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="scrim"></div>
+            <div class="meta">
+              <h3>完美的一天</h3>
+              <p>下一个瞬间 · 金色时刻</p>
+              <div class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="cta">继续今天的故事</div>
+        </div>
+
+        <div class="seclabel">其他的故事</div>
+        <div class="rowcard">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+          <div><div class="t">和我做饭</div><div class="s">下一个 · 备料</div></div>
+          <div class="chev">›</div>
+        </div>
+        <div class="newcard">
+          <div class="plusbox"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div><div class="t">再开一个故事</div><div class="s">今天还可以是别的样子</div></div>
+          <div class="chev" style="color:#1677FF">›</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>方案 B · 列表末尾的虚线卡片</b>
+      和 <code>StoryRowCard</code> 同尺寸的虚线占位卡。新建和已有故事在同一条视觉序列里，读作「再来一张」，贴合你这套卡片/海报隐喻。
+      代价：要滚到底部。</div>
+  </div>
+
+  <!-- C -->
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>􀙇 􀛨</span></div>
+      <div class="pad">
+        <div class="brand">
+          <div>
+            <div class="logo"><img src="../../ios/AISetlog/Assets.xcassets/OneDayBrandLockup.imageset/1day-logo-lockup.png" alt="1day"></div>
+            <div class="greet">早上好</div>
+          </div>
+          <div class="bubbles">
+            <div class="bub"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M18 8v6M15 11h6"/></svg></div>
+            <div class="bub" style="background:linear-gradient(135deg,#7FB4FF,#38B6FF)"></div>
+          </div>
+        </div>
+
+        <div class="seclabel">今天的故事</div>
+        <div class="hero">
+          <div class="cover">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="scrim"></div>
+            <div class="meta">
+              <h3>完美的一天</h3>
+              <p>下一个瞬间 · 金色时刻</p>
+              <div class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="cta">继续今天的故事</div>
+        </div>
+
+        <div class="seclabel">其他的故事</div>
+        <div class="rowcard">
+          <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+          <div><div class="t">和我做饭</div><div class="s">下一个 · 备料</div></div>
+          <div class="chev">›</div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M7 7V5h10v2"/></svg>计划</div>
+        <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="7" width="18" height="13" rx="3.5"/><circle cx="12" cy="13.5" r="3.4"/><path d="M8.5 7l1.4-2.4h4.2L15.5 7"/></svg>拍摄</div>
+      </div>
+    </div>
+    <div class="cap"><b>方案 C · 底部胶囊中间的 FAB</b>
+      最显眼，胶囊中间本来就是空的。但 <code>RootShellView.swift:7</code> 的注释明确写了「下面不放主按钮」是当初的设计决定，选 C 等于推翻它。
+      <span class="tag no">需要你拍板</span></div>
+  </div>
+
+</div>
+
+<div style="height:26px"></div>
+<div class="note">
+  <h4>我的建议：A + B</h4>
+  <ul>
+    <li><b>A</b> 解决「常驻、够大、找得到」——任何时候右上角都有入口；</li>
+    <li><b>B</b> 解决「这是一个可以收集的东西」——在你已经在浏览故事的地方，顺手再加一个；</li>
+    <li><b>C</b> 先留着。它和你原本「底部不放主按钮」的原则冲突，值得单独决定，不该顺手改掉。</li>
+  </ul>
+</div>
+
+<!-- ============ PART 2 ============ -->
+<h2>二、新建故事页：codex 那张图的优化版</h2>
+<p class="sub">
+  保留你喜欢的版式（顶部二选一 → 自己写 → 推荐列表 → 底部主按钮），换掉文字、图标和素材。
+</p>
+
+<div class="row">
+
+  <div class="phone">
+    <div class="screen scroll">
+      <div class="statusbar"><span>9:41</span><span>􀙇 􀛨</span></div>
+      <div class="pad">
+        <div class="topbar">
+          <div class="xbtn"><svg viewBox="0 0 24 24" fill="none" stroke="#0F2E6B" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+          <div style="flex:1"></div>
+          <div class="dots"><i class="on"></i><i></i></div>
+          <div style="flex:1"></div>
+          <div style="width:34px"></div>
+        </div>
+
+        <div class="comp-h1">今天会是什么故事？</div>
+        <div class="comp-sub">先决定怎么记，再挑一个题目。</div>
+
+        <div class="modewrap">
+          <div class="mode on">
+            <div class="art">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateMainCharacter.imageset/cover.jpg" alt="">
+              <div class="veil"></div>
+              <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2" stroke-linecap="round"><path d="M6 3v18"/><circle cx="6" cy="7" r="2" fill="#1677FF" stroke="none"/><circle cx="6" cy="13" r="2" fill="#1677FF" stroke="none"/><circle cx="6" cy="19" r="2" fill="#7FB4FF" stroke="none"/><path d="M11 7h8M11 13h6M11 19h4" stroke="#7FB4FF"/></svg></div>
+            </div>
+            <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
+            <div class="body">
+              <div class="t">跟着时间走</div>
+              <div class="s">发生什么拍什么，<br>按时间替你排好。</div>
+            </div>
+          </div>
+
+          <div class="mode">
+            <div class="art">
+              <img src="../../ios/AISetlog/Assets.xcassets/TemplateLockIn.imageset/cover.jpg" alt="">
+              <div class="veil"></div>
+              <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.4" fill="#1677FF" stroke="none"/></svg></div>
+            </div>
+            <div class="body">
+              <div class="t">接一个题目</div>
+              <div class="s">7 个题目，<br>拍完就是一部片。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="writecard">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#7C6BE0" stroke-width="2" stroke-linecap="round"><path d="M4 20h4l10-10a2.5 2.5 0 10-3.5-3.5L4.5 16.5 4 20z"/></svg></div>
+          <div><div class="t">自己写今天的题目</div><div class="s">回答几个小问题，3 个也够</div></div>
+          <div class="chev">›</div>
+        </div>
+
+        <div class="seclabel">挑一个题目 <span class="linkbtn">全部 13 个 ›</span></div>
+      </div>
+
+      <div class="pad" style="padding-left:0;padding-right:0">
+        <div class="shelf">
+          <div class="poster sel">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplatePerfectDay.imageset/cover.jpg" alt="">
+            <div class="sc"></div><div class="lb"><b>完美的一天</b><span>愿意再过一遍的一天。</span></div>
+          </div>
+          <div class="poster">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplateSoftReset.imageset/cover.jpg" alt="">
+            <div class="sc"></div><div class="lb"><b>慢慢重启</b><span>安静地重新开始。</span></div>
+          </div>
+          <div class="poster">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplateLittleAdventure.imageset/cover.jpg" alt="">
+            <div class="sc"></div><div class="lb"><b>出门冒险</b><span>看看会遇到什么。</span></div>
+          </div>
+          <div class="poster">
+            <img src="../../ios/AISetlog/Assets.xcassets/TemplateCookWithMe.imageset/cover.jpg" alt="">
+            <div class="sc"></div><div class="lb"><b>和我做饭</b><span>从备料，到第一口。</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pad">
+        <div style="height:10px"></div>
+        <div class="rowcard" style="background:rgba(255,255,255,.6)">
+          <div style="width:48px;height:54px;border-radius:13px;display:grid;place-items:center;background:rgba(220,235,255,.7)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#1677FF" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+          </div>
+          <div><div class="t">还是没有想要的？</div><div class="s">看看七日挑战，或自己编一个</div></div>
+          <div class="chev">›</div>
+        </div>
+      </div>
+
+      <div class="bottomcta"><div class="b">下一步</div></div>
+    </div>
+    <div class="cap"><b>优化版</b>——版式不动，换了文案、图标、素材和推荐内容。</div>
+  </div>
+
+  <div style="flex:1;min-width:340px">
+    <div class="note" style="max-width:none">
+      <h4>相对 codex 那张图，改了 6 件事</h4>
+      <ul>
+        <li><b>题目全换成真的。</b>「今天刚刚好 / 慢慢恢复 / 普通的一天」在 app 里<b>不存在</b>——codex 自己编的。真的是完美的一天 / 慢慢重启 / 进入状态 / 我的主角日 / 和我做饭 / 出门冒险，一共 6 个一日 + 6 个七日。</li>
+        <li><b>封面用你自己的素材。</b><code>Assets.xcassets</code> 里那 13 张插画（蓝色小方块 + 暖光房间）是一整套品牌资产，codex 那张图用的是通用 AI 插画，风格对不上。而且你的封面是 <b>16:10 横构图</b>，codex 那张切成方形缩略图会把主体裁掉——所以我改成横向海报架，让插画完整露出来。</li>
+        <li><b>「无题目 / 有题目」→「跟着时间走 / 接一个题目」。</b>这正是你说的第一个是时间顺序、第二个是挑战感。「无题目」是从功能角度取的否定式命名，用户读到的是「缺了点什么」；换成正向描述之后，左边卖的是「不用想」，右边卖的是「有个目标」。</li>
+        <li><b>图标换掉。</b>左边勾选圆圈只表示「选中」，不表示这个模式是什么——换成<b>时间轴</b>（竖线三点）。右边换成<b>靶心</b>（app 里 Lock In 已经在用 <code>scope</code>，同一套语言）。选中态的勾移到卡片右上角，和「这是什么」分开。</li>
+        <li><b>标题从说明书改回人话。</b>「先选择题目，再开始记录你的故事。」是流程描述；app 里已经有一句现成的「今天会是什么故事？」（<code>Localization.swift:739</code>），语气一致。</li>
+        <li><b>「自定义提示」→「自己写今天的题目」</b>，副标题写明「3 个也够」——现在代码里 <code>canSave</code> 其实只要 2 个，但界面给 7 个填满的框，把人吓住了。</li>
+      </ul>
+    </div>
+
+    <div style="height:20px"></div>
+    <h4 style="margin:0 0 8px;font-size:15px">顶部二选一：三种措辞，你挑</h4>
+    <div class="variants">
+      <div class="vcard">
+        <h4>① 动作式（图里用的）</h4>
+        <div class="vrow">
+          <div class="vhalf"><div class="t">跟着时间走</div><div class="s">发生什么拍什么</div></div>
+          <div class="vhalf"><div class="t">接一个题目</div><div class="s">7 个题目，拍完成片</div></div>
+        </div>
+        <div class="vnote">最直白，两边都在说「你要做什么」。</div>
+      </div>
+      <div class="vcard">
+        <h4>② 状态式</h4>
+        <div class="vrow">
+          <div class="vhalf"><div class="t">顺其自然</div><div class="s">今天不做计划</div></div>
+          <div class="vhalf"><div class="t">给我题目</div><div class="s">今天想被推一把</div></div>
+        </div>
+        <div class="vnote">最像「选心情」，和现有 blurb 的语气最近，但稍微含糊。</div>
+      </div>
+      <div class="vcard">
+        <h4>③ 名词式</h4>
+        <div class="vrow">
+          <div class="vhalf"><div class="t">时间线</div><div class="s">按发生顺序排</div></div>
+          <div class="vhalf"><div class="t">挑战</div><div class="s">题目拍满才算完</div></div>
+        </div>
+        <div class="vnote">最短、最好扫，但「挑战」两个字压力大，可能劝退。</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="height:40px"></div>
+<div class="note" style="max-width:760px">
+  <h4>顺带发现的一个素材 bug</h4>
+  <ul>
+    <li><code>ChallengeTemplate.swift:56</code> 和 <code>:60</code>——<b>「和我过一天」和「我的主角日」共用同一张封面</b> <code>TemplateMainCharacter</code>。
+    在海报架里它们会长得一模一样。「和我过一天」是唯一没有题目的模式，最该有一张自己的图。</li>
+  </ul>
+</div>
+
+</body>
+</html>

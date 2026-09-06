@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppleLogo, ArrowRight, CalendarBlank, Camera, Check, FilmStrip, LockKey, Smiley, UsersThree } from '@phosphor-icons/react';
 
-const TESTFLIGHT_URL = 'https://testflight.apple.com/join/cRQm6Va2';
+const APP_STORE_URL = 'https://apps.apple.com/us/app/1-day/id6794565199';
 
 const themes = [
   { id: 'perfect', en: 'Perfect Day', zh: '完美的一天', enNote: 'Capture the little things that made today good.', zhNote: '记下那些让今天变好的小事。', image: '/assets/moment-1.jpg' },
@@ -12,7 +12,7 @@ const themes = [
 
 const copy = {
   zh: {
-    nav: ['使用方式', '你能做什么', '隐私'], beta: '加入 TestFlight 测试', betaSmall: '加入测试', heroNote: '你的每一天，都值得留成故事。',
+    nav: ['使用方式', '你能做什么', '隐私'], storeAria: '在 App Store 下载 1Day', storeSmall: '在', storeLarge: 'App Store 下载', storeCompact: 'App Store', heroNote: '你的每一天，都值得留成故事。',
     title: <>把琐事<br />拍成 <em>电影</em><br />让生活更有意思。</>,
     lede: '录下 2 秒、5 秒或 10 秒的片段。1Day 会把它们编成一支完整的每日短片——一个人，或和朋友一起。', learn: '看看它如何工作', themeTitle: '选择你的故事主题', allThemes: '查看全部主题',
     how: '1Day 如何工作', howNote: '从一个小小的故事开始，把散落的瞬间留成完整的一天。',
@@ -23,10 +23,10 @@ const copy = {
       ['观看成片', '1Day 自动整理所有片段，完成一支好看的每日短片。', FilmStrip],
     ],
     finished: '在 iPhone 上完成', filmTitle: <>每一段。<br />一个完整故事。</>, filmText: '随时预览最后的竖版短片；想和朋友一起看时切成网格，然后保存到照片或通过 iOS 分享。', privacy: '单人故事只留在你的设备上。要不要保存或分享，始终由你决定。',
-    modes: [['独自记录', '只关于你和你的这一天。', UsersThree], ['朋友房间', '无论身处哪里，一起记录。', UsersThree], ['每日成片', '每天一支，都是故事。', FilmStrip]], footer: ['隐私政策', '测试海报', '支持'], filmNote: '真实成片 · 7 个瞬间 · 11 秒', filmAria: '1Day 生成的样片', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 7 月 24 日',
+    modes: [['独自记录', '只关于你和你的这一天。', UsersThree], ['朋友房间', '无论身处哪里，一起记录。', UsersThree], ['每日成片', '每天一支，都是故事。', FilmStrip]], footer: ['隐私政策', 'App Store', '支持'], filmNote: '真实成片 · 7 个瞬间 · 11 秒', filmAria: '1Day 生成的样片', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 7 月 24 日',
   },
   en: {
-    nav: ['How it works', 'What you can do', 'Privacy'], beta: 'Join the beta on TestFlight', betaSmall: 'Join beta', heroNote: 'Your day is a story worth keeping.',
+    nav: ['How it works', 'What you can do', 'Privacy'], storeAria: 'Download 1Day on the App Store', storeSmall: 'Download on the', storeLarge: 'App Store', storeCompact: 'App Store', heroNote: 'Your day is a story worth keeping.',
     title: <>Turn everyday<br />moments into <em>film</em>.<br />Make life more fun.</>,
     lede: 'Record 2, 5, or 10-second clips of your day. 1Day turns them into a beautiful daily film—solo or with friends.', learn: 'Learn how it works', themeTitle: 'Choose your story theme', allThemes: 'See all themes',
     how: 'How 1Day works', howNote: 'Start with a small story, then keep the moments that make up a complete day.',
@@ -37,13 +37,13 @@ const copy = {
       ['Watch your film', '1Day orders every clip and turns it into a beautiful daily film.', FilmStrip],
     ],
     finished: 'Finished on your iPhone', filmTitle: <>Every clip.<br />One complete story.</>, filmText: 'Preview the finished vertical film, turn shared clips into a grid when you want, then save it to Photos or share it through iOS.', privacy: 'Solo stories stay on your device. You decide what to save or share.',
-    modes: [['Solo', 'Just you and your day.', UsersThree], ['Friends Room', 'Capture together, from anywhere.', UsersThree], ['Daily Film', 'One film. Every day.', FilmStrip]], footer: ['Privacy Policy', 'Beta Poster', 'Support'], filmNote: 'A real film · 7 moments · 11s', filmAria: 'Sample film made by 1Day', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective July 24, 2026',
+    modes: [['Solo', 'Just you and your day.', UsersThree], ['Friends Room', 'Capture together, from anywhere.', UsersThree], ['Daily Film', 'One film. Every day.', FilmStrip]], footer: ['Privacy Policy', 'App Store', 'Support'], filmNote: 'A real film · 7 moments · 11s', filmAria: 'Sample film made by 1Day', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective July 24, 2026',
   },
 };
 
 function StoreButton({ locale, compact = false }) {
   const t = copy[locale];
-  return <a className={`store-button ${compact ? 'compact' : ''}`} href={TESTFLIGHT_URL} target="_blank" rel="noreferrer" aria-label={t.beta}><AppleLogo weight="fill" /><span><small>{locale === 'zh' ? '加入 beta 测试' : 'Join the beta on'}</small>{compact ? t.betaSmall : 'TestFlight'}</span></a>;
+  return <a className={`store-button ${compact ? 'compact' : ''}`} href={APP_STORE_URL} target="_blank" rel="noreferrer" aria-label={t.storeAria}><AppleLogo weight="fill" /><span><small>{t.storeSmall}</small>{compact ? t.storeCompact : t.storeLarge}</span></a>;
 }
 
 function PrivacyPolicy({ locale }) {
@@ -87,6 +87,6 @@ export function App() {
     <section id="how" className="how shell"><div className="how-heading"><p className="eyebrow">{t.how}</p><p>{t.howNote}</p></div><div className="steps">{t.steps.map(([title, note, Icon], index) => <article className="step" key={title}><div className="step-icon"><Icon weight="fill" /></div><div><p><b>{index + 1}</b> {title}</p><small>{note}</small></div>{index < t.steps.length - 1 && <ArrowRight className="step-arrow" />}</article>)}</div></section>
     <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.finished}</p><h2>{t.filmTitle}</h2><p>{t.filmText}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><figure className="movie"><video className="sample-film" src="/assets/sample-film.mp4" poster="/assets/sample-film-poster.jpg" autoPlay muted loop playsInline preload="metadata" aria-label={t.filmAria} /><figcaption>{t.filmNote}</figcaption></figure></section>
     <section className="modes shell">{t.modes.map(([title, note, Icon], index) => <div key={title}><Icon weight="fill" /><span><small>0{index + 1}</small><strong>{title}</strong><em>{note}</em></span></div>)}</section>
-    <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/privacy`}>{t.footer[0]}</a><a href="/assets/testflight-qr-poster-ipad.png" download>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a></div></footer>
+    <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/privacy`}>{t.footer[0]}</a><a href={APP_STORE_URL}>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a></div></footer>
   </main>;
 }

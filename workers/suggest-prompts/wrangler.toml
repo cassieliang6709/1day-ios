@@ -1,0 +1,8 @@
+name = "oneday-suggest-prompts"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# The DeepSeek key is a secret, not a var — set it with:
+#   wrangler secret put DEEPSEEK_API_KEY
+[vars]
+DEEPSEEK_MODEL = "deepseek-v4-flash"

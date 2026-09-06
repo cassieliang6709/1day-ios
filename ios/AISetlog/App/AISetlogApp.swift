@@ -5,6 +5,8 @@ struct AISetlogApp: App {
     @UIApplicationDelegateAdaptor(NotificationAppDelegate.self) private var appDelegate
     @State private var account: AccountStore
     @State private var store: ChallengeStore
+    @State private var drafts = ClipDraftStore()
+    @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
 
@@ -16,6 +18,21 @@ struct AISetlogApp: App {
         SharedActivityNotificationService.reconcileSubscriptions(for: store.challenges)
         _account = State(initialValue: account)
         _store = State(initialValue: store)
+        Self.settleGentleLook()
+    }
+
+    /// Put the look back to "as shot" unless you asked it to stick.
+    ///
+    /// Done here, before any view reads the key, so nothing gets one frame of
+    /// yesterday's setting on the way to the right one.
+    private static func settleGentleLook() {
+        let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: GentleLook.storageKey)
+            .flatMap(GentleLook.init(rawValue:)) ?? .none
+        let sticky = defaults.bool(forKey: GentleLook.stickyKey)
+        let opening = GentleLook.onLaunch(stored: stored, sticky: sticky)
+        guard opening != stored else { return }
+        defaults.set(opening.rawValue, forKey: GentleLook.storageKey)
     }
 
     var body: some Scene {
@@ -23,6 +40,8 @@ struct AISetlogApp: App {
             RootView()
                 .environment(store)
                 .environment(account)
+                .environment(drafts)
+                .environment(promptMetrics)
                 .tint(Color.oneDayBlue)
                 .preferredColorScheme(appAppearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in
@@ -55,7 +74,7 @@ struct RootView: View {
                 FirstRunOnboardingView(
                     onCreateStory: {
                         hasCompletedOnboarding = true
-                        homeLaunchAction = .newStory
+                        homeLaunchAction = .quickStart
                     },
                     onJoin: {
                         hasCompletedOnboarding = true

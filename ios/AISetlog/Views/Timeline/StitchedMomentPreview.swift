@@ -11,8 +11,11 @@ struct StitchedMomentPreview: View {
     let clips: [DayClip]
     let day: Int
     var slotTitle: String?
+    /// How many moments the story has, so playback can say "3 / 5".
+    var momentCount = 0
     var clipLength: Challenge.ClipLength = .tiny
     var challengeID: UUID?
+    var showsPrompt = true
     let myID: String
     let onReRecord: () -> Void
 
@@ -68,9 +71,11 @@ struct StitchedMomentPreview: View {
         ClipPreviewView(
             day: day,
             slotTitle: slotTitle,
+            momentCount: momentCount,
             authorName: authorName,
             overlayText: overlayText,
             clipLength: clipLength,
+            showsPrompt: showsPrompt,
             url: url,
             recordedAt: clips.first?.recordedAt,
             challengeID: challengeID,
@@ -90,6 +95,8 @@ struct StitchedMomentPreview: View {
         // No captions or crossfade: this is one moment, not a film.
         options.showDayCaptions = false
         options.crossfadeSeconds = 0
+        // And no look, deliberately: this file goes to `ClipPreviewView`, which
+        // filters as it plays. Baking it in here would apply it twice.
         do {
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             Self.cache[cacheKey] = url
