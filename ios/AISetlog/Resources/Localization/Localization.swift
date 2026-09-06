@@ -511,9 +511,6 @@ enum Strings {
     static func previewSharedFilm(_ clips: Int) -> String {
         lang == .chinese ? "预览共同影片 · \(clips) 个片段" : "Preview shared film · \(clips) clips"
     }
-    static func membersInRoom(_ count: Int) -> String {
-        lang == .chinese ? "房间里有 \(count) 人" : "\(count) in this room"
-    }
     static var friend: String { lang == .chinese ? "朋友" : "Friend" }
     static func sharedClips(_ count: Int) -> String {
         lang == .chinese ? "共同片段 · \(count)" : "Shared clips · \(count)"
@@ -998,10 +995,13 @@ enum Strings {
     static var createRoomSubtitle: String {
         lang == .chinese ? "一起完成今天的故事。" : "Build today's story together."
     }
+    /// Shown before the room exists, so it has to say the room is empty. The
+    /// composer used to show faces here instead, which read as "these people
+    /// are already in" — nobody is, until an invite code gets used.
     static var roomExplainer: String {
         lang == .chinese
-            ? "大家在一天里各自拍下瞬间，1Day 把它们缝成一部影片。"
-            : "Everyone captures moments through the day. 1Day stitches them into one beautiful film."
+            ? "创建后房间里先只有你。把邀请码发出去，进来的人各自拍各自的瞬间，1Day 缝成一部影片。"
+            : "At first the room is just you. Share the invite code — whoever joins films their own moments, and 1Day stitches them into one film."
     }
     /// Beside the room's own count, so "3/5" can mean the day and this can
     /// mean me. Only shown when the two differ.

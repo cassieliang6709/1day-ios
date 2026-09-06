@@ -419,7 +419,6 @@ struct SetupStep: View {
     @Binding var moments: [String]
     let isOneDay: Bool
     let isTimeOnly: Bool
-    let memberNames: [String]
 
     @FocusState private var titleFocused: Bool
     @State private var momentsExpanded = false
@@ -630,15 +629,10 @@ struct SetupStep: View {
                 ) { withFriends = true }
             }
 
-            if withFriends, !memberNames.isEmpty {
-                HStack(spacing: 8) {
-                    AvatarStack(names: memberNames, maxShown: 5, size: 28)
-                    Text(Strings.membersInRoom(memberNames.count))
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                }
-                .padding(.top, 2)
-            }
+            // No faces here. A room that hasn't been created yet has nobody in
+            // it; borrowing names from the user's other rooms made the picker
+            // claim a membership that doesn't exist. `roomExplainer` below says
+            // what's actually true instead.
         }
     }
 
