@@ -655,11 +655,12 @@ enum Strings {
         if lang == .chinese { return recording ? "拍摄中 · \(secondsLabel)" : "轻点拍摄" }
         return recording ? "Recording · \(secondsLabel)" : "Tap to capture"
     }
-    static var capturedLabel: String { lang == .chinese ? "已拍摄" : "CAPTURED" }
-    static func momentN(_ day: Int) -> String {
-        lang == .chinese ? "瞬间 \(day)" : "MOMENT \(day)"
+    /// Spoken by the progress bars over the camera. There is no visible version
+    /// of this — the bars themselves say it, and they only appear when the
+    /// numbers in them are real.
+    static func momentPosition(_ index: Int, of total: Int) -> String {
+        lang == .chinese ? "第 \(index) 个瞬间，共 \(total) 个" : "Moment \(index) of \(total)"
     }
-    static var dailyFilm: String { lang == .chinese ? "每日影片" : "daily film" }
     static var addCaption: String { lang == .chinese ? "加一句字幕" : "add a caption" }
     static var writeOnMoment: String {
         lang == .chinese ? "给这个瞬间写点什么" : "Write on this moment"

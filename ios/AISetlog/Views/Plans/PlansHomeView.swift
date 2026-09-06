@@ -353,6 +353,7 @@ struct PlansHomeView: View {
             slotTitle: challenge.isTimeOnly
                 ? nil
                 : ChallengePresenter(challenge: challenge).title(forSlot: slot),
+            momentCount: challenge.cards.count,
             clipLength: challenge.resolvedClipLength,
             showsPrompt: !challenge.isTimeOnly,
             orientation: challenge.resolvedOrientation

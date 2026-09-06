@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Shared camera/recording UI pieces used by `RecordClipView` and
-/// `ClipPreviewView`: the framed camera shell, the burned-in moment stamp,
-/// brand/identity badges, and caption editors.
+/// Shared camera/recording UI pieces used by `RecordClipView`: the framed
+/// camera shell, the moment stamp that previews what the film will carry, and
+/// the caption editors.
 
 struct CuteCameraBackdrop: View {
     var body: some View {
@@ -20,9 +20,15 @@ struct CuteCameraBackdrop: View {
 }
 
 struct CameraShell<Content: View>: View {
+    /// Whose camera this is. Only the frame's tint uses it now — the picture
+    /// itself no longer gets labelled with your own name.
     let name: String?
-    let momentTitle: String
+    /// The moment's name, or nil when this take isn't a moment in a story yet.
+    let momentTitle: String?
     let day: Int
+    /// How many moments the story has. 0 means "no story behind this take",
+    /// which is what free-form capture passes.
+    var momentCount = 0
     let mode: MomentStampOverlay.Mode
     let timestamp: Date?
     let overlayText: String?
@@ -41,9 +47,9 @@ struct CameraShell<Content: View>: View {
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
                 MomentStampOverlay(
-                    name: name,
                     momentTitle: momentTitle,
                     day: day,
+                    momentCount: momentCount,
                     mode: mode,
                     timestamp: timestamp,
                     overlayText: overlayText,
@@ -62,6 +68,23 @@ struct CameraShell<Content: View>: View {
     }
 }
 
+/// What the camera draws on top of the picture.
+///
+/// The rule for this layer: **whatever you can see here has to survive into the
+/// finished film.** It sits on the frame like a burned-in stamp, so anything it
+/// shows reads as a promise about the export.
+///
+/// Three things used to break that promise and are gone:
+/// - the 1Day badge in the top-left, which the film never draws (the film's
+///   own mark is a small "made with 1Day" in the bottom-*left*, added by
+///   `VideoStitcher.addWatermark`);
+/// - your own name in a dashed pill, which the film only ever shows as an
+///   initial in a room with more than one person in it;
+/// - "MOMENT 1" plus three decorative bars, which said the same thing on every
+///   take of every story.
+///
+/// What's left maps onto `VideoStitcher`: date and time → `addTimestampPill`,
+/// the moment's name → `addCaption`, the caption → `addOverlayText`.
 struct MomentStampOverlay: View {
     enum Mode {
         case live
@@ -69,14 +92,19 @@ struct MomentStampOverlay: View {
         case review
     }
 
-    let name: String?
-    let momentTitle: String
+    let momentTitle: String?
     let day: Int
+    var momentCount = 0
     let mode: Mode
     let timestamp: Date?
     var overlayText: String?
     var clipSeconds: Double = 2
     var showsPrompt = true
+
+    /// nil when there's no honest indicator to draw — see `MomentProgress`.
+    private var progress: MomentProgress? {
+        MomentProgress(day: day, momentCount: momentCount)
+    }
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -104,8 +132,9 @@ struct MomentStampOverlay: View {
         )
     }
 
+    /// Only ever read while recording — a state read-out, not a sticker.
     private var modeText: String {
-        mode == .recording ? "REC 00:\(String(format: "%02d", Int(clipSeconds)))" : Strings.capturedLabel
+        "REC 00:\(String(format: "%02d", Int(clipSeconds)))"
     }
 
     var body: some View {
@@ -122,8 +151,9 @@ struct MomentStampOverlay: View {
                 )
 
                 VStack {
+                    // Top-right, because that's the corner the film's own
+                    // timestamp pill lands in (`addTimestampPill`).
                     HStack(alignment: .top, spacing: 8 * scale) {
-                        BrandStamp(scale: scale)
                         Spacer(minLength: 6 * scale)
                         VStack(alignment: .trailing, spacing: 4 * scale) {
                             Text(dateText)
@@ -144,38 +174,11 @@ struct MomentStampOverlay: View {
 
                     Spacer(minLength: 8 * scale)
 
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 9 * scale) {
-                            if let name, !name.isEmpty {
-                                NameChip(name: name, scale: scale)
-                            }
-                            if showsPrompt {
-                                Text(momentTitle)
-                                    .font(.system(size: 22 * scale, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.62)
-                                    .allowsTightening(true)
-                                Text(Strings.momentN(day))
-                                    .font(.system(size: 12 * scale, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.78))
-                                    .lineLimit(1)
-                                HStack(spacing: 7 * scale) {
-                                    Capsule()
-                                        .fill(.white.opacity(0.42))
-                                        .frame(width: 34 * scale, height: max(3, 5 * scale))
-                                    Capsule()
-                                        .fill(.white)
-                                        .frame(width: 46 * scale, height: max(3, 5 * scale))
-                                    Capsule()
-                                        .fill(.white.opacity(0.42))
-                                        .frame(width: 34 * scale, height: max(3, 5 * scale))
-                                }
-                            }
-                        }
-
-                        Spacer(minLength: 0)
+                    VStack(spacing: 10 * scale) {
+                        progressBars(scale: scale)
+                        momentPill(scale: scale)
                     }
+                    .frame(maxWidth: .infinity)
                     .padding(edgeInset)
                 }
 
@@ -204,55 +207,44 @@ struct MomentStampOverlay: View {
         }
         .allowsHitTesting(false)
     }
-}
 
-/// Whose clip this is — a small dashed pill with a pencil, sitting above the
-/// moment title in the live preview.
-struct NameChip: View {
-    let name: String
-    var scale: CGFloat = 1
-
-    var body: some View {
-        HStack(spacing: 6 * scale) {
-            Image(systemName: "pencil")
-                .font(.system(size: 11 * scale, weight: .bold))
-            Text(name)
-                .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+    /// One segment per moment in the story, the one you're filming lit.
+    ///
+    /// The segments share the row equally, so a five-moment story reads as
+    /// fifths — the drawing is the count. There is no printed "MOMENT 3 / 5"
+    /// any more; the bars carry it, and VoiceOver gets the sentence.
+    @ViewBuilder
+    private func progressBars(scale: CGFloat) -> some View {
+        if let progress {
+            let barHeight = max(3, 5 * scale)
+            HStack(spacing: 7 * scale) {
+                ForEach(0..<progress.count, id: \.self) { index in
+                    Capsule()
+                        .fill(.white.opacity(progress.isActive(index) ? 1 : 0.42))
+                        .frame(height: barHeight)
+                }
+            }
+            .frame(maxWidth: min(CGFloat(progress.count) * 30, 190) * scale)
+            .accessibilityElement()
+            .accessibilityLabel(Strings.momentPosition(progress.position, of: progress.count))
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12 * scale)
-        .padding(.vertical, 7 * scale)
-        .background(.black.opacity(0.22), in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(
-                    .white.opacity(0.85),
-                    style: StrokeStyle(lineWidth: max(0.8, 1.2 * scale), dash: [5 * scale, 4 * scale])
-                )
-        )
     }
-}
 
-struct BrandStamp: View {
-    var scale: CGFloat = 1
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: max(1, 2 * scale)) {
-            OneDayBrandLogo(width: 94 * scale)
-            Text(Strings.dailyFilm)
-                .font(.system(size: 9.5 * scale, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayNavy.opacity(0.72))
+    /// The moment's name, drawn where and how the film draws it: a dark capsule
+    /// across the bottom center. `VideoStitcher.addCaption` burns the same
+    /// string in at `renderSize.height * 0.075`.
+    @ViewBuilder
+    private func momentPill(scale: CGFloat) -> some View {
+        if showsPrompt, let momentTitle, !momentTitle.isEmpty {
+            Text(momentTitle)
+                .font(.system(size: 17 * scale, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .padding(.horizontal, 9 * scale)
-        .padding(.vertical, 6 * scale)
-        .background(Color.oneDayMist.opacity(0.9), in: RoundedRectangle(cornerRadius: 12 * scale, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12 * scale, style: .continuous)
-                .strokeBorder(.white.opacity(0.55), lineWidth: max(0.7, scale))
+                .minimumScaleFactor(0.6)
+                .allowsTightening(true)
+                .padding(.horizontal, 16 * scale)
+                .padding(.vertical, 8 * scale)
+                .background(.black.opacity(0.45), in: Capsule())
         }
     }
 }

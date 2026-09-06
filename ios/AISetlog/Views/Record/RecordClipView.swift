@@ -12,6 +12,10 @@ import AVFoundation
 struct RecordClipView: View {
     let day: Int
     var slotTitle: String?
+    /// How many moments the story has, so the camera's progress bars can be
+    /// about this story rather than decoration. 0 = no story behind this take
+    /// (free-form), and then no indicator is drawn at all.
+    var momentCount = 0
     var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
@@ -70,6 +74,15 @@ struct RecordClipView: View {
     }
     private var localizedMomentTitle: String {
         slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
+    }
+
+    /// What to stamp on the picture as the moment's name — nil in free-form,
+    /// where the take doesn't belong to a moment yet and "Free-form" is a mode
+    /// label rather than something the film will ever say. The header above the
+    /// frame still names the mode; the frame itself only shows what survives
+    /// into the export.
+    private var stampedMomentTitle: String? {
+        isFreeform ? nil : localizedMomentTitle
     }
 
     var body: some View {
@@ -150,8 +163,9 @@ struct RecordClipView: View {
 
             CameraShell(
                 name: myName,
-                momentTitle: localizedMomentTitle,
+                momentTitle: stampedMomentTitle,
                 day: day,
+                momentCount: momentCount,
                 mode: recorder.state == .recording ? .recording : .live,
                 timestamp: recorder.recordedAt,
                 overlayText: nil,
@@ -253,8 +267,9 @@ struct RecordClipView: View {
 
             CameraShell(
                 name: myName,
-                momentTitle: localizedMomentTitle,
+                momentTitle: stampedMomentTitle,
                 day: day,
+                momentCount: momentCount,
                 mode: .review,
                 timestamp: recorder.recordedAt,
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
