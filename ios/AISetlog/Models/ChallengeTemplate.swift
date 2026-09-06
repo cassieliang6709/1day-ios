@@ -25,10 +25,15 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     /// Built-ins are identified by name (stable across app versions); custom
     /// ones by their generated id, since a user could name two the same.
     var isCustom: Bool = false
+    /// A picture the user chose from their photo library, filed by
+    /// `TemplateCoverStore`. Nil means nobody picked one, and the cover is
+    /// matched from the moments instead — see `TemplateCoverMatcher`.
+    var coverFileName: String?
 
     init(id: UUID = UUID(), emoji: String = "", symbol: String? = nil,
          name: LocalizedText, momentKeys: [String]?,
-         blurb: LocalizedText? = nil, isCustom: Bool = false) {
+         blurb: LocalizedText? = nil, isCustom: Bool = false,
+         coverFileName: String? = nil) {
         self.id = id
         self.emoji = emoji
         self.symbol = symbol
@@ -36,6 +41,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         self.momentKeys = momentKeys
         self.blurb = blurb
         self.isCustom = isCustom
+        self.coverFileName = coverFileName
     }
 
     /// Name in the active language.
@@ -201,6 +207,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, emoji, symbol, name, momentKeys, momentTitles, blurb, isCustom
+        case coverFileName
     }
 
     init(from decoder: Decoder) throws {
@@ -210,6 +217,9 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         isCustom = (try? c.decode(Bool.self, forKey: .isCustom)) ?? false
         blurb = try? c.decodeIfPresent(LocalizedText.self, forKey: .blurb)
         symbol = try? c.decodeIfPresent(String.self, forKey: .symbol)
+        // Absent in everything saved before covers existed: those templates
+        // simply get a matched cover instead of an uploaded one.
+        coverFileName = try? c.decodeIfPresent(String.self, forKey: .coverFileName)
         // name: new bilingual object, or a legacy plain string.
         if let loc = try? c.decode(LocalizedText.self, forKey: .name) {
             name = loc
@@ -236,5 +246,6 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         try c.encodeIfPresent(blurb, forKey: .blurb)
         try c.encodeIfPresent(symbol, forKey: .symbol)
         try c.encode(isCustom, forKey: .isCustom)
+        try c.encodeIfPresent(coverFileName, forKey: .coverFileName)
     }
 }

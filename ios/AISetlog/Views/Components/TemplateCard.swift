@@ -10,6 +10,8 @@ struct TemplateCard: View {
     let isOneDay: Bool
     /// The centre card is the selected one; neighbours sit back and desaturate.
     var isActive: Bool = true
+    /// The template's own cover picture, if the user uploaded one.
+    var coverURL: URL?
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
@@ -34,21 +36,17 @@ struct TemplateCard: View {
 
     private var cover: some View {
         ZStack {
-            if let assetName = template.coverAssetName {
-                Image(assetName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .accessibilityHidden(true)
-            } else {
-                Image("TemplateCustomStory")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .accessibilityHidden(true)
+            TemplateCoverImage(
+                assetName: template.matchedCoverAssetName, fileURL: coverURL)
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .accessibilityHidden(true)
 
+            // Only over the stand-in art. A cover that actually depicts the
+            // day — painted or photographed — doesn't need a badge on top.
+            if template.coverAssetName == nil, coverURL == nil,
+               template.matchedCoverAssetName == TemplateCoverMatcher.fallbackAssetName {
                 Image(systemName: template.displaySymbol)
                     .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(.white)
@@ -168,6 +166,7 @@ struct TemplateCarousel: View {
     let secondsLabel: String
     let isOneDay: Bool
     @Binding var activeIndex: Int
+    var coverURL: (ChallengeTemplate) -> URL? = { _ in nil }
     var onEdit: (ChallengeTemplate) -> Void = { _ in }
     var onDelete: (ChallengeTemplate) -> Void = { _ in }
 
@@ -185,6 +184,7 @@ struct TemplateCarousel: View {
                         secondsLabel: secondsLabel,
                         isOneDay: isOneDay,
                         isActive: index == activeIndex,
+                        coverURL: coverURL(template),
                         onEdit: { onEdit(template) },
                         onDelete: { onDelete(template) }
                     )

@@ -1,9 +1,22 @@
 import SwiftUI
 
+/// What the guided flow hands back: a story to start now, and — if the user
+/// wants it — a template to keep.
+struct CustomStoryDraft {
+    var moments: [String]
+    var name: String
+    /// Whether this also becomes a reusable template rather than evaporating
+    /// once the story is made.
+    var savesToLibrary: Bool
+    /// Bytes of a cover picked from the photo library. Nil means the app
+    /// matches one from the prompts.
+    var coverImageData: Data?
+}
+
 /// A small blank canvas for a user's own prompts. It starts with two rows so
 /// the user does not have to predict an entire day before anything happens.
 struct GuidedMomentsView: View {
-    let onDone: ([String], String) -> Void
+    let onDone: (CustomStoryDraft) -> Void
     /// Injectable so previews and tests don't reach the network.
     var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
 
@@ -15,6 +28,11 @@ struct GuidedMomentsView: View {
     @State private var storyName = ""
     @State private var showPromptLibrary = false
     @FocusState private var focused: Int?
+
+    /// On by default. Writing seven prompts is the expensive part; throwing
+    /// them away after one story is the surprising outcome, not keeping them.
+    @State private var savesToLibrary = true
+    @State private var coverChoice: TemplateCoverChoice = .unchanged
 
     /// The sentence about today, and what came back from it.
     @State private var intent = ""
@@ -51,6 +69,7 @@ struct GuidedMomentsView: View {
                         intentCard
                         promptEditor
                         libraryButton
+                        keepItCard
                         footnote
                     }
                     .padding(.horizontal, 20)
@@ -241,6 +260,50 @@ struct GuidedMomentsView: View {
         .buttonStyle(.softAction)
     }
 
+    /// Keeping the prompts is a decision about the future, so it sits at the
+    /// end — after the list it's talking about exists and is worth keeping.
+    private var keepItCard: some View {
+        GlassCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $savesToLibrary) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(Strings.saveToTemplateLibrary)
+                            .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                        Text(Strings.saveToTemplateLibraryNote)
+                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Color.oneDayBlue)
+                .accessibilityIdentifier("save-to-template-library")
+
+                if savesToLibrary {
+                    Divider().overlay(OneDay.hairline)
+                    SectionLabel(text: Strings.templateCoverLabel)
+                    TemplateCoverField(
+                        matchedAssetName: matchedCoverAssetName,
+                        choice: $coverChoice)
+                }
+            }
+        }
+        .animation(OneDay.Motion.soft, value: savesToLibrary)
+    }
+
+    /// What the cover would be if the user leaves it alone — recomputed as
+    /// they type, so the preview is honest about what they'd get.
+    private var matchedCoverAssetName: String {
+        TemplateCoverMatcher.assetName(forMomentKeys: filledAnswers, name: storyName)
+            ?? TemplateCoverMatcher.fallbackAssetName
+    }
+
+    private var filledAnswers: [String] {
+        answers
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private var footnote: some View {
         HStack(alignment: .top, spacing: 10) {
             OneDayBuddy(size: 30)
@@ -313,14 +376,16 @@ struct GuidedMomentsView: View {
     }
 
     private func save() {
-        let moments = answers
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let moments = filledAnswers
         guard moments.count >= 2 else { return }
         // Which of the generated prompts survived contact with a person. This
         // is the number the whole feature exists to produce.
         metrics.recordAdopted(offered: offeredPrompts, saved: moments)
-        onDone(moments, storyName.trimmingCharacters(in: .whitespacesAndNewlines))
+        onDone(CustomStoryDraft(
+            moments: moments,
+            name: storyName.trimmingCharacters(in: .whitespacesAndNewlines),
+            savesToLibrary: savesToLibrary,
+            coverImageData: coverChoice.pickedData))
         dismiss()
     }
 }

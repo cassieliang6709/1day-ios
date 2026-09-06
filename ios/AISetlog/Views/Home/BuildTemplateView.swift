@@ -5,14 +5,20 @@ import SwiftUI
 /// dragging them into a custom order before saving. Works for both 1-day
 /// moments and 7-day themes — the same short prompts read fine either way.
 struct BuildTemplateView: View {
-    var onSave: (ChallengeTemplate) -> Void
+    /// The edited template, plus the bytes of a newly picked cover — the view
+    /// hands the picture over rather than filing it, so nothing here knows
+    /// where covers live on disk.
+    var onSave: (ChallengeTemplate, Data?) -> Void
     private let editingTemplate: ChallengeTemplate?
+    private let coverURL: URL?
 
     init(
         template: ChallengeTemplate? = nil,
-        onSave: @escaping (ChallengeTemplate) -> Void
+        coverURL: URL? = nil,
+        onSave: @escaping (ChallengeTemplate, Data?) -> Void
     ) {
         editingTemplate = template
+        self.coverURL = coverURL
         self.onSave = onSave
         _selected = State(initialValue: template?.momentKeys ?? [])
         _name = State(initialValue: template?.name.en ?? "")
@@ -27,6 +33,7 @@ struct BuildTemplateView: View {
     @State private var hasManuallyOrdered = false
     @State private var name = ""
     @State private var emoji = "🎬"
+    @State private var coverChoice: TemplateCoverChoice = .unchanged
     @FocusState private var nameFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -48,6 +55,21 @@ struct BuildTemplateView: View {
                         headerCard
                     }
                     .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                    Section {
+                        TemplateCoverField(
+                            matchedAssetName: matchedCoverAssetName,
+                            existingCoverURL: coverURL,
+                            choice: $coverChoice)
+                    } header: {
+                        Text(Strings.templateCoverLabel)
+                            .font(.caption.bold())
+                            .foregroundStyle(Color.oneDayBlue.opacity(0.62))
+                            .kerning(1.2)
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
@@ -226,6 +248,13 @@ struct BuildTemplateView: View {
         pool.firstIndex(of: prompt) ?? Int.max
     }
 
+    /// The cover this template would wear with nobody's picture on it — shown
+    /// live, so reordering the prompts shows what that does to the poster.
+    private var matchedCoverAssetName: String {
+        TemplateCoverMatcher.assetName(forMomentKeys: selected, name: name)
+            ?? TemplateCoverMatcher.fallbackAssetName
+    }
+
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmoji = emoji.trimmingCharacters(in: .whitespaces)
@@ -236,8 +265,13 @@ struct BuildTemplateView: View {
             momentKeys: selected.map {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines)
             },
-            isCustom: true)
-        onSave(template)
+            isCustom: true,
+            // Asking for the matched cover back drops the file name here; the
+            // store deletes the picture that name pointed at.
+            coverFileName: coverChoice.clearsUploadedCover
+                ? nil
+                : editingTemplate?.coverFileName)
+        onSave(template, coverChoice.pickedData)
         dismiss()
     }
 }

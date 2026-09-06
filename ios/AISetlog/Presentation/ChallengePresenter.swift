@@ -20,9 +20,13 @@ struct ChallengePresenter {
     }
 
     /// Every story has real artwork before its first recorded frame: its
-    /// built-in poster when known, otherwise the universal custom-story cover.
+    /// built-in poster when known, otherwise the closest poster its own
+    /// moments can earn, and only then the universal custom-story cover.
     var coverAssetName: String {
-        builtInTemplate?.coverAssetName ?? "TemplateCustomStory"
+        builtInTemplate?.coverAssetName
+            ?? TemplateCoverMatcher.assetName(
+                forMomentKeys: challenge.momentTitles ?? [], name: challenge.title)
+            ?? TemplateCoverMatcher.fallbackAssetName
     }
 
     var unitName: String { Strings.unitName(oneDay: challenge.isOneDay) }

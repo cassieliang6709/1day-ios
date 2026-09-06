@@ -73,7 +73,8 @@ struct StoryComposerView: View {
                         selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
                         onEdit: { editingTemplate = $0 },
-                        onDelete: deleteTemplate)
+                        onDelete: deleteTemplate,
+                        coverURL: { store.coverURL(for: $0) })
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)))
@@ -81,6 +82,7 @@ struct StoryComposerView: View {
                 case .setup:
                     SetupStep(
                         template: selected,
+                        templateCoverURL: selected.flatMap { store.coverURL(for: $0) },
                         title: $title,
                         titleEdited: $titleEdited,
                         withFriends: $withFriends,
@@ -103,18 +105,14 @@ struct StoryComposerView: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showGuided) {
-            GuidedMomentsView { written, name in
-                isCustomPromptStory = true
-                selection.useCustomPrompts()
-                moments = written
-                title = name
-                titleEdited = true
-                withAnimation(OneDay.Motion.soft) { step = .setup }
-            }
+            GuidedMomentsView(onDone: applyCustomDraft)
         }
         .sheet(item: $editingTemplate) { template in
-            BuildTemplateView(template: template) { updated in
-                store.updateCustomTemplate(updated)
+            BuildTemplateView(
+                template: template,
+                coverURL: store.coverURL(for: template)
+            ) { updated, coverImageData in
+                store.updateCustomTemplate(updated, coverImageData: coverImageData)
             }
         }
         .onAppear(perform: syncTitleToTemplate)
@@ -278,6 +276,38 @@ struct StoryComposerView: View {
 
     private func beginCustomPromptFlow() {
         showGuided = true
+    }
+
+    /// What the guided flow wrote, applied to this story — and, if the user
+    /// asked for it, kept as a template first.
+    ///
+    /// Saving takes the ordinary template path from there: the new script is
+    /// simply *selected*, exactly as if it had always been on the shelf. That
+    /// keeps one code path for "a story made from a template" instead of a
+    /// second, subtly different one for scripts written five seconds ago.
+    private func applyCustomDraft(_ draft: CustomStoryDraft) {
+        title = draft.name
+        titleEdited = true
+        moments = draft.moments
+
+        if draft.savesToLibrary {
+            let saved = store.addCustomTemplate(
+                ChallengeTemplate(
+                    name: LocalizedText(en: draft.name, zh: draft.name),
+                    momentKeys: draft.moments.map {
+                        MomentCatalog.key(forDisplay: $0) ?? $0
+                    },
+                    isCustom: true),
+                coverImageData: draft.coverImageData)
+            isCustomPromptStory = false
+            selection.select(
+                saved, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        } else {
+            isCustomPromptStory = true
+            selection.useCustomPrompts()
+        }
+
+        withAnimation(OneDay.Motion.soft) { step = .setup }
     }
 
     // MARK: - Derived state

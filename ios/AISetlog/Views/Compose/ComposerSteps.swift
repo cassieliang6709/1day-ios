@@ -20,6 +20,9 @@ struct MoodStep: View {
     let onBuildOwn: () -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
+    /// Where a template's own cover picture lives, asked of the store rather
+    /// than looked up here — this layer doesn't know about Documents.
+    var coverURL: (ChallengeTemplate) -> URL? = { _ in nil }
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -152,7 +155,7 @@ struct MoodStep: View {
                 .padding(.horizontal, 20)
 
             if let chosen = selectedPromptTemplate {
-                OpenTemplateCard(template: chosen) {
+                OpenTemplateCard(template: chosen, coverURL: coverURL(chosen)) {
                     MomentChips(moments: chosen.momentKeys?
                         .map { MomentCatalog.localize($0) } ?? [])
                 }
@@ -167,6 +170,7 @@ struct MoodStep: View {
                     PromptTemplateTile(
                         template: template,
                         isSelected: false,
+                        coverURL: coverURL(template),
                         onSelect: { select(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
@@ -243,14 +247,15 @@ private struct OpenTemplateCard<Detail: View>: View {
     let template: ChallengeTemplate
     /// Off for the time-only story, which has no prompts to count.
     var showsPromptCount = true
+    var coverURL: URL?
     @ViewBuilder var detail: Detail
 
     private var promptCount: Int { template.momentKeys?.count ?? 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Image(template.coverAssetName ?? "TemplateCustomStory")
-                .resizable()
+            TemplateCoverImage(
+                assetName: template.matchedCoverAssetName, fileURL: coverURL)
                 .scaledToFill()
                 .frame(maxWidth: .infinity)
                 .frame(height: 118)
@@ -332,6 +337,7 @@ private struct PromptTemplateTile: View {
 
     let template: ChallengeTemplate
     let isSelected: Bool
+    var coverURL: URL?
     let onSelect: () -> Void
     var subtitle: Subtitle = .prompts
     var onEdit: (() -> Void)?
@@ -350,8 +356,8 @@ private struct PromptTemplateTile: View {
     var body: some View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 0) {
-                Image(template.coverAssetName ?? "TemplateCustomStory")
-                    .resizable()
+                TemplateCoverImage(
+                    assetName: template.matchedCoverAssetName, fileURL: coverURL)
                     .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1.6, contentMode: .fit)
@@ -408,6 +414,8 @@ private struct PromptTemplateTile: View {
 /// long each clip runs and which way the frame sits.
 struct SetupStep: View {
     let template: ChallengeTemplate?
+    /// The template's own cover picture, if the user uploaded one.
+    var templateCoverURL: URL?
     @Binding var title: String
     @Binding var titleEdited: Bool
     @Binding var withFriends: Bool
@@ -489,8 +497,8 @@ struct SetupStep: View {
         GlassCard(padding: 14) {
             HStack(spacing: 13) {
                 if let template {
-                    Image(template.coverAssetName ?? "TemplateCustomStory")
-                        .resizable()
+                    TemplateCoverImage(
+                        assetName: template.matchedCoverAssetName, fileURL: templateCoverURL)
                         .scaledToFill()
                         .frame(width: 46, height: 46)
                         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
