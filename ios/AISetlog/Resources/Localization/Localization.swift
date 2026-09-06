@@ -195,6 +195,17 @@ enum Strings {
         lang == .chinese ? "在通知中显示好友名字" : "Show friend names in notifications"
     }
     static var sharedRooms: String { lang == .chinese ? "共享挑战" : "Shared challenges" }
+    /// Sits under the friend-activity switch as a summary of the room list one
+    /// level down, so you can tell at a glance whether anything is muted.
+    static var allRoomsOn: String { lang == .chinese ? "都开着" : "All on" }
+    static func roomsMuted(_ count: Int) -> String {
+        lang == .chinese ? "静音了 \(count) 个" : "\(count) muted"
+    }
+    static var sharedRoomsFooter: String {
+        lang == .chinese
+            ? "关掉某个房间，就不再收到那边的动态，其他房间照常。"
+            : "Turn a room off and it stops writing to you. The others carry on."
+    }
     static var notificationPermissionDenied: String {
         lang == .chinese
             ? "系统通知已关闭。请到 iPhone 设置中允许 1Day 通知。"
@@ -708,6 +719,9 @@ enum Strings {
     /// The Settings row. Names the effect rather than the setting, because in a
     /// list of settings "Look" on its own says nothing.
     static var lookSetting: String { lang == .chinese ? "回看的样子" : "How clips look" }
+    /// What the settings row says once a dial has been moved and the look is no
+    /// longer any of the presets. "原样" there would be a lie.
+    static var lookCustom: String { lang == .chinese ? "调过的" : "Adjusted" }
 
     // MARK: Final reel
 
@@ -1150,6 +1164,12 @@ enum Strings {
         lang == .chinese
             ? "只影响 1Day，不改变系统设置。"
             : "Applies to 1Day only — your system setting is untouched."
+    }
+    /// One heading over the three "what the app looks and reads like" rows.
+    /// Each is a choice you make once, so they get one line apiece and the
+    /// options live one screen down.
+    static var displayAndLanguage: String {
+        lang == .chinese ? "显示与语言" : "Display & Language"
     }
     static var inviteCodeLabel: String { lang == .chinese ? "邀请码" : "Invite code" }
     static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }

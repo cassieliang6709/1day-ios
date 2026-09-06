@@ -1,7 +1,9 @@
 import SwiftUI
 import UserNotifications
 
-/// App-level language and notification preferences.
+/// App-level preferences: notifications, display and language, the account,
+/// and the small print. Anything with more than a couple of options is a row
+/// here and a page behind it — see `body`.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
@@ -16,8 +18,9 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    /// Read, not written, here: the row shows which look is on and the page
+    /// behind it does the setting.
     @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
-    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -38,94 +41,19 @@ struct SettingsView: View {
         }
     }
 
+    /// Four titled groups, in the order you'd go looking for them: the switches
+    /// you actually flip, the things you set once, who you are, and the legal
+    /// small print.
+    ///
+    /// It used to be nine sections, three of them untitled, with every option
+    /// of three pickers spelled out on the front page — the medium detent
+    /// couldn't show past "Appearance". Notifications alone were spread over
+    /// four sections that had nothing between them but a gap.
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker(Strings.language, selection: $appLanguage) {
-                        ForEach(AppLanguage.allCases) { lang in
-                            Text(lang.displayName).tag(lang)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                } header: {
-                    Text(Strings.language)
-                } footer: {
-                    Text(Strings.languageFootnote)
-                }
-
-                Section {
-                    Picker(Strings.appearance, selection: $appAppearance) {
-                        ForEach(AppAppearance.allCases) { appearance in
-                            Text(appearance.displayName).tag(appearance)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                } header: {
-                    Text(Strings.appearance)
-                } footer: {
-                    Text(Strings.appearanceFootnote)
-                }
-
-                lookSection
-
-                Section {
-                    Toggle(
-                        Strings.eveningReminder,
-                        isOn: Binding(
-                            get: { eveningEnabled },
-                            set: setEveningEnabled))
-                    if eveningEnabled {
-                        DatePicker(
-                            Strings.reminderTime,
-                            selection: reminderTime,
-                            displayedComponents: .hourAndMinute)
-                    }
-                } header: {
-                    Text(Strings.notifications)
-                } footer: {
-                    Text(Strings.eveningReminderFooter)
-                }
-
-                Section {
-                    Toggle(
-                        Strings.friendActivity,
-                        isOn: Binding(
-                            get: { sharedEnabled },
-                            set: setSharedEnabled))
-                    if sharedEnabled {
-                        Toggle(Strings.showFriendNames, isOn: $showFriendNames)
-                    }
-                } footer: {
-                    Text(Strings.friendActivityFooter)
-                }
-
-                if sharedEnabled && !sharedChallenges.isEmpty {
-                    Section(Strings.sharedRooms) {
-                        ForEach(sharedChallenges) { challenge in
-                            Toggle(
-                                ChallengePresenter(challenge: challenge).displayTitle,
-                                isOn: roomEnabledBinding(for: challenge))
-                        }
-                    }
-                }
-
-                if authorizationStatus == .denied
-                    && (eveningEnabled || sharedEnabled) {
-                    Section {
-                        Text(Strings.notificationPermissionDenied)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Button(Strings.openSettings) {
-                            guard let url = URL(
-                                string: UIApplication.openSettingsURLString)
-                            else { return }
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                }
+                notificationSection
+                displaySection
                 accountSection
                 aboutSection
             }
@@ -150,26 +78,102 @@ struct SettingsView: View {
         .presentationDetents([.medium, .large])
     }
 
-    // MARK: - How clips look
+    // MARK: - Notifications
 
-    /// The same two controls the panel over a clip has, for when you want them
-    /// without opening a clip. The dials are deliberately not here — a dial you
-    /// can't see the effect of is a dial you're guessing at, so fine-tuning
-    /// stays on the screen with the picture on it.
-    private var lookSection: some View {
+    /// Everything that can make this app interrupt you, under one heading. The
+    /// two switches stay here because they're what people come to change; the
+    /// room-by-room list is one tap down because it's as long as the number of
+    /// rooms you're in, and the "iPhone says no" notice only appears when it's
+    /// true of something you just asked for.
+    @ViewBuilder
+    private var notificationSection: some View {
         Section {
-            Picker(Strings.lookSetting, selection: $look) {
-                ForEach(GentleLook.presets, id: \.key) { preset in
-                    Text(GentleLook.presetName(preset.key)).tag(preset.look)
+            Toggle(
+                Strings.eveningReminder,
+                isOn: Binding(get: { eveningEnabled }, set: setEveningEnabled))
+            if eveningEnabled {
+                DatePicker(
+                    Strings.reminderTime,
+                    selection: reminderTime,
+                    displayedComponents: .hourAndMinute)
+            }
+
+            Toggle(
+                Strings.friendActivity,
+                isOn: Binding(get: { sharedEnabled }, set: setSharedEnabled))
+            if sharedEnabled {
+                Toggle(Strings.showFriendNames, isOn: $showFriendNames)
+
+                if !sharedChallenges.isEmpty {
+                    NavigationLink {
+                        RoomNotificationsView(
+                            rooms: sharedChallenges, mutedRooms: $mutedRooms)
+                    } label: {
+                        LabeledContent(
+                            Strings.sharedRooms,
+                            value: RoomNotificationsView.summary(
+                                rooms: sharedChallenges, muted: mutedRooms))
+                    }
                 }
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
-            Toggle(Strings.lookRemember, isOn: $lookIsSticky)
+
+            if authorizationStatus == .denied && (eveningEnabled || sharedEnabled) {
+                Text(Strings.notificationPermissionDenied)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Button(Strings.openSettings) {
+                    guard let url = URL(string: UIApplication.openSettingsURLString)
+                    else { return }
+                    UIApplication.shared.open(url)
+                }
+            }
         } header: {
-            Text(Strings.lookSetting)
+            Text(Strings.notifications)
         } footer: {
-            Text("\(Strings.lookFootnote)\n\(Strings.lookRememberFootnote)")
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Strings.eveningReminderFooter)
+                Text(Strings.friendActivityFooter)
+            }
+        }
+    }
+
+    // MARK: - Display & language
+
+    /// Three decisions you make once and forget. One line each, showing what
+    /// it's currently set to; the options and the sentence explaining them are
+    /// on the screen behind the row.
+    ///
+    /// The look dials are deliberately not here, on this page or the one behind
+    /// it — a dial you can't see the effect of is a dial you're guessing at, so
+    /// fine-tuning stays on the screen with the picture on it.
+    private var displaySection: some View {
+        Section {
+            NavigationLink {
+                LookSettingsView()
+            } label: {
+                LabeledContent(
+                    Strings.lookSetting, value: LookSettingsView.summary(for: look))
+            }
+
+            NavigationLink {
+                SettingsOptionPage(
+                    title: Strings.appearance,
+                    footnote: Strings.appearanceFootnote,
+                    selection: $appAppearance)
+            } label: {
+                LabeledContent(Strings.appearance, value: appAppearance.displayName)
+            }
+
+            NavigationLink {
+                SettingsOptionPage(
+                    title: Strings.language,
+                    footnote: Strings.languageFootnote,
+                    selection: $appLanguage)
+            } label: {
+                LabeledContent(Strings.language, value: appLanguage.displayName)
+            }
+        } header: {
+            Text(Strings.displayAndLanguage)
         }
     }
 
@@ -327,19 +331,6 @@ struct SettingsView: View {
             if granted {
                 NotificationPermissionService.registerForRemoteNotificationsIfNeeded()
             }
-            SharedActivityNotificationService.reconcileSubscriptions(
-                for: store.challenges)
-        }
-    }
-
-    private func roomEnabledBinding(for challenge: Challenge) -> Binding<Bool> {
-        Binding {
-            guard let code = challenge.roomCode else { return false }
-            return !mutedRooms.contains(code)
-        } set: { enabled in
-            guard let code = challenge.roomCode else { return }
-            NotificationPreferences.setRoom(code, muted: !enabled)
-            mutedRooms = NotificationPreferences.mutedRoomCodes
             SharedActivityNotificationService.reconcileSubscriptions(
                 for: store.challenges)
         }
