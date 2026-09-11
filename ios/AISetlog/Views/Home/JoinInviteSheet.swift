@@ -73,27 +73,35 @@ struct JoinInviteSheet: View {
                         .multilineTextAlignment(.center)
                 }
 
-                ZStack {
-                    HStack(spacing: 7) {
-                        ForEach(0..<6, id: \.self) { index in
-                            CodeSlot(character: character(at: index), isActive: normalizedCode.count == index)
+                VStack(spacing: 10) {
+                    ZStack {
+                        HStack(spacing: 7) {
+                            ForEach(0..<6, id: \.self) { index in
+                                CodeSlot(character: character(at: index), isActive: normalizedCode.count == index)
+                            }
                         }
-                    }
 
-                    TextField("", text: $code)
-                        .keyboardType(.asciiCapable)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .focused($codeFocused)
-                        .opacity(0.01)
-                        .frame(height: 52)
-                        .onChange(of: code) { _, newValue in
-                            let cleaned = InviteCode.normalize(newValue)
-                            if cleaned != newValue { code = cleaned }
-                        }
+                        TextField("", text: $code)
+                            .keyboardType(.asciiCapable)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .focused($codeFocused)
+                            .opacity(0.01)
+                            .frame(height: 52)
+                            .onChange(of: code) { _, newValue in
+                                let cleaned = InviteCode.normalize(newValue)
+                                if cleaned != newValue { code = cleaned }
+                            }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { codeFocused = true }
+
+                    Label(Strings.inviteCodeFormatHint, systemImage: "doc.on.clipboard")
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { codeFocused = true }
 
                 Button(action: onJoin) {
                     Text(Strings.joinRoomButton)
