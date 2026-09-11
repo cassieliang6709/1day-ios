@@ -19,6 +19,7 @@ struct PlansHomeView: View {
     @State private var showComposer = false
     @State private var showJoin = false
     @State private var showSettings = false
+    @State private var showRoomDemo = false
     @State private var joinCode = ""
     @State private var joining = false
     @State private var errorText: String?
@@ -57,6 +58,11 @@ struct PlansHomeView: View {
             }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showRoomDemo) {
+            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+            LocalRoomDemoView(chinese: appLanguage.resolved == .chinese)
+            #endif
+        }
         .sheet(isPresented: $showJoin) {
             JoinInviteSheet(
                 code: $joinCode,
@@ -103,6 +109,18 @@ struct PlansHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
+
+                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+                Button {
+                    showRoomDemo = true
+                } label: {
+                    Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
+                          systemImage: "person.3.sequence")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("home-room-demo")
+                #endif
 
                 switch stories.hero {
                 case .today(let challenge):
