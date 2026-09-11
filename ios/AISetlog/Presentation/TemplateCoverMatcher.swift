@@ -102,7 +102,8 @@ extension ChallengeTemplate {
     /// cover of their own. Built-ins keep their painted poster; everything
     /// else gets one matched to its moments.
     var matchedCoverAssetName: String {
-        coverAssetName
+        presetCoverAssetName
+            ?? coverAssetName
             ?? TemplateCoverMatcher.assetName(forMomentKeys: momentKeys ?? [], name: name.en)
             ?? TemplateCoverMatcher.fallbackAssetName
     }

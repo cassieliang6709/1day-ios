@@ -62,6 +62,7 @@ struct BuildTemplateView: View {
                         TemplateCoverField(
                             matchedAssetName: matchedCoverAssetName,
                             existingCoverURL: coverURL,
+                            existingPresetAssetName: editingTemplate?.presetCoverAssetName,
                             choice: $coverChoice)
                     } header: {
                         Text(Strings.templateCoverLabel)
@@ -266,11 +267,10 @@ struct BuildTemplateView: View {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines)
             },
             isCustom: true,
-            // Asking for the matched cover back drops the file name here; the
-            // store deletes the picture that name pointed at.
-            coverFileName: coverChoice.clearsUploadedCover
-                ? nil
-                : editingTemplate?.coverFileName)
+            coverFileName: coverChoice.resolvedCoverFileName(
+                existing: editingTemplate?.coverFileName),
+            presetCoverAssetName: coverChoice.resolvedPreset(
+                existing: editingTemplate?.presetCoverAssetName))
         onSave(template, coverChoice.pickedData)
         dismiss()
     }
