@@ -53,6 +53,7 @@ enum CloudKitService {
         case notSignedIntoiCloud
         case roomNotFound
         case fieldNotQueryable
+        case networkUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -62,15 +63,18 @@ enum CloudKitService {
                 return Strings.errorNoRoom
             case .fieldNotQueryable:
                 return Strings.errorIndexDeploying
+            case .networkUnavailable:
+                return Strings.errorNetwork
             }
         }
     }
-
-    // MARK: - Account
-
     static func ensureAccountAvailable() async throws {
         let status = try await CKContainer(identifier: containerID).accountStatus()
-        guard status == .available else { throw CKServiceError.notSignedIntoiCloud }
+        guard status == .available else {
+            // Diagnostic (temporary): which state the join/create path died on.
+            print("[room] iCloud account not available: status=\(status.rawValue) container=\(containerID)")
+            throw CKServiceError.notSignedIntoiCloud
+        }
     }
 
     // MARK: - Rooms
@@ -111,12 +115,19 @@ enum CloudKitService {
             record["clipLength"] = clipLength.rawValue as CKRecordValue
             record["orientation"] = orientation.rawValue as CKRecordValue
             if let templateName { record["templateName"] = templateName as CKRecordValue }
-            if let momentTitles { record["momentTitles"] = momentTitles.joined(separator: "\n") as CKRecordValue }
+            // Diagnostic (temporary): the code under which the room is saved,
+            // so a "no room with that code" report can be matched against it.
+            print("[room] creating room code=\(code) container=\(containerID)")
             do {
                 let saved = try await db.save(record)
+                print("[room] created room code=\(code)")
                 return room(from: saved)
             } catch let error as CKError where error.code == .serverRecordChanged {
+                print("[room] code \(code) taken, retrying")
                 continue // code taken, try another
+            } catch {
+                print("[room] create room code=\(code) failed: \(error)")
+                throw error
             }
         }
         throw CKError(.limitExceeded)
@@ -124,11 +135,28 @@ enum CloudKitService {
 
     static func fetchRoom(code: String) async throws -> RemoteRoom {
         try await ensureAccountAvailable()
+        // Diagnostic (temporary): the exact code being fetched, so a
+        // cross-device miss can be compared with the creator's save log.
+        print("[room] fetching room code=\(code) container=\(containerID)")
         do {
             let record = try await db.record(for: .init(recordName: code))
+            print("[room] fetched room code=\(code)")
             return room(from: record)
-        } catch let error as CKError where error.code == .unknownItem {
-            throw CKServiceError.roomNotFound
+        } catch let error as CKError {
+            // Only `.unknownItem` truly means "no room with that code" — a
+            // network drop or a signed-out iCloud account failing the fetch
+            // must reach the user as what it is, not as a wrong-code hint.
+            print("[room] fetch room code=\(code) failed: \(error)")
+            switch error.code {
+            case .unknownItem:
+                throw CKServiceError.roomNotFound
+            case .notAuthenticated:
+                throw CKServiceError.notSignedIntoiCloud
+            case .networkFailure, .networkUnavailable, .serviceUnavailable:
+                throw CKServiceError.networkUnavailable
+            default:
+                throw error
+            }
         }
     }
 
@@ -333,6 +361,44 @@ enum CloudKitService {
     /// Rooms the person created are kept but stripped of their name: the room
     /// holds other people's clips too, and destroying a friend's story is not
     /// what "delete my account" should mean.
+    /// Deletes a batch and reports back only what CloudKit individually
+    /// confirmed gone.
+    ///
+    /// The difference from `deleteMyRoomData` is the whole point of it: that
+    /// one wraps the batch in `try?` and carries on, so a network drop halfway
+    /// through looks exactly like success. An account deletion cannot be
+    /// allowed to look like that, so this returns the confirmed IDs and lets
+    /// the caller's journal decide what still needs another go.
+    ///
+    /// A record that is already absent counts as confirmed. It is the state the
+    /// caller asked for, and a retry after a partial batch will hit this case
+    /// for everything the first attempt did manage.
+    static func deleteRecordsConfirmingEachOne(_ names: Set<String>) async throws -> Set<String> {
+        guard !names.isEmpty else { return [] }
+        try await ensureAccountAvailable()
+
+        var confirmed: Set<String> = []
+        let ids = names.sorted().map { CKRecord.ID(recordName: $0) }
+        // Chunked: CloudKit rejects oversized batches, and one bad ID shouldn't
+        // cost us the confirmations for the rest.
+        for chunk in stride(from: 0, to: ids.count, by: 200).map({
+            Array(ids[$0..<min($0 + 200, ids.count)])
+        }) {
+            let (_, deleted) = try await db.modifyRecords(saving: [], deleting: chunk)
+            for (id, result) in deleted {
+                switch result {
+                case .success:
+                    confirmed.insert(id.recordName)
+                case .failure(let error as CKError) where error.code == .unknownItem:
+                    confirmed.insert(id.recordName)
+                case .failure:
+                    continue
+                }
+            }
+        }
+        return confirmed
+    }
+
     static func deleteMyRoomData(
         authorID: String,
         clips: [(code: String, day: Int)],

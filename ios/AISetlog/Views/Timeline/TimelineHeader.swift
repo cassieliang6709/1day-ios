@@ -12,6 +12,7 @@ struct TimelineHeader: View {
     var showsViewModeToggle = true
     var isSyncing = false
 
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var didCopyCode = false
 
     private var schedule: StorySchedule { StorySchedule(challenge) }
@@ -25,7 +26,7 @@ struct TimelineHeader: View {
                 RoomRoster(cast: cast)
             }
 
-            if challenge.isShared, let code = challenge.roomCode {
+            if previewMedia == nil, challenge.isShared, let code = challenge.roomCode {
                 inviteCode(code)
             }
 

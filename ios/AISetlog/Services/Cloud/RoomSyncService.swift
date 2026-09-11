@@ -23,9 +23,11 @@ final class RoomSyncService {
     private(set) var lastError: [String: String] = [:]
 
     private let fileStore: ClipFileStore
+    private let transport: RoomSyncTransport
 
-    init(fileStore: ClipFileStore = DiskClipFileStore()) {
+    init(fileStore: ClipFileStore = DiskClipFileStore(), transport: RoomSyncTransport = .live) {
         self.fileStore = fileStore
+        self.transport = transport
     }
 
     func remoteCacheDir(for code: String) -> URL {
@@ -47,8 +49,8 @@ final class RoomSyncService {
         syncing.insert(code)
         defer { syncing.remove(code) }
         do {
-            let clips = try await CloudKitService.fetchClips(
-                code: code, into: fileStore.remoteCacheDir(roomCode: code))
+            let clips = try await transport.fetchClips(
+                code, fileStore.remoteCacheDir(roomCode: code))
             remoteClips[code] = clips
             lastError[code] = nil
             return clips
@@ -62,7 +64,7 @@ final class RoomSyncService {
     /// Fetch remote reactions/comments. Degrades to nil (caller keeps local
     /// state) if the CloudKit index isn't deployed — never fails a clip sync.
     func fetchInteractions(code: String) async -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])? {
-        try? await CloudKitService.fetchInteractions(code: code)
+        try? await transport.fetchInteractions(code)
     }
 
     /// Push one of my clips to the room. The caller refreshes the complete room
@@ -71,10 +73,8 @@ final class RoomSyncService {
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
                     fileURL: URL, overlayText: String?) async -> Bool {
         do {
-            try await CloudKitService.uploadClip(
-                code: code, day: day, authorID: authorID,
-                authorName: authorName, fileURL: fileURL,
-                overlayText: overlayText)
+            try await transport.uploadClip(
+                code, day, authorID, authorName, fileURL, overlayText)
             lastError[code] = nil
             return true
         } catch {
@@ -86,20 +86,18 @@ final class RoomSyncService {
 
     func setReaction(code: String, day: Int, authorID: String, authorName: String,
                      targetAuthorID: String, emoji: String, on: Bool) async {
-        try? await CloudKitService.setReaction(
-            code: code, day: day, authorID: authorID, authorName: authorName,
-            targetAuthorID: targetAuthorID, emoji: emoji, on: on)
+        try? await transport.setReaction(
+            code, day, authorID, authorName, targetAuthorID, emoji, on)
     }
 
     func postComment(code: String, day: Int, id: String, text: String,
                      authorID: String, authorName: String, targetAuthorID: String) async {
-        try? await CloudKitService.postComment(
-            code: code, day: day, id: id, text: text,
-            authorID: authorID, authorName: authorName, targetAuthorID: targetAuthorID)
+        try? await transport.postComment(
+            code, day, id, text, authorID, authorName, targetAuthorID)
     }
 
     func deleteComment(id: String) async {
-        try? await CloudKitService.deleteComment(id: id)
+        try? await transport.deleteComment(id)
     }
 
 }

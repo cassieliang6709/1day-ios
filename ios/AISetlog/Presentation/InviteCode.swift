@@ -70,16 +70,20 @@ enum InviteCode {
         let upper = text.uppercased()
 
         if let marker = upper.range(of: "CODE=") {
-            let candidate = String(upper[marker.upperBound...].prefix(length))
+            let candidate = String(upper[marker.upperBound...].prefix {
+                $0.isASCII && ($0.isLetter || $0.isNumber)
+            })
             if isValid(candidate) { return candidate }
         }
 
         var run = ""
         for character in upper + " " {
-            if allowed.contains(character) {
+            // Invalid ASCII letters/digits belong to the same token: never
+            // salvage six valid characters from a longer malformed code.
+            if character.isASCII && (character.isLetter || character.isNumber) {
                 run.append(character)
             } else {
-                if run.count == length { return run }
+                if isValid(run) { return run }
                 run = ""
             }
         }

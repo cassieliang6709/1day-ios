@@ -11,6 +11,8 @@ struct CustomStoryDraft {
     /// Bytes of a cover picked from the photo library. Nil means the app
     /// matches one from the prompts.
     var coverImageData: Data?
+    /// A bundled scene chosen from the preset cover library.
+    var presetCoverAssetName: String?
 }
 
 /// A small blank canvas for a user's own prompts. It starts with two rows so
@@ -65,8 +67,8 @@ struct GuidedMomentsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         heading
-                        nameCard
                         intentCard
+                        nameCard
                         promptEditor
                         libraryButton
                         keepItCard
@@ -355,16 +357,16 @@ struct GuidedMomentsView: View {
         Task {
             defer { isSuggesting = false }
             do {
-                let prompts = try await suggestions.suggest(
+                let suggestion = try await suggestions.suggestStory(
                     intent: sentence,
                     count: Self.suggestionCount,
                     language: appLanguage)
                 metrics.recordGenerated()
-                offeredPrompts = prompts
-                answers = SuggestedPromptFill.apply(prompts, to: answers)
-                // The sentence already named the day. Only when the field is
-                // still blank — a name someone typed is never overwritten.
-                if needsName, let seeded = IntentStoryName.derive(from: sentence) {
+                offeredPrompts = suggestion.prompts
+                answers = SuggestedPromptFill.apply(suggestion.prompts, to: answers)
+                // Read the current fields after the await: edits made while
+                // generating win as well. Old servers still seed from intent.
+                if needsName, let seeded = suggestion.title ?? IntentStoryName.derive(from: sentence) {
                     storyName = seeded
                 }
             } catch PromptSuggestionError.rateLimited {
@@ -385,7 +387,8 @@ struct GuidedMomentsView: View {
             moments: moments,
             name: storyName.trimmingCharacters(in: .whitespacesAndNewlines),
             savesToLibrary: savesToLibrary,
-            coverImageData: coverChoice.pickedData))
+            coverImageData: coverChoice.pickedData,
+            presetCoverAssetName: coverChoice.resolvedPreset(existing: nil)))
         dismiss()
     }
 }

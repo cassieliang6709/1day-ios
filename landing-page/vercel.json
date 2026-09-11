@@ -1,28 +1,3 @@
 {
-  "rewrites": [
-    {
-      "source": "/privacy",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/privacy/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/en",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/en/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/en/privacy",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/en/privacy/",
-      "destination": "/index.html"
-    }
-  ]
+  "cleanUrls": true
 }

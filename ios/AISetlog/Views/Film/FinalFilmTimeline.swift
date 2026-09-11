@@ -16,6 +16,7 @@ struct FinalFilmTimeline: View {
     let onAdjust: () -> Void
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
 
     private var schedule: StorySchedule { StorySchedule(challenge) }
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
@@ -68,6 +69,7 @@ struct FinalFilmTimeline: View {
                 accent: .oneDayBlue,
                 isBusy: isSaving,
                 action: onSave)
+                .disabled(previewMedia != nil)
 
             ShareLink(item: filmURL) {
                 FilmActionLabel(
@@ -76,6 +78,7 @@ struct FinalFilmTimeline: View {
                     accent: .oneDayLavender)
             }
             .buttonStyle(.plain)
+            .disabled(previewMedia != nil)
 
             FilmAction(
                 icon: "slider.horizontal.3",

@@ -13,7 +13,7 @@ struct LoopingClipPlayer: View {
     var refreshToken: Date? = nil
     /// Applied as the frames come off the file. Nothing is written anywhere, so
     /// turning it off gives back exactly what the camera saw.
-    var look: GentleLook = .none
+    var look: PersonalEffectParameters = .none
 
     var body: some View {
         LoopingPlayerLayerView(url: url, look: look)
@@ -23,7 +23,7 @@ struct LoopingClipPlayer: View {
 
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
-    var look: GentleLook = .none
+    var look: PersonalEffectParameters = .none
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -35,7 +35,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         /// either one means building a new player.
         struct Request: Equatable {
             let url: URL
-            let look: GentleLook
+            let look: PersonalEffectParameters
         }
 
         var looper: AVPlayerLooper?
@@ -78,7 +78,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         // unfiltered item now and every loop after this one is unfiltered too.
         // So the layer stays black for the moment it takes to read the tracks.
         coordinator.building = Task { @MainActor in
-            let composition = await GentleLookFilter.playbackComposition(
+            let composition = await PersonalEffectFilter.playbackComposition(
                 request.look, for: AVURLAsset(url: request.url))
             guard !Task.isCancelled, coordinator.loaded == request else { return }
             play(request, composition: composition, in: view, coordinator: coordinator)

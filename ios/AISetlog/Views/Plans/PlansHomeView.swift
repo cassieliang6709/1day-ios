@@ -19,10 +19,13 @@ struct PlansHomeView: View {
     @State private var showComposer = false
     @State private var showJoin = false
     @State private var showSettings = false
+    @State private var showRoomDemo = false
     @State private var joinCode = ""
     @State private var joining = false
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
+    /// The story a long press is proposing to delete, held until it's confirmed.
+    @State private var pendingDeletion: Challenge?
     @State private var notificationRecordRoute: NotificationRecordRoute?
     /// When set, present sign-in and run this once the user finishes.
     @State private var afterSignIn: (() -> Void)?
@@ -57,6 +60,40 @@ struct PlansHomeView: View {
             }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .confirmationDialog(
+            pendingDeletion.map {
+                $0.isShared
+                    ? Strings.leaveRoomTitle($0.title)
+                    : Strings.deleteStoryTitle($0.title)
+            } ?? "",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let challenge = pendingDeletion {
+                Button(
+                    challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
+                    role: .destructive
+                ) {
+                    store.delete(challenge.id)
+                    pendingDeletion = nil
+                }
+            }
+            Button(Strings.cancel, role: .cancel) { pendingDeletion = nil }
+        } message: {
+            if let challenge = pendingDeletion {
+                Text(
+                    challenge.isShared
+                        ? Strings.leaveRoomWarning
+                        : Strings.deleteStoryWarning(challenge.recordedCount))
+            }
+        }
+        .sheet(isPresented: $showRoomDemo) {
+            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+            LocalRoomDemoView(chinese: appLanguage.resolved == .chinese)
+            #endif
+        }
         .sheet(isPresented: $showJoin) {
             JoinInviteSheet(
                 code: $joinCode,
@@ -103,6 +140,18 @@ struct PlansHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
+
+                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+                Button {
+                    showRoomDemo = true
+                } label: {
+                    Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
+                          systemImage: "person.3.sequence")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("home-room-demo")
+                #endif
 
                 switch stories.hero {
                 case .today(let challenge):
@@ -334,7 +383,12 @@ struct PlansHomeView: View {
                 challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
                 role: .destructive
             ) {
-                store.delete(challenge.id)
+                // Ask, don't do. A long press is the easiest gesture in the app
+                // to trigger by accident, and this menu item used to delete
+                // every clip in a story outright — the app's most destructive
+                // frequent action was the one without a confirmation, while
+                // "delete account" had a full dialog.
+                pendingDeletion = challenge
             }
         }
         .padding(.horizontal, 20)

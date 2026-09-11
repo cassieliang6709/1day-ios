@@ -151,7 +151,17 @@ struct StoryComposerView: View {
 
             Spacer()
 
-            StepDots(count: 2, index: step.rawValue)
+            VStack(spacing: 6) {
+                Text(appLanguage.resolved == .chinese
+                     ? (step == .mood ? "1/2 选拍法" : "2/2 设置故事")
+                     : (step == .mood ? "1/2 Choose a style" : "2/2 Set up your story"))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("composer-step")
+                StepDots(count: 2, index: step.rawValue)
+                    .accessibilityHidden(true)
+            }
 
             Spacer()
 
@@ -175,6 +185,15 @@ struct StoryComposerView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
+            }
+
+            if step == .setup && title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(Strings.storyNameNeeded)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("composer-name-needed")
             }
 
             Button(action: advance) {
@@ -296,7 +315,8 @@ struct StoryComposerView: View {
                     momentKeys: draft.moments.map {
                         MomentCatalog.key(forDisplay: $0) ?? $0
                     },
-                    isCustom: true),
+                    isCustom: true,
+                    presetCoverAssetName: draft.presetCoverAssetName),
                 coverImageData: draft.coverImageData)
             isCustomPromptStory = false
             selection.select(

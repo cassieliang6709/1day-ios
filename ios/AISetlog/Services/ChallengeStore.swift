@@ -9,11 +9,11 @@ final class ChallengeStore {
     var challenges: [Challenge] = [] {
         didSet {
             repository.saveChallenges(challenges)
-            ReminderService.reconcile(for: challenges)
+            effects.reconcileReminders(challenges)
             let oldRooms = Set(oldValue.compactMap(\.roomCode))
             let newRooms = Set(challenges.compactMap(\.roomCode))
             if oldRooms != newRooms {
-                SharedActivityNotificationService.reconcileSubscriptions(for: challenges)
+                effects.reconcileSubscriptions(challenges)
             }
         }
     }
@@ -31,11 +31,14 @@ final class ChallengeStore {
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
     private let coverStore: TemplateCoverStore
+    let effects: ChallengeStoreEffects
 
     init(repository: ChallengeRepository? = nil,
          fileStore: ClipFileStore = DiskClipFileStore(),
          coverStore: TemplateCoverStore = DiskTemplateCoverStore(),
-         roomSync: RoomSyncService? = nil) {
+         roomSync: RoomSyncService? = nil,
+         effects: ChallengeStoreEffects = .live) {
+        self.effects = effects
         self.fileStore = fileStore
         self.coverStore = coverStore
         self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
@@ -162,6 +165,9 @@ final class ChallengeStore {
         var errorDescription: String? { Strings.errorSignInFirst }
     }
 
+    /// A preview cannot manage real rooms or erase a real account.
+    enum IsolationError: Error { case cloudRoomManagementDisabled }
+
     /// Create a CloudKit-backed room and mirror it locally.
     @MainActor
     @discardableResult
@@ -173,6 +179,7 @@ final class ChallengeStore {
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> Challenge {
+        guard effects.allowsCloudRoomManagement else { throw IsolationError.cloudRoomManagementDisabled }
         guard let me = account?.account else { throw RoomError.notSignedIn }
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
@@ -194,6 +201,7 @@ final class ChallengeStore {
     @MainActor
     @discardableResult
     func joinRoom(code: String) async throws -> Challenge {
+        guard effects.allowsCloudRoomManagement else { throw IsolationError.cloudRoomManagementDisabled }
         guard account?.account != nil else { throw RoomError.notSignedIn }
         let normalized = InviteCode.normalize(code)
         // Already joined? Jump to it.
@@ -325,6 +333,8 @@ final class ChallengeStore {
     /// has to let you delete one. Signing out is not the same thing.
     @MainActor
     func deleteAccountAndAllData() async {
+        // Preview teardown is owned by its runtime, never by account deletion.
+        guard effects.allowsCloudRoomManagement else { return }
         if let me = account?.account {
             // Everything this person authored, addressed by reconstructable
             // record IDs rather than a query. See `deleteMyRoomData`.
@@ -363,9 +373,22 @@ final class ChallengeStore {
                 roomCodes: roomCodes)
         }
 
-        // Local wipe happens whether or not the cloud step succeeded — the
-        // person asked to be gone from this device, and a network failure
-        // must not leave them still signed in with their stories intact.
+        await wipeLocalAccountData()
+    }
+
+    /// The device half of account deletion: every stored clip, story, cover and
+    /// preference, then the sign-out.
+    ///
+    /// Separated from the cloud half so `AccountDeletionService` can hold it
+    /// back until the remote records are confirmed gone. Running it first, as
+    /// the older path did, destroys the only copy of the inventory a retry
+    /// would need — and leaves someone signed out, with their clips still on
+    /// CloudKit, told they were deleted.
+    ///
+    /// Idempotent: the coordinator can replay this step after a crash between
+    /// the wipe and the journal write.
+    @MainActor
+    func wipeLocalAccountData() async {
         for challenge in challenges {
             fileStore.deleteClips(challengeID: challenge.id)
             if let code = challenge.roomCode { roomSync.clearRoom(code) }
@@ -376,7 +399,7 @@ final class ChallengeStore {
         challenges = []
         customTemplates = []
         account?.signOut()
-        NotificationPreferences.resetAll()
+        effects.resetNotificationPreferences()
     }
 
     func delete(_ id: UUID) {

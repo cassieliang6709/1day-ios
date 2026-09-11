@@ -10,6 +10,9 @@ struct SettingsView: View {
     @Environment(AccountStore.self) private var account
 
     @State private var showDeleteConfirmation = false
+    /// Raised when the deletion stopped part-way. Nothing on the device has
+    /// been touched at that point, so there is genuinely something to retry.
+    @State private var deleteFailed = false
     @State private var isDeleting = false
     @State private var showSignIn = false
     /// Held locally so a half-typed name never reaches the rooms.
@@ -20,7 +23,7 @@ struct SettingsView: View {
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
     /// Read, not written, here: the row shows which look is on and the page
     /// behind it does the setting.
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -242,14 +245,33 @@ struct SettingsView: View {
             Button(Strings.deleteAccountConfirm, role: .destructive) {
                 isDeleting = true
                 Task {
-                    await store.deleteAccountAndAllData()
+                    // Through the journalled service, so a network failure
+                    // stops and says so instead of wiping the device and
+                    // reporting success it can't vouch for.
+                    let service = AccountDeletionService(store: store)
+                    let gone = await service.run()
                     isDeleting = false
-                    dismiss()
+                    if gone {
+                        dismiss()
+                    } else {
+                        // Nothing local has been touched, so there is something
+                        // to come back to. Saying "try again" is only honest
+                        // because of that ordering.
+                        deleteFailed = true
+                    }
                 }
             }
             Button(Strings.cancel, role: .cancel) {}
         } message: {
             Text(Strings.deleteAccountWarning)
+        }
+        .alert(Strings.deleteAccountFailedTitle, isPresented: $deleteFailed) {
+            Button(Strings.deleteAccountConfirm, role: .destructive) {
+                showDeleteConfirmation = true
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        } message: {
+            Text(Strings.deleteAccountFailedMessage)
         }
         .overlay {
             if isDeleting {

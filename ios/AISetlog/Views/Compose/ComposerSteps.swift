@@ -260,6 +260,10 @@ private struct OpenTemplateCard<Detail: View>: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 118)
                 .clipped()
+                // Clipping pixels does not clip SwiftUI's hit-test region.
+                // The scaled image otherwise covers the mode selector above.
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
@@ -288,6 +292,7 @@ private struct OpenTemplateCard<Detail: View>: View {
         }
         .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
+        .contentShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(Color.oneDayBlue.opacity(0.65), lineWidth: 2)
@@ -362,6 +367,8 @@ private struct PromptTemplateTile: View {
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1.6, contentMode: .fit)
                     .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(template.displayName)
@@ -378,6 +385,7 @@ private struct PromptTemplateTile: View {
             }
             .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
             .clipShape(RoundedRectangle(cornerRadius: 18))
+            .contentShape(RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .strokeBorder(
@@ -527,7 +535,7 @@ struct SetupStep: View {
     private var momentsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionLabel(text: Strings.theMoments)
+                SectionLabel(text: Strings.theMoments(moments.count))
                 Spacer()
                 Button {
                     withAnimation(OneDay.Motion.soft) { momentsExpanded.toggle() }
