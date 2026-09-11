@@ -535,7 +535,7 @@ struct SetupStep: View {
     private var momentsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionLabel(text: Strings.theMoments)
+                SectionLabel(text: Strings.theMoments(moments.count))
                 Spacer()
                 Button {
                     withAnimation(OneDay.Motion.soft) { momentsExpanded.toggle() }

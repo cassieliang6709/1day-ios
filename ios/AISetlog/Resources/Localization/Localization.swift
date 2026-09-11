@@ -454,7 +454,9 @@ enum Strings {
             ? "把这个邀请码发给朋友。朋友加入后，会在这里看到彼此拍过的瞬间。"
             : "Send this code to friends. Once they join, everyone's moments show up here."
     }
-    static var joinRoomButton: String { lang == .chinese ? "加入今日房间" : "Join today's room" }
+    /// Not "today's room": a room can be a seven-day story, and the button
+    /// said otherwise on every one of them.
+    static var joinRoomButton: String { lang == .chinese ? "加入房间" : "Join room" }
 
     static func completedOn(_ date: String) -> String {
         lang == .chinese ? "已完成 · \(date)" : "Completed · \(date)"
@@ -1136,7 +1138,13 @@ enum Strings {
 
     // MARK: Moments (composer)
 
-    static var theMoments: String { lang == .chinese ? "七个瞬间" : "The moments" }
+    /// Carries the number, because it used to be hard-coded to seven and a
+    /// three-moment story read "七个瞬间" over a list of three — a factual
+    /// error the reader can see, on the page where they are deciding whether
+    /// to trust the app with their day.
+    static func theMoments(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 个瞬间" : "The moments · \(count)"
+    }
     static var reviewMoments: String { lang == .chinese ? "查看/编辑" : "Review" }
     static var hideMoments: String { lang == .chinese ? "收起" : "Hide" }
     static var addMoment: String { lang == .chinese ? "加一个瞬间" : "Add a moment" }
