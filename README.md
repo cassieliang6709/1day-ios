@@ -1,20 +1,48 @@
 # 1Day
 
-**Capture the moments that usually disappear. Turn them into a film worth keeping.**
+**Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.**
 
-1Day is a native iOS video diary for solo and shared challenges. Record a few
-seconds at a time—across one day or seven—and the app turns those clips into a
-finished film, entirely on-device.
+1Day starts with a question: **How do you want to spend today?** Choose a theme,
+follow a few moment prompts, and capture the day on your own or with friends.
+The finished vlog is your keepsake. The native iOS app supports one-day and
+seven-day stories, with film assembly entirely on-device.
+
+**Theme → Moments → Together → Film**
+
+[Website](https://1day.liangyue.site) · [English website](https://1day.liangyue.site/en) · [App Store](https://apps.apple.com/cn/app/1-day/id6794565199?uo=4) · [App release notes](https://1day.liangyue.site/en/updates)
 
 <p align="center">
-  <img src="docs/assets/new-challenge.png" width="280" alt="Create a challenge in 1Day">
+  <img src="landing-page/public/assets/app-theme-en.png" width="230" alt="Choose a theme in the real 1Day app">
   &nbsp;&nbsp;
-  <img src="docs/assets/demo.gif" width="280" alt="Seven short clips becoming one film">
+  <img src="landing-page/public/assets/app-friends-en.png" width="230" alt="A shared story with demo participants in 1Day">
+  &nbsp;&nbsp;
+  <img src="landing-page/public/assets/app-film-en.png" width="230" alt="The finished film in 1Day">
 </p>
 
-> The animation preserves the original deterministic rendering proof. The iOS
-> app now records and renders with AVFoundation; the retired FFmpeg scripts are
-> no longer part of the repository.
+Real App UI captured in an isolated iOS Simulator build. Blue’s illustrated
+story and the shared participants are demo data, not user footage or evidence
+of a live multiplayer session.
+
+## Version 1.2: a day your way
+
+The current development version focuses on making it easier to design,
+capture, and revisit your own day:
+
+- **From an idea to moments.** Describe what you want to do today, request
+  filming suggestions, then edit the prompts yourself.
+- **Themes worth keeping.** Save custom prompts to your template library with
+  a cover, ready to use again.
+- **Film in your own order.** Choose any available moment rather than follow
+  a fixed recording sequence.
+- **Keep watching.** Review solo-story clips full-screen and swipe between them.
+- **A gentle look.** Adjust softness, brightness, and warmth for playback and
+  export while preserving the original footage.
+- **Know who is there.** Shared stories make participants and filming status
+  clearer; solo stories omit the shared-room UI.
+
+Version 1.2 is **not yet listed as released**. The latest App Store version
+verified on September 8, 2026 was **1.1**, released August 25, 2026. Repository
+features and demo screenshots may be ahead of the store build.
 
 ## The idea
 
@@ -27,8 +55,8 @@ of footage or an evening spent in a video editor.
 
 - **One day or seven.** Capture several moments today, or return for one clip a
   day over a week.
-- **Guided or personal.** Start from bilingual built-in templates or build a
-  custom sequence of prompts.
+- **Guided or personal.** Start from bilingual themes, create your own prompts,
+  or record by time without a prompt sequence.
 - **Short by design.** Choose 2, 5, or 10-second clips and lock the challenge to
   portrait or landscape.
 - **Made with friends.** Create a CloudKit room, invite people with a six-character
@@ -108,6 +136,14 @@ English or Chinese prompt strings, older challenge defaults, and the original
 single-challenge storage shape are migrated or resolved without discarding a
 user’s clips.
 
+### Optional prompt suggestions
+
+The core solo recording flow stays on-device. If the user requests suggestions,
+the app sends their sentence, prompt count, language, and a random installation
+identifier to a Cloudflare Worker. The Worker uses DeepSeek to suggest prompts;
+it does not receive the user’s video clips. Users can also write prompts without
+calling this service. See [the Worker](workers/suggest-prompts) for configuration.
+
 ## Tech stack
 
 | Area | Implementation |
@@ -118,7 +154,8 @@ user’s clips.
 | Collaboration | CloudKit public database, Sign in with Apple, deep links |
 | Persistence | Codable metadata in UserDefaults, media on disk |
 | Notifications | UserNotifications |
-| Website | React 19, Vite 6 |
+| Website | React 19, Vite 6, prerendered bilingual routes, Vercel |
+| Optional prompt suggestions | Cloudflare Worker, DeepSeek |
 | Project generation | XcodeGen |
 | Tests | XCTest with real MP4 export fixtures |
 
@@ -139,7 +176,8 @@ ios/
 ├── AISetlogTests/          # State, localization, migration, and export tests
 └── project.yml             # XcodeGen project definition
 landing-page/               # React/Vite product site
-docs/                       # Beta protocol and README assets
+workers/suggest-prompts/    # Optional filming-prompt service
+docs/                       # Product specs, beta protocol, and assets
 ```
 
 ## Run the iOS app
@@ -168,11 +206,30 @@ Shared rooms additionally require:
 
 ## Run the landing page
 
+Source: [`landing-page/`](landing-page). The production site is
+[1day.liangyue.site](https://1day.liangyue.site).
+
+Routes: `/` and `/en` for the product site, `/updates` and `/en/updates` for
+App release notes, and `/privacy` and `/en/privacy` for privacy information.
+
+
 ```bash
 cd landing-page
 npm install
 npm run dev
 ```
+
+For a production build and local preview:
+
+```bash
+npm run build
+npm run preview
+```
+
+The build generates the client bundle and prerenders all six routes. App
+screenshots and the illustrated demo film live in `landing-page/public/assets`.
+The demo film has optional Chinese and English captions; below-the-fold images
+load lazily and the video waits for playback before loading.
 
 ## Test
 
@@ -183,6 +240,10 @@ xcodebuild test \
   -project AISetlog.xcodeproj \
   -scheme AISetlog \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
+  -skip-testing:AISetlogTests/CloudKitPaginationTests \
+  -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
+  -skip-testing:AISetlogTests/JoinedRoomTests \
   CODE_SIGNING_ALLOWED=NO
 ```
 
@@ -190,10 +251,15 @@ The suite covers challenge and card state, one-day behavior, localized prompt
 resolution, legacy data decoding, empty renderer input, and playable
 AVFoundation MP4 export with real media fixtures.
 
+The four skipped suites talk to the real CloudKit development database. Run
+them separately on a signed simulator or device that is signed into iCloud;
+an unsigned test host has no CloudKit entitlement, and constructing the
+container terminates the process before XCTest can skip the test.
+
 ## Project status
 
 1Day is available on the
-[App Store](https://apps.apple.com/us/app/1-day/id6794565199). The testing
+[App Store](https://apps.apple.com/cn/app/1-day/id6794565199?uo=4). The testing
 protocol and privacy-safe results template remain in
 [docs/BETA_TESTING.md](docs/BETA_TESTING.md); the repository does not claim
 adoption or completion metrics that have not been measured.
