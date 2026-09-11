@@ -14,6 +14,9 @@ final class AccountStore {
     }
 
     private static let key = "account.v1"
+    /// In-process session epoch. Logging back into the same account must not
+    /// revive work started before sign-out; a display-name change is not a login.
+    private(set) static var identityRevision: UInt64 = 0
 
     static var persistedUserID: String? {
         guard let data = UserDefaults.standard.data(forKey: key),
@@ -25,12 +28,22 @@ final class AccountStore {
     private(set) var account: Account?
     var isSignedIn: Bool { account != nil }
 
-    init() {
-        if let data = UserDefaults.standard.data(forKey: Self.key),
+    /// nil is an explicitly memory-only identity: no Apple validation, disk
+    /// access, or mutation of the live chat session epoch.
+    private let defaults: UserDefaults?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.key),
            let saved = try? JSONDecoder().decode(Account.self, from: data) {
             account = saved
             revalidate(saved.id)
         }
+    }
+
+    init(localIdentity: Account) {
+        defaults = nil
+        account = localIdentity
     }
 
     /// If the Apple ID credential was revoked (e.g. user signed out in Settings),
@@ -49,8 +62,9 @@ final class AccountStore {
     }
 
     func signOut() {
+        if defaults != nil { Self.identityRevision &+= 1 }
         account = nil
-        UserDefaults.standard.removeObject(forKey: Self.key)
+        defaults?.removeObject(forKey: Self.key)
     }
 
     // MARK: - Sign in with Apple (driven by SignInWithAppleButton)
@@ -122,9 +136,10 @@ final class AccountStore {
 #endif
 
     private func persist(_ account: Account) {
+        if defaults != nil, self.account?.id != account.id { Self.identityRevision &+= 1 }
         self.account = account
-        if let data = try? JSONEncoder().encode(account) {
-            UserDefaults.standard.set(data, forKey: Self.key)
+        if let defaults, let data = try? JSONEncoder().encode(account) {
+            defaults.set(data, forKey: Self.key)
         }
     }
 
