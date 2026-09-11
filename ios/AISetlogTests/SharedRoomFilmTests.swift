@@ -65,6 +65,9 @@ final class SharedRoomFilmTests: XCTestCase {
         ]
         var options = VideoStitcher.Options()
         options.layout = .friendsTogether
+        // Preserve explicit portrait-layout coverage. Automatic portrait input
+        // now defaults to landscape; DefaultFilmAspectTests covers that path.
+        options.aspect = .portrait
         options.showDayCaptions = false
 
         let film = try await VideoStitcher.stitch(clips: clips, options: options)
@@ -73,14 +76,27 @@ final class SharedRoomFilmTests: XCTestCase {
         // Same moment from two people plays once, together — not back to back.
         XCTAssertEqual(duration, 2, accuracy: 0.2)
 
-        // And stacked top-to-bottom, not side by side: the two halves of the
-        // frame must differ vertically and match horizontally.
+        // And stacked top-to-bottom, not side by side.
         let image = try await frameImage(of: film, at: 1, saveAs: "friends-together")
         let top = pixel(image, atX: 0.5, y: 0.25)
         let bottom = pixel(image, atX: 0.5, y: 0.75)
-        let topLeft = pixel(image, atX: 0.25, y: 0.25)
+        let topLeft = pixel(image, atX: 0.12, y: 0.25)
         XCTAssertNotEqual(top, bottom, "the two authors should be stacked vertically")
-        XCTAssertEqual(topLeft, top, "each author should span the full width")
+
+        // The left of a cell used to be the same pixels as its middle, because
+        // each take was scaled up until it covered the cell and the overhang was
+        // cut off. It is now that person's own blurred bed instead: the take
+        // keeps its shape and the margin is filled rather than cropped into. So
+        // the edge no longer *matches* the middle — but it must still belong to
+        // the same person, which is what this checks.
+        XCTAssertLessThan(
+            distance(topLeft, top), distance(topLeft, bottom),
+            "the margin beside a take should be that take's own blurred bed")
+    }
+
+    /// How far apart two sampled pixels are, summed over the channels.
+    private func distance(_ a: [UInt8], _ b: [UInt8]) -> Int {
+        zip(a, b).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) }
     }
 
     func testGridStaysVerticalForTwoAndThreeThenSquaresOff() {

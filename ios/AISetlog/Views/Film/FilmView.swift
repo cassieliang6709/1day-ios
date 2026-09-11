@@ -13,6 +13,9 @@ struct FilmView: View {
     let clips: [DayClip]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
+    /// Read only to know whose clips the grade is allowed to touch.
+    @Environment(AccountStore.self) private var account
 
     @State private var exportURL: URL?
     @State private var errorMessage: String?
@@ -30,7 +33,7 @@ struct FilmView: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     /// The film gets whatever you've been watching your clips in. It isn't
     /// asked again at save time: you already answered by looking.
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
@@ -158,15 +161,19 @@ struct FilmView: View {
             options.layout = challenge.isShared ? .friendsTogether : .sequential
             options.titleCard = includeTitleCard ? titleCard : nil
             options.look = look
+            // Solo films are all yours, so the grade is unrestricted; in a
+            // shared room it stops at your own takes.
+            options.lookAuthorID = challenge.isShared ? (account.account?.id ?? "local") : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             // A newer render started while this one was working.
-            guard requested == renderRevision else {
+            guard !Task.isCancelled, requested == renderRevision else {
                 try? FileManager.default.removeItem(at: url)
                 return
             }
+            if let previewMedia, !previewMedia.accept(url) { return }
             withAnimation(OneDay.Motion.soft) { exportURL = url }
         } catch {
-            guard requested == renderRevision else { return }
+            guard !Task.isCancelled, previewMedia?.isClosed != true, requested == renderRevision else { return }
             print("[stitch] failed: \(error)")
             errorMessage = error.localizedDescription
         }
@@ -203,6 +210,8 @@ struct FilmView: View {
     // MARK: - Saving
 
     private func saveToPhotos(_ url: URL) async {
+        // Local previews do not write into the user's photo library.
+        guard previewMedia == nil else { return }
         isSaving = true
         saveMessage = nil
         defer { isSaving = false }

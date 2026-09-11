@@ -53,7 +53,7 @@ struct RecordClipView: View {
     /// not to the file — but this is the first time you see yourself back, and
     /// deciding whether to retake off a picture the app will never show you
     /// again is the wrong way round.
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
 
     /// Whoever's signed in records the clip — solo challenges have no
     /// account, so this (and the identity tint it drives) falls back to a
@@ -190,7 +190,7 @@ struct RecordClipView: View {
                 .stroke(.white.opacity(0.55), lineWidth: 4)
                 .frame(width: 66, height: 66)
             Circle()
-                .fill(myTint)
+                .fill(Color.oneDayBlue)
                 .frame(width: 50, height: 50)
         }
     }
@@ -201,13 +201,10 @@ struct RecordClipView: View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            VStack(spacing: 5) {
+            CenteredCaptureControl(instruction: Strings.captureState(
+                recording: false, secondsLabel: clipSecondsText
+            )) {
                 recordButtonVisual
-                Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -219,18 +216,11 @@ struct RecordClipView: View {
         ))
     }
 
-    /// While recording: a compact countdown row that leaves the camera frame
-    /// large enough on short devices such as iPhone SE.
+    /// Match the idle shutter's center axis; translated instructions sit below
+    /// rather than pushing the countdown sideways.
     private var recordingControls: some View {
-        HStack(spacing: 12) {
-            WaveformBars(tint: myTint)
+        CenteredCaptureControl(instruction: Strings.tapToStop) {
             countdownRing
-            Text(Strings.tapToStop)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-            Spacer(minLength: 0)
         }
     }
 

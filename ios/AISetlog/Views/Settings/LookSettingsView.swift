@@ -1,34 +1,35 @@
 import SwiftUI
 
-/// The two look controls that make sense away from a picture: which preset to
-/// start from, and whether it should stick.
+/// The one look control that makes sense away from a picture: whether the grade
+/// should stick, plus a way out of one you can't see.
 ///
-/// The dials are deliberately still not here. A dial you can't see the effect
-/// of is a dial you're guessing at, so fine-tuning stays on the screen with the
-/// picture on it — this page only sets where that screen starts.
+/// The dials are deliberately not here. A dial you can't see the effect of is a
+/// dial you're guessing at, so all three live on the screen with the picture on
+/// it. This page used to offer four presets to start from; those are gone, and
+/// nothing replaced them, because a starting point you pick without a picture in
+/// front of you is the same guess in a different shape.
 struct LookSettingsView: View {
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
-    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
+    @AppStorage(PersonalEffectParameters.storageKey)
+    private var look: PersonalEffectParameters = .none
+    @AppStorage(PersonalEffectParameters.stickyKey) private var lookIsSticky = false
     /// Bound only so a language change re-renders the page.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// What the row one level up says. Nil preset means a dial has been moved,
-    /// and calling that "原样" would be a lie.
-    static func summary(for look: GentleLook) -> String {
-        guard let key = look.presetKey else { return Strings.lookCustom }
-        return GentleLook.presetName(key)
+    /// What the row one level up says.
+    static func summary(for look: PersonalEffectParameters) -> String {
+        look.isIdentity ? Strings.lookAsShot : Strings.lookCustom
     }
 
     var body: some View {
         Form {
             Section {
-                Picker(Strings.lookSetting, selection: $look) {
-                    ForEach(GentleLook.presets, id: \.key) { preset in
-                        Text(GentleLook.presetName(preset.key)).tag(preset.look)
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                LabeledContent(Strings.lookSetting, value: Self.summary(for: look))
+                // The escape hatch. Someone who left a dial somewhere odd and
+                // switched the app off before noticing has no picture in front
+                // of them to fix it against, and this page is where they'd come
+                // looking.
+                Button(Strings.lookReset) { look = .none }
+                    .disabled(look.isIdentity)
             } footer: {
                 Text(Strings.lookFootnote)
             }

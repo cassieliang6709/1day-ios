@@ -54,12 +54,12 @@ struct ClipPreviewView: View {
     /// How soft you want to look. Read here rather than passed in, because it's
     /// a setting about you and not about this clip — every clip you look back
     /// at gets the same one, and the film you save gets it too.
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
-    @AppStorage(GentleLook.stickyKey) private var lookIsSticky = false
+    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
+    @AppStorage(PersonalEffectParameters.stickyKey) private var lookIsSticky = false
 
     /// What the player should actually show. Holding the compare chip down puts
     /// the original back without touching what you've chosen.
-    private var playedLook: GentleLook { showingOriginal ? .none : look }
+    private var playedLook: PersonalEffectParameters { showingOriginal ? .none : look }
 
     private var myID: String { account.account?.id ?? "local" }
 
@@ -99,9 +99,12 @@ struct ClipPreviewView: View {
         targetAuthorID == nil || targetAuthorID == "local" || targetAuthorID == myID
     }
 
-    /// Prefer the live card's caption so edits show immediately; fall back to
-    /// the value passed in (used when there's no challenge context).
-    private var liveOverlayText: String? { card?.overlayText ?? overlayText }
+    /// Only my page may read my live card. A friend's caption belongs to the
+    /// displayed clip; a cleared own caption must not revive the deck snapshot.
+    private var liveOverlayText: String? {
+        ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
+                                  liveText: card?.overlayText, snapshotText: overlayText)
+    }
     private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
 
     private var localizedMomentTitle: String {
@@ -340,7 +343,7 @@ struct ClipPreviewView: View {
             if isShared {
                 floatingButton(
                     "bubble.left.fill",
-                    comments.isEmpty ? nil : "\(comments.count)",
+                    appLanguage.resolved == .chinese ? "聊天" : "Chat",
                     fills: !isMine
                 ) { showComments = true }
             }
@@ -380,39 +383,12 @@ struct ClipPreviewView: View {
     /// this screen to look at. In a sheet the video stays behind it, still
     /// looping.
     private var commentsSheet: some View {
-        NavigationStack {
-            ScrollView {
-                CommentsSection(comments: comments, myID: myID) { comment in
-                    if let challengeID {
-                        store.deleteComment(
-                            comment.id, day: day, challengeID: challengeID,
-                            targetAuthorID: targetAuthorID ?? myID)
-                    }
-                }
-                .padding()
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(
-                comments.isEmpty ? Strings.comments : Strings.commentsCount(comments.count))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.done) { showComments = false }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                CommentInputBar { text in
-                    if let challengeID {
-                        store.addComment(
-                            text, day: day, challengeID: challengeID,
-                            targetAuthorID: targetAuthorID ?? myID)
-                    }
-                }
+        Group {
+            if let challengeID {
+                RoomChatView(challengeID: challengeID, moment: day)
             }
         }
-        .presentationDetents([.medium, .large])
-        // Without this the sheet is translucent over a playing video, so the
-        // thread reads as grey text on whatever colour is on screen this frame.
+        .presentationDetents([.large])
         .presentationBackground(Color.oneDayMist)
     }
 

@@ -408,6 +408,24 @@ enum Strings {
     static var inviteHint: String {
         lang == .chinese ? "向朋友要 6 位邀请码。" : "Ask your friend for the 6-character code."
     }
+    static var inviteCodeFormatHint: String {
+        lang == .chinese
+            ? "可以直接粘贴整段邀请文字；1Day 会自动找出 6 位邀请码。"
+            : "Paste the whole invite if you have it — 1Day will find the 6-character code."
+    }
+    static var joinFriendsWithCode: String {
+        lang == .chinese ? "用邀请码加入朋友" : "Join friends with a code"
+    }
+    static var homeChoiceHint: String {
+        lang == .chinese
+            ? "没有故事就先创建；朋友已经建好房间，就输入邀请码。"
+            : "Create a story if you are starting; enter a code if a friend already made the room."
+    }
+    static var roomInviteHelp: String {
+        lang == .chinese
+            ? "把这个邀请码发给朋友。朋友加入后，会在这里看到彼此拍过的瞬间。"
+            : "Send this code to friends. Once they join, everyone's moments show up here."
+    }
     static var joinRoomButton: String { lang == .chinese ? "加入今日房间" : "Join today's room" }
 
     static func completedOn(_ date: String) -> String {
@@ -701,12 +719,13 @@ enum Strings {
     }
     static var lookAction: String { lang == .chinese ? "柔和" : "Look" }
     static var lookAsShot: String { lang == .chinese ? "原样" : "As shot" }
-    static var lookClean: String { lang == .chinese ? "干净" : "Clean" }
-    static var lookSoft: String { lang == .chinese ? "柔光" : "Soft" }
-    static var lookWarm: String { lang == .chinese ? "暖阳" : "Warm" }
-    static var lookSmoothing: String { lang == .chinese ? "细腻" : "Smooth" }
-    static var lookBrightness: String { lang == .chinese ? "提亮" : "Lift" }
-    static var lookWarmth: String { lang == .chinese ? "暖调" : "Warmth" }
+    /// The three dials. Named for what the camera got wrong, not for the Core
+    /// Image filter underneath — nobody films thinking "my white point is off".
+    static var lookExposure: String { lang == .chinese ? "亮度" : "Exposure" }
+    static var lookTemperature: String { lang == .chinese ? "色温" : "Warmth" }
+    static var lookContrast: String { lang == .chinese ? "对比" : "Contrast" }
+    /// Puts all three dials back to centre.
+    static var lookReset: String { lang == .chinese ? "复位" : "Reset" }
     static var lookHoldToCompare: String {
         lang == .chinese ? "按住看原片" : "Hold to see the original"
     }
@@ -819,6 +838,12 @@ enum Strings {
     static var chooseCoverFromPhotos: String {
         lang == .chinese ? "从相册选一张" : "Choose from photos"
     }
+    static var presetCoverHeading: String {
+        lang == .chinese ? "选一个喜欢的场景" : "Choose a scene"
+    }
+    static var automaticCover: String {
+        lang == .chinese ? "自动搭配" : "Automatic"
+    }
     static var useMatchedCover: String {
         lang == .chinese ? "还是用配好的" : "Use the matched one"
     }
@@ -859,6 +884,11 @@ enum Strings {
         lang == .chinese
             ? "房间还没准备好 — CloudKit 索引还在部署中。"
             : "Room isn't set up yet — the CloudKit index is still deploying."
+    }
+    static var errorNetwork: String {
+        lang == .chinese
+            ? "连不上 iCloud，检查一下网络再试。"
+            : "Can't reach iCloud. Check your connection and try again."
     }
 
     // MARK: Plans home
@@ -1115,8 +1145,8 @@ enum Strings {
     }
     static var intentSubtitle: String {
         lang == .chinese
-            ? "一句话就行。题目会填进下面的列表，每条都能改。"
-            : "One sentence is enough. The prompts fill the list below, and every one is editable."
+            ? "一句话就行。生成标题和题目，只填空白，不覆盖已有内容；每项都能改，也可以直接手写。"
+            : "One sentence suggests a title and prompts. Only blanks are filled; existing text stays. Edit anything, or write your own."
     }
     static var intentPlaceholder: String {
         lang == .chinese ? "比如：今天要搬家" : "For example: moving house today"
@@ -1379,6 +1409,18 @@ enum Strings {
             : "Signing out just signs you out; your stories stay on this device. Deleting removes everything."
     }
     static var deletingAccount: String { lang == .chinese ? "正在删除…" : "Deleting…" }
+    /// Said out loud, because the alternative — a spinner that ends and a
+    /// screen that looks finished — is the app claiming something it can't
+    /// check. Naming what is still intact is what makes "try again" mean
+    /// anything.
+    static var deleteAccountFailedTitle: String {
+        lang == .chinese ? "没有删干净" : "Not fully deleted"
+    }
+    static var deleteAccountFailedMessage: String {
+        lang == .chinese
+            ? "网络中断，云端还有一部分没删掉。你的故事和视频都还在这台设备上，没有动。连上网络后再试一次，会从断掉的地方接着删。"
+            : "The connection dropped and some of your records are still in the cloud. Nothing on this device has been touched. Try again when you're back online and it will pick up where it stopped."
+    }
     /// Replaces a departed creator's name on a room their friends still use.
     static var deletedMemberName: String {
         lang == .chinese ? "已注销的用户" : "A former member"
