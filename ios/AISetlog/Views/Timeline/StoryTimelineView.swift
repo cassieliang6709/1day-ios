@@ -25,6 +25,8 @@ struct StoryTimelineView: View {
     @State private var sheet: TimelineSheet?
     @State private var showFilm = false
     @State private var showEditPlan = false
+    /// Held between the menu tap and the confirmation.
+    @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
     @State private var showRoomDemo = false
     /// The beat between the last moment landing and the film assembling.
@@ -85,6 +87,35 @@ struct StoryTimelineView: View {
                 EditPlanSheet(challenge: challenge) { title, moments in
                     store.updatePlan(challengeID, title: title, momentTitles: moments)
                 }
+            }
+        }
+        // Same question, same words as the long press on the home list. Two
+        // entry points to one irreversible action, so they say one thing.
+        .confirmationDialog(
+            challenge.map {
+                $0.isShared
+                    ? Strings.leaveRoomTitle($0.title)
+                    : Strings.deleteStoryTitle($0.title)
+            } ?? "",
+            isPresented: $askBeforeDeleting,
+            titleVisibility: .visible
+        ) {
+            if let challenge {
+                Button(
+                    challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
+                    role: .destructive
+                ) {
+                    store.delete(challengeID)
+                    dismiss()
+                }
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        } message: {
+            if let challenge {
+                Text(
+                    challenge.isShared
+                        ? Strings.leaveRoomWarning
+                        : Strings.deleteStoryWarning(challenge.recordedCount))
             }
         }
         // The magic moment: the last slot lands → a tiny celebration → the
@@ -320,8 +351,7 @@ struct StoryTimelineView: View {
                     systemImage: "trash",
                     role: .destructive
                 ) {
-                    store.delete(challengeID)
-                    dismiss()
+                    askBeforeDeleting = true
                 }
 
                 // A sync failure used to print itself in red under the story's

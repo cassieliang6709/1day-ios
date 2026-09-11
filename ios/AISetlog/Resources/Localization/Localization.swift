@@ -324,6 +324,34 @@ enum Strings {
     static var couldntJoin: String { lang == .chinese ? "无法加入" : "Couldn't join" }
     static var leaveRoom: String { lang == .chinese ? "退出房间" : "Leave room" }
     static var deleteChallenge: String { lang == .chinese ? "删除挑战" : "Delete challenge" }
+
+    /// Deleting a story and leaving a room are one menu item but two very
+    /// different outcomes, and the difference is exactly what someone needs to
+    /// know before they tap. Deleting takes the clips off this phone for good;
+    /// leaving only takes the room off this phone — what you filmed stays in it
+    /// for everyone else (`ChallengeStore.delete` clears locally and leaves the
+    /// shared records alone).
+    static func deleteStoryTitle(_ name: String) -> String {
+        lang == .chinese ? "删除《\(name)》？" : "Delete “\(name)”?"
+    }
+    static func deleteStoryWarning(_ clipCount: Int) -> String {
+        if lang == .chinese {
+            return clipCount > 0
+                ? "已经拍的 \(clipCount) 段视频会一起删掉，找不回来。"
+                : "这个故事会从这台设备上删掉，找不回来。"
+        }
+        return clipCount > 0
+            ? "The \(clipCount) clip\(clipCount == 1 ? "" : "s") you filmed will be deleted too. This can't be undone."
+            : "This story will be deleted from this device. This can't be undone."
+    }
+    static func leaveRoomTitle(_ name: String) -> String {
+        lang == .chinese ? "退出《\(name)》？" : "Leave “\(name)”?"
+    }
+    static var leaveRoomWarning: String {
+        lang == .chinese
+            ? "这台设备上就看不到这个房间了。你已经拍的片段还留在房间里，其他人照常能看。"
+            : "The room disappears from this device. The clips you filmed stay in it — everyone else can still see them."
+    }
     static var history: String { lang == .chinese ? "历史" : "HISTORY" }
     static var joining: String { lang == .chinese ? "加入中…" : "Joining…" }
     static func todayIs(_ date: String) -> String {
@@ -618,6 +646,14 @@ enum Strings {
     static var keepClipQuestion: String { lang == .chinese ? "这段还没归档" : "This clip isn't filed yet" }
     static var keepClip: String { lang == .chinese ? "保留" : "Keep" }
     static var discardClip: String { lang == .chinese ? "丢弃" : "Discard" }
+    /// Names where "keep" puts it. Without this the two buttons are a coin
+    /// toss — nobody should have to guess whether "保留" means it goes
+    /// somewhere findable or just stays on this screen.
+    static var keepClipFootnote: String {
+        lang == .chinese
+            ? "「保留」会存进草稿，之后再决定放进哪个故事。「丢弃」之后这段就找不回来了。"
+            : "Keep puts it in drafts to file later. Discard means it's gone."
+    }
     static var draftSaveFailed: String {
         lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
     }
@@ -665,6 +701,16 @@ enum Strings {
     }
     static var cameraUnavailable: String { lang == .chinese ? "相机不可用" : "Camera not available" }
     static var retryCamera: String { lang == .chinese ? "重新打开相机" : "Try camera again" }
+    /// Said separately from "camera not available", because the way out is
+    /// different: iOS won't ask a second time, so retrying here can never work.
+    static var cameraDeniedTitle: String {
+        lang == .chinese ? "还没允许使用相机" : "Camera access is off"
+    }
+    static var cameraDeniedFootnote: String {
+        lang == .chinese
+            ? "系统只会问一次。到「设置 → 1Day → 相机」打开就可以接着拍。"
+            : "iOS only asks once. Turn it on in Settings → 1Day → Camera and you're back."
+    }
     static func useDemoClip(_ title: String) -> String {
         lang == .chinese ? "为「\(title)」使用示例片段" : "Use demo clip for \(title)"
     }
