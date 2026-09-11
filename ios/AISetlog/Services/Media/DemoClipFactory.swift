@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG || LOCAL_ROOM_CHAT_DEMO
 import AVFoundation
 import UIKit
 
@@ -79,7 +79,17 @@ enum DemoClipFactory {
         let frameCount = max(Int(seconds * Double(frameRate)), 1)
         for frame in 0..<frameCount {
             while !input.isReadyForMoreMediaData {
+                guard !Task.isCancelled, writer.status == .writing else {
+                    writer.cancelWriting()
+                    try? FileManager.default.removeItem(at: url)
+                    return nil
+                }
                 try? await Task.sleep(for: .milliseconds(5))
+            }
+            guard !Task.isCancelled else {
+                writer.cancelWriting()
+                try? FileManager.default.removeItem(at: url)
+                return nil
             }
             let image = render(
                 size: size, color: color, author: name, moment: moment,
@@ -122,7 +132,9 @@ enum DemoClipFactory {
             }
 
             draw(author, y: size.height * 0.36, size: size.width * 0.09, weight: .heavy)
-            draw("MOMENT \(moment)", y: size.height * 0.46, size: size.width * 0.055, weight: .bold)
+            // Central motion evidence survives the portrait compositor's crop;
+            // a sweeping bar near the bottom alone can be cropped out entirely.
+            draw("MOMENT \(moment) · \(Int(progress * 100))%", y: size.height * 0.46, size: size.width * 0.055, weight: .bold)
             draw(label, y: size.height * 0.53, size: size.width * 0.045, weight: .medium)
 
             let barHeight = size.height * 0.012

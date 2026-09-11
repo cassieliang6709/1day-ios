@@ -19,6 +19,7 @@ struct StitchedMomentPreview: View {
     let myID: String
     let onReRecord: () -> Void
 
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var stitched: URL?
     @State private var stitchFailed = false
 
@@ -27,7 +28,10 @@ struct StitchedMomentPreview: View {
     /// pile up one per tap.
     private static var cache: [String: URL] = [:]
 
-    private var cacheKey: String { "\(day)-" + clips.map(\.id).joined(separator: "-") }
+    private var cacheKey: String {
+        if previewMedia != nil { return LocalRoomMediaKey.make(day: day, clips: clips) }
+        return "\(day)-" + clips.map(\.id).joined(separator: "-")
+    }
 
     private var mine: DayClip? {
         clips.first { $0.authorID == myID || $0.authorID == "local" }
@@ -85,7 +89,13 @@ struct StitchedMomentPreview: View {
 
     private func stitch() async {
         guard clips.count > 1, stitched == nil else { return }
-        if let cached = Self.cache[cacheKey],
+        let cached: URL?
+        if let previewMedia {
+            cached = previewMedia.cached(cacheKey)
+        } else {
+            cached = Self.cache[cacheKey]
+        }
+        if let cached,
            FileManager.default.fileExists(atPath: cached.path) {
             stitched = cached
             return
@@ -99,9 +109,18 @@ struct StitchedMomentPreview: View {
         // filters as it plays. Baking it in here would apply it twice.
         do {
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
-            Self.cache[cacheKey] = url
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            if let previewMedia {
+                guard previewMedia.accept(url, key: cacheKey) else { return }
+            } else {
+                Self.cache[cacheKey] = url
+            }
             stitched = url
         } catch {
+            guard !Task.isCancelled, previewMedia?.isClosed != true else { return }
             print("[moment] stitch failed: \(error)")
             stitchFailed = true
         }
