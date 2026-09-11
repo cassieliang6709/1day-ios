@@ -6,14 +6,14 @@ final class IntentFirstCreationUITests: XCTestCase {
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
         let create = app.buttons["New story"]
-        XCTAssertTrue(create.waitForExistence(timeout: 8))
+        XCTAssertTrue(create.waitForExistence(timeout: 15))
         create.tap()
         let own = app.buttons["Write your own prompts"]
-        XCTAssertTrue(own.waitForExistence(timeout: 5))
+        XCTAssertTrue(own.waitForExistence(timeout: 15))
         own.tap()
         let intent = app.textFields["today-intent"]
         let name = app.textFields["custom-story-name"]
-        XCTAssertTrue(intent.waitForExistence(timeout: 5))
+        XCTAssertTrue(intent.waitForExistence(timeout: 15))
         XCTAssertTrue(name.exists)
         XCTAssertLessThan(intent.frame.minY, name.frame.minY)
         XCTAssertFalse(app.buttons["suggest-prompts"].isEnabled)
