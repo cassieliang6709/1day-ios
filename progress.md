@@ -134,36 +134,48 @@ FriendsTogetherCompositor : AVVideoCompositing
 
 ### 先说清楚模拟器上那几个"随机失败"是什么
 
-不是随机，也不是断言写错了，是**进程被杀掉**。
+不是随机，也不是断言写错，是**测试宿主进程被杀掉**。
 
-整套测试跑完的真实数字：**450 个 case 全部通过，0 个 suite 以 failed 结束，但进程被重启了 8 次**。日志里的 `(Fig) signalled err=-12900` 和 `<<<< VRP >>>>` 是 AVFoundation 的视频解码错误——大量 `AVAssetExportSession` 测试连续跑，把模拟器的视频解码会话耗尽，测试进程崩溃。`xcodebuild` 会自动重启并继续，但**崩溃那一刻正在跑的那个 case 会被记成 failed**，然后重跑时通过。
+原因 `.github/workflows/ios-tests.yml` 里早就写清楚了：`CloudKitIdempotencyTests`、
+`CloudKitPaginationTests`、`RoomSyncIntegrationTests`、`JoinedRoomTests` 这四个套件
+要连真实 CloudKit 开发库。它们都写了「没登录 iCloud 就 XCTSkip」的保护——但
+`CODE_SIGNING_ALLOWED=NO` 的构建**没有 iCloud entitlement**，而在没有 entitlement 的
+container 上调 `accountStatus()` 会直接杀掉测试宿主，不是返回错误。进程都没了，
+自然也就没人来执行那个 skip。
 
-所以 `Failing tests:` 那个列表列的是「崩溃时恰好轮到谁」，跟那几个测试本身没关系。这次点名的是两个 CloudKit 测试（它们本身有 `XCTSkip` 保护，根本轮不到断言就死了）。本轮新增的媒体测试（compositor 5 个、调色范围 2 个、导出 2 个）加重了这个压力。
+日志里的特征是 `[CK] Significant issue at CKContainer.m:748: ... must have a
+com.apple.developer.icloud-services entitlement`，紧接着 `Restarting after unexpected
+exit`。`xcodebuild` 会重启进程继续跑，但**崩溃那一刻正在排队的 case 会被记成
+failed**，重跑时通过。所以 `Failing tests:` 列的是「谁运气不好轮到了」。
 
-**判断标准**：看 `Test Suite '<名字>' failed at` 有没有出现，以及 `Executed N tests, with M failures` 里的 M。只看末尾的 `** TEST FAILED **` 会被崩溃重启误导。
+CI 的做法是直接跳过这四个套件。本地也应该这么跑。这四个要验，得在一台
+**登录了 iCloud 的模拟器**上单独跑。
+
+**判断标准**：看有没有 `Test Suite '<名字>' failed at`，以及
+`Executed N tests, with M failures` 里的 M。只看末尾的 `** TEST FAILED **` 会被
+崩溃重启误导。
+
+已验证：加上这四个 `-skip-testing` 之后，**450 个 case 全过，0 失败，0 次进程
+重启**。抖动完全来自 entitlement，不是媒体测试压力。
 
 ### 怎么跑
 
-**日常（快，30 秒内）**——纯逻辑，不碰 AVFoundation，不会崩：
+**全量（本地，跟 CI 一致）**——跳过四个需要 iCloud entitlement 的套件：
 
 ```bash
 xcodebuild -project ios/AISetlog.xcodeproj -scheme AISetlog \
   -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
-  test CODE_SIGNING_ALLOWED=NO \
-  -only-testing:AISetlogTests/PersonalEffectParametersTests \
-  -only-testing:AISetlogTests/ChineseCopyPurityTests \
-  -only-testing:AISetlogTests/AccountDeletionServiceTests \
-  -only-testing:AISetlogTests/LocalizationTests \
-  -only-testing:AISetlogTests/InviteCodeTests \
-  -only-testing:AISetlogTests/SevenDayCalendarBoundaryTests
+  test -only-testing:AISetlogTests \
+  -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
+  -skip-testing:AISetlogTests/CloudKitPaginationTests \
+  -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
+  -skip-testing:AISetlogTests/JoinedRoomTests \
+  CODE_SIGNING_ALLOWED=NO
 ```
 
-**媒体（慢，单独跑，降低同进程压力）**：
+**改了某一块时只跑那一块**，比如媒体管线：
 
 ```bash
-xcodebuild -project ios/AISetlog.xcodeproj -scheme AISetlog \
-  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
-  test CODE_SIGNING_ALLOWED=NO \
   -only-testing:AISetlogTests/FriendsTogetherCompositorTests \
   -only-testing:AISetlogTests/PersonalEffectFilterTests \
   -only-testing:AISetlogTests/PersonalEffectScopeTests \
@@ -171,7 +183,8 @@ xcodebuild -project ios/AISetlog.xcodeproj -scheme AISetlog \
   -only-testing:AISetlogTests/DefaultFilmAspectTests
 ```
 
-**全量**：`-only-testing:AISetlogTests`，跑约 6 分钟，按上面的判断标准读结果。
+**那四个 CloudKit 套件**：需要一台登录了 iCloud 的模拟器，并且不能用
+`CODE_SIGNING_ALLOWED=NO`。CI 永远跳过它们，所以这部分只能人工跑。
 
 ### 真机验收清单
 
