@@ -452,7 +452,24 @@ final class ChallengeStore {
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
         else { return }
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
-        challenges[ci].cards[idx].overlayText = trimmed?.isEmpty == true ? nil : trimmed
+        let words = trimmed?.isEmpty == true ? nil : trimmed
+        challenges[ci].cards[idx].overlayText = words
+        // Clearing the words clears where they were. Otherwise a caption
+        // deleted and typed again would reappear wherever the last one was
+        // dragged to, which reads as the app remembering something you threw
+        // away.
+        if words == nil { challenges[ci].cards[idx].captionSticker = nil }
+    }
+
+    /// Where the caption sits on the clip, and how it's drawn.
+    ///
+    /// Written on every drag, so it takes the finished sticker rather than a
+    /// delta — the gesture owns the arithmetic, the card owns the result.
+    func updateCaptionSticker(_ sticker: CaptionSticker?, day: Int, challengeID: UUID) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
+        else { return }
+        challenges[ci].cards[idx].captionSticker = sticker
     }
 
     // MARK: - Reactions & comments (local-first)
@@ -599,6 +616,7 @@ final class ChallengeStore {
                         authorID: clip.authorID,
                         label: challenge.isTimeOnly ? nil : presenter.title(forSlot: clip.day),
                         overlayText: clip.overlayText,
+                        captionSticker: clip.captionSticker,
                         recordedAt: clip.recordedAt,
                         emoji: emojis,
                         comments: commentLines,
@@ -622,6 +640,7 @@ final class ChallengeStore {
                     authorID: account?.account?.id ?? RoomProgress.soloAuthorID,
                     label: challenge.isTimeOnly ? nil : presenter.title(forSlot: card.day),
                     overlayText: card.overlayText,
+                    captionSticker: card.captionSticker,
                     recordedAt: card.recordedAt,
                     emoji: card.reactions.map(\.emoji),
                     comments: Self.commentLines(for: card))

@@ -51,9 +51,13 @@ enum DemoClipFactory {
         seconds: Double,
         orientation: Challenge.Orientation
     ) async -> URL? {
-        let size: CGSize = orientation == .landscape
-            ? CGSize(width: 960, height: 540)
-            : CGSize(width: 540, height: 960)
+        let size: CGSize = switch orientation {
+        case .landscape: CGSize(width: 960, height: 540)
+        case .portrait: CGSize(width: 540, height: 960)
+        // Generated already square, the way a square room's files arrive after
+        // `SquareCrop` — the demo has no camera to crop from.
+        case .square: CGSize(width: 720, height: 720)
+        }
         let name = author ?? "Tester"
         let color = tint(author: name, moment: moment)
 
@@ -104,8 +108,14 @@ enum DemoClipFactory {
         return writer.status == .completed ? url : nil
     }
 
-    /// A flat card: who, which moment, and a sweeping bar so it's obvious the
-    /// clip is playing rather than frozen on its first frame.
+    /// A flat card: who, which moment, and how far through it is — the
+    /// percentage is what makes it obvious the clip is playing rather than
+    /// frozen on its first frame.
+    ///
+    /// It used to be a white bar sweeping across 82% of the height as well,
+    /// which read as part of the app rather than part of the footage: in a
+    /// two-up film it drew a white line across somebody's take, and the first
+    /// question it got asked was what that line was.
     private static func render(
         size: CGSize,
         color: UIColor,
@@ -132,17 +142,11 @@ enum DemoClipFactory {
             }
 
             draw(author, y: size.height * 0.36, size: size.width * 0.09, weight: .heavy)
-            // Central motion evidence survives the portrait compositor's crop;
-            // a sweeping bar near the bottom alone can be cropped out entirely.
+            // Kept in the middle of the frame, where a cell of any shape still
+            // shows it. Anything near an edge can be cropped away by a mosaic
+            // and take the only sign of movement with it.
             draw("MOMENT \(moment) · \(Int(progress * 100))%", y: size.height * 0.46, size: size.width * 0.055, weight: .bold)
             draw(label, y: size.height * 0.53, size: size.width * 0.045, weight: .medium)
-
-            let barHeight = size.height * 0.012
-            let barY = size.height * 0.82
-            UIColor.white.withAlphaComponent(0.3).setFill()
-            ctx.fill(CGRect(x: 0, y: barY, width: size.width, height: barHeight))
-            UIColor.white.setFill()
-            ctx.fill(CGRect(x: 0, y: barY, width: size.width * progress, height: barHeight))
         }
     }
 

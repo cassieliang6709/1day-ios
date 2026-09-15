@@ -186,6 +186,17 @@ enum CloudKitService {
         let recordedAt: Date
         let localURL: URL       // downloaded asset, cached on disk
         let overlayText: String?
+        /// Where the author put their caption.
+        ///
+        /// Read-only for now, and nil in practice: a caption edit doesn't sync
+        /// at all yet (see `ChallengeStore.updateOverlayText`), so nothing
+        /// writes this field. It is read anyway, because the day edits do sync
+        /// is the day a friend's placement has to be honoured rather than
+        /// silently recentred — and a clip whose sticker string doesn't parse
+        /// still shows its words, in the old place.
+        /// Defaulted, so a fixture or a test that doesn't care about captions
+        /// doesn't have to say so.
+        var captionSticker: CaptionSticker? = nil
     }
 
     /// Internal rather than private so the naming rule can be checked without a
@@ -261,7 +272,9 @@ enum CloudKitService {
                 authorName: record["authorName"] as? String ?? "Friend",
                 recordedAt: record["recordedAt"] as? Date ?? .now,
                 localURL: dest,
-                overlayText: record["overlayText"] as? String))
+                overlayText: record["overlayText"] as? String,
+                captionSticker: (record["captionSticker"] as? String)
+                    .flatMap(CaptionSticker.init(cloudValue:))))
         }
         return clips
     }

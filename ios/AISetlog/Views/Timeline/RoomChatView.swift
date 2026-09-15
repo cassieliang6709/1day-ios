@@ -81,7 +81,9 @@ private struct RoomChatConversation: View {
                                 Text(text("在这里聊聊你们的故事", "Talk about your story here"))
                                     .foregroundStyle(.secondary).padding(.top, 48)
                             }
-                            ForEach(entries) { entry in bubble(entry).id(entry.id) }
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                bubble(entry, namesAuthor: namesAuthor(at: index)).id(entry.id)
+                            }
                             Color.clear.frame(height: 1).id("latest")
                                 .onAppear { followsLatest = true }
                                 .onDisappear { followsLatest = false }
@@ -135,12 +137,38 @@ private struct RoomChatConversation: View {
         }
     }
 
-    private func bubble(_ entry: RoomChatEntry) -> some View {
-        let mine = entry.message.authorID == session.state?.scope.accountID
+    private func isMine(_ entry: RoomChatEntry) -> Bool {
+        entry.message.authorID == session.state?.scope.accountID
+    }
+
+    /// Whether this bubble has to say whose it is.
+    ///
+    /// The name used to sit over every bubble, so the room most people are in
+    /// — two of you — printed the same two names six times down one screen,
+    /// including over my own messages, which are already the blue ones on the
+    /// right. A name answers "which of you said this", and in a two-person
+    /// room there is only one other answer: it gets said once, on the first
+    /// thing the other person says, and after that the side of the screen the
+    /// bubble is on carries it. Three or more people in the room and the
+    /// question comes back, so each run of messages is labelled again.
+    private func namesAuthor(at index: Int) -> Bool {
+        let entry = entries[index]
+        guard !isMine(entry) else { return false }
+        let earlier = entries[..<index]
+        guard earlier.contains(where: { !isMine($0) }) else { return true }
+        let others = Set(entries.filter { !isMine($0) }.map(\.message.authorID))
+        guard others.count > 1 else { return false }
+        return earlier.last?.message.authorID != entry.message.authorID
+    }
+
+    private func bubble(_ entry: RoomChatEntry, namesAuthor: Bool) -> some View {
+        let mine = isMine(entry)
         return HStack(alignment: .bottom) {
             if mine { Spacer(minLength: 40) }
             VStack(alignment: mine ? .trailing : .leading, spacing: 5) {
-                Text(entry.message.authorName).font(.caption).foregroundStyle(.secondary)
+                if namesAuthor {
+                    Text(entry.message.authorName).font(.caption).foregroundStyle(.secondary)
+                }
                 if let context = entry.message.moment {
                     Text(text("来自第 \(context) 个瞬间", "From moment \(context)"))
                         .font(.caption2).foregroundStyle(.secondary)

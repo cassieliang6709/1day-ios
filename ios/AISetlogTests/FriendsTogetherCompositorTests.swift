@@ -79,18 +79,42 @@ final class FriendsTogetherCompositorTests: XCTestCase {
             "The right edge of a landscape take was cut off in a portrait cell")
     }
 
-    func testTheGapBetweenCellsStaysBlackSoNobodyBleedsIntoAnybodyElse() async throws {
+    /// The automatic canvas is built so that a cell is the take's own shape, so
+    /// two portrait takes are whole *and* fill the frame — no bed, no bars, and
+    /// the bands land exactly where they do in the take.
+    func testTwoPortraitTakesFillTheAutomaticCanvasWholeAndUncropped() async throws {
         let banded = try await bandedClip()
-        let film = try await render([banded, banded], aspect: .landscape)
+        let film = try await render([banded, banded])
         let frame = try await sample(film)
 
-        // The seam down the middle of a two-up grid. Both cells are inset, so
-        // whatever is there came from the instruction background, not a take
-        // that overflowed — the failure the old crop rectangle existed to stop.
-        let seam = frame.pixel(x: frame.size.width / 2, y: frame.size.height / 2)
-        XCTAssertLessThan(seam.r, 60)
-        XCTAssertLessThan(seam.g, 60)
-        XCTAssertLessThan(seam.b, 60)
+        XCTAssertEqual(frame.size.width / frame.size.height, 9.0 / 8, accuracy: 0.02)
+        for column in [frame.size.width * 0.25, frame.size.width * 0.75] {
+            // 0...0.04 and 0.96...1 are inside the take's own 8% bands only if
+            // nothing was cropped off the ends and nothing was padded onto them.
+            XCTAssertTrue(
+                frame.contains(.red, alongColumn: column, in: 0...0.04),
+                "the top of a take is missing from the automatic canvas")
+            XCTAssertTrue(
+                frame.contains(.blue, alongColumn: column, in: 0.96...1),
+                "the bottom of a take is missing from the automatic canvas")
+        }
+    }
+
+    func testCellsMeetWithNoBarDownTheSeam() async throws {
+        let banded = try await bandedClip()
+        let film = try await render([banded, banded])
+        let frame = try await sample(film)
+
+        // Across the join, at the green middle of both takes. The cells used to
+        // be inset by a fraction of the width, which put a black bar here — a
+        // hairline in the export, a thick seam once a player had scaled the
+        // film up to a phone.
+        let middle = frame.size.height / 2
+        for offset in -2...2 {
+            let seam = frame.pixel(x: frame.size.width / 2 + CGFloat(offset), y: middle)
+            XCTAssertGreaterThan(
+                seam.g, 100, "a dark seam at x offset \(offset) down the middle of the film")
+        }
     }
 
     // MARK: - Fixtures
@@ -182,8 +206,11 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         return buffer
     }
 
+    /// `aspect: nil` is the product's own path: the canvas is computed from the
+    /// takes. Naming one is what a person does in the room demo, and it is the
+    /// case where a cell stops matching the take.
     private func render(
-        _ urls: [URL], aspect: VideoStitcher.Aspect
+        _ urls: [URL], aspect: VideoStitcher.Aspect? = nil
     ) async throws -> URL {
         var options = VideoStitcher.Options()
         options.layout = .friendsTogether

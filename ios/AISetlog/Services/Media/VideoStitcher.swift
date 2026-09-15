@@ -24,25 +24,17 @@ enum VideoStitcher {
         let subtitle: String
     }
 
-    /// The shape of the finished film.
+    /// The shape of the finished film, when somebody asks for one by name.
     ///
     /// A property of the finished film, separate from source capture direction.
-    /// Automatic output reverses that direction; an explicit choice overrides it.
-    /// Each layout still owns its existing fit/crop behaviour. Changing the
-    /// canvas does not rotate the source or implement a new crop-free layout.
+    /// Left unset, the canvas is computed from the takes instead — see
+    /// `mosaicRenderSize`. An explicit choice overrides that, and then the cells
+    /// stop matching the takes, so the compositor's fit-and-bed fallback is what
+    /// keeps everybody whole. Changing the canvas does not rotate the source.
     enum Aspect: String, CaseIterable, Identifiable {
         case portrait, landscape, square
 
         var id: String { rawValue }
-
-        /// Automatic output uses the opposite of the oriented source, not the
-        /// phone's current pose or the encoded track dimensions. Square sources
-        /// have no opposite orientation and retain their original size.
-        static func defaultForSource(_ size: CGSize) -> Aspect? {
-            if size.height > size.width { return .landscape }
-            if size.width > size.height { return .portrait }
-            return nil
-        }
 
         /// width / height
         var ratio: CGFloat {
@@ -77,8 +69,9 @@ enum VideoStitcher {
         var layout: Layout = .sequential
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
-        /// nil selects the opposite orientation of the first usable clip,
-        /// after preferredTransform. An explicit aspect always wins.
+        /// nil builds the canvas from the takes, so that every cell of the
+        /// mosaic comes out the shape the takes were filmed in and nothing is
+        /// cropped — see `mosaicRenderSize`. An explicit aspect always wins.
         var aspect: Aspect?
         /// How you want your own footage graded, the same value the review
         /// screen plays with. Costs an extra pass over your clips when it isn't
@@ -114,6 +107,7 @@ enum VideoStitcher {
         let label: String?
         let authorName: String?
         let overlayText: String?
+        let captionSticker: CaptionSticker?
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
@@ -145,6 +139,10 @@ enum VideoStitcher {
     /// to say their own thing about it.
     private struct AuthorCaptionWindow {
         let text: String
+        /// Where in the cell the words go. The fractions are measured against
+        /// the cell, not the canvas, so a sticker somebody dragged to the top
+        /// left of their own take is at the top left of their own cell.
+        let sticker: CaptionSticker
         /// In render space, origin top-left, matching the grid's own maths.
         let cell: CGRect
         let start: Double
@@ -157,6 +155,7 @@ enum VideoStitcher {
         let label: String?
         let authorName: String?
         let overlayText: String?
+        let captionSticker: CaptionSticker?
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
@@ -195,6 +194,7 @@ enum VideoStitcher {
             loaded.append(LoadedClip(
                 day: clip.day, label: clip.label, authorName: clip.authorName,
                 overlayText: clip.overlayText,
+                captionSticker: clip.captionSticker,
                 recordedAt: clip.recordedAt,
                 emoji: clip.emoji, comments: clip.comments,
                 asset: asset, videoRange: videoRange, videoTrack: video,
@@ -204,11 +204,20 @@ enum VideoStitcher {
         guard !loaded.isEmpty else { throw StitchError.noClips }
 
         let firstSize = loaded[0].orientedSize
-        let aspect = options.aspect ?? Aspect.defaultForSource(firstSize)
-        let renderSize = aspect?.renderSize(sourceLongEdge: max(firstSize.width, firstSize.height))
-            ?? CGSize(
-                width: (firstSize.width / 2).rounded(.down) * 2,
-                height: (firstSize.height / 2).rounded(.down) * 2)
+        let sourceAspect = firstSize.height > 0 ? firstSize.width / firstSize.height : 1
+        // How many takes ever share one frame. A film's canvas is one shape for
+        // its whole length, so the busiest moment is the one that sets it; a
+        // quieter moment inside the same film falls back to fit-and-bed.
+        let widestMoment: Int = switch options.layout {
+        case .sequential: 1
+        case .friendsTogether:
+            Dictionary(grouping: loaded, by: \.day).values.map(\.count).max() ?? 1
+        }
+        let renderSize = options.aspect?
+            .renderSize(sourceLongEdge: max(firstSize.width, firstSize.height))
+            ?? mosaicRenderSize(
+                count: widestMoment, sourceAspect: sourceAspect,
+                longEdge: max(firstSize.width, firstSize.height))
 
         #if targetEnvironment(simulator)
         let titleOffset = CMTime.zero
@@ -234,6 +243,7 @@ enum VideoStitcher {
         case .friendsTogether:
             try buildFriendsTogether(
                 loaded: loaded, into: composition, renderSize: renderSize,
+                sourceAspect: sourceAspect,
                 startAt: titleOffset, instructions: &instructions,
                 audioParams: &audioParams, captions: &captions,
                 authorCaptions: &authorCaptions)
@@ -469,6 +479,7 @@ enum VideoStitcher {
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
                 overlayText: p.clip.overlayText,
+                captionSticker: p.clip.captionSticker,
                 recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
@@ -519,6 +530,7 @@ enum VideoStitcher {
         loaded: [LoadedClip],
         into composition: AVMutableComposition,
         renderSize: CGSize,
+        sourceAspect: CGFloat,
         startAt: CMTime,
         instructions: inout [any AVVideoCompositionInstructionProtocol],
         audioParams: inout [AVMutableAudioMixInputParameters],
@@ -535,11 +547,15 @@ enum VideoStitcher {
             let end = CMTimeAdd(cursor, groupDuration)
             var placements: [FriendsTogetherPlacement] = []
 
-            let (rows, columns) = grid(for: clips.count, in: renderSize)
-            let cellSize = CGSize(
-                width: renderSize.width / CGFloat(columns),
-                height: renderSize.height / CGFloat(rows))
-            let gap = renderSize.width * 0.004
+            let (rows, columns) = grid(for: clips.count, sourceAspect: sourceAspect)
+            // Cells meet on rounded pixel boundaries and tile the canvas
+            // exactly. They used to be inset by a gap, which drew a black bar
+            // down the middle of the film — and the fraction that looks like a
+            // hairline in an export is a thick seam once a player has scaled
+            // the film up to a phone.
+            func edge(_ step: Int, of count: Int, across total: CGFloat) -> CGFloat {
+                (total * CGFloat(step) / CGFloat(count)).rounded()
+            }
             let volume = max(Float(0.15), Float(0.8) / Float(clips.count))
 
             for (index, clip) in clips.enumerated() {
@@ -562,12 +578,13 @@ enum VideoStitcher {
 
                 let row = index / columns
                 let column = index % columns
+                let left = edge(column, of: columns, across: renderSize.width)
+                let top = edge(row, of: rows, across: renderSize.height)
                 let cell = CGRect(
-                    x: CGFloat(column) * cellSize.width,
-                    y: CGFloat(row) * cellSize.height,
-                    width: cellSize.width,
-                    height: cellSize.height)
-                    .insetBy(dx: gap, dy: gap)
+                    x: left,
+                    y: top,
+                    width: edge(column + 1, of: columns, across: renderSize.width) - left,
+                    height: edge(row + 1, of: rows, across: renderSize.height) - top)
                 // The cell is handed over as geometry, not as a transform: the
                 // compositor has to scale the take twice — once to cover, once
                 // to fit — and a layer instruction can only carry one.
@@ -580,7 +597,7 @@ enum VideoStitcher {
                 if let words = clip.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !words.isEmpty {
                     authorCaptions.append(AuthorCaptionWindow(
-                        text: words, cell: cell,
+                        text: words, sticker: clip.captionSticker ?? .default, cell: cell,
                         start: CMTimeGetSeconds(cursor), end: CMTimeGetSeconds(end)))
                 }
 
@@ -614,6 +631,7 @@ enum VideoStitcher {
                 label: clips.first?.label,
                 authorName: nil,
                 overlayText: nil,
+                captionSticker: nil,
                 recordedAt: clips.compactMap(\.recordedAt).max(),
                 emoji: clips.flatMap(\.emoji),
                 comments: clips.flatMap(\.comments),
@@ -642,20 +660,68 @@ enum VideoStitcher {
 
     /// How a moment's clips share the frame when everyone filmed it.
     ///
-    /// A square-ish grid put two people side by side, which in a portrait film
-    /// crops each 9:16 clip to a sliver — heads clipped, nobody legible. Two or
-    /// three people stack top to bottom instead, so each keeps the full width
-    /// and the moment reads as a list of who was there. Past three, strips get
-    /// too short to see and a grid is the better trade.
-    static func grid(for count: Int, in renderSize: CGSize) -> (rows: Int, columns: Int) {
+    /// The split runs across the take's short edge, so a cell comes out the
+    /// same shape as the take going into it: portrait takes stand side by side,
+    /// landscape takes stack. That is the whole trick behind a crop-free
+    /// mosaic — see `mosaicRenderSize`, which sizes the canvas to match.
+    ///
+    /// Past three the strip gets too narrow to see a person in, so it squares
+    /// off into a grid, which for four portrait takes is 2×2 and lands back on
+    /// a 9:16 canvas exactly.
+    ///
+    /// `sourceAspect` is width / height of the takes *after* rotation.
+    static func grid(for count: Int, sourceAspect: CGFloat) -> (rows: Int, columns: Int) {
         guard count > 1 else { return (1, 1) }
-        let isPortrait = renderSize.height >= renderSize.width
         if count <= 3 {
-            return isPortrait ? (count, 1) : (1, count)
+            return sourceAspect < 1 ? (1, count) : (count, 1)
         }
-        let side = Int(ceil(sqrt(Double(count))))
-        let other = Int(ceil(Double(count) / Double(side)))
-        return isPortrait ? (side, other) : (other, side)
+        let columns = Int(ceil(sqrt(Double(count))))
+        let rows = Int(ceil(Double(count) / Double(columns)))
+        return (rows, columns)
+    }
+
+    /// The canvas that makes every cell of a `count`-up mosaic exactly the
+    /// shape of the takes filling it — so nothing is cropped and nothing is
+    /// padded.
+    ///
+    /// Two portrait takes side by side need a canvas twice as wide as one of
+    /// them: 9:8. Three need 27:16, which is all but 16:9. Four go 2×2 and land
+    /// on 9:16 again. This is what the old "automatic output is the opposite of
+    /// the source" rule was reaching for — it flipped portrait takes into a
+    /// 16:9 film, which is right for three people and wrong for two, and it
+    /// flipped a one-person diary too, where the opposite orientation is the
+    /// one thing it cannot be.
+    ///
+    /// `longEdge` caps the result, so a four-up film isn't four times the
+    /// pixels of a one-up.
+    /// How far from square a canvas may go before matching the cells to the
+    /// takes costs more than it earns.
+    ///
+    /// Only square takes ever reach it. Three of them in a strip want a 1:3
+    /// canvas, which is a crop-free film nobody can watch on a phone — and the
+    /// two shapes a phone actually films, 9:16 and 16:9, never get past 27:16
+    /// either way. Past the limit the canvas becomes the take's own shape and
+    /// the compositor's fit-and-bed keeps everybody whole instead.
+    private static let elongationLimit: CGFloat = 2
+
+    static func mosaicRenderSize(
+        count: Int, sourceAspect: CGFloat, longEdge: CGFloat
+    ) -> CGSize {
+        guard sourceAspect.isFinite, sourceAspect > 0, longEdge > 0 else {
+            return CGSize(width: 2, height: 2)
+        }
+        let (rows, columns) = grid(for: max(count, 1), sourceAspect: sourceAspect)
+        let mosaic = sourceAspect * CGFloat(columns) / CGFloat(rows)
+        let ratio = mosaic > elongationLimit || mosaic < 1 / elongationLimit
+            ? sourceAspect
+            : mosaic
+        let raw = ratio >= 1
+            ? CGSize(width: longEdge, height: longEdge / ratio)
+            : CGSize(width: longEdge * ratio, height: longEdge)
+        // H.264 wants even dimensions, and a zero would take the export with it.
+        return CGSize(
+            width: max((raw.width / 2).rounded(.down) * 2, 2),
+            height: max((raw.height / 2).rounded(.down) * 2, 2))
     }
 
     // MARK: - Overlays (device only)
@@ -727,52 +793,85 @@ enum VideoStitcher {
     /// cell it belongs to, and it sits just inside that cell's bottom edge. In a
     /// two-up grid that puts each person's line under their own face, which is
     /// the only arrangement where both can be read at once.
+    /// One person's words, drawn where they put them and the way they chose.
+    ///
+    /// `frame` is what the sticker's fractions are measured against, in render
+    /// space with the origin at the top left: the whole canvas for a film
+    /// nobody shares the frame in, one cell for a mosaic. The returned layer is
+    /// already placed in Core Animation's coordinates (which count from the
+    /// bottom) and carries no animation — the caller owns the fade, because the
+    /// two callers fade on different clocks.
+    private static func captionLayer(
+        text: String, sticker: CaptionSticker, in frame: CGRect, renderSize: CGSize
+    ) -> CALayer {
+        let minEdge = min(frame.width, frame.height)
+        let maxWidth = frame.width * 0.76
+        let banded = sticker.style == .band
+        var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        let weight: UIFont.Weight = sticker.style == .headline ? .heavy : .bold
+        var attributed = NSAttributedString()
+        repeat {
+            attributed = NSAttributedString(string: text, attributes: [
+                .font: roundedFont(size: fontSize, weight: weight),
+                .foregroundColor: UIColor.white,
+            ])
+            if attributed.size().width + (banded ? fontSize * 1.6 : 0) <= maxWidth { break }
+            fontSize *= 0.92
+        } while fontSize > 10
+
+        let textSize = attributed.size()
+        let padH = banded ? fontSize * 0.8 : 0
+        let padV = banded ? fontSize * 0.42 : 0
+        let box = CGSize(
+            width: min(textSize.width, maxWidth) + padH * 2,
+            height: textSize.height + padV * 2)
+
+        // Kept off the edge of its frame, and clamped in an order that survives
+        // a sticker wider than the space left for it: the lower bound wins.
+        let inset = frame.width * 0.03
+        let lower = frame.minX + inset
+        let upper = max(lower, frame.maxX - inset - box.width)
+        let x = min(max(frame.minX + frame.width * sticker.x - box.width / 2, lower), upper)
+        let yFromTop = frame.minY + frame.height * sticker.y
+        let container = CALayer()
+        container.frame = CGRect(
+            x: x, y: renderSize.height - yFromTop - box.height / 2,
+            width: box.width, height: box.height)
+        if banded {
+            container.backgroundColor = UIColor.black.withAlphaComponent(0.45).cgColor
+            container.cornerRadius = box.height * 0.34
+        }
+
+        let layer = CATextLayer()
+        layer.string = attributed
+        layer.alignmentMode = .center
+        layer.truncationMode = .end
+        layer.contentsScale = 2
+        layer.frame = CGRect(
+            x: padH, y: padV, width: box.width - padH * 2, height: textSize.height)
+        if !banded {
+            // Nothing behind the words, so they need their own edge to stay
+            // readable over whatever they landed on.
+            layer.shadowColor = UIColor.black.withAlphaComponent(0.32).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = max(fontSize * 0.08, 3)
+            layer.shadowOffset = CGSize(width: 0, height: fontSize * 0.06)
+        }
+        container.addSublayer(layer)
+        return container
+    }
+
     private static func addAuthorCaption(
         _ caption: AuthorCaptionWindow, to parentLayer: CALayer, renderSize: CGSize
     ) {
-        let maxWidth = caption.cell.width * 0.88
-        var fontSize = caption.cell.height * 0.05
-        var attributed: NSAttributedString
-        repeat {
-            let baseFont = UIFont.systemFont(ofSize: fontSize, weight: .semibold)
-            let font = UIFont(
-                descriptor: baseFont.fontDescriptor.withDesign(.rounded) ?? baseFont.fontDescriptor,
-                size: fontSize)
-            attributed = NSAttributedString(string: caption.text, attributes: [
-                .font: font,
-                .foregroundColor: UIColor.white,
-            ])
-            if attributed.size().width + fontSize * 1.6 <= maxWidth { break }
-            fontSize *= 0.92
-        } while fontSize > 8
-        let textSize = attributed.size()
-
-        let padH = fontSize * 0.8
-        let padV = fontSize * 0.4
-        let pillSize = CGSize(
-            width: min(textSize.width + padH * 2, maxWidth),
-            height: textSize.height + padV * 2)
-
-        // CA coordinates count from the bottom of the frame; the cell counts
-        // from the top, like the rest of the grid maths.
-        let cellBottomFromBase = renderSize.height - caption.cell.maxY
-        let pill = CALayer()
-        pill.frame = CGRect(
-            x: caption.cell.midX - pillSize.width / 2,
-            y: cellBottomFromBase + caption.cell.height * 0.05,
-            width: pillSize.width, height: pillSize.height)
-        pill.backgroundColor = UIColor.black.withAlphaComponent(0.45).cgColor
-        pill.cornerRadius = pillSize.height / 2
-
-        let text = CATextLayer()
-        text.string = attributed
-        text.alignmentMode = .center
-        text.truncationMode = .end
-        text.contentsScale = 2
-        text.frame = CGRect(
-            x: 0, y: (pillSize.height - textSize.height) / 2,
-            width: pillSize.width, height: textSize.height)
-        pill.addSublayer(text)
+        // Measured against this person's cell rather than the canvas, so their
+        // words land on their own footage wherever they dragged them. This used
+        // to be a dark pill pinned to the bottom of the cell whatever the
+        // review screen had shown, which is the one place a caption could be
+        // that nobody had chosen.
+        let pill = captionLayer(
+            text: caption.text, sticker: caption.sticker,
+            in: caption.cell, renderSize: renderSize)
 
         pill.opacity = 0
         let duration = max(caption.end - caption.start, 0.1)
@@ -1032,36 +1131,9 @@ enum VideoStitcher {
         guard let rawText = caption.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
               !rawText.isEmpty else { return }
 
-        let target = CGRect(origin: .zero, size: renderSize)
-        let maxWidth = target.width * 0.68
-        var fontSize = min(target.width, target.height) * 0.062
-        var attributed: NSAttributedString
-        repeat {
-            attributed = NSAttributedString(string: rawText, attributes: [
-                .font: roundedFont(size: fontSize, weight: .bold),
-                .foregroundColor: UIColor.white,
-            ])
-            if attributed.size().width <= maxWidth { break }
-            fontSize *= 0.92
-        } while fontSize > 10
-
-        let textSize = attributed.size()
-        let textLayerSize = CGSize(width: maxWidth, height: textSize.height * 1.18)
-
-        let videoCenter = CGPoint(x: target.midX, y: target.minY + target.height * 0.43)
-        let caOrigin = CGPoint(
-            x: max(target.minX + target.width * 0.08, min(videoCenter.x - textLayerSize.width / 2, target.maxX - textLayerSize.width - target.width * 0.08)),
-            y: renderSize.height - videoCenter.y - textLayerSize.height / 2)
-
-        let text = CATextLayer()
-        text.string = attributed
-        text.alignmentMode = .center
-        text.contentsScale = 2
-        text.shadowColor = UIColor.black.withAlphaComponent(0.32).cgColor
-        text.shadowOpacity = 1
-        text.shadowRadius = max(fontSize * 0.08, 3)
-        text.shadowOffset = CGSize(width: 0, height: fontSize * 0.06)
-        text.frame = CGRect(origin: caOrigin, size: textLayerSize)
+        let text = captionLayer(
+            text: rawText, sticker: caption.captionSticker ?? .default,
+            in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
 
         text.opacity = 0
         let anim = CAKeyframeAnimation(keyPath: "opacity")

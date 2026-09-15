@@ -237,27 +237,38 @@ enum Strings {
             ? "今天还差 \(remaining) 个瞬间，留一个给此刻吧。"
             : "\(remaining) moment\(remaining == 1 ? "" : "s") left today. Save one for now."
     }
+    /// Empty is how `AccountStore` stores "no name yet", so it has to behave
+    /// like nil in every line below. `name.map` on "" would otherwise render a
+    /// leading space and an orphaned verb — " 评论了你们的片段。"
+    private static func named(_ name: String?) -> String? {
+        guard let name, !name.isEmpty else { return nil }
+        return name
+    }
+
+    // "朋友" was wrong twice over: it asserts a relationship the app never
+    // established, and a room member with no name is not necessarily anyone's
+    // friend. "有人" / "Someone" says only what is known.
     static func roomClipActivity(name: String?, day: Int) -> String {
         if lang == .chinese {
-            return name.map { "\($0) 刚上传了第 \(day) 天的片段。" }
-                ?? "朋友刚上传了第 \(day) 天的片段。"
+            return named(name).map { "\($0) 刚上传了第 \(day) 天的片段。" }
+                ?? "有人刚上传了第 \(day) 天的片段。"
         }
-        return name.map { "\($0) just added their Day \(day) clip." }
-            ?? "A friend just added their Day \(day) clip."
+        return named(name).map { "\($0) just added their Day \(day) clip." }
+            ?? "Someone just added their Day \(day) clip."
     }
     static func roomCommentActivity(name: String?) -> String {
         if lang == .chinese {
-            return name.map { "\($0) 评论了你们的片段。" } ?? "朋友评论了你们的片段。"
+            return named(name).map { "\($0) 评论了你们的片段。" } ?? "有人评论了你们的片段。"
         }
-        return name.map { "\($0) commented on your shared film." }
-            ?? "A friend commented on your shared film."
+        return named(name).map { "\($0) commented on your shared film." }
+            ?? "Someone commented on your shared film."
     }
     static func roomReactionActivity(name: String?) -> String {
         if lang == .chinese {
-            return name.map { "\($0) 回应了你们的片段。" } ?? "朋友回应了你们的片段。"
+            return named(name).map { "\($0) 回应了你们的片段。" } ?? "有人回应了你们的片段。"
         }
-        return name.map { "\($0) reacted to your shared film." }
-            ?? "A friend reacted to your shared film."
+        return named(name).map { "\($0) reacted to your shared film." }
+            ?? "Someone reacted to your shared film."
     }
 
     // MARK: Models
@@ -632,12 +643,26 @@ enum Strings {
     static var orientationHeader: String { lang == .chinese ? "画幅" : "Orientation" }
     static var orientationPortrait: String { lang == .chinese ? "竖屏" : "Portrait" }
     static var orientationLandscape: String { lang == .chinese ? "横屏" : "Landscape" }
-    static var switchOrientation: String { lang == .chinese ? "切换横竖屏" : "Switch orientation" }
+    static var orientationSquare: String { lang == .chinese ? "正方形" : "Square" }
+    static var switchOrientation: String { lang == .chinese ? "切换画幅" : "Switch frame" }
     static var flipCamera: String { lang == .chinese ? "切换前后摄像头" : "Flip camera" }
-    static func noMatchingPlan(landscape: Bool) -> String {
-        let kind = landscape
-            ? (lang == .chinese ? "横屏" : "landscape")
-            : (lang == .chinese ? "竖屏" : "portrait")
+
+    /// The frame a clip was filmed in, named the way the picker names it — so
+    /// "no landscape plan yet" and the row that would have created one agree.
+    ///
+    /// Taken as the orientation rather than a `landscape: Bool`: the bool had
+    /// no third answer, and a square clip asking for "a portrait story" is a
+    /// sentence that sends somebody to the wrong place.
+    static func orientationName(_ orientation: Challenge.Orientation) -> String {
+        switch orientation {
+        case .portrait: lang == .chinese ? "竖屏" : "portrait"
+        case .landscape: lang == .chinese ? "横屏" : "landscape"
+        case .square: lang == .chinese ? "正方形" : "square"
+        }
+    }
+
+    static func noMatchingPlan(_ orientation: Challenge.Orientation) -> String {
+        let kind = orientationName(orientation)
         return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
     }
 
@@ -683,10 +708,8 @@ enum Strings {
     }
     /// No matching story for this clip's frame, from inside the drafts list —
     /// where "retake" isn't an option, so it says what would help instead.
-    static func noPlaceForDraft(landscape: Bool) -> String {
-        let kind = lang == .chinese
-            ? (landscape ? "横屏" : "竖屏")
-            : (landscape ? "landscape" : "portrait")
+    static func noPlaceForDraft(_ orientation: Challenge.Orientation) -> String {
+        let kind = orientationName(orientation)
         return lang == .chinese
             ? "还没有\(kind)的故事能放这段"
             : "No \(kind) story can take this yet"

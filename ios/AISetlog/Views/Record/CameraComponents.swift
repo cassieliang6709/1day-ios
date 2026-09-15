@@ -64,7 +64,12 @@ struct CameraShell<Content: View>: View {
             }
             .shadow(color: tint.opacity(0.35), radius: 18, y: 8)
         }
-        .aspectRatio(aspectRatio ?? 9 / 14.3, contentMode: .fit)
+        // The fallback is the portrait capture shape, same as
+        // `Challenge.Orientation.portrait.aspectRatio`. It used to be 9/14.3,
+        // which is wider than anything the camera writes — and since `content`
+        // aspect-fills, a wider shell meant the preview was a cropped, scaled-
+        // up view of the take rather than the take.
+        .aspectRatio(aspectRatio ?? 9 / 16, contentMode: .fit)
     }
 }
 

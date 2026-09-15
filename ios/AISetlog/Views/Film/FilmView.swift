@@ -125,6 +125,10 @@ struct FilmView: View {
         var authorName: String?
         var label: String?
         var overlayText: String?
+        /// Where those words are burned. Moving a caption changes the frames
+        /// without changing anything else, so a stale film has to be noticed
+        /// here or the old one gets handed back.
+        var captionSticker: CaptionSticker?
         var recordedAt: Date?
         var emoji: [String] = []
         var comments: [String] = []
@@ -136,6 +140,7 @@ struct FilmView: View {
             authorName = clip.authorName
             label = clip.label
             overlayText = clip.overlayText
+            captionSticker = clip.captionSticker
             recordedAt = clip.recordedAt
             emoji = clip.emoji
             comments = clip.comments

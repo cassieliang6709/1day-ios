@@ -11,16 +11,37 @@ struct Challenge: Codable, Identifiable {
     enum Orientation: String, Codable, CaseIterable, Identifiable {
         case portrait
         case landscape
+        /// Filmed through a square viewfinder and cropped to square before the
+        /// file is ever handed on, so everything downstream — review, drafts,
+        /// the roster thumbnails, the stitcher — sees a square take and needs
+        /// to know nothing about this case. See `SquareCrop`.
+        case square
 
         var id: String { rawValue }
 
         /// Aspect (width / height) of the camera shell, board cards, preview.
+        ///
+        /// These are the shapes the camera actually writes, not shapes picked
+        /// to sit well in a layout. Every surface that shows a clip aspect-
+        /// *fills* its box, so a box wider than the file crops the top and
+        /// bottom off and scales up what is left. `9 / 14.3` here — a number
+        /// matching no real video — made the live preview and the review
+        /// screen 12% larger than the take that was actually recorded, which
+        /// reads as the camera having zoomed in on your face.
+        ///
+        /// Keep these equal to `VideoStitcher.Aspect.ratio`. Two constants for
+        /// one fact is what let them drift apart in the first place.
         var aspectRatio: CGFloat {
             switch self {
-            case .portrait: 9 / 14.3
-            case .landscape: 14.3 / 9
+            case .portrait: 9 / 16
+            case .landscape: 16 / 9
+            case .square: 1
             }
         }
+
+        /// Whether a clip filmed this way round has to be cropped after
+        /// recording. The camera only ever writes the sensor's whole frame.
+        var cropsAfterRecording: Bool { self == .square }
     }
 
     enum ClipLength: String, Codable, CaseIterable, Identifiable {

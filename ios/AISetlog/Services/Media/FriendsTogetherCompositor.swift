@@ -60,14 +60,16 @@ final class FriendsTogetherInstruction: NSObject, AVVideoCompositionInstructionP
 
 /// Draws the shared-room grid without cropping anybody.
 ///
-/// Each cell gets two copies of the same take: one scaled up until it covers the
-/// cell and blurred, and the original scaled down until all of it fits, centred
-/// on top. So the take is complete — the top of a head, the edge of a room — and
-/// the leftover space is that person's own colours rather than a black bar.
+/// A cell the same shape as the take — which is what `VideoStitcher`'s
+/// automatic canvas produces — is simply filled: the take covers it exactly,
+/// nothing cropped, nothing padded, and two cells meet without a seam.
 ///
-/// The alternative, and what this replaces, was a centred crop: it filled the
-/// cell exactly and threw away whatever the cell's aspect ratio disagreed with,
-/// which for a 9:16 take in a landscape cell is most of the person.
+/// When the cell is a different shape, because an aspect was asked for by name
+/// or because one person's phone films 4:3 while another's films 16:9, filling
+/// it would cut the difference off the take. So a small difference is absorbed
+/// by cropping (`cropAllowance`) and a large one isn't: the take is scaled down
+/// until all of it fits and sits on a blurred, slightly darkened copy of
+/// itself. The leftover space is that person's own colours — never a black bar.
 final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     /// Deep enough to soften a face past recognition, shallow enough that the
     /// bed still reads as the same room. Proportional to the cell so it looks
@@ -76,6 +78,13 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     /// The bed sits back a little, so two adjacent cells don't bleed into each
     /// other and the sharp copy is clearly the subject.
     private static let backgroundDim = -0.08
+    /// How much of a take may be cropped to fill a cell of the wrong shape
+    /// before the fit-and-bed fallback takes over.
+    ///
+    /// An eighth covers the mismatch between the phone shapes people actually
+    /// film on — 4:3 against 16:9 is a fifth, which does not, and that is the
+    /// intent: a fifth of somebody's frame is a person's shoulder.
+    private static let cropAllowance: CGFloat = 0.125
 
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let queue = DispatchQueue(label: "1day.friends-together-compositor")
@@ -151,6 +160,13 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
 
         let fill = max(cell.width / oriented.width, cell.height / oriented.height)
         let fit = min(cell.width / oriented.width, cell.height / oriented.height)
+
+        // Filling costs `1 - fit / fill` of the take. When that is affordable,
+        // the take covers the cell on its own and there is no bed to draw —
+        // which is also the fast path, and the common one.
+        if fill > 0, 1 - fit / fill <= Self.cropAllowance {
+            return scaled(image, by: fill, from: oriented, into: cell).cropped(to: cell)
+        }
 
         let bed = scaled(image, by: fill, from: oriented, into: cell)
             // Clamp before the blur, or it reads transparent black from past the

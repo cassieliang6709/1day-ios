@@ -90,6 +90,10 @@ final class VlogPlayback {
 
 struct VlogPlayer: View {
     let url: URL
+    /// What shape to lay out before the file has been read. The film's own
+    /// shape wins as soon as it's known: a shared-room film is a mosaic, and a
+    /// mosaic of portrait takes is not portrait — two of them make a 9:8 frame,
+    /// which in a 9:16 box is a thick black bar top and bottom.
     var aspectRatio: CGFloat = 9 / 16
     /// Autoplay once the film first appears — the payoff shouldn't need a tap.
     var autoplay = true
@@ -97,6 +101,9 @@ struct VlogPlayer: View {
     @State private var playback: VlogPlayback
     @State private var showsChrome = true
     @State private var expanded = false
+    @State private var measuredAspect: CGFloat?
+
+    private var shape: CGFloat { measuredAspect ?? aspectRatio }
 
     init(url: URL, aspectRatio: CGFloat = 9 / 16, autoplay: Bool = true) {
         self.url = url
@@ -110,7 +117,8 @@ struct VlogPlayer: View {
         // in a ZStack: the video is aspect-fit, so it's narrower than the space
         // it's given, and a sibling control bar would overhang its corners.
         PlayerSurface(player: playback.player)
-            .aspectRatio(aspectRatio, contentMode: .fit)
+            .aspectRatio(shape, contentMode: .fit)
+            .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
             .onTapGesture {

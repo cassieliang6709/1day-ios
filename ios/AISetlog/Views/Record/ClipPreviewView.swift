@@ -21,6 +21,9 @@ struct ClipPreviewView: View {
     var momentCount = 0
     var authorName: String?
     var overlayText: String?
+    /// The caption's sticker as it was handed in, for a clip this screen can't
+    /// read a live card for — a friend's take, or a page of the deck.
+    var captionSticker: CaptionSticker?
     var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Whether this page should hold a player at all. `ClipDeckReview` sets it
@@ -42,6 +45,10 @@ struct ClipPreviewView: View {
     /// record time. Saved to the card on submit/focus-out.
     @State private var captionDraft = ""
     @State private var editingCaption = false
+    /// The finger's translation while a sticker is being dragged, in points.
+    /// Only ever this — the card stores fractions, so nothing outlives the
+    /// gesture that would have to be converted back.
+    @State private var captionDrag: CGSize = .zero
     @FocusState private var captionFocused: Bool
     @State private var showComments = false
     @State private var showLook = false
@@ -87,12 +94,28 @@ struct ClipPreviewView: View {
         return store.challenge(challengeID)?.isShared ?? false
     }
 
+    /// The shape of the file, measured once it's readable.
+    ///
+    /// The story's own orientation only says how it was *filmed*, and a
+    /// stitched moment isn't the shape of the takes inside it: two portrait
+    /// takes side by side come out 9:8. Playing that edge to edge — which is
+    /// right for one portrait take, and what this screen used to do to
+    /// everything a portrait story contained — scaled it up until only the
+    /// middle quarter of its width was on screen, so what you saw of two
+    /// friends was the seam between them.
+    @State private var measuredAspect: CGFloat?
+
     private var isLandscape: Bool {
         guard let challengeID else { return false }
         return store.challenge(challengeID)?.resolvedOrientation == .landscape
     }
 
-    private var aspectRatio: CGFloat { isLandscape ? 16 / 9 : 9 / 16 }
+    private var aspectRatio: CGFloat { measuredAspect ?? (isLandscape ? 16 / 9 : 9 / 16) }
+
+    /// Edge to edge is for footage taller than it is wide, where filling the
+    /// screen costs a strip off each side. Anything squarer than that keeps its
+    /// own shape and sits on a blurred bed of itself.
+    private var fillsScreen: Bool { aspectRatio < 0.95 }
 
     /// Whether this clip is mine to change.
     private var isMine: Bool {
@@ -106,6 +129,38 @@ struct ClipPreviewView: View {
                                   liveText: card?.overlayText, snapshotText: overlayText)
     }
     private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
+
+    /// Where the caption sits and how it's drawn.
+    ///
+    /// Read by the same rule as the words themselves: my own live card wins on
+    /// my own page, a friend's belongs to the clip that was handed in, and a
+    /// card nobody has dragged has no sticker at all — which is the default
+    /// one, the place and style every caption used to be burned at, so nothing
+    /// moves under somebody opening an old story.
+    private var sticker: CaptionSticker {
+        let live = isMine && card != nil
+        return (live ? card?.captionSticker : captionSticker) ?? .default
+    }
+
+    private func saveSticker(_ new: CaptionSticker) {
+        guard let challengeID else { return }
+        store.updateCaptionSticker(new, day: day, challengeID: challengeID)
+    }
+
+    /// Which of the three styles the button is offering to switch to.
+    private var styleSymbol: String {
+        switch sticker.style {
+        case .outline: "textformat.size.smaller"
+        case .band: "textformat.size.larger"
+        case .headline: "character"
+        }
+    }
+
+    private func cycleCaptionStyle() {
+        let styles = CaptionSticker.Style.allCases
+        let next = styles[((styles.firstIndex(of: sticker.style) ?? 0) + 1) % styles.count]
+        saveSticker(CaptionSticker(x: sticker.x, y: sticker.y, style: next))
+    }
 
     private var localizedMomentTitle: String {
         slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
@@ -133,6 +188,7 @@ struct ClipPreviewView: View {
             }
         }
         .statusBarHidden()
+        .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
         .sheet(isPresented: $showComments) { commentsSheet }
         .onChange(of: captionFocused) { _, focused in
             if !focused, editingCaption { saveCaption() }
@@ -146,39 +202,57 @@ struct ClipPreviewView: View {
     ///
     /// Portrait footage goes edge to edge — `LoopingClipPlayer` already fills
     /// its frame, so a selfie crops at the sides rather than sitting in a
-    /// letterbox. Landscape footage can't: filling a portrait screen with a
-    /// 16:9 frame would throw away most of the picture, so it keeps its bars.
+    /// letterbox. A wider film can't: filling a portrait screen with it would
+    /// throw away most of the picture, so it keeps its shape. What used to be
+    /// black bars either side of it is now the film's own first frame, blurred
+    /// — the same idea the stitcher uses inside a cell, for the same reason.
     @ViewBuilder
     private var videoStage: some View {
         let stage = ZStack {
             if isLive {
-                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: playedLook)
+                // Review is the truth: show the captured file without the personal look.
+                // The look belongs in the dedicated adjustment/export surface.
+                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: .none)
             } else {
                 Color.black
             }
             captionLayer
         }
 
-        if isLandscape {
-            stage.aspectRatio(aspectRatio, contentMode: .fit)
-        } else {
+        if fillsScreen {
             stage.ignoresSafeArea()
+        } else {
+            ZStack {
+                backdrop
+                stage.aspectRatio(aspectRatio, contentMode: .fit)
+            }
         }
     }
 
-    /// The caption, at 43% down the frame.
+    /// Behind a film that doesn't fill the screen: itself, out of focus.
+    private var backdrop: some View {
+        ClipThumbnail(url: url, refreshToken: recordedAt)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .blur(radius: 44)
+            .overlay(Color.black.opacity(0.35))
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+    }
+
+    /// The caption, wherever it was put.
     ///
-    /// That number is not a design choice — `VideoStitcher.addOverlayText`
-    /// burns the caption in at `height * 0.43`, centered. This is the one piece
-    /// of this screen that has to match the film exactly, which is also why it
-    /// belongs inside `videoStage` rather than up in the chrome: it's part of
-    /// the picture, not part of the interface.
+    /// A sticker, not a fixed line: `VideoStitcher.captionLayer` burns it at the
+    /// same fractions of the frame, in the same three styles, at the same size
+    /// relative to the frame. That parity is why this lives inside
+    /// `videoStage` rather than up in the chrome — it's part of the picture,
+    /// not part of the interface — and why the numbers here are fractions of
+    /// `proxy.size` rather than points.
     ///
-    /// Tapping the caption edits it. Tapping anywhere else does nothing, which
-    /// is the fix: the old edit button was `.frame(maxWidth: .infinity,
-    /// maxHeight: .infinity)`, so the whole video was a button into the text
-    /// editor — and its label sat in the dead center, printed straight on top
-    /// of the "MOMENT 4" that `MomentStampOverlay` drew in the same spot.
+    /// Tap edits the words. Drag moves them. Tapping anywhere else does
+    /// nothing, which is the fix: the old edit button was `.frame(maxWidth:
+    /// .infinity, maxHeight: .infinity)`, so the whole video was a button into
+    /// the text editor.
     @ViewBuilder
     private var captionLayer: some View {
         if editingCaption {
@@ -194,25 +268,65 @@ struct ClipPreviewView: View {
             }
         } else if let text = liveOverlayText, !text.isEmpty {
             GeometryReader { proxy in
-                captionText(text)
+                captionText(text, in: proxy.size)
                     .frame(maxWidth: proxy.size.width * 0.76)
                     .contentShape(Rectangle())
                     .onTapGesture { if isMine { startEditingCaption() } }
-                    .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.43)
+                    .position(
+                        x: (sticker.x + dragFraction(in: proxy.size).x) * proxy.size.width,
+                        y: (sticker.y + dragFraction(in: proxy.size).y) * proxy.size.height)
+                    .gesture(isMine ? dragSticker(in: proxy.size) : nil)
+                    .animation(nil, value: captionDrag)
             }
         }
     }
 
-    /// Same size, weight and shadow the stitcher uses, so what you read here is
-    /// what gets exported.
-    private func captionText(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 22, weight: .bold, design: .rounded))
+    /// What the live drag is worth, as a fraction of the frame, so the sticker
+    /// keeps up with the finger without a point-sized offset being stored
+    /// anywhere: the model only ever holds fractions.
+    private func dragFraction(in size: CGSize) -> (x: Double, y: Double) {
+        guard size.width > 0, size.height > 0 else { return (0, 0) }
+        return (captionDrag.width / size.width, captionDrag.height / size.height)
+    }
+
+    private func dragSticker(in size: CGSize) -> some Gesture {
+        DragGesture()
+            .onChanged { captionDrag = $0.translation }
+            .onEnded { value in
+                let moved = dragFraction(in: size)
+                captionDrag = .zero
+                guard abs(value.translation.width) + abs(value.translation.height) > 2
+                else { return }
+                saveSticker(CaptionSticker(
+                    x: sticker.x + moved.x, y: sticker.y + moved.y, style: sticker.style))
+            }
+    }
+
+    /// Same fractions, weights and shadow the stitcher uses, so what you read
+    /// here is what gets exported.
+    private func captionText(_ text: String, in size: CGSize) -> some View {
+        let minEdge = min(size.width, size.height)
+        let fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        return Text(text)
+            .font(.system(
+                size: fontSize,
+                weight: sticker.style == .headline ? .heavy : .bold,
+                design: .rounded))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.68)
-            .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
+            .padding(.horizontal, sticker.style == .band ? fontSize * 0.8 : 0)
+            .padding(.vertical, sticker.style == .band ? fontSize * 0.42 : 0)
+            .background {
+                if sticker.style == .band {
+                    RoundedRectangle(cornerRadius: fontSize * 0.7, style: .continuous)
+                        .fill(.black.opacity(0.45))
+                }
+            }
+            .shadow(
+                color: .black.opacity(sticker.style == .band ? 0 : 0.28),
+                radius: 5, y: 2)
     }
 
     private var scrim: some View {
@@ -338,6 +452,13 @@ struct ClipPreviewView: View {
                     Strings.captionAction,
                     fills: true,
                     action: startEditingCaption)
+                // Only once there are words to restyle, and with no label: the
+                // caption itself is the label, and it changes in place as this
+                // is tapped. A panel for three options would be a panel you
+                // have to close before you can see what you picked.
+                if hasCaption {
+                    floatingButton(styleSymbol, nil, action: cycleCaptionStyle)
+                }
                 floatingButton("arrow.counterclockwise", Strings.rerecordShort, action: onReRecord)
             }
             if isShared {

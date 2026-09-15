@@ -239,6 +239,35 @@ final class ChallengeStateTests: XCTestCase {
         }
     }
 
+    /// A square take is filmed upright and cropped afterwards, so it records at
+    /// the same angle portrait does. At the sensor's angle instead, the crop
+    /// would cut its square out of a sideways frame — the same square, turned a
+    /// quarter turn, which is exactly what nobody filmed.
+    func testSquareRecordsUprightLikePortrait() {
+        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
+            for angle: CGFloat in [0, 90, 180, 270] {
+                XCTAssertEqual(
+                    ClipRecorder.rotationAngle(
+                        orientation: .square,
+                        devicePosition: position,
+                        coordinatedAngle: angle),
+                    ClipRecorder.rotationAngle(
+                        orientation: .portrait,
+                        devicePosition: position,
+                        coordinatedAngle: angle),
+                    "square/\(position.rawValue) at \(angle) should match portrait")
+            }
+        }
+    }
+
+    /// Only square is cropped after recording. The other two are whatever the
+    /// camera wrote, and a copy pass over them would be an export for nothing.
+    func testOnlySquareCropsAfterRecording() {
+        XCTAssertTrue(Challenge.Orientation.square.cropsAfterRecording)
+        XCTAssertFalse(Challenge.Orientation.portrait.cropsAfterRecording)
+        XCTAssertFalse(Challenge.Orientation.landscape.cropsAfterRecording)
+    }
+
 }
 
 private final class MemoryChallengeRepository: ChallengeRepository {

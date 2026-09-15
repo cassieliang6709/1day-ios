@@ -72,6 +72,7 @@ struct StoryComposerView: View {
                         sevenDayTemplates: sevenDayTemplates,
                         selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
+                        onChoose: createFromPoster,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate,
                         coverURL: { store.coverURL(for: $0) })
@@ -294,6 +295,26 @@ struct StoryComposerView: View {
 
     private func beginCustomPromptFlow() {
         showGuided = true
+    }
+
+    /// A poster is the submit button. The old setup step remains reachable
+    /// through the poster's settings affordance, but defaults should get a
+    /// first-time user to the camera without another decision screen.
+    private func createFromPoster(_ template: ChallengeTemplate) {
+        guard !creating else { return }
+        let mode: Challenge.Mode = template.isTimeOnly ? .oneDay :
+            (sevenDayTemplates.contains(where: { $0.id == template.id }) ? .sevenDay : .oneDay)
+        let moments = template.momentKeys?.map { MomentCatalog.localize($0) } ?? []
+        creating = true
+        let challenge = store.create(
+            title: template.displayName,
+            mode: mode,
+            clipLength: .tiny,
+            orientation: .portrait,
+            templateName: template.identityKey,
+            momentTitles: moments)
+        dismiss()
+        onCreate(challenge.id)
     }
 
     /// What the guided flow wrote, applied to this story — and, if the user

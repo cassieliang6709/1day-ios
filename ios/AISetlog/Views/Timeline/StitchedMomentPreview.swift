@@ -46,13 +46,16 @@ struct StitchedMomentPreview: View {
     var body: some View {
         Group {
             if clips.count <= 1, let only = clips.first {
-                preview(url: only.url, authorName: only.authorName, overlayText: only.overlayText)
+                preview(url: only.url, authorName: only.authorName,
+                        overlayText: only.overlayText, sticker: only.captionSticker)
             } else if let stitched {
-                preview(url: stitched, authorName: authorLine, overlayText: nil)
+                // No caption of its own: the stitched moment has everybody's
+                // words burned into it already, each on their own half.
+                preview(url: stitched, authorName: authorLine, overlayText: nil, sticker: nil)
             } else if stitchFailed, let fallback = mine ?? clips.first {
                 // Better someone's clip than an empty sheet.
                 preview(url: fallback.url, authorName: fallback.authorName,
-                        overlayText: fallback.overlayText)
+                        overlayText: fallback.overlayText, sticker: fallback.captionSticker)
             } else {
                 loading
             }
@@ -71,13 +74,16 @@ struct StitchedMomentPreview: View {
         .background(OneDayCanvas())
     }
 
-    private func preview(url: URL, authorName: String?, overlayText: String?) -> some View {
+    private func preview(
+        url: URL, authorName: String?, overlayText: String?, sticker: CaptionSticker?
+    ) -> some View {
         ClipPreviewView(
             day: day,
             slotTitle: slotTitle,
             momentCount: momentCount,
             authorName: authorName,
             overlayText: overlayText,
+            captionSticker: sticker,
             clipLength: clipLength,
             showsPrompt: showsPrompt,
             url: url,

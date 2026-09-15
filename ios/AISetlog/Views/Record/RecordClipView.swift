@@ -293,7 +293,8 @@ struct RecordClipView: View {
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 ZStack {
-                    LoopingClipPlayer(url: url, look: look)
+                    // Immediate review is always the camera truth; grading belongs elsewhere.
+                    LoopingClipPlayer(url: url, look: .none)
                     // The caption is typed right where it lands in the film —
                     // center of the frame, not in a bar below the video.
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
@@ -373,7 +374,7 @@ struct RecordClipView: View {
     private var noPlaceMessage: String {
         store.challenges.isEmpty
             ? Strings.makePlanFirst
-            : Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape)
+            : Strings.noMatchingPlan(effectiveOrientation)
     }
 
     // MARK: - Free-form filing
@@ -560,11 +561,17 @@ struct RecordClipView: View {
                 // No cover to dismiss in the tab — the left slot carries the
                 // orientation toggle instead.
                 Button {
-                    freeformOrientation = freeformOrientation == .portrait ? .landscape : .portrait
+                    // Cycles rather than toggles now that there are three
+                    // frames. The glyph is the current one, so which way round
+                    // the cycle runs doesn't have to be learned.
+                    freeformOrientation = switch freeformOrientation {
+                    case .portrait: .landscape
+                    case .landscape: .square
+                    case .square: .portrait
+                    }
                 } label: {
-                    Image(systemName: "rectangle.portrait")
+                    Image(systemName: SetupStep.orientationIcon(freeformOrientation))
                         .font(.system(size: 18, weight: .bold))
-                        .rotationEffect(freeformOrientation == .landscape ? .degrees(90) : .zero)
                         .foregroundStyle(.black.opacity(0.78))
                         .frame(width: 44, height: 44)
                         .background(.white.opacity(0.92), in: Circle())

@@ -73,6 +73,7 @@ struct ClipDeckReview: View {
             momentCount: momentCount,
             authorName: clip.authorName,
             overlayText: clip.overlayText,
+            captionSticker: clip.captionSticker,
             clipLength: clipLength,
             showsPrompt: showsPrompt,
             isLive: isLive,

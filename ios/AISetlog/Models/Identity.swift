@@ -5,9 +5,16 @@ import UIKit
 /// old free-choice "sticker pack". `MemberChip` (ChallengeBoardView) shares
 /// this same palette so a person's color matches everywhere in the app.
 enum Identity {
+    /// Seven hues, deliberately spread across the wheel. The old palette was six
+    /// blues (`oneDaySky`, `systemTeal`, `systemBlue` among them), so two people
+    /// in one room read as the same person at a glance — and the light end of it
+    /// could not hold the white initial `AvatarDot` draws on top. Every entry
+    /// here clears 4:1 against white.
+    ///
+    /// `oneDayMint` is not a candidate: it rings "this is you" in `AvatarStack`.
     static let paletteUIColors: [UIColor] = [
         .oneDayNavy, .oneDayBlue, .oneDayCyan,
-        .oneDaySky, .systemTeal, .systemBlue,
+        .oneDayCoral, .oneDayAmber, .oneDayEmerald, .oneDayGrape,
     ]
 
     static func uiColor(for name: String?) -> UIColor {

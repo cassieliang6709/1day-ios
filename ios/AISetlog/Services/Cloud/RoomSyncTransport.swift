@@ -65,7 +65,8 @@ final class LocalRoomSyncSource {
         let old = clips[index]
         clips[index] = .init(id: old.id, day: old.day, authorID: old.authorID,
             authorName: old.authorName, recordedAt: old.recordedAt,
-            localURL: url, overlayText: old.overlayText)
+            localURL: url, overlayText: old.overlayText,
+            captionSticker: old.captionSticker)
     }
 
     func close() {

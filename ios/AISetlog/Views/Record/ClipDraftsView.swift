@@ -103,7 +103,7 @@ struct ClipDraftsView: View {
                     .lineLimit(1)
 
                 if !canFile {
-                    Text(Strings.noPlaceForDraft(landscape: draft.orientation == .landscape))
+                    Text(Strings.noPlaceForDraft(draft.orientation))
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkFaint)
                         .lineLimit(2)
@@ -155,9 +155,11 @@ struct ClipDraftsView: View {
     }
 
     private func detailLine(_ draft: ClipDraft) -> String {
-        let frame = draft.orientation == .landscape
-            ? Strings.orientationLandscape
-            : Strings.orientationPortrait
+        let frame = switch draft.orientation {
+        case .portrait: Strings.orientationPortrait
+        case .landscape: Strings.orientationLandscape
+        case .square: Strings.orientationSquare
+        }
         return "\(frame) · \(Strings.draftSize(draft.byteSize))"
     }
 

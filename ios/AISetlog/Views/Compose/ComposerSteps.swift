@@ -18,6 +18,9 @@ struct MoodStep: View {
     let sevenDayTemplates: [ChallengeTemplate]
     @Binding var selection: ComposerSelection
     let onBuildOwn: () -> Void
+    /// Poster tap is submission in the one-step flow; settings remain behind
+    /// the poster gear in the parent.
+    let onChoose: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
     /// Where a template's own cover picture lives, asked of the store rather
@@ -234,6 +237,7 @@ struct MoodStep: View {
 
     private func select(_ template: ChallengeTemplate) {
         selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        onChoose(template)
     }
 }
 
@@ -438,6 +442,17 @@ struct SetupStep: View {
 
     @FocusState private var titleFocused: Bool
     @State private var momentsExpanded = false
+
+    /// The shape of the frame, as a glyph. Shared with the camera's own
+    /// orientation button so the row that sets it and the button that switches
+    /// it are never showing two different pictures of the same choice.
+    static func orientationIcon(_ orientation: Challenge.Orientation) -> String {
+        switch orientation {
+        case .portrait: "rectangle.portrait"
+        case .landscape: "rectangle"
+        case .square: "square"
+        }
+    }
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
@@ -681,7 +696,7 @@ struct SetupStep: View {
                 Divider().overlay(OneDay.hairline)
 
                 OptionRow(
-                    icon: orientation == .portrait ? "rectangle.portrait" : "rectangle",
+                    icon: Self.orientationIcon(orientation),
                     title: Strings.orientationRow,
                     accent: .oneDayMint
                 ) {
@@ -689,10 +704,13 @@ struct SetupStep: View {
                         options: [
                             .init(value: Challenge.Orientation.portrait, label: Strings.orientationPortrait),
                             .init(value: Challenge.Orientation.landscape, label: Strings.orientationLandscape),
+                            .init(value: Challenge.Orientation.square, label: Strings.orientationSquare),
                         ],
                         selection: $orientation,
                         compact: true)
-                        .frame(width: 172)
+                        // Three pills where there were two, and the labels are
+                        // wider in Chinese than in English.
+                        .frame(width: 236)
                 }
             }
         }

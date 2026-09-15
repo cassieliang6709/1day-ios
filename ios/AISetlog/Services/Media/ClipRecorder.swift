@@ -62,8 +62,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 // preview for the re-record screen. Reuse the existing graph
                 // instead of trying to add its inputs and output a second time.
                 if isConfigured {
-                    if !session.isRunning { session.startRunning() }
-                    continuation.resume(returning: session.isRunning)
+                    // The preview layer may not exist yet. Starting here can
+                    // leave the first camera page showing a black frame.
+                    continuation.resume(returning: true)
                     return
                 }
 
@@ -94,8 +95,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 session.addOutput(movieOutput)
                 session.commitConfiguration()
                 isConfigured = true
-                session.startRunning()
-                continuation.resume(returning: session.isRunning)
+                // Start after `CameraPreview` attaches its layer. This avoids
+                // racing the first frame against SwiftUI view creation.
+                continuation.resume(returning: true)
             }
         }
 
@@ -114,6 +116,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     func attachPreview(_ layer: AVCaptureVideoPreviewLayer) {
         previewLayer = layer
         applyOrientation()
+        Self.sessionQueue.async { [weak self] in
+            guard let self, !self.session.isRunning else { return }
+            self.session.startRunning()
+        }
     }
 
     /// Rebuilds the rotation coordinator for the current device and preview,
@@ -176,15 +182,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
     /// The angle to put on a connection.
     ///
-    /// Portrait trusts the coordinator, which knows how this specific camera is
-    /// mounted. Landscape means "the sensor's own frame", which is 0 — no
-    /// rotation, front or back, physical or external.
+    /// Both orientations use the coordinator. The app UI is portrait-locked,
+    /// but a landscape clip still needs the device/front-camera angle; forcing
+    /// 0° leaves the sensor's portrait frame inside the landscape composition.
+    /// The coordinator avoids a hard-coded 90° guess.
     static func rotationAngle(
         orientation: Challenge.Orientation,
         devicePosition: AVCaptureDevice.Position,
         coordinatedAngle: CGFloat
     ) -> CGFloat {
-        orientation == .portrait ? coordinatedAngle : 0
+        coordinatedAngle
     }
 
     func flipCamera() {
@@ -280,13 +287,128 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
 
         Task { @MainActor in
-            if finishedSuccessfully {
-                self.clipURL = outputFileURL
-            } else {
+            guard finishedSuccessfully else {
                 try? FileManager.default.removeItem(at: outputFileURL)
                 self.recordedAt = nil
+                self.state = .ready
+                return
             }
+            // The crop happens here rather than on the way out of the review
+            // screen, so `clipURL` is the only thing anybody downstream — the
+            // review player, the draft store, the uploader, the stitcher —
+            // ever sees, and none of them has to ask what shape it is.
+            //
+            // `state` stays `.recording` while it runs. Going `.ready` with no
+            // clip yet puts the live preview and a live shutter back for the
+            // half second the export takes, which invites a second take over
+            // the top of the one being written.
+            let kept = self.orientation.cropsAfterRecording
+                ? await SquareCrop.copy(of: outputFileURL)
+                : outputFileURL
+            self.clipURL = kept
             self.state = .ready
+        }
+    }
+}
+
+/// Turns a recorded take into a square one.
+///
+/// The camera cannot film a square: `AVCaptureMovieFileOutput` takes a rotation
+/// angle and nothing else, so the file it writes is always the sensor's whole
+/// frame. A square room therefore films upright and centre-crops immediately
+/// afterwards, and the cropped file is the only one that survives.
+///
+/// Cropping here rather than at export time means it happens once, to one clip,
+/// while the person is still looking at the review screen — and the stitcher
+/// then reads `sourceAspect` 1 off the file and builds a square canvas by the
+/// rules it already has, with no crop of its own.
+enum SquareCrop {
+    /// A square copy, or the original URL when there is nothing to gain.
+    ///
+    /// Returns the input on any failure. A take that could not be cropped is
+    /// still the take somebody just filmed: it goes to the review screen in the
+    /// shape it came out of the camera, which is worse than square and far
+    /// better than gone.
+    static func copy(of url: URL) async -> URL {
+        guard let cropped = try? await square(url) else { return url }
+        try? FileManager.default.removeItem(at: url)
+        return cropped
+    }
+
+    private static func square(_ url: URL) async throws -> URL {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first
+        else { throw CropError.noVideoTrack }
+
+        let natural = try await track.load(.naturalSize)
+        let transform = try await track.load(.preferredTransform)
+        // The frame as a viewer sees it, which is what has to end up square —
+        // a 1080×1920 file and a 1920×1080 file carrying a quarter turn are the
+        // same upright take, and cropping the stored dimensions would take the
+        // square out of the wrong axis on one of them.
+        let upright = CGRect(origin: .zero, size: natural).applying(transform)
+        let oriented = CGSize(width: abs(upright.width), height: abs(upright.height))
+        guard oriented.width > 0, oriented.height > 0 else { throw CropError.noVideoTrack }
+
+        // H.264 wants even dimensions.
+        let side = (min(oriented.width, oriented.height) / 2).rounded(.down) * 2
+        guard side >= 2 else { throw CropError.noVideoTrack }
+        let render = CGSize(width: side, height: side)
+
+        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+        // Rotate upright, pull the rotated frame back to the origin, then slide
+        // the middle of it under the square. Two of the four rotations leave
+        // the extent in negative space, which is what `upright.minX/minY`
+        // absorbs — without it the take lands off-canvas and exports black.
+        layer.setTransform(
+            transform
+                .concatenating(CGAffineTransform(
+                    translationX: -upright.minX, y: -upright.minY))
+                .concatenating(CGAffineTransform(
+                    translationX: (side - oriented.width) / 2,
+                    y: (side - oriented.height) / 2)),
+            at: .zero)
+
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: try await asset.load(.duration))
+        instruction.layerInstructions = [layer]
+
+        let composition = AVMutableVideoComposition()
+        composition.renderSize = render
+        composition.frameDuration = CMTime(value: 1, timescale: 30)
+        composition.instructions = [instruction]
+
+        guard let export = AVAssetExportSession(
+            asset: asset, presetName: AVAssetExportPresetHighestQuality)
+        else { throw CropError.sessionUnavailable }
+
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("square-\(UUID().uuidString).mov")
+        export.outputURL = output
+        export.outputFileType = .mov
+        export.videoComposition = composition
+
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            export.exportAsynchronously { cont.resume() }
+        }
+        guard export.status == .completed else {
+            try? FileManager.default.removeItem(at: output)
+            throw CropError.failed(export.error?.localizedDescription ?? "unknown")
+        }
+        return output
+    }
+
+    enum CropError: LocalizedError {
+        case noVideoTrack
+        case sessionUnavailable
+        case failed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .noVideoTrack: "That take has no video to crop."
+            case .sessionUnavailable: "The exporter was unavailable."
+            case .failed(let reason): "Square crop failed: \(reason)"
+            }
         }
     }
 }

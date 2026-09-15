@@ -65,9 +65,8 @@ final class SharedRoomFilmTests: XCTestCase {
         ]
         var options = VideoStitcher.Options()
         options.layout = .friendsTogether
-        // Preserve explicit portrait-layout coverage. Automatic portrait input
-        // now defaults to landscape; DefaultFilmAspectTests covers that path.
-        options.aspect = .portrait
+        // No aspect named: the canvas comes from the takes, which for two
+        // portrait takes means 9:8 with a 9:16 cell each.
         options.showDayCaptions = false
 
         let film = try await VideoStitcher.stitch(clips: clips, options: options)
@@ -76,22 +75,20 @@ final class SharedRoomFilmTests: XCTestCase {
         // Same moment from two people plays once, together — not back to back.
         XCTAssertEqual(duration, 2, accuracy: 0.2)
 
-        // And stacked top-to-bottom, not side by side.
+        // And side by side, each in a cell its own shape.
         let image = try await frameImage(of: film, at: 1, saveAs: "friends-together")
-        let top = pixel(image, atX: 0.5, y: 0.25)
-        let bottom = pixel(image, atX: 0.5, y: 0.75)
-        let topLeft = pixel(image, atX: 0.12, y: 0.25)
-        XCTAssertNotEqual(top, bottom, "the two authors should be stacked vertically")
+        // Below the stamped name and moment, above the sweeping progress bar:
+        // flat tint, which is what tells the two authors apart.
+        let left = pixel(image, atX: 0.25, y: 0.68)
+        let right = pixel(image, atX: 0.75, y: 0.68)
+        XCTAssertNotEqual(left, right, "the two authors should stand side by side")
 
-        // The left of a cell used to be the same pixels as its middle, because
-        // each take was scaled up until it covered the cell and the overhang was
-        // cut off. It is now that person's own blurred bed instead: the take
-        // keeps its shape and the margin is filled rather than cropped into. So
-        // the edge no longer *matches* the middle — but it must still belong to
-        // the same person, which is what this checks.
+        // The take fills its cell, so the outer edge of a cell is that person's
+        // own footage rather than a bed or a bar — no crop, no padding.
+        let outerEdge = pixel(image, atX: 0.02, y: 0.68)
         XCTAssertLessThan(
-            distance(topLeft, top), distance(topLeft, bottom),
-            "the margin beside a take should be that take's own blurred bed")
+            distance(outerEdge, left), distance(outerEdge, right),
+            "the edge of a cell should be that cell's own take")
     }
 
     /// How far apart two sampled pixels are, summed over the channels.
@@ -99,25 +96,60 @@ final class SharedRoomFilmTests: XCTestCase {
         zip(a, b).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) }
     }
 
-    func testGridStaysVerticalForTwoAndThreeThenSquaresOff() {
-        let portrait = CGSize(width: 540, height: 960)
+    func testGridSplitsAcrossTheTakesShortEdgeThenSquaresOff() {
+        let portrait = 9.0 / 16
+        let landscape = 16.0 / 9
         func assertGrid(
-            _ count: Int, in size: CGSize, rows: Int, columns: Int,
+            _ count: Int, source: CGFloat, rows: Int, columns: Int,
             line: UInt = #line
         ) {
-            let actual = VideoStitcher.grid(for: count, in: size)
+            let actual = VideoStitcher.grid(for: count, sourceAspect: source)
             XCTAssertEqual(actual.rows, rows, "rows for \(count)", line: line)
             XCTAssertEqual(actual.columns, columns, "columns for \(count)", line: line)
         }
 
-        assertGrid(1, in: portrait, rows: 1, columns: 1)
-        assertGrid(2, in: portrait, rows: 2, columns: 1)
-        assertGrid(3, in: portrait, rows: 3, columns: 1)
-        assertGrid(4, in: portrait, rows: 2, columns: 2)
+        // Portrait takes stand side by side, landscape takes stack: either way
+        // the cell keeps the take's own shape, which is what lets the mosaic
+        // crop nobody.
+        assertGrid(1, source: portrait, rows: 1, columns: 1)
+        assertGrid(2, source: portrait, rows: 1, columns: 2)
+        assertGrid(3, source: portrait, rows: 1, columns: 3)
+        assertGrid(2, source: landscape, rows: 2, columns: 1)
+        assertGrid(3, source: landscape, rows: 3, columns: 1)
 
-        // A landscape film keeps people side by side — stacking would sliver them.
-        let landscape = CGSize(width: 960, height: 540)
-        assertGrid(2, in: landscape, rows: 1, columns: 2)
+        // Past three a strip is too narrow to see a person in.
+        assertGrid(4, source: portrait, rows: 2, columns: 2)
+        assertGrid(4, source: landscape, rows: 2, columns: 2)
+    }
+
+    /// The canvas exists to make the cells match the takes. Two portrait takes
+    /// side by side is 9:8, four is 9:16 again — and in both the cell comes
+    /// back out at 9:16, which is the whole point.
+    func testMosaicCanvasGivesEveryCellTheShapeOfTheTakes() {
+        func assertCells(
+            _ count: Int, source: CGFloat, canvas: CGFloat, line: UInt = #line
+        ) {
+            let size = VideoStitcher.mosaicRenderSize(
+                count: count, sourceAspect: source, longEdge: 1920)
+            let split = VideoStitcher.grid(for: count, sourceAspect: source)
+            XCTAssertEqual(size.width / size.height, canvas, accuracy: 0.01,
+                           "canvas for \(count)", line: line)
+            let cell = (size.width / CGFloat(split.columns))
+                / (size.height / CGFloat(split.rows))
+            XCTAssertEqual(cell, source, accuracy: 0.01, "cell for \(count)", line: line)
+            XCTAssertEqual(max(size.width, size.height), 1920, accuracy: 2,
+                           "long edge for \(count)", line: line)
+        }
+
+        let portrait = 9.0 / 16
+        assertCells(1, source: portrait, canvas: 9.0 / 16)
+        assertCells(2, source: portrait, canvas: 9.0 / 8)
+        assertCells(3, source: portrait, canvas: 27.0 / 16)
+        assertCells(4, source: portrait, canvas: 9.0 / 16)
+
+        let landscape = 16.0 / 9
+        assertCells(2, source: landscape, canvas: 8.0 / 9)
+        assertCells(4, source: landscape, canvas: 16.0 / 9)
     }
 
     /// Grabs a frame, saves a PNG into Caches for inspection (Documents is the

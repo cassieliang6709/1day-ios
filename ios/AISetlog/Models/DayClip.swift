@@ -11,6 +11,9 @@ struct DayClip: Identifiable {
     var authorID: String?
     var label: String?
     var overlayText: String?
+    /// Where `overlayText` sits on the frame, and how it's drawn. Nil draws it
+    /// at `CaptionSticker.default`, which is where every caption used to go.
+    var captionSticker: CaptionSticker?
     var recordedAt: Date?
     /// Emoji to float onto this clip in the final film (from its reactions).
     var emoji: [String]
@@ -24,6 +27,7 @@ struct DayClip: Identifiable {
         authorID: String? = nil,
         label: String? = nil,
         overlayText: String? = nil,
+        captionSticker: CaptionSticker? = nil,
         recordedAt: Date? = nil,
         emoji: [String] = [],
         comments: [String] = [],
@@ -35,6 +39,7 @@ struct DayClip: Identifiable {
         self.authorID = authorID
         self.label = label
         self.overlayText = overlayText
+        self.captionSticker = captionSticker
         self.recordedAt = recordedAt
         self.emoji = emoji
         self.comments = comments
@@ -48,7 +53,8 @@ struct DayClip: Identifiable {
     func replacingURL(_ url: URL) -> DayClip {
         DayClip(
             day: day, url: url, authorName: authorName, authorID: authorID,
-            label: label, overlayText: overlayText, recordedAt: recordedAt,
+            label: label, overlayText: overlayText, captionSticker: captionSticker,
+            recordedAt: recordedAt,
             emoji: emoji, comments: comments, key: id)
     }
 }
