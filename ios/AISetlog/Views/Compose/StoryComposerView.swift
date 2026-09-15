@@ -73,6 +73,7 @@ struct StoryComposerView: View {
                         selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
                         onChoose: createFromPoster,
+                        onSettings: openSettings,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate,
                         coverURL: { store.coverURL(for: $0) })
@@ -300,6 +301,13 @@ struct StoryComposerView: View {
     /// A poster is the submit button. The old setup step remains reachable
     /// through the poster's settings affordance, but defaults should get a
     /// first-time user to the camera without another decision screen.
+    private func openSettings(_ template: ChallengeTemplate) {
+        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        isCustomPromptStory = false
+        syncTitleToTemplate()
+        withAnimation(OneDay.Motion.soft) { step = .setup }
+    }
+
     private func createFromPoster(_ template: ChallengeTemplate) {
         guard !creating else { return }
         let mode: Challenge.Mode = template.isTimeOnly ? .oneDay :

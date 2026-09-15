@@ -21,6 +21,7 @@ struct MoodStep: View {
     /// Poster tap is submission in the one-step flow; settings remain behind
     /// the poster gear in the parent.
     let onChoose: (ChallengeTemplate) -> Void
+    let onSettings: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
     /// Where a template's own cover picture lives, asked of the store rather
@@ -175,6 +176,7 @@ struct MoodStep: View {
                         isSelected: false,
                         coverURL: coverURL(template),
                         onSelect: { select(template) },
+                        onSettings: { onSettings(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
                 }
@@ -348,6 +350,7 @@ private struct PromptTemplateTile: View {
     let isSelected: Bool
     var coverURL: URL?
     let onSelect: () -> Void
+    var onSettings: (() -> Void)? = nil
     var subtitle: Subtitle = .prompts
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
@@ -390,6 +393,20 @@ private struct PromptTemplateTile: View {
             .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .contentShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(alignment: .topTrailing) {
+                if let onSettings {
+                    Button(action: onSettings) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(OneDay.ink)
+                            .padding(8)
+                            .background(.thinMaterial, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(7)
+                    .accessibilityLabel("设置故事")
+                }
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .strokeBorder(
