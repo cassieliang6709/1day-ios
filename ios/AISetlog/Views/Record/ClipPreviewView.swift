@@ -230,9 +230,19 @@ struct ClipPreviewView: View {
     }
 
     /// Behind a film that doesn't fill the screen: itself, out of focus.
+    ///
+    /// Bedded on `Color.clear` rather than framed, because a filling image
+    /// reports the size it filled to and `.clipped()` only clips the drawing.
+    /// A stitched moment is 9:8, so the bed measured a screen's height times
+    /// 1.125 — 1078pt on a 440pt phone — and a ZStack lays its siblings out in
+    /// the width of its widest child. That dragged the whole of `chrome` out
+    /// with it: the caption button stretched to 749pt and "重拍" and "聊天"
+    /// were placed past the right edge of the screen, present and untappable.
+    /// `Color.clear` takes the offered size and overlays don't feed back into
+    /// it, so the bed can overflow without moving anything else.
     private var backdrop: some View {
-        ClipThumbnail(url: url, refreshToken: recordedAt)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Color.clear
+            .overlay { ClipThumbnail(url: url, refreshToken: recordedAt) }
             .clipped()
             .blur(radius: 44)
             .overlay(Color.black.opacity(0.35))
