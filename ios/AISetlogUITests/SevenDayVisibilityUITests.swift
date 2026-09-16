@@ -37,7 +37,7 @@ final class SevenDayVisibilityUITests: XCTestCase {
         demo.tap()
         XCTAssertTrue(app.staticTexts["local-room-notice"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["三人"].exists)
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 90))
+        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.buttons["聊天"].exists)
         XCTAssertFalse(app.staticTexts["每个人的原片"].exists)
         XCTAssertFalse(app.buttons["邀请"].exists)

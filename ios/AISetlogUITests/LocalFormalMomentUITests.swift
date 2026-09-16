@@ -13,7 +13,7 @@ final class LocalFormalMomentUITests: XCTestCase {
         XCTAssertTrue(moment.exists)
         moment.tap()
         let caption = app.buttons["加字幕"]
-        XCTAssertTrue(caption.waitForExistence(timeout: 90))
+        XCTAssertTrue(caption.waitForExistence(timeout: UITestWait.media))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Production full-screen StitchedMomentPreview"
         screenshot.lifetime = .keepAlways

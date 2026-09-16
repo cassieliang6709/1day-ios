@@ -8,7 +8,7 @@ final class LocalRoomImportUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 90))
+        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
         let importer = app.buttons["local-room-import"]
         XCTAssertTrue(importer.exists)
         importer.tap()
