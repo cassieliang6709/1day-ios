@@ -7,7 +7,7 @@ final class LocalFormalMomentUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["home-room-demo"].waitForExistence(timeout: 15))
         app.buttons["home-room-demo"].tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 90))
+        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
         XCTAssertFalse(app.staticTexts["LOCAL-DEMO"].exists)
         let moment = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "一起出发")).firstMatch
         XCTAssertTrue(moment.exists)
