@@ -60,23 +60,21 @@ struct RootShellView: View {
                     })
             }
 
-            // One explicit action instead of a second navigation world.
-            if surface == .plans {
-                Button {
-                    guardedSurface.wrappedValue = .camera
-                } label: {
-                    Label(Strings.surfaceCamera, systemImage: "camera.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 13)
-                        .background(OneDay.ink, in: Capsule())
-                        .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 18)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            FloatingTabBar(
+                items: [
+                    .init(
+                        tab: Surface.plans,
+                        label: Strings.surfacePlans,
+                        icon: "rectangle.stack",
+                        activeIcon: "rectangle.stack.fill"),
+                    .init(
+                        tab: Surface.camera,
+                        label: Strings.surfaceCamera,
+                        icon: "camera",
+                        activeIcon: "camera.fill"),
+                ],
+                selection: guardedSurface)
+                .padding(.bottom, 6)
         }
         .confirmationDialog(
             Strings.keepClipQuestion,

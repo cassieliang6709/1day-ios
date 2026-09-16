@@ -72,7 +72,7 @@ struct StoryComposerView: View {
                         sevenDayTemplates: sevenDayTemplates,
                         selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
-                        onChoose: createFromPoster,
+                        onChoose: selectPoster,
                         onSettings: openSettings,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate,
@@ -298,31 +298,29 @@ struct StoryComposerView: View {
         showGuided = true
     }
 
-    /// A poster is the submit button. The old setup step remains reachable
-    /// through the poster's settings affordance, but defaults should get a
-    /// first-time user to the camera without another decision screen.
+    /// The poster's settings affordance: pick it and go straight to setup,
+    /// skipping the "下一步" tap for someone who already knows they want to
+    /// rename it or change the length.
     private func openSettings(_ template: ChallengeTemplate) {
-        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
-        isCustomPromptStory = false
-        syncTitleToTemplate()
+        selectPoster(template)
         withAnimation(OneDay.Motion.soft) { step = .setup }
     }
 
-    private func createFromPoster(_ template: ChallengeTemplate) {
-        guard !creating else { return }
-        let mode: Challenge.Mode = template.isTimeOnly ? .oneDay :
-            (sevenDayTemplates.contains(where: { $0.id == template.id }) ? .sevenDay : .oneDay)
-        let moments = template.momentKeys?.map { MomentCatalog.localize($0) } ?? []
-        creating = true
-        let challenge = store.create(
-            title: template.displayName,
-            mode: mode,
-            clipLength: .tiny,
-            orientation: .portrait,
-            templateName: template.identityKey,
-            momentTitles: moments)
-        dismiss()
-        onCreate(challenge.id)
+    /// Tapping a poster picks it. "下一步" is what submits.
+    ///
+    /// A poster used to *be* the submit button: one tap created the story,
+    /// dismissed the sheet and pushed the story page, on the theory that a
+    /// first-time user should reach the camera without another decision
+    /// screen. But this screen says `1/2 选拍法` at the top and carries a
+    /// 下一步 button at the bottom, and both only ever applied to whichever
+    /// poster was selected by default — tapping any other one skipped them.
+    /// Two rules on one screen, and the faster of the two was the one the
+    /// user had to discover by accident. Every poster now behaves the way the
+    /// default already did.
+    private func selectPoster(_ template: ChallengeTemplate) {
+        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        isCustomPromptStory = false
+        syncTitleToTemplate()
     }
 
     /// What the guided flow wrote, applied to this story — and, if the user

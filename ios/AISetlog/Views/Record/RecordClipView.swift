@@ -16,7 +16,11 @@ struct RecordClipView: View {
     /// about this story rather than decoration. 0 = no story behind this take
     /// (free-form), and then no indicator is drawn at all.
     var momentCount = 0
-    var clipLength: Challenge.ClipLength = .tiny
+    /// The story's length is where this take starts, not where it's stuck: the
+    /// timer chip switches it for this recording only. `@State` so the chip can
+    /// write to it — the value the caller passes seeds the camera the first
+    /// time it opens for a slot and is never written back to the challenge.
+    @State var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
     /// clip is filed into a chosen plan instead of a fixed day slot.
@@ -199,6 +203,27 @@ struct RecordClipView: View {
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
+            }
+            .overlay(alignment: .topLeading) {
+                Button {
+                    guard recorder.state != .recording, recorder.clipURL == nil else { return }
+                    clipLength = switch clipLength {
+                    case .tiny: .story
+                    case .story: .scene
+                    case .scene: .tiny
+                    }
+                } label: {
+                    Label("每段 \(clipSecondsText)", systemImage: "timer")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.regularMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(recorder.state == .recording || recorder.clipURL != nil)
+                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
+                .padding(12)
             }
             .layoutPriority(1)
 

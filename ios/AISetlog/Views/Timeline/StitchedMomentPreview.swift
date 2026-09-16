@@ -65,7 +65,7 @@ struct StitchedMomentPreview: View {
 
     private var loading: some View {
         VStack(spacing: 14) {
-            OneDayBuddy(size: 54, isWorking: true)
+            OneDayBuddy(size: 64, isWorking: true)
             Text(Strings.stitchingMoment)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
@@ -120,13 +120,24 @@ struct StitchedMomentPreview: View {
                 return
             }
             if let previewMedia {
-                guard previewMedia.accept(url, key: cacheKey) else { return }
+                // A scope that closed mid-stitch throws the finished file away.
+                // Switching the 两人/三人 picker does exactly that, and the view
+                // that asked for the stitch can still be on screen afterwards —
+                // so this has to land on the fallback rather than return and
+                // leave the spinner up with nothing left to finish it.
+                guard previewMedia.accept(url, key: cacheKey) else {
+                    stitchFailed = true
+                    return
+                }
             } else {
                 Self.cache[cacheKey] = url
             }
             stitched = url
         } catch {
-            guard !Task.isCancelled, previewMedia?.isClosed != true else { return }
+            // Cancellation is the one silent exit: the view is going away, so
+            // there is nobody left to show a fallback to. Every other failure
+            // has to be terminal, closed scope included.
+            guard !Task.isCancelled else { return }
             print("[moment] stitch failed: \(error)")
             stitchFailed = true
         }
