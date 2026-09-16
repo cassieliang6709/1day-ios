@@ -21,30 +21,26 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(newStory.waitForExistence(timeout: 15))
         newStory.tap()
 
-        // The screen opens on prompts, so the grid and the one-day/seven-day
-        // switch above it are the visible half. That switch used to live only
-        // inside a "more templates" sheet, which made seven-day challenges
-        // unreachable whenever the sheet wouldn't open.
-        let byTime = app.buttons["按时间拍"]
+        // One row of four racks, replacing 跟着题目拍/按时间拍 stacked over
+        // 一日/七日. All four are always there — 按时间 no longer takes the
+        // other choices off screen, it just changes which posters are shown.
+        let byTime = app.buttons["按时间"]
         XCTAssertTrue(byTime.waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["跟着题目拍"].exists)
         XCTAssertTrue(app.buttons["一日"].exists)
         XCTAssertTrue(app.buttons["七日"].exists)
+        XCTAssertTrue(app.buttons["自己写"].exists)
 
-        // This tap is what the test used to be missing: it asserted the
-        // time-only setup page while still on a prompted story, so it had been
-        // failing for as long as the assertion had been there.
         byTime.tap()
 
-        XCTAssertTrue(app.staticTexts["没有题目。拍到的每一段按时间排好，发生什么拍什么。"]
+        XCTAssertTrue(app.staticTexts["没有题目，只记录此刻发生的事。"]
             .waitForExistence(timeout: 15))
-        // Nothing greyed out beside it — the grid is gone, not disabled, and
-        // the mode switch goes with it: a record-by-time story is always a day.
-        XCTAssertFalse(app.buttons["七日"].exists)
+        XCTAssertTrue(app.staticTexts["字幕由你自己在每段片子上填写，1Day 只负责保留拍摄时间。"].exists)
 
-        let next = app.buttons["下一步"]
-        XCTAssertTrue(next.waitForExistence(timeout: 15))
-        next.tap()
+        // Its settings are behind the poster's gear now. Tapping the poster
+        // itself would create the story, which this test deliberately doesn't.
+        let gear = app.buttons.matching(identifier: "poster-settings").firstMatch
+        XCTAssertTrue(gear.waitForExistence(timeout: 15))
+        gear.tap()
 
         XCTAssertTrue(app.staticTexts["只记录时间"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["拍下当下，1Day 会自动保留拍摄时间；画面上的文字由每个人自己填写。"].exists)
@@ -63,8 +59,12 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(newStory.waitForExistence(timeout: 15))
         newStory.tap()
 
-        XCTAssertTrue(app.buttons["跟着题目拍"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["按时间拍"].exists)
+        XCTAssertTrue(app.buttons["一日"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["七日"].exists)
+        XCTAssertTrue(app.buttons["按时间"].exists)
+        XCTAssertTrue(app.buttons["自己写"].exists)
+        // One screen: no counter and nothing to submit.
+        XCTAssertFalse(app.buttons["下一步"].exists)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "New story composer"
@@ -78,6 +78,12 @@ final class CreationFlowUITests: XCTestCase {
         let newStory = app.buttons["新建故事"]
         XCTAssertTrue(newStory.waitForExistence(timeout: 15))
         newStory.tap()
+
+        // 自己写题目 used to sit at the bottom of every rack, under posters it
+        // had nothing to do with. It is the 自己写 rack's own content now.
+        let ownRack = app.buttons["自己写"]
+        XCTAssertTrue(ownRack.waitForExistence(timeout: 15))
+        ownRack.tap()
 
         let custom = app.buttons["custom-prompts-entry"]
         XCTAssertTrue(custom.waitForExistence(timeout: 15))

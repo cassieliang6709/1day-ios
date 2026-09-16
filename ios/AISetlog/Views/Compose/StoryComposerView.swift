@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Screens 2 and 3 — choosing a story, then setting it up.
+/// Making a story: one screen, one decision.
 ///
-/// The old creation screen was one long form: a title field, a fanned deck,
-/// five settings rows and a toggle, all competing. Splitting it means step one
-/// can be nothing but posters (choosing a mood should feel like browsing a
-/// shelf) and step two can be short enough to read in a glance.
+/// It was two screens and eight controls — 1/2 选拍法 with a style pill, a
+/// mode pill and a poster grid, then 2/2 设置故事 with a name, a moment list, a
+/// company picker and two capture rows — and seven of the eight already had
+/// the right default. Now the rack of posters *is* the form: tapping one
+/// creates the story with those defaults and goes straight to filming, and the
+/// gear on a poster's corner opens everything the second screen used to ask,
+/// for the person who actually wants to change something.
 struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
 
@@ -13,9 +16,9 @@ struct StoryComposerView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
 
-    enum Step: Int { case mood, setup }
-
-    @State private var step: Step = .mood
+    /// Which shelf of posters is showing. Purely a filter — the story's style
+    /// and mode come from the poster that gets tapped.
+    @State private var rack: TemplateRack = .oneDay
     /// Style, template and mode as one value — see `ComposerSelection` for why
     /// the style can't be inferred from the template.
     @State private var selection = ComposerSelection.initial(
@@ -32,6 +35,8 @@ struct StoryComposerView: View {
     @State private var moments: [String] = []
     @State private var isCustomPromptStory = false
     @State private var showGuided = false
+    /// The old step 2, now a sheet behind a poster's gear.
+    @State private var showSetup = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
@@ -65,42 +70,20 @@ struct StoryComposerView: View {
             VStack(spacing: 0) {
                 topBar
 
-                switch step {
-                case .mood:
-                    MoodStep(
-                        oneDayTemplates: oneDayTemplates,
-                        sevenDayTemplates: sevenDayTemplates,
-                        selection: $selection,
-                        onBuildOwn: beginCustomPromptFlow,
-                        onChoose: selectPoster,
-                        onSettings: openSettings,
-                        onEdit: { editingTemplate = $0 },
-                        onDelete: deleteTemplate,
-                        coverURL: { store.coverURL(for: $0) })
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)))
-
-                case .setup:
-                    SetupStep(
-                        template: selected,
-                        templateCoverURL: selected.flatMap { store.coverURL(for: $0) },
-                        title: $title,
-                        titleEdited: $titleEdited,
-                        withFriends: $withFriends,
-                        clipLength: $clipLength,
-                        orientation: $orientation,
-                        moments: $moments,
-                        isOneDay: mode == .oneDay,
-                        isTimeOnly: selection.style == .timeOnly)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)))
-                }
-
-                footer
+                MoodStep(
+                    oneDayBuiltins: ChallengeTemplate.oneDayBuiltins,
+                    sevenDayTemplates: sevenDayTemplates,
+                    customTemplates: store.customTemplates,
+                    rack: $rack,
+                    onBuildOwn: beginCustomPromptFlow,
+                    onChoose: createFromPoster,
+                    onSettings: openSettings,
+                    onEdit: { editingTemplate = $0 },
+                    onDelete: deleteTemplate,
+                    coverURL: { store.coverURL(for: $0) })
             }
         }
+        .sheet(isPresented: $showSetup) { setupSheet }
         .sheet(isPresented: $showSignIn) {
             SignInView { createSharedRoom() }
                 .presentationDetents([.medium])
@@ -138,44 +121,54 @@ struct StoryComposerView: View {
 
     // MARK: - Chrome
 
+    /// Just the way out. There is no progress counter because there is no
+    /// second step — `StepDots` reading `1/2` was itself telling people to
+    /// expect another screen to fill in.
     private var topBar: some View {
         HStack(spacing: 12) {
-            IconBubble(systemName: step == .mood ? "xmark" : "chevron.left") {
-                if step == .mood {
-                    dismiss()
-                } else {
-                    // The warning belongs to "Create room". Carrying it back to
-                    // the poster rack makes it look like picking a story failed.
-                    errorText = nil
-                    withAnimation(OneDay.Motion.soft) { step = .mood }
-                }
-            }
-
+            IconBubble(systemName: "xmark") { dismiss() }
             Spacer()
-
-            VStack(spacing: 6) {
-                Text(appLanguage.resolved == .chinese
-                     ? (step == .mood ? "1/2 选拍法" : "2/2 设置故事")
-                     : (step == .mood ? "1/2 Choose a style" : "2/2 Set up your story"))
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("composer-step")
-                StepDots(count: 2, index: step.rawValue)
-                    .accessibilityHidden(true)
-            }
-
-            Spacer()
-
-            // Balances the leading bubble so the dots stay centred.
             Color.clear.frame(width: 38, height: 38)
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 6)
+        .padding(.bottom, 2)
     }
 
-    private var footer: some View {
+    // MARK: - The settings sheet
+
+    /// Everything the second screen used to ask, now optional: reached from a
+    /// poster's gear, and the only place 一起拍 lives.
+    private var setupSheet: some View {
+        VStack(spacing: 0) {
+            // No title of its own: `SetupStep` already leads with 设置, and two
+            // headings stacked read as two screens.
+            HStack {
+                Spacer()
+                IconBubble(systemName: "xmark") { showSetup = false }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, -6)
+
+            SetupStep(
+                template: selected,
+                templateCoverURL: selected.flatMap { store.coverURL(for: $0) },
+                title: $title,
+                titleEdited: $titleEdited,
+                withFriends: $withFriends,
+                clipLength: $clipLength,
+                orientation: $orientation,
+                moments: $moments,
+                isOneDay: mode == .oneDay,
+                isTimeOnly: selection.style == .timeOnly)
+
+            sheetFooter
+        }
+        .background(OneDayCanvas(seed: 3))
+    }
+
+    private var sheetFooter: some View {
         VStack(spacing: 10) {
             // Above the button, not at the bottom of the scroll: the reason a
             // tap did nothing has to be on screen when the tap happens.
@@ -189,7 +182,7 @@ struct StoryComposerView: View {
                     .transition(.opacity)
             }
 
-            if step == .setup && title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(Strings.storyNameNeeded)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
@@ -198,19 +191,19 @@ struct StoryComposerView: View {
                     .accessibilityIdentifier("composer-name-needed")
             }
 
-            Button(action: advance) {
+            Button(action: start) {
                 HStack(spacing: 8) {
                     if creating {
                         ProgressView().tint(.white)
                     } else {
-                        Text(primaryTitle)
-                        Image(systemName: step == .mood ? "arrow.right" : "sparkles")
+                        Text(withFriends ? Strings.createRoom : Strings.startFilmingCTA)
+                        Image(systemName: "sparkles")
                     }
                 }
             }
             .buttonStyle(.primaryAction)
-            .disabled(!canAdvance)
-            .opacity(canAdvance ? 1 : 0.55)
+            .disabled(!canStart)
+            .opacity(canStart ? 1 : 0.55)
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -218,30 +211,11 @@ struct StoryComposerView: View {
         .animation(OneDay.Motion.soft, value: errorText)
     }
 
-    private var primaryTitle: String {
-        switch step {
-        case .mood: return Strings.next
-        case .setup: return withFriends ? Strings.createRoom : Strings.createStoryCTA
-        }
-    }
-
-    private var canAdvance: Bool {
-        switch step {
-        case .mood: return selected != nil || isCustomPromptStory
-        case .setup: return !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
-        }
+    private var canStart: Bool {
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
     }
 
     // MARK: - Actions
-
-    private func advance() {
-        switch step {
-        case .mood:
-            withAnimation(OneDay.Motion.soft) { step = .setup }
-        case .setup:
-            start()
-        }
-    }
 
     private func start() {
         let name = title.trimmingCharacters(in: .whitespaces)
@@ -260,6 +234,9 @@ struct StoryComposerView: View {
                 orientation: orientation,
                 templateName: selected?.identityKey,
                 momentTitles: resolvedMoments)
+            // Closing the sheet first: dismissing the composer out from under
+            // an open sheet leaves the sheet animating over the story page.
+            showSetup = false
             dismiss()
             onCreate(challenge.id)
         }
@@ -278,6 +255,7 @@ struct StoryComposerView: View {
                     orientation: orientation,
                     templateName: selected?.identityKey,
                     momentTitles: resolvedMoments)
+                showSetup = false
                 dismiss()
                 onCreate(challenge.id)
             } catch {
@@ -298,26 +276,46 @@ struct StoryComposerView: View {
         showGuided = true
     }
 
-    /// The poster's settings affordance: pick it and go straight to setup,
-    /// skipping the "下一步" tap for someone who already knows they want to
-    /// rename it or change the length.
+    /// The gear on a poster's corner: adopt that poster, then open the
+    /// settings sheet instead of creating anything. This is the whole of the
+    /// old second screen, for the person who wants to rename the story, edit
+    /// its moments, or invite someone before they start.
     private func openSettings(_ template: ChallengeTemplate) {
-        selectPoster(template)
-        withAnimation(OneDay.Motion.soft) { step = .setup }
+        adopt(template)
+        errorText = nil
+        showSetup = true
     }
 
-    /// Tapping a poster picks it. "下一步" is what submits.
+    /// Tapping a poster creates the story and leaves for the camera.
     ///
-    /// A poster used to *be* the submit button: one tap created the story,
-    /// dismissed the sheet and pushed the story page, on the theory that a
-    /// first-time user should reach the camera without another decision
-    /// screen. But this screen says `1/2 选拍法` at the top and carries a
-    /// 下一步 button at the bottom, and both only ever applied to whichever
-    /// poster was selected by default — tapping any other one skipped them.
-    /// Two rules on one screen, and the faster of the two was the one the
-    /// user had to discover by accident. Every poster now behaves the way the
-    /// default already did.
-    private func selectPoster(_ template: ChallengeTemplate) {
+    /// The poster *is* the submit button. Every other control on this screen
+    /// had a correct default, so asking for confirmation was asking the user
+    /// to re-affirm a choice they had just made — and the previous shape made
+    /// it worse than that: `1/2 选拍法` and 下一步 only ever applied to the
+    /// poster that happened to be selected by default, so tapping any other
+    /// one skipped both. One rule now, and it is the fast one.
+    private func createFromPoster(_ template: ChallengeTemplate) {
+        guard !creating else { return }
+        adopt(template)
+        // `adopt` has just synced `title` and `moments` to this poster — or
+        // kept a name the user typed in the settings sheet, which is the one
+        // case where they told us what to call it. An empty name can't reach
+        // `store.create`, so the poster's own name is the floor.
+        let typed = title.trimmingCharacters(in: .whitespaces)
+        creating = true
+        let challenge = store.create(
+            title: typed.isEmpty ? template.displayName : typed,
+            mode: selection.mode,
+            clipLength: clipLength,
+            orientation: orientation,
+            templateName: template.identityKey,
+            momentTitles: resolvedMoments)
+        dismiss()
+        onCreate(challenge.id)
+    }
+
+    /// Makes `template` the story's script, without deciding what happens next.
+    private func adopt(_ template: ChallengeTemplate) {
         selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
         isCustomPromptStory = false
         syncTitleToTemplate()
@@ -353,7 +351,11 @@ struct StoryComposerView: View {
             selection.useCustomPrompts()
         }
 
-        withAnimation(OneDay.Motion.soft) { step = .setup }
+        // Straight into settings rather than straight into creating: the user
+        // just wrote these moments by hand, so this is the one path where the
+        // defaults behind a poster haven't been agreed to yet.
+        errorText = nil
+        showSetup = true
     }
 
     // MARK: - Derived state
@@ -380,23 +382,5 @@ struct StoryComposerView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cleaned.isEmpty ? selected?.momentKeys : cleaned
-    }
-}
-
-/// Two-step progress, as dots rather than a bar — the flow is short enough
-/// that a bar would overstate it.
-struct StepDots: View {
-    let count: Int
-    let index: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<count, id: \.self) { dot in
-                Capsule()
-                    .fill(dot <= index ? Color.oneDayBlue : Color.oneDaySky.opacity(0.3))
-                    .frame(width: dot == index ? 22 : 7, height: 7)
-            }
-        }
-        .animation(OneDay.Motion.snap, value: index)
     }
 }

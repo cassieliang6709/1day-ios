@@ -1,18 +1,31 @@
 import XCTest
 
 final class ComposerGuidanceUITests: XCTestCase {
-    func testStepsAndEmptyNameExplainDisabledCreationWithoutSaving() {
+    /// The composer is one screen: the rack of posters, and nothing to submit.
+    ///
+    /// This used to walk `1/2 Choose a style` → Next → `2/2 Set up your story`
+    /// and assert both labels. Both screens and the button between them are
+    /// gone — a poster tap creates the story — so what is worth pinning is
+    /// that the screen has no second step to reach and that the name guidance
+    /// still appears where a name can still be typed: the settings sheet.
+    func testOneScreenComposerKeepsNameGuidanceBehindThePosterGear() {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
         let create = app.buttons["New story"]
         XCTAssertTrue(create.waitForExistence(timeout: 15))
         create.tap()
-        let step = app.staticTexts["composer-step"]
-        XCTAssertTrue(step.waitForExistence(timeout: 15))
-        XCTAssertEqual(step.label, "1/2 Choose a style")
-        app.buttons["Next"].tap()
-        XCTAssertEqual(step.label, "2/2 Set up your story")
+
+        XCTAssertTrue(app.staticTexts["composer-question"].waitForExistence(timeout: 15))
+        // No progress counter and no bottom button: both only made sense when
+        // choosing and submitting were two separate taps.
+        XCTAssertFalse(app.staticTexts["composer-step"].exists)
+        XCTAssertFalse(app.buttons["Next"].exists)
+
+        let gear = app.buttons.matching(identifier: "poster-settings").firstMatch
+        XCTAssertTrue(gear.waitForExistence(timeout: 15))
+        gear.tap()
+
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         name.tap()

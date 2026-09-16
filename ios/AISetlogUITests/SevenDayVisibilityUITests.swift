@@ -18,13 +18,14 @@ final class SevenDayVisibilityUITests: XCTestCase {
         shot.name = "Seven day after switch"
         shot.lifetime = .keepAlways
         add(shot)
-        XCTAssertTrue(app.buttons["下一步"].isHittable)
         app.buttons["一日"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch.waitForExistence(timeout: 15))
         seven.tap()
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
+        // The poster is the submit button: one tap makes the story and leaves
+        // for it, named after the template the way the old step 2 pre-filled.
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "早起的人、")).firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "7 天早起的人")).firstMatch.waitForExistence(timeout: 15))
     }
 
     func testDemoIsReachableFromHomeWithoutSharedRoom() {

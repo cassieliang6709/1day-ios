@@ -8,6 +8,10 @@ final class IntentFirstCreationUITests: XCTestCase {
         let create = app.buttons["New story"]
         XCTAssertTrue(create.waitForExistence(timeout: 15))
         create.tap()
+        // The guided flow lives on the 自己写 rack now, not under every rack.
+        let ownRack = app.buttons["Your own"]
+        XCTAssertTrue(ownRack.waitForExistence(timeout: 15))
+        ownRack.tap()
         let own = app.buttons["Write your own prompts"]
         XCTAssertTrue(own.waitForExistence(timeout: 15))
         own.tap()

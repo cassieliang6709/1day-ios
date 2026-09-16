@@ -3,23 +3,44 @@ import SwiftUI
 /// The two pages of `StoryComposerView`. Stateless — the composer owns every
 /// choice; these just render it.
 
-// MARK: - Step 1: choose how to record
+// MARK: - The poster rack
 
-/// One choice, not two. This screen used to ask twice: two 150pt posters for
-/// "prompt challenge vs record by time", and then a grid of templates below —
-/// where picking a poster could silently flip the mode above it. The prompts
-/// themselves appeared a third time, in a preview strip in between.
+/// Which shelf of posters the grid is showing.
 ///
-/// Now the pill at the top only *filters*: it says which kind of story this is,
-/// and the one thing below it answers accordingly. The prompts live on the card
-/// you selected, and nowhere else.
+/// These four replace two stacked `PillSelector`s (按提示拍/按时间拍, then
+/// 一日/七日, with a `SectionLabel` wedged between them) and the 自己写题目 row
+/// that used to sit under the grid. All three were answering the same question
+/// — what kind of story is today — in three different shapes, and the middle
+/// one could silently move the first one's answer.
+///
+/// The rack only filters. It deliberately does *not* write through to
+/// `ComposerSelection`: with a poster tap creating the story outright, the
+/// style and mode are read off the poster you tapped, so there is no second
+/// copy of that state to keep in step.
+enum TemplateRack: Hashable {
+    case oneDay
+    case sevenDay
+    case byTime
+    case custom
+}
+
+/// The whole composer: one question, one row of filters, one rack of posters.
+/// Tapping a poster creates the story. The gear on its corner is the way to
+/// rename it, edit its moments or invite someone first.
+///
+/// This used to be step 1 of 2, with a 下一步 button, a `1/2` counter, and a
+/// selected poster that rose to the top and expanded — which made "selected"
+/// and "submitted" two different things, so every poster except the default
+/// needed two taps and the default needed one.
 struct MoodStep: View {
-    let oneDayTemplates: [ChallengeTemplate]
+    /// Built-ins only. The user's own sets live on the 自己写 rack, so the two
+    /// lists are passed apart rather than concatenated.
+    let oneDayBuiltins: [ChallengeTemplate]
     let sevenDayTemplates: [ChallengeTemplate]
-    @Binding var selection: ComposerSelection
+    let customTemplates: [ChallengeTemplate]
+    @Binding var rack: TemplateRack
     let onBuildOwn: () -> Void
-    /// Poster tap is submission in the one-step flow; settings remain behind
-    /// the poster gear in the parent.
+    /// A poster tap is the submission: this creates the story and leaves.
     let onChoose: (ChallengeTemplate) -> Void
     let onSettings: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
@@ -30,55 +51,26 @@ struct MoodStep: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var mode: Challenge.Mode { selection.mode }
-
-    private var currentModeTemplates: [ChallengeTemplate] {
-        mode == .oneDay ? oneDayTemplates : sevenDayTemplates
-    }
-
-    private var promptTemplates: [ChallengeTemplate] {
-        currentModeTemplates.filter { !$0.isTimeOnly }
-    }
-
-    /// The one-day / seven-day switch, which used to live inside the "more
-    /// templates" sheet — the only place it existed. When that sheet wouldn't
-    /// open, seven-day challenges were unreachable from the whole app.
-    private var modeSelection: Binding<Challenge.Mode> {
-        Binding(get: { selection.mode }, set: { selection.setMode($0) })
-    }
-
-    private var timeOnlyTemplate: ChallengeTemplate? {
-        oneDayTemplates.first(where: \.isTimeOnly)
-    }
-
-    /// The pill writes through to the selection so the two can't disagree —
-    /// that disagreement is the bug this screen was rebuilt around.
-    private var style: Binding<ComposerSelection.Style> {
-        Binding(
-            get: { selection.style },
-            set: { next in
-                switch next {
-                case .timeOnly: selectTimeOnly()
-                case .prompted: selectPromptMode()
-                }
-            })
+    /// The posters on the current shelf.
+    private var shown: [ChallengeTemplate] {
+        switch rack {
+        case .oneDay: oneDayBuiltins.filter { !$0.isTimeOnly }
+        case .sevenDay: sevenDayTemplates
+        case .byTime: oneDayBuiltins.filter(\.isTimeOnly)
+        case .custom: customTemplates
+        }
     }
 
     var body: some View {
         ScrollView {
-            page
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    private var page: some View {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(Strings.newStoryQuestion)
                         .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(OneDay.ink)
+                        .accessibilityIdentifier("composer-question")
 
-                    Text(Strings.recordingStyleSubtitle)
+                    Text(Strings.pickOneAndGo)
                         .font(.system(size: 14.5, weight: .medium, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
                 }
@@ -86,123 +78,63 @@ struct MoodStep: View {
 
                 PillSelector(
                     options: [
-                        .init(value: ComposerSelection.Style.prompted, label: Strings.followPrompts),
-                        .init(value: ComposerSelection.Style.timeOnly, label: Strings.recordByTime),
+                        .init(value: TemplateRack.oneDay, label: Strings.modeOneDay),
+                        .init(value: TemplateRack.sevenDay, label: Strings.modeSevenDay),
+                        .init(value: TemplateRack.byTime, label: Strings.rackByTime),
+                        .init(value: TemplateRack.custom, label: Strings.rackCustom),
                     ],
-                    selection: style)
+                    selection: $rack,
+                    compact: true)
                     .padding(.horizontal, 20)
+                    .accessibilityIdentifier("composer-rack")
 
-                if selection.promptGridEnabled {
-                    promptSection
-                } else {
-                    timeOnlySection
+                // "选一张，就建好了" is a promise about the posters below it —
+                // on an empty rack there is nothing for it to be about.
+                if !shown.isEmpty {
+                    SectionLabel(text: Strings.pickOneCreatesIt)
+                        .padding(.horizontal, 20)
                 }
 
-                Button(action: onBuildOwn) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.oneDayLavender)
-                            .frame(width: 42, height: 42)
-                            .background(Color.oneDayLavender.opacity(0.16), in: RoundedRectangle(cornerRadius: 14))
+                grid
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(Strings.customPromptsTitle)
-                                .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                                .foregroundStyle(OneDay.ink)
-                            Text(Strings.customPromptsCaption)
-                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(OneDay.inkSoft)
-                                .lineLimit(2)
-                        }
-
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(OneDay.inkFaint)
-                    }
-                    .padding(13)
-                    .background(OneDay.surface.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
-                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(OneDay.hairline, lineWidth: 1))
-                    .oneDaySoftShadow(strength: 0.45)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.customPromptsTitle)
-                .accessibilityIdentifier("custom-prompts-entry")
-                .padding(.horizontal, 20)
+                if rack == .custom { writeYourOwn }
             }
             .padding(.bottom, 16)
+            .animation(OneDay.Motion.soft, value: rack)
+        }
+        .scrollIndicators(.hidden)
     }
 
-    /// The chosen story, opened up, then the alternatives. The selected card
-    /// rises to the top rather than expanding where it sits: full width is the
-    /// only way seven prompts fit, and a card that grows sideways out of one
-    /// grid column has to shove its neighbour somewhere.
-    private var promptSection: some View {
+    /// Every poster the same size. The prompts each one will ask for are the
+    /// tile's second line, which is the only place they appear on this screen.
+    private var grid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                SectionLabel(text: mode == .oneDay
-                    ? Strings.pickPromptSet
-                    : Strings.sevenDayChallenges)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-
-            // One day or seven. This is the question the grid below is an
-            // answer to, so it sits above the grid rather than behind a sheet.
-            PillSelector(
-                options: [
-                    .init(value: Challenge.Mode.oneDay, label: Strings.modeOneDay),
-                    .init(value: Challenge.Mode.sevenDay, label: Strings.modeSevenDay),
-                ],
-                selection: modeSelection)
-                .padding(.horizontal, 20)
-
-            if let chosen = selectedPromptTemplate {
-                OpenTemplateCard(template: chosen, coverURL: coverURL(chosen)) {
-                    MomentChips(moments: chosen.momentKeys?
-                        .map { MomentCatalog.localize($0) } ?? [])
-                }
-                .padding(.horizontal, 20)
+            if shown.isEmpty {
+                Text(Strings.noCustomTemplatesYet)
+                    .font(.system(size: 13.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
             }
 
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
                 spacing: 12
             ) {
-                ForEach(alternativeTemplates) { template in
+                ForEach(shown) { template in
                     PromptTemplateTile(
                         template: template,
                         isSelected: false,
                         coverURL: coverURL(template),
-                        onSelect: { select(template) },
+                        onSelect: { onChoose(template) },
                         onSettings: { onSettings(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
                 }
             }
             .padding(.horizontal, 20)
-        }
-        .animation(OneDay.Motion.soft, value: selection.templateID)
-    }
 
-    /// Record-by-time replaces the grid instead of dimming it. The old screen
-    /// left five posters sitting there greyed out — an answer to a question
-    /// nobody asked, and still the most eye-catching thing on screen.
-    private var timeOnlySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let template = timeOnlyTemplate {
-                SectionLabel(text: template.displayName)
-                    .padding(.horizontal, 20)
-
-                OpenTemplateCard(template: template, showsPromptCount: false) {
-                    Text(Strings.timeOnlyCardBody)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 20)
-
+            if rack == .byTime {
                 Label(Strings.timeOnlyCaptionNote, systemImage: "clock")
                     .font(.system(size: 12.5, weight: .medium, design: .rounded))
                     .foregroundStyle(OneDay.inkFaint)
@@ -212,131 +144,41 @@ struct MoodStep: View {
         }
     }
 
-    /// The prompted story currently chosen. Nil during the guided flow, whose
-    /// moments aren't backed by a template.
-    private var selectedPromptTemplate: ChallengeTemplate? {
-        guard let templateID = selection.templateID else { return nil }
-        return promptTemplates.first { $0.id == templateID }
-    }
+    /// Only on the 自己写 rack. It used to sit at the bottom of every rack,
+    /// under posters it had nothing to do with.
+    private var writeYourOwn: some View {
+        Button(action: onBuildOwn) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.oneDayLavender)
+                    .frame(width: 42, height: 42)
+                    .background(Color.oneDayLavender.opacity(0.16), in: RoundedRectangle(cornerRadius: 14))
 
-    /// Everything except the one already open above.
-    ///
-    /// All of them, not the first five. The cut-off was there to justify a
-    /// "more templates" sheet, and its side effect was that a template you
-    /// wrote yourself — always last in the list — could never appear on this
-    /// screen at all.
-    private var alternativeTemplates: [ChallengeTemplate] {
-        promptTemplates.filter { $0.id != selectedPromptTemplate?.id }
-    }
-
-    private func selectTimeOnly() {
-        selection.selectTimeOnly(in: oneDayTemplates)
-    }
-
-    private func selectPromptMode() {
-        selection.selectPrompted(in: currentModeTemplates)
-    }
-
-    private func select(_ template: ChallengeTemplate) {
-        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
-        onChoose(template)
-    }
-}
-
-/// The story you've chosen, opened up: cover, name, and — right there on the
-/// card — exactly what it will ask you to film.
-///
-/// The prompts used to be spread across three places on this screen (a preview
-/// strip, a tile subtitle, and the next step behind a collapsed card). They
-/// live here now, and only here.
-private struct OpenTemplateCard<Detail: View>: View {
-    let template: ChallengeTemplate
-    /// Off for the time-only story, which has no prompts to count.
-    var showsPromptCount = true
-    var coverURL: URL?
-    @ViewBuilder var detail: Detail
-
-    private var promptCount: Int { template.momentKeys?.count ?? 0 }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            TemplateCoverImage(
-                assetName: template.matchedCoverAssetName, fileURL: coverURL)
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 118)
-                .clipped()
-                // Clipping pixels does not clip SwiftUI's hit-test region.
-                // The scaled image otherwise covers the mode selector above.
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Text(template.displayName)
-                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(Strings.customPromptsTitle)
+                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
-                        .lineLimit(1)
-
-                    if showsPromptCount, promptCount > 0 {
-                        Text("·")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.inkFaint)
-                        Text(Strings.promptCountLabel(promptCount))
-                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .fixedSize()
-                    }
-
-                    Spacer(minLength: 4)
-                }
-
-                detail
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(13)
-        }
-        .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .contentShape(RoundedRectangle(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Color.oneDayBlue.opacity(0.65), lineWidth: 2)
-        }
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 22, weight: .bold))
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, Color.oneDayBlue)
-                .padding(9)
-        }
-        .oneDaySoftShadow(strength: 0.8)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isSelected)
-    }
-}
-
-/// The prompts, numbered, in the order they'll be asked for.
-private struct MomentChips: View {
-    let moments: [String]
-
-    var body: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(Array(moments.enumerated()), id: \.offset) { index, moment in
-                HStack(spacing: 4) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
-                    Text(moment)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    Text(Strings.customPromptsCaption)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5.5)
-                .background(OneDay.surfaceSoft.opacity(0.9), in: Capsule())
+
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(OneDay.inkFaint)
             }
+            .padding(13)
+            .background(OneDay.surface.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(OneDay.hairline, lineWidth: 1))
+            .oneDaySoftShadow(strength: 0.45)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.customPromptsTitle)
+        .accessibilityIdentifier("custom-prompts-entry")
+        .padding(.horizontal, 20)
     }
 }
 
@@ -366,74 +208,86 @@ private struct PromptTemplateTile: View {
     }
 
     var body: some View {
-        Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 0) {
-                TemplateCoverImage(
-                    assetName: template.matchedCoverAssetName, fileURL: coverURL)
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(1.6, contentMode: .fit)
-                    .clipped()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(template.displayName)
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .lineLimit(1)
-                    Text(subtitleText)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(2)
-                        .frame(minHeight: 30, alignment: .topLeading)
-                }
-                .padding(11)
-            }
-            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .contentShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(alignment: .topTrailing) {
-                if let onSettings {
-                    Button(action: onSettings) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(OneDay.ink)
-                            .padding(8)
-                            .background(.thinMaterial, in: Circle())
+        // The gear is a *sibling* of the poster button, not an overlay inside
+        // its label. A Button nested in another Button's label gets flattened:
+        // the outer one swallows both the tap and the accessibility element,
+        // so the gear rendered but could never be pressed. That went unnoticed
+        // while it was only a shortcut past 下一步 — now it is the only way to
+        // reach the story's settings at all.
+        ZStack(alignment: .topTrailing) {
+            Button(action: onSelect) { card }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .contextMenu {
+                    if let onEdit {
+                        Button(Strings.editTemplate, systemImage: "pencil", action: onEdit)
                     }
-                    .buttonStyle(.plain)
-                    .padding(7)
-                    .accessibilityLabel("设置故事")
+                    if let onDelete {
+                        Button(
+                            Strings.deleteTemplate, systemImage: "trash",
+                            role: .destructive, action: onDelete)
+                    }
                 }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(
-                        isSelected ? Color.oneDayBlue.opacity(0.65) : OneDay.hairline,
-                        lineWidth: isSelected ? 2 : 1)
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 21, weight: .bold))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, Color.oneDayBlue)
+
+            if let onSettings {
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(OneDay.ink)
                         .padding(8)
+                        .background(.thinMaterial, in: Circle())
                 }
-            }
-            .oneDaySoftShadow(strength: isSelected ? 0.75 : 0.35)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .contextMenu {
-            if let onEdit {
-                Button(Strings.editTemplate, systemImage: "pencil", action: onEdit)
-            }
-            if let onDelete {
-                Button(Strings.deleteTemplate, systemImage: "trash", role: .destructive, action: onDelete)
+                .buttonStyle(.plain)
+                .padding(7)
+                .accessibilityLabel(Strings.storySettingsTitle)
+                .accessibilityIdentifier("poster-settings")
             }
         }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TemplateCoverImage(
+                assetName: template.matchedCoverAssetName, fileURL: coverURL)
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1.6, contentMode: .fit)
+                .clipped()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(template.displayName)
+                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(1)
+                Text(subtitleText)
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(2)
+                    .frame(minHeight: 30, alignment: .topLeading)
+            }
+            .padding(11)
+        }
+        .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    isSelected ? Color.oneDayBlue.opacity(0.65) : OneDay.hairline,
+                    lineWidth: isSelected ? 2 : 1)
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 21, weight: .bold))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, Color.oneDayBlue)
+                    .padding(8)
+            }
+        }
+        .oneDaySoftShadow(strength: isSelected ? 0.75 : 0.35)
     }
 }
 

@@ -1062,6 +1062,14 @@ enum Strings {
             ? "跟着题目拍，或者按时间随手拍。"
             : "Follow prompts, or just record as the day goes."
     }
+    /// The one-screen composer: the poster *is* the submit button, so the
+    /// subtitle has to say so — there is no 下一步 left to imply it.
+    static var pickOneAndGo: String {
+        lang == .chinese ? "选一张，直接开始拍。" : "Pick one and start filming."
+    }
+    static var pickOneCreatesIt: String {
+        lang == .chinese ? "选一张，就建好了" : "One tap creates it"
+    }
     /// The two halves of the one pill selector at the top of the screen. They
     /// filter what's below; they are not themselves a thing you "pick", which
     /// is why they're pills and not two posters the size of the templates.
@@ -1070,6 +1078,29 @@ enum Strings {
     }
     static var recordByTime: String {
         lang == .chinese ? "按时间拍" : "Record by time"
+    }
+    /// The same two choices as `followPrompts` / `recordByTime`, shortened to
+    /// share one row with 一日 and 七日. Four segments in a Chinese pill leave
+    /// about three characters each.
+    static var rackByTime: String {
+        lang == .chinese ? "按时间" : "By time"
+    }
+    static var rackCustom: String {
+        lang == .chinese ? "自己写" : "Your own"
+    }
+    /// The settings sheet behind a poster's gear, and the button that closes
+    /// it by creating the story.
+    static var storySettingsTitle: String {
+        lang == .chinese ? "故事设置" : "Story settings"
+    }
+    static var startFilmingCTA: String {
+        lang == .chinese ? "开始拍" : "Start filming"
+    }
+    /// The empty 自己写 rack: no saved prompt sets yet.
+    static var noCustomTemplatesYet: String {
+        lang == .chinese
+            ? "还没有自己写的题目。写一组，它就留在这里。"
+            : "No prompt sets of your own yet. Write one and it stays here."
     }
     static var customPromptsTitle: String {
         lang == .chinese ? "自己写题目" : "Write your own prompts"
