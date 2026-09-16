@@ -764,6 +764,34 @@ enum Strings {
     /// The same action as `rerecord`, for a chip sitting on top of the video
     /// where "Re-record this day" wraps to two lines and stops being a chip.
     static var rerecordShort: String { lang == .chinese ? "重拍" : "Retake" }
+    /// The review screen's card of things you can do to one moment, and the
+    /// button that gives the clip the whole display when you want it.
+    static var thisMoment: String { lang == .chinese ? "这个瞬间" : "This moment" }
+    static var addReaction: String { lang == .chinese ? "加个表情" : "Add a reaction" }
+    /// The settings screen, which leads with who you are rather than with a
+    /// list of switches.
+    static var meTitle: String { lang == .chinese ? "我" : "Me" }
+    static var tapToRename: String { lang == .chinese ? "点这里改名字" : "Tap to rename" }
+    static var signedInWithApple: String {
+        lang == .chinese ? "已用 Apple ID 登录" : "Signed in with Apple"
+    }
+    static var statStories: String { lang == .chinese ? "故事" : "Stories" }
+    static var statMoments: String { lang == .chinese ? "瞬间" : "Moments" }
+    /// Stories with every moment filmed. Deliberately not "films exported" —
+    /// nothing tracks exports, and a number the app can't actually count is
+    /// worse than one it can.
+    static var statFinished: String { lang == .chinese ? "拍完了" : "Finished" }
+    static var anyEmojiPlaceholder: String {
+        lang == .chinese ? "或者打任意表情" : "Or type any emoji"
+    }
+    static var fullScreenAction: String { lang == .chinese ? "全屏看" : "Full screen" }
+    static var noCaptionYet: String { lang == .chinese ? "还没有字幕" : "No caption yet" }
+    static var chatAboutMoment: String {
+        lang == .chinese ? "聊聊这个瞬间" : "Talk about this moment"
+    }
+    static func messagesCount(_ count: Int) -> String {
+        lang == .chinese ? "\(count) 条" : "\(count)"
+    }
     /// The chip that opens the caption editor. `addCaption` is the placeholder
     /// *inside* the editor, which is a sentence; this is a button, which isn't.
     static var captionAction: String { lang == .chinese ? "加字幕" : "Caption" }

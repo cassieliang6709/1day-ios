@@ -807,13 +807,18 @@ enum VideoStitcher {
         let minEdge = min(frame.width, frame.height)
         let maxWidth = frame.width * 0.76
         let banded = sticker.style == .band
-        var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        // `scale` is what the pinch gesture committed. It goes in here rather
+        // than as a layer transform so the shrink-to-fit loop below sees the
+        // real size: scaling the layer afterwards would push a caption
+        // somebody enlarged straight back out past `maxWidth`.
+        var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062) * sticker.scale
         let weight: UIFont.Weight = sticker.style == .headline ? .heavy : .bold
+        let ink = sticker.tint.uiColor
         var attributed = NSAttributedString()
         repeat {
             attributed = NSAttributedString(string: text, attributes: [
                 .font: roundedFont(size: fontSize, weight: weight),
-                .foregroundColor: UIColor.white,
+                .foregroundColor: ink,
             ])
             if attributed.size().width + (banded ? fontSize * 1.6 : 0) <= maxWidth { break }
             fontSize *= 0.92
@@ -840,6 +845,19 @@ enum VideoStitcher {
         if banded {
             container.backgroundColor = UIColor.black.withAlphaComponent(0.45).cgColor
             container.cornerRadius = box.height * 0.34
+        }
+        if sticker.angle != 0 {
+            // Around the container's own middle, which is already where the
+            // sticker's fractions placed it — the default anchor point — so
+            // turning the words doesn't also move them.
+            //
+            // Negated: this layer tree counts y from the bottom (see the
+            // `renderSize.height -` above), so a positive z-rotation here
+            // turns anticlockwise, while SwiftUI's `.rotationEffect` on the
+            // review screen turns clockwise. Same number, opposite sign, so
+            // the export matches what was placed.
+            container.transform = CATransform3DMakeRotation(
+                -sticker.angle * .pi / 180, 0, 0, 1)
         }
 
         let layer = CATextLayer()

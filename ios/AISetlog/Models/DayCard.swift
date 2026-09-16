@@ -14,18 +14,39 @@ struct CaptionSticker: Codable, Equatable {
     var x: Double
     var y: Double
     var style: Style
+    /// How big, relative to the size the style draws at. Pinch to change.
+    var scale: Double
+    /// How far it's turned, in degrees. Rotate with two fingers.
+    var angle: Double
+    /// What colour the words are.
+    var tint: Tint
 
     /// Middle of the frame, a little above centre — where the caption has
     /// always been burned, so a card saved before stickers existed looks the
     /// same as it did.
     static let `default` = CaptionSticker(x: 0.5, y: 0.43, style: .outline)
 
-    init(x: Double, y: Double, style: Style) {
+    init(
+        x: Double,
+        y: Double,
+        style: Style,
+        scale: Double = 1,
+        angle: Double = 0,
+        tint: Tint = .white
+    ) {
         // 0.08 keeps the sticker off the frame's edge, which is where the
         // stitcher's own margin is and where a phone's rounded corners eat it.
         self.x = min(max(x, 0.08), 0.92)
         self.y = min(max(y, 0.08), 0.92)
         self.style = style
+        // Clamped for the same reason the position is: a pinch that ran away
+        // leaves a caption too small to read or too big to fit, and there is no
+        // reset button. Below 0.55 the smallest style is under 10pt at export.
+        self.scale = min(max(scale.isFinite ? scale : 1, 0.55), 2.2)
+        // Past about a third of a turn it stops reading as a tilted caption and
+        // starts reading as a mistake.
+        self.angle = min(max(angle.isFinite ? angle : 0, -35), 35)
+        self.tint = tint
     }
 
     init(from decoder: Decoder) throws {
@@ -36,7 +57,13 @@ struct CaptionSticker: Codable, Equatable {
             // A style added in a later version, read by an older one, is a
             // style that doesn't exist yet — draw the words rather than
             // throwing the whole card away.
-            style: Style(rawValue: try c.decode(String.self, forKey: .style)) ?? .outline)
+            style: Style(rawValue: try c.decode(String.self, forKey: .style)) ?? .outline,
+            // Added after stickers shipped. Absent means a caption saved before
+            // they existed: unscaled, unturned, white — exactly how it looked.
+            scale: try c.decodeIfPresent(Double.self, forKey: .scale) ?? 1,
+            angle: try c.decodeIfPresent(Double.self, forKey: .angle) ?? 0,
+            tint: (try c.decodeIfPresent(String.self, forKey: .tint))
+                .flatMap(Tint.init(rawValue:)) ?? .white)
     }
 
     /// How the words are drawn. Three, because a fourth would be a font picker.
@@ -53,21 +80,47 @@ struct CaptionSticker: Codable, Equatable {
         var id: String { rawValue }
     }
 
+    /// The colour of the words. The app's own palette rather than a colour
+    /// wheel: six that are legible over footage, and no way to pick the one
+    /// that isn't.
+    enum Tint: String, Codable, CaseIterable, Identifiable {
+        case white, blue, cyan, lavender, mint, ink
+
+        var id: String { rawValue }
+    }
+
     // MARK: - CloudKit
 
-    /// One field rather than three, because two thirds of a sticker is not a
+    /// One field rather than six, because two thirds of a sticker is not a
     /// sticker: a position without a style, or an x without a y, has nothing
     /// to draw. Also one schema change in the room's record type instead of
-    /// three.
-    var cloudValue: String { "\(x),\(y),\(style.rawValue)" }
+    /// six.
+    ///
+    /// Appended to rather than restructured: a three-part value is one written
+    /// by a version before scale/angle/tint existed, and it has to keep
+    /// meaning what it meant.
+    var cloudValue: String {
+        "\(x),\(y),\(style.rawValue),\(scale),\(angle),\(tint.rawValue)"
+    }
 
     init?(cloudValue: String) {
         let parts = cloudValue.split(separator: ",")
-        guard parts.count == 3,
+        guard parts.count == 3 || parts.count == 6,
               let x = Double(parts[0]), let y = Double(parts[1]),
               let style = Style(rawValue: String(parts[2]))
         else { return nil }
-        self.init(x: x, y: y, style: style)
+        guard parts.count == 6 else {
+            self.init(x: x, y: y, style: style)
+            return
+        }
+        // A newer phone's extra fields, read by this one. Anything unparseable
+        // falls back to the default for that field rather than dropping the
+        // whole sticker — half a sticker still beats none.
+        self.init(
+            x: x, y: y, style: style,
+            scale: Double(parts[3]) ?? 1,
+            angle: Double(parts[4]) ?? 0,
+            tint: Tint(rawValue: String(parts[5])) ?? .white)
     }
 }
 

@@ -49,9 +49,16 @@ struct ClipPreviewView: View {
     /// Only ever this — the card stores fractions, so nothing outlives the
     /// gesture that would have to be converted back.
     @State private var captionDrag: CGSize = .zero
+    /// Live pinch and twist, for the duration of the gesture only — same rule
+    /// as `captionDrag`: the card stores the committed value, never a delta.
+    @State private var pinch: CGFloat = 1
+    @State private var twist: Double = 0
     @FocusState private var captionFocused: Bool
     @State private var showComments = false
     @State private var showLook = false
+    /// Off by default — see `stagedLayout`. The ⤢ button and writing a caption
+    /// are the two things that turn it on.
+    @State private var fullScreen = false
     /// Held down in the look panel: play the clip as it was filmed.
     @State private var showingOriginal = false
 
@@ -159,7 +166,10 @@ struct ClipPreviewView: View {
     private func cycleCaptionStyle() {
         let styles = CaptionSticker.Style.allCases
         let next = styles[((styles.firstIndex(of: sticker.style) ?? 0) + 1) % styles.count]
-        saveSticker(CaptionSticker(x: sticker.x, y: sticker.y, style: next))
+        // Through `reshaped`, so cycling the style keeps the size, the angle
+        // and the colour. Rebuilding the sticker from x/y/style alone silently
+        // reset the other three every time this was tapped.
+        saveSticker(reshaped(style: next))
     }
 
     private var localizedMomentTitle: String {
@@ -176,16 +186,17 @@ struct ClipPreviewView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
-            videoStage
-            scrim
-            if editingCaption {
-                EmptyView()
-            } else if showLook {
-                lookOverlay
+            backdrop
+            // Placing a caption means placing it in the frame it gets exported
+            // in, so writing one always takes the whole display — and stays
+            // there afterwards, so you can see what you just wrote where it
+            // will actually be.
+            if fullScreen || editingCaption {
+                fullScreenLayout
             } else {
-                chrome
+                stagedLayout
             }
+            if showLook { lookOverlay }
         }
         .statusBarHidden()
         .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
@@ -198,17 +209,51 @@ struct ClipPreviewView: View {
 
     // MARK: - The video, and the one thing drawn where the film draws it
 
-    /// The player plus the caption layer, sized to the video itself.
+    /// Looking back at a moment, inset — not the whole screen.
     ///
-    /// Portrait footage goes edge to edge — `LoopingClipPlayer` already fills
-    /// its frame, so a selfie crops at the sides rather than sitting in a
-    /// letterbox. A wider film can't: filling a portrait screen with it would
-    /// throw away most of the picture, so it keeps its shape. What used to be
-    /// black bars either side of it is now the film's own first frame, blurred
-    /// — the same idea the stitcher uses inside a cell, for the same reason.
-    @ViewBuilder
+    /// Edge to edge is what this screen used to do, and it reads as an alarm:
+    /// one tap on a grid tile and a two-second clip takes the entire display
+    /// with no border, no ✕ in the picture and nothing around it. The clip is
+    /// still the biggest thing here, but it now sits as a rounded card on its
+    /// own blurred bed, with the title above it and what you can do to it in a
+    /// card below. Nothing is hidden and nothing scrolls.
+    ///
+    /// "Fill the screen" survives as a button (`⤢`), because filling it is the
+    /// only way to judge a stitched moment's two halves and the only size at
+    /// which you can place a caption accurately.
+    private var stagedLayout: some View {
+        VStack(spacing: 12) {
+            top
+            // Centred in what's left under the title bar, not top-aligned: a
+            // 9:8 stitched moment is only about 40% of the height, and pinning
+            // it up top left the bottom third of the screen empty.
+            Spacer(minLength: 0)
+            Color.clear
+                // `Color.clear` rather than the player: an aspect-filling
+                // player reports the size it filled to, and a ZStack/VStack
+                // lays siblings out in the widest child. A 9:8 stitched moment
+                // measured 1.125 screens wide that way and pushed 重拍 and
+                // 聊天 clean off the display. Clear takes the offered size and
+                // an overlay can't feed back into it.
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .overlay { videoStage }
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
+            momentCard
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 14)
+    }
+
+    /// The player plus the caption layer, sized by whoever hosts it.
     private var videoStage: some View {
-        let stage = ZStack {
+        ZStack {
             if isLive {
                 // Review is the truth: show the captured file without the personal look.
                 // The look belongs in the dedicated adjustment/export surface.
@@ -218,15 +263,78 @@ struct ClipPreviewView: View {
             }
             captionLayer
         }
+    }
 
-        if fillsScreen {
-            stage.ignoresSafeArea()
-        } else {
-            ZStack {
-                backdrop
-                stage.aspectRatio(aspectRatio, contentMode: .fit)
+    /// The clip with the display to itself: what this screen used to be, now
+    /// something you ask for. `fillsScreen` still decides whether portrait
+    /// footage crops at the sides or keeps its shape on the blurred bed.
+    private var fullScreenLayout: some View {
+        ZStack {
+            if fillsScreen {
+                videoStage.ignoresSafeArea()
+            } else {
+                Color.clear
+                    .aspectRatio(aspectRatio, contentMode: .fit)
+                    .overlay { videoStage }
             }
+            scrim
+            if !editingCaption { fullScreenChrome }
         }
+    }
+
+    private var fullScreenChrome: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                positionChip
+                HStack {
+                    // Out of full screen, not out of the screen. The card
+                    // layout behind this is where ✕ means "done looking".
+                    IconBubble(systemName: "arrow.down.right.and.arrow.up.left") {
+                        withAnimation(OneDay.Motion.soft) { fullScreen = false }
+                    }
+                    Spacer(minLength: 0)
+                    IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
+                        withAnimation(OneDay.Motion.soft) { showLook = true }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            // Only where the caption is: the colour of the words is something
+            // you judge against the picture behind them, and this is the only
+            // layout that shows the picture at the size it exports at.
+            if isMine, hasCaption { tintRow }
+            actionRow
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 22)
+    }
+
+    /// Six dots. Not a colour wheel — over footage most colours are illegible,
+    /// and the six that aren't are the app's own.
+    private var tintRow: some View {
+        HStack(spacing: 9) {
+            ForEach(CaptionSticker.Tint.allCases) { tint in
+                Button {
+                    saveSticker(reshaped(tint: tint))
+                } label: {
+                    Circle()
+                        .fill(tint.color)
+                        .frame(width: 24, height: 24)
+                        .overlay {
+                            Circle().strokeBorder(
+                                .white.opacity(tint == sticker.tint ? 0.95 : 0.35),
+                                lineWidth: tint == sticker.tint ? 2.5 : 1)
+                        }
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tint.rawValue)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 10)
+        .accessibilityIdentifier("caption-tints")
     }
 
     /// Behind a film that doesn't fill the screen: itself, out of focus.
@@ -245,7 +353,10 @@ struct ClipPreviewView: View {
             .overlay { ClipThumbnail(url: url, refreshToken: recordedAt) }
             .clipped()
             .blur(radius: 44)
-            .overlay(Color.black.opacity(0.35))
+            // Darker than it was: it is the whole background now, not a strip
+            // either side of a filling clip, and the inset card needs something
+            // to sit against.
+            .overlay(Color.black.opacity(fullScreen || editingCaption ? 0.35 : 0.52))
             .ignoresSafeArea()
             .allowsHitTesting(false)
     }
@@ -280,15 +391,61 @@ struct ClipPreviewView: View {
             GeometryReader { proxy in
                 captionText(text, in: proxy.size)
                     .frame(maxWidth: proxy.size.width * 0.76)
+                    // Live pinch and twist multiply the saved values rather
+                    // than replacing them, so a second gesture starts from
+                    // where the first one left off.
+                    .scaleEffect(pinch)
+                    .rotationEffect(.degrees(sticker.angle + twist))
                     .contentShape(Rectangle())
                     .onTapGesture { if isMine { startEditingCaption() } }
                     .position(
                         x: (sticker.x + dragFraction(in: proxy.size).x) * proxy.size.width,
                         y: (sticker.y + dragFraction(in: proxy.size).y) * proxy.size.height)
-                    .gesture(isMine ? dragSticker(in: proxy.size) : nil)
+                    .gesture(isMine ? shapeSticker(in: proxy.size) : nil)
                     .animation(nil, value: captionDrag)
+                    .animation(nil, value: pinch)
+                    .animation(nil, value: twist)
             }
         }
+    }
+
+    /// Drag, pinch and twist at once. Simultaneously rather than exclusively:
+    /// a two-finger gesture that starts as a pinch almost always rotates a
+    /// little too, and having the first millimetre of movement decide which
+    /// one you meant makes both feel broken.
+    private func shapeSticker(in size: CGSize) -> some Gesture {
+        SimultaneousGesture(
+            dragSticker(in: size),
+            SimultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { pinch = $0.magnification }
+                    .onEnded { value in
+                        pinch = 1
+                        saveSticker(reshaped(scale: sticker.scale * value.magnification))
+                    },
+                RotateGesture()
+                    .onChanged { twist = $0.rotation.degrees }
+                    .onEnded { value in
+                        twist = 0
+                        saveSticker(reshaped(angle: sticker.angle + value.rotation.degrees))
+                    }))
+    }
+
+    /// The current sticker with one field changed. `CaptionSticker.init` does
+    /// the clamping, so a runaway pinch can't be saved.
+    private func reshaped(
+        x: Double? = nil, y: Double? = nil,
+        style: CaptionSticker.Style? = nil,
+        scale: Double? = nil, angle: Double? = nil,
+        tint: CaptionSticker.Tint? = nil
+    ) -> CaptionSticker {
+        CaptionSticker(
+            x: x ?? sticker.x,
+            y: y ?? sticker.y,
+            style: style ?? sticker.style,
+            scale: scale ?? sticker.scale,
+            angle: angle ?? sticker.angle,
+            tint: tint ?? sticker.tint)
     }
 
     /// What the live drag is worth, as a fraction of the frame, so the sticker
@@ -307,8 +464,7 @@ struct ClipPreviewView: View {
                 captionDrag = .zero
                 guard abs(value.translation.width) + abs(value.translation.height) > 2
                 else { return }
-                saveSticker(CaptionSticker(
-                    x: sticker.x + moved.x, y: sticker.y + moved.y, style: sticker.style))
+                saveSticker(reshaped(x: sticker.x + moved.x, y: sticker.y + moved.y))
             }
     }
 
@@ -316,13 +472,14 @@ struct ClipPreviewView: View {
     /// here is what gets exported.
     private func captionText(_ text: String, in size: CGSize) -> some View {
         let minEdge = min(size.width, size.height)
-        let fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        let base = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        let fontSize = base * sticker.scale
         return Text(text)
             .font(.system(
                 size: fontSize,
                 weight: sticker.style == .headline ? .heavy : .bold,
                 design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(sticker.tint.color)
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.68)
@@ -351,17 +508,6 @@ struct ClipPreviewView: View {
     }
 
     // MARK: - Chrome
-
-    private var chrome: some View {
-        VStack(spacing: 0) {
-            top
-            Spacer(minLength: 0)
-            bottom
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 22)
-    }
 
     private var top: some View {
         ZStack {
@@ -421,23 +567,33 @@ struct ClipPreviewView: View {
         }
     }
 
-    private var bottom: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Only somebody else's name. Labelling your own face with your own
-            // name is the kind of thing an app does when it forgot who's
-            // holding it.
-            if !isMine, let authorName, !authorName.isEmpty {
-                Text(authorName)
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.4), radius: 6, y: 1)
+    /// What you can do to this moment, as rows under the clip rather than
+    /// pills floating over it.
+    ///
+    /// Three floating buttons over the footage were only ever legible because
+    /// of the scrim under them, and they said what they did in four characters
+    /// each. A row can say what the caption currently *is*, and how many
+    /// messages the thread already has, without taking any more space.
+    private var momentCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            // White, not ink: this line sits on the blurred bed rather than on
+            // the card, and the bed is whatever colour the footage was.
+            HStack(spacing: 8) {
+                // Only somebody else's name. Labelling your own face with your
+                // own name is the kind of thing an app does when it forgot
+                // who's holding it.
+                Text(isMine ? Strings.thisMoment : (authorName ?? Strings.thisMoment))
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+                Spacer(minLength: 4)
+                if let timeText {
+                    Text(timeText)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.62))
+                }
             }
-            if let timeText {
-                Text(timeText)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.75))
-            }
+            .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
 
             if isShared {
                 ReactionBar(reactions: reactions, myID: myID) { emoji in
@@ -449,9 +605,101 @@ struct ClipPreviewView: View {
                 }
             }
 
-            actionRow
+            VStack(spacing: 0) {
+                if isMine {
+                    // `captions.bubble`, not `textformat`: SF Symbols draws
+                    // `textformat` as localized letterforms, so in Chinese it
+                    // renders the word 格式 inside a 27pt tile.
+                    momentRow(
+                        "captions.bubble", .oneDayBlue, Strings.captionAction,
+                        value: hasCaption ? liveOverlayText : Strings.noCaptionYet,
+                        action: startEditingCaption)
+                }
+                if isShared {
+                    divider
+                    // Two bubbles, not one: `captions.bubble` above it is
+                    // already a single bubble, and at 13pt the two rows were
+                    // wearing the same icon.
+                    momentRow(
+                        "bubble.left.and.bubble.right.fill", .oneDayLavender,
+                        Strings.chatAboutMoment,
+                        value: comments.isEmpty ? nil : Strings.messagesCount(comments.count)
+                    ) { showComments = true }
+                }
+                if isMine {
+                    divider
+                    momentRow(
+                        "arrow.counterclockwise", .oneDayNavy,
+                        Strings.rerecordShort, value: nil, action: onReRecord)
+                }
+            }
+            .glassSurface(radius: 18)
+
+            Button {
+                withAnimation(OneDay.Motion.soft) { fullScreen = true }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 13, weight: .bold))
+                    Text(Strings.fullScreenAction)
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(.white.opacity(0.16), in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("moment-full-screen")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var divider: some View {
+        Divider().overlay(OneDay.hairline).padding(.leading, 46)
+    }
+
+    private func momentRow(
+        _ symbol: String, _ accent: Color, _ title: String, value: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(accent)
+                    .frame(width: 27, height: 27)
+                    .background(accent.opacity(0.14), in: RoundedRectangle(
+                        cornerRadius: 9, style: .continuous))
+
+                Text(title)
+                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: 6)
+
+                if let value, !value.isEmpty {
+                    Text(value)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(OneDay.inkFaint)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // The row's own name, not the name plus whatever it currently says on
+        // the right. Without this the button is called "加字幕, 还没有字幕",
+        // which changes the moment somebody writes a caption — so anything
+        // looking for the button by name stops finding it.
+        .accessibilityLabel(title)
     }
 
     private var actionRow: some View {
@@ -516,6 +764,12 @@ struct ClipPreviewView: View {
     private var commentsSheet: some View {
         Group {
             if let challengeID {
+                // No `onOpenMoment` here: this screen *is* one moment and has
+                // no navigation of its own, so it cannot honour a quote
+                // pointing at a different one. The quotes stay plain labels —
+                // better than an arrow that does nothing four times out of
+                // five. The room chat opened from the story timeline is where
+                // they're links.
                 RoomChatView(challengeID: challengeID, moment: day)
             }
         }
@@ -525,8 +779,14 @@ struct ClipPreviewView: View {
 
     // MARK: - Caption
 
+    /// Always full screen. A caption is placed as a fraction of the exported
+    /// frame, so placing one inside a 16pt-inset card means aiming at a
+    /// smaller picture than the one it lands on — and the keyboard would take
+    /// most of that card. Staying full screen afterwards is deliberate too:
+    /// the first thing you want after writing it is to see it.
     private func startEditingCaption() {
         captionDraft = liveOverlayText ?? ""
+        fullScreen = true
         editingCaption = true
         captionFocused = true
     }

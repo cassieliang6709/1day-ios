@@ -244,9 +244,12 @@
           <li>从故事时间轴进来 → <code>RoomChatView(challengeID:)</code>，<code>moment</code> 是 nil，那一行不出现（<code>StoryTimelineView.swift:78</code>）</li>
         </ul>
         「取消引用」<code>Button { moment = nil }</code>（<code>RoomChatView.swift:214</code>）只是把这个标签摘掉，
-        之后发的消息不带瞬间号。<b>它跟任何一条别人的消息都没有关系，点它不会跳转，消息气泡上也不显示这个标签。</b>
+        之后发的消息不带瞬间号。<b>它跟任何一条别人的消息都没有关系，点它不会跳转。</b>
         <br><br>
-        所以现在这个功能是半个：带进去了，但收进去之后<b>看不见</b>。两条路，见下面第 5 节。
+        <b>更正：</b>我一开始说「气泡上根本看不见它」，这句是错的。气泡上方确实印了一行
+        <code>Text("来自第 N 个瞬间")</code>，<code>caption2</code> 灰字（<code>RoomChatView.swift:172-175</code>）——
+        只是没有题目名、跟气泡没有视觉连接、也点不了。所以这个功能不是「看不见」，是<b>只做了显示的一半</b>。
+        两条路，见下面第 5 节。
       </div>
     </div>
   </div>
@@ -631,12 +634,12 @@
 <table>
   <thead><tr><th></th><th>项</th><th>判定</th><th>工时</th><th>卡在哪</th></tr></thead>
   <tbody>
-    <tr><td class="n">1</td><td>聊天配色（气泡 + 输入框走设计系统）</td><td><span class="chip on">直接做</span></td><td>2 小时</td><td>不卡</td></tr>
-    <tr><td class="n">2</td><td>字幕缩放 + 旋转 + 颜色</td><td><span class="chip on">直接做</span></td><td>5 小时</td><td>不卡</td></tr>
-    <tr><td class="n">3</td><td>Emoji 放开表情盘（六个默认 + 系统键盘）</td><td><span class="chip on">直接做</span></td><td>3 小时</td><td>不卡</td></tr>
-    <tr><td class="n">4</td><td>聊天「引用」补完（甲）</td><td><span class="chip">等你选</span></td><td>3 小时</td><td>待你定 ③</td></tr>
-    <tr><td class="n">5</td><td>个人设置重做</td><td><span class="chip">等你选</span></td><td>2–4 小时</td><td>待你定 ①</td></tr>
-    <tr><td class="n">6</td><td>回看不再默认全屏</td><td><span class="chip">等你选</span></td><td>4 小时</td><td>待你定 ②</td></tr>
+    <tr><td class="n">1</td><td>聊天配色（气泡 + 输入框走设计系统）</td><td><span class="chip on">已做</span></td><td>2 小时</td><td>—</td></tr>
+    <tr><td class="n">2</td><td>字幕缩放 + 旋转 + 颜色</td><td><span class="chip on">已做</span></td><td>5 小时</td><td>—</td></tr>
+    <tr><td class="n">3</td><td>Emoji 放开表情盘 + 重新设计 reaction bar</td><td><span class="chip on">已做</span></td><td>3 小时</td><td>—</td></tr>
+    <tr><td class="n">4</td><td>聊天「引用」补完（甲）</td><td><span class="chip on">已做</span></td><td>3 小时</td><td>从 timeline 进的聊天里可点跳转；从单个瞬间进的是纯标签</td></tr>
+    <tr><td class="n">5</td><td>个人设置重做（方案 A 个人主页）</td><td><span class="chip on">已做</span></td><td>4 小时</td><td>「拍完了」= 每个瞬间都拍了的故事数</td></tr>
+    <tr><td class="n">6</td><td>回看默认收边卡片 + 「全屏看」按钮</td><td><span class="chip on">已做</span></td><td>4 小时</td><td>B 收边为底，融合了 A 的卡片列表</td></tr>
     <tr><td class="n">7</td><td>Emoji 存储 / 删掉 Emoji 功能</td><td><span class="chip" style="background:rgba(12,163,12,.15);color:#0a7a0a">不做</span></td><td>—</td><td>存储是对的，见开头</td></tr>
     <tr><td class="n">8</td><td>字幕多条 / 出现时间</td><td><span class="chip" style="background:rgba(11,11,11,.06)">先不做</span></td><td>2 天</td><td>会改存储格式，等 ①② 上线看反馈</td></tr>
   </tbody>

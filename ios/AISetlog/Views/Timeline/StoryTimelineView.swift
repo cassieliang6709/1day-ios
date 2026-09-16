@@ -75,7 +75,14 @@ struct StoryTimelineView: View {
             }
         }
         .sheet(isPresented: $showRoomChat) {
-            RoomChatView(challengeID: challengeID)
+            // The timeline can reach any moment, so a quoted one is a link
+            // from here: close the chat and open that moment.
+            RoomChatView(challengeID: challengeID) { day in
+                showRoomChat = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    sheet = .moment(day: day)
+                }
+            }
         }
         .sheet(isPresented: $showRoomDemo) {
             #if DEBUG || LOCAL_ROOM_CHAT_DEMO

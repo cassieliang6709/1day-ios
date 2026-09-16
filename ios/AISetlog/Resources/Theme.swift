@@ -173,3 +173,27 @@ extension View {
         shadow(color: color.opacity(0.28 * strength), radius: 18 * strength, y: 9 * strength)
     }
 }
+
+// MARK: - Caption tints
+
+extension CaptionSticker.Tint {
+    /// Deliberately fixed hexes rather than the themed tokens above.
+    ///
+    /// A caption gets burned into an exported file. Resolving its colour
+    /// through `UIColor.themed` would mean the same story exports with dark
+    /// ink on a light-mode phone and pale blue on a dark-mode one — the
+    /// device's appearance setting deciding what somebody's film looks like
+    /// forever. These six are the palette's own values, pinned.
+    var uiColor: UIColor {
+        switch self {
+        case .white: .white
+        case .blue: UIColor(hex: 0x1677FF)
+        case .cyan: UIColor(hex: 0x38B6FF)
+        case .lavender: UIColor(hex: 0xB3A4FF)
+        case .mint: UIColor(hex: 0x4FD1A5)
+        case .ink: UIColor(hex: 0x0F2E6B)
+        }
+    }
+
+    var color: Color { Color(uiColor: uiColor) }
+}

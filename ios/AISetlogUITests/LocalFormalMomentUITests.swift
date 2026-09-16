@@ -14,15 +14,26 @@ final class LocalFormalMomentUITests: XCTestCase {
         moment.tap()
         let caption = app.buttons["加字幕"]
         XCTAssertTrue(caption.waitForExistence(timeout: UITestWait.media))
+        // The clip is an inset card now, with these three as rows in a glass
+        // card under it and 全屏看 as the way to the old edge-to-edge layout.
+        // The regression this test exists for is the same either way: every
+        // one of them has to be on screen and hittable.
+        XCTAssertTrue(app.buttons["moment-full-screen"].isHittable)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Production full-screen StitchedMomentPreview"
+        screenshot.name = "Production inset StitchedMomentPreview"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        let chat = app.buttons.matching(identifier: "聊天").allElementsBoundByIndex.first { $0.isHittable }
+        let chat = app.buttons.matching(identifier: "聊聊这个瞬间").allElementsBoundByIndex.first { $0.isHittable }
         XCTAssertNotNil(chat)
         chat?.tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["聊聊第 1 个瞬间"].exists)
+        // The composer says what the next message will be tagged with. It now
+        // carries the moment's own prompt after the number, so match the part
+        // that is the contract — the moment this chat was opened from.
+        XCTAssertTrue(
+            app.staticTexts
+                .matching(NSPredicate(format: "label CONTAINS %@", "第 1 个瞬间"))
+                .firstMatch.exists)
         app.buttons["退出演示"].tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))
         let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "关闭", "xmark"])).firstMatch
@@ -32,6 +43,6 @@ final class LocalFormalMomentUITests: XCTestCase {
         // Reopening must use this owner's still-readable scoped cache.
         moment.tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons.matching(identifier: "聊天").allElementsBoundByIndex.contains { $0.isHittable })
+        XCTAssertTrue(app.buttons.matching(identifier: "聊聊这个瞬间").allElementsBoundByIndex.contains { $0.isHittable })
     }
 }
