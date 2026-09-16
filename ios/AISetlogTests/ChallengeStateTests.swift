@@ -226,16 +226,24 @@ final class ChallengeStateTests: XCTestCase {
         }
     }
 
-    /// Landscape means the sensor's own frame, so nothing rotates — whatever
-    /// the coordinator would have preferred for a horizon-level portrait shot.
-    func testLandscapeStaysUnrotatedRegardlessOfCoordinator() {
+    /// Landscape takes the coordinator's angle too, like every other orientation.
+    ///
+    /// This used to assert a hardcoded 0 — "landscape means the sensor's own
+    /// frame, so nothing rotates". That reads right and films wrong: the app UI
+    /// is portrait-locked, so leaving the connection at 0° puts the sensor's
+    /// portrait frame inside a landscape composition. The coordinator already
+    /// knows how this camera is mounted, so landscape passes it through as well.
+    func testLandscapeTakesTheCoordinatorsAngleForEveryCamera() {
         for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
-            XCTAssertEqual(
-                ClipRecorder.rotationAngle(
-                    orientation: .landscape,
-                    devicePosition: position,
-                    coordinatedAngle: 90),
-                0)
+            for angle: CGFloat in [0, 90, 180, 270] {
+                XCTAssertEqual(
+                    ClipRecorder.rotationAngle(
+                        orientation: .landscape,
+                        devicePosition: position,
+                        coordinatedAngle: angle),
+                    angle,
+                    "landscape/\(position.rawValue) should pass \(angle) through")
+            }
         }
     }
 
