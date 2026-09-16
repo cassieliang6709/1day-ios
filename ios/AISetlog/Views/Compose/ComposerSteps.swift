@@ -64,17 +64,17 @@ struct MoodStep: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(Strings.newStoryQuestion)
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .accessibilityIdentifier("composer-question")
+                Text(Strings.newStoryQuestion)
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .accessibilityIdentifier("composer-question")
+                    .padding(.horizontal, 20)
 
-                    Text(Strings.pickOneAndGo)
-                        .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                }
-                .padding(.horizontal, 20)
+                // Above the racks, not inside one. It isn't a fifth shelf of
+                // posters — it's the other way in, for a day no template
+                // describes, and it was previously the least visible thing on
+                // the screen while being the only one that adapts to today.
+                writeYourOwn
 
                 PillSelector(
                     options: [
@@ -96,8 +96,6 @@ struct MoodStep: View {
                 }
 
                 grid
-
-                if rack == .custom { writeYourOwn }
             }
             .padding(.bottom, 16)
             .animation(OneDay.Motion.soft, value: rack)
@@ -144,36 +142,44 @@ struct MoodStep: View {
         }
     }
 
-    /// Only on the 自己写 rack. It used to sit at the bottom of every rack,
-    /// under posters it had nothing to do with.
+    /// The way in for a day no poster describes: say what today is for, and
+    /// the prompts come back written.
+    ///
+    /// In the brand gradient rather than white glass, because it has to hold
+    /// its own directly above a wall of poster artwork — and because the
+    /// screen it opens leads with the same ✨ and the same promise. A rounded
+    /// card and not a capsule: this goes somewhere, it doesn't submit.
     private var writeYourOwn: some View {
         Button(action: onBuildOwn) {
-            HStack(spacing: 12) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.oneDayLavender)
-                    .frame(width: 42, height: 42)
-                    .background(Color.oneDayLavender.opacity(0.16), in: RoundedRectangle(cornerRadius: 14))
+            HStack(spacing: 13) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.22), in: RoundedRectangle(
+                        cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(Strings.customPromptsTitle)
-                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                    Text(Strings.customPromptsCaption)
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
+                        .font(.system(size: 16.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(Strings.customPromptsLead)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.88))
                         .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(OneDay.inkFaint)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.75))
             }
-            .padding(13)
-            .background(OneDay.surface.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(OneDay.hairline, lineWidth: 1))
-            .oneDaySoftShadow(strength: 0.45)
+            .padding(14)
+            .background(
+                OneDay.brandHorizontal,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .oneDayGlow(.oneDayBlue, strength: 0.7)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.customPromptsTitle)

@@ -1063,10 +1063,7 @@ enum Strings {
             : "Follow prompts, or just record as the day goes."
     }
     /// The one-screen composer: the poster *is* the submit button, so the
-    /// subtitle has to say so — there is no 下一步 left to imply it.
-    static var pickOneAndGo: String {
-        lang == .chinese ? "选一张，直接开始拍。" : "Pick one and start filming."
-    }
+    /// label above the grid has to say so — there is no 下一步 left to imply it.
     static var pickOneCreatesIt: String {
         lang == .chinese ? "选一张，就建好了" : "One tap creates it"
     }
@@ -1109,6 +1106,14 @@ enum Strings {
         lang == .chinese
             ? "先写几个想拍的，之后随时可以改"
             : "Start with a few ideas. You can change them anytime."
+    }
+    /// On the entry card at the top of the composer, where it has to say what
+    /// the screen behind it actually does — that one is 说说今天要干嘛 with a
+    /// sentence in and prompts out, not a blank list to fill in yourself.
+    static var customPromptsLead: String {
+        lang == .chinese
+            ? "说一句今天要干嘛，题目我来出"
+            : "Say what today is for — I'll write the prompts"
     }
     static var pickPromptSet: String {
         lang == .chinese ? "选一组题目" : "Pick a set of prompts"

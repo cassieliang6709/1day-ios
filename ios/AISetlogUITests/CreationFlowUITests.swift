@@ -79,12 +79,8 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(newStory.waitForExistence(timeout: 15))
         newStory.tap()
 
-        // 自己写题目 used to sit at the bottom of every rack, under posters it
-        // had nothing to do with. It is the 自己写 rack's own content now.
-        let ownRack = app.buttons["自己写"]
-        XCTAssertTrue(ownRack.waitForExistence(timeout: 15))
-        ownRack.tap()
-
+        // 自己写题目 sits above the racks now, not at the bottom under posters
+        // it has nothing to do with — so it is reachable without changing rack.
         let custom = app.buttons["custom-prompts-entry"]
         XCTAssertTrue(custom.waitForExistence(timeout: 15))
         custom.tap()
