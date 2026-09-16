@@ -44,6 +44,14 @@ struct RecordClipView: View {
     @State private var freeformOrientation: Challenge.Orientation = .portrait
     @State private var showNotificationPrimer = false
     @State private var dismissAfterPrimer = false
+    /// Raised when the close button is pressed with a take still in review.
+    ///
+    /// The free-form camera has had this guard since `UnfiledClipGuard` —
+    /// leaving with a clip in review asks first. The per-moment camera, opened
+    /// as a modal from a story, never got the other half: you filmed two
+    /// seconds, tapped X out of habit, and `teardown()` deleted the temp file
+    /// on the way out with nothing on screen to say it had happened.
+    @State private var askBeforeDiscarding = false
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -53,7 +61,7 @@ struct RecordClipView: View {
     /// not to the file — but this is the first time you see yourself back, and
     /// deciding whether to retake off a picture the app will never show you
     /// again is the wrong way round.
-    @AppStorage(GentleLook.storageKey) private var look: GentleLook = .none
+    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
 
     /// Whoever's signed in records the clip — solo challenges have no
     /// account, so this (and the identity tint it drives) falls back to a
@@ -128,6 +136,23 @@ struct RecordClipView: View {
             Task { await recorder.configure() }
         }
         .onDisappear { recorder.teardown() }
+        .confirmationDialog(
+            Strings.keepClipQuestion,
+            isPresented: $askBeforeDiscarding,
+            titleVisibility: .visible
+        ) {
+            // Same three words as the free-form guard, deliberately: it is the
+            // same question, and answering it should not feel like a different
+            // decision depending on which camera you opened.
+            Button(Strings.keepClip) { keepAsDraft { dismiss() } }
+            Button(Strings.discardClip, role: .destructive) {
+                clearReview()
+                dismiss()
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        } message: {
+            Text(Strings.keepClipFootnote)
+        }
         .sheet(
             isPresented: $showNotificationPrimer,
             onDismiss: {
@@ -190,7 +215,7 @@ struct RecordClipView: View {
                 .stroke(.white.opacity(0.55), lineWidth: 4)
                 .frame(width: 66, height: 66)
             Circle()
-                .fill(myTint)
+                .fill(Color.oneDayBlue)
                 .frame(width: 50, height: 50)
         }
     }
@@ -201,13 +226,10 @@ struct RecordClipView: View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            VStack(spacing: 5) {
+            CenteredCaptureControl(instruction: Strings.captureState(
+                recording: false, secondsLabel: clipSecondsText
+            )) {
                 recordButtonVisual
-                Text(Strings.captureState(recording: false, secondsLabel: clipSecondsText))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -219,18 +241,11 @@ struct RecordClipView: View {
         ))
     }
 
-    /// While recording: a compact countdown row that leaves the camera frame
-    /// large enough on short devices such as iPhone SE.
+    /// Match the idle shutter's center axis; translated instructions sit below
+    /// rather than pushing the countdown sideways.
     private var recordingControls: some View {
-        HStack(spacing: 12) {
-            WaveformBars(tint: myTint)
+        CenteredCaptureControl(instruction: Strings.tapToStop) {
             countdownRing
-            Text(Strings.tapToStop)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-            Spacer(minLength: 0)
         }
     }
 
@@ -278,7 +293,8 @@ struct RecordClipView: View {
                 aspectRatio: effectiveOrientation.aspectRatio
             ) {
                 ZStack {
-                    LoopingClipPlayer(url: url, look: look)
+                    // Immediate review is always the camera truth; grading belongs elsewhere.
+                    LoopingClipPlayer(url: url, look: .none)
                     // The caption is typed right where it lands in the film —
                     // center of the frame, not in a bar below the video.
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
@@ -358,7 +374,7 @@ struct RecordClipView: View {
     private var noPlaceMessage: String {
         store.challenges.isEmpty
             ? Strings.makePlanFirst
-            : Strings.noMatchingPlan(landscape: effectiveOrientation == .landscape)
+            : Strings.noMatchingPlan(effectiveOrientation)
     }
 
     // MARK: - Free-form filing
@@ -404,6 +420,28 @@ struct RecordClipView: View {
         }
     }
 
+    /// Whether the camera is off because this person turned it off.
+    ///
+    /// Read at draw time rather than stored: coming back from Settings having
+    /// granted it doesn't re-run `configure()` on its own, and a stale `false`
+    /// here would put the dead "try again" button back.
+    private var cameraAccessDenied: Bool {
+        AVCaptureDevice.authorizationStatus(for: .video) == .denied
+    }
+
+    /// The close button. Asks first when there is a take that would go with it.
+    ///
+    /// Nothing to lose means no dialog: a confirmation people see every time
+    /// they back out of a camera they opened by mistake is one they learn to
+    /// dismiss without reading, which is how the one that mattered gets missed.
+    private func closeRequested() {
+        guard recorder.clipURL != nil else {
+            dismiss()
+            return
+        }
+        askBeforeDiscarding = true
+    }
+
     private func clearReview() {
         recorder.retake()
         ringProgress = 0
@@ -436,13 +474,38 @@ struct RecordClipView: View {
             Image(systemName: "video.slash")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text(Strings.cameraUnavailable)
-                .font(.headline)
-            Button(Strings.retryCamera) {
-                Task { await recorder.configure() }
+
+            // Denied is a different situation from unavailable, and the
+            // difference is the only thing that matters here: iOS will not ask
+            // again once someone has said no, so `requestAccess` returns false
+            // forever and "try again" is a button that cannot work. Someone who
+            // mistapped "Don't Allow" on first run was stuck in that loop with
+            // nothing in the app ever mentioning Settings — in an app whose
+            // entire purpose is the camera.
+            if cameraAccessDenied {
+                Text(Strings.cameraDeniedTitle)
+                    .font(.headline)
+                Text(Strings.cameraDeniedFootnote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Button(Strings.openSettings) {
+                    guard let url = URL(string: UIApplication.openSettingsURLString)
+                    else { return }
+                    UIApplication.shared.open(url)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(myTint)
+            } else {
+                Text(Strings.cameraUnavailable)
+                    .font(.headline)
+                Button(Strings.retryCamera) {
+                    Task { await recorder.configure() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(myTint)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(myTint)
             #if DEBUG
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
             Button(Strings.useDemoClip(localizedMomentTitle)) {
@@ -498,11 +561,17 @@ struct RecordClipView: View {
                 // No cover to dismiss in the tab — the left slot carries the
                 // orientation toggle instead.
                 Button {
-                    freeformOrientation = freeformOrientation == .portrait ? .landscape : .portrait
+                    // Cycles rather than toggles now that there are three
+                    // frames. The glyph is the current one, so which way round
+                    // the cycle runs doesn't have to be learned.
+                    freeformOrientation = switch freeformOrientation {
+                    case .portrait: .landscape
+                    case .landscape: .square
+                    case .square: .portrait
+                    }
                 } label: {
-                    Image(systemName: "rectangle.portrait")
+                    Image(systemName: SetupStep.orientationIcon(freeformOrientation))
                         .font(.system(size: 18, weight: .bold))
-                        .rotationEffect(freeformOrientation == .landscape ? .degrees(90) : .zero)
                         .foregroundStyle(.black.opacity(0.78))
                         .frame(width: 44, height: 44)
                         .background(.white.opacity(0.92), in: Circle())
@@ -513,7 +582,7 @@ struct RecordClipView: View {
                 .disabled(recorder.state == .recording || recorder.clipURL != nil)
                 .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
             } else {
-                Button { dismiss() } label: {
+                Button { closeRequested() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .bold))
                         .frame(width: 44, height: 44)

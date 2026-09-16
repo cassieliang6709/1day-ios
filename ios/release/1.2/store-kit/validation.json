@@ -1,0 +1,116 @@
+{
+  "screenshots": [
+    {
+      "file": "en-US/01-theme.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "en-US/02-moments.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "en-US/03-daily-vlog.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "en-US/04-record-by-time.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "en-US/05-blue-and-private.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "zh-Hans/01-theme.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "zh-Hans/02-moments.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "zh-Hans/03-daily-vlog.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "zh-Hans/04-record-by-time.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    },
+    {
+      "file": "zh-Hans/05-blue-and-private.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB"
+    }
+  ],
+  "metadata_counts": {
+    "en-US": {
+      "name": 27,
+      "subtitle": 26,
+      "keywords": 90,
+      "promotional_text": 161,
+      "description": 1660,
+      "whats_new": 264
+    },
+    "zh-Hans": {
+      "name": 16,
+      "subtitle": 15,
+      "keywords": 53,
+      "promotional_text": 66,
+      "description": 656,
+      "whats_new": 100
+    }
+  },
+  "site_routes": [
+    {
+      "route": "/",
+      "static_content": true,
+      "canonical": "https://1day.liangyue.site/",
+      "client_bootstrap": true
+    },
+    {
+      "route": "/en",
+      "static_content": true,
+      "canonical": "https://1day.liangyue.site/en",
+      "client_bootstrap": true
+    },
+    {
+      "route": "/privacy",
+      "static_content": true,
+      "canonical": "https://1day.liangyue.site/privacy",
+      "client_bootstrap": true
+    },
+    {
+      "route": "/en/privacy",
+      "static_content": true,
+      "canonical": "https://1day.liangyue.site/en/privacy",
+      "client_bootstrap": true
+    }
+  ],
+  "viewports_checked": [
+    1440,
+    390,
+    320
+  ],
+  "dependency_audit_vulnerabilities": 0,
+  "production_deployed": false,
+  "positioning": "选个主题，把日常拍成 Vlog"
+}

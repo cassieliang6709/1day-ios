@@ -18,21 +18,21 @@ struct AISetlogApp: App {
         SharedActivityNotificationService.reconcileSubscriptions(for: store.challenges)
         _account = State(initialValue: account)
         _store = State(initialValue: store)
-        Self.settleGentleLook()
+        Self.settlePersonalEffect()
     }
 
-    /// Put the look back to "as shot" unless you asked it to stick.
+    /// Put the grade back to "as shot" unless you asked it to stick.
     ///
     /// Done here, before any view reads the key, so nothing gets one frame of
     /// yesterday's setting on the way to the right one.
-    private static func settleGentleLook() {
+    private static func settlePersonalEffect() {
         let defaults = UserDefaults.standard
-        let stored = defaults.string(forKey: GentleLook.storageKey)
-            .flatMap(GentleLook.init(rawValue:)) ?? .none
-        let sticky = defaults.bool(forKey: GentleLook.stickyKey)
-        let opening = GentleLook.onLaunch(stored: stored, sticky: sticky)
+        let stored = defaults.string(forKey: PersonalEffectParameters.storageKey)
+            .flatMap(PersonalEffectParameters.init(rawValue:)) ?? .none
+        let sticky = defaults.bool(forKey: PersonalEffectParameters.stickyKey)
+        let opening = PersonalEffectParameters.onLaunch(stored: stored, sticky: sticky)
         guard opening != stored else { return }
-        defaults.set(opening.rawValue, forKey: GentleLook.storageKey)
+        defaults.set(opening.rawValue, forKey: PersonalEffectParameters.storageKey)
     }
 
     var body: some Scene {

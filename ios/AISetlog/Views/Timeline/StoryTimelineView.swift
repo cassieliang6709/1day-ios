@@ -20,10 +20,15 @@ struct StoryTimelineView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
 
     @State private var sheet: TimelineSheet?
     @State private var showFilm = false
     @State private var showEditPlan = false
+    /// Held between the menu tap and the confirmation.
+    @State private var askBeforeDeleting = false
+    @State private var showRoomChat = false
+    @State private var showRoomDemo = false
     /// The beat between the last moment landing and the film assembling.
     @State private var celebrate = false
 
@@ -69,11 +74,48 @@ struct StoryTimelineView: View {
                     clips: store.recordedClips(for: challengeID))
             }
         }
+        .sheet(isPresented: $showRoomChat) {
+            RoomChatView(challengeID: challengeID)
+        }
+        .sheet(isPresented: $showRoomDemo) {
+            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+            RoomChatDemoView(chinese: appLanguage.resolved == .chinese)
+            #endif
+        }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
                 EditPlanSheet(challenge: challenge) { title, moments in
                     store.updatePlan(challengeID, title: title, momentTitles: moments)
                 }
+            }
+        }
+        // Same question, same words as the long press on the home list. Two
+        // entry points to one irreversible action, so they say one thing.
+        .confirmationDialog(
+            challenge.map {
+                $0.isShared
+                    ? Strings.leaveRoomTitle($0.title)
+                    : Strings.deleteStoryTitle($0.title)
+            } ?? "",
+            isPresented: $askBeforeDeleting,
+            titleVisibility: .visible
+        ) {
+            if let challenge {
+                Button(
+                    challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
+                    role: .destructive
+                ) {
+                    store.delete(challengeID)
+                    dismiss()
+                }
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        } message: {
+            if let challenge {
+                Text(
+                    challenge.isShared
+                        ? Strings.leaveRoomWarning
+                        : Strings.deleteStoryWarning(challenge.recordedCount))
             }
         }
         // The magic moment: the last slot lands → a tiny celebration → the
@@ -120,15 +162,6 @@ struct StoryTimelineView: View {
 
                 StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
 
-                // Who has put something in the day, directly under the number
-                // that says how much is in it. It used to ride on the next-up
-                // card, which meant it disappeared the moment the day filled
-                // up — and "他俩拍了" is a fact about the room, not about the
-                // moment the page happened to be offering.
-                if let note = cast?.filmedNote {
-                    RoomNote(note: note)
-                }
-
                 // Only once, and only when it's the whole answer.
                 if agenda.isComplete {
                     FilmReadyCard(clipCount: clips.count) { showFilm = true }
@@ -138,11 +171,7 @@ struct StoryTimelineView: View {
                 // already done, and this list is the page's way into the
                 // camera now that no single moment owns one.
                 if !agenda.openToMe.isEmpty {
-                    section(
-                        Strings.stillOpenHeader,
-                        note: Strings.anyOrderHint(
-                            duration: challenge.resolvedClipLength.secondsLabel)
-                    ) {
+                    section(Strings.stillOpenHeader) {
                         openList(challenge, agenda: agenda)
                     }
                 }
@@ -168,17 +197,6 @@ struct StoryTimelineView: View {
                     }
                 }
 
-                // One line about who the room is waiting on, at the bottom
-                // where what's missing belongs. It replaced a card under every
-                // moment naming the friends who hadn't filmed it — the same
-                // fact, restated once per slot per person.
-                //
-                // Silent once the day is full: the room got there, and a page
-                // that has just offered you the film shouldn't also be tapping
-                // its watch.
-                if !agenda.isComplete, let note = cast?.waitingNote {
-                    RoomNote(note: note, isPending: true)
-                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 6)
@@ -278,10 +296,19 @@ struct StoryTimelineView: View {
 
         return HStack(spacing: 12) {
             IconBubble(systemName: "chevron.left") { dismiss() }
+                .accessibilityIdentifier("room-back")
 
             Spacer()
 
             if challenge.isShared, let code = challenge.roomCode {
+                Button {
+                    showRoomChat = true
+                } label: {
+                    Label(appLanguage.resolved == .chinese ? "聊天" : "Chat", systemImage: "bubble.left.and.bubble.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                if previewMedia == nil {
                 ShareLink(item: shareText(code: code, challenge: challenge)) {
                     Label(Strings.inviteLabel, systemImage: "person.badge.plus")
                         .font(.system(size: 13.5, weight: .bold, design: .rounded))
@@ -292,9 +319,17 @@ struct StoryTimelineView: View {
                         .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
                         .oneDaySoftShadow(strength: 0.5)
                 }
+                }
             }
 
             Menu {
+                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+                if challenge.isShared, previewMedia == nil {
+                    Button(appLanguage.resolved == .chinese ? "房间演示" : "Room demo", systemImage: "person.3.sequence") {
+                        showRoomDemo = true
+                    }
+                }
+                #endif
                 // Watching an unfinished day is a real thing to want — a friend
                 // who joins late can see it before filming — but it isn't the
                 // page's answer to "what now", so it stops being a button and
@@ -316,8 +351,7 @@ struct StoryTimelineView: View {
                     systemImage: "trash",
                     role: .destructive
                 ) {
-                    store.delete(challengeID)
-                    dismiss()
+                    askBeforeDeleting = true
                 }
 
                 // A sync failure used to print itself in red under the story's

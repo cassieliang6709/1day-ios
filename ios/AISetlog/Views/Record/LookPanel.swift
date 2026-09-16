@@ -1,17 +1,18 @@
 import SwiftUI
 
-/// The look, chosen while you watch it happen.
+/// The grade, chosen while you watch it happen.
 ///
 /// Not a sheet. A sheet would cover the one thing you're deciding about — you
-/// can't pick how soft your face should be by looking at a slider. So it sits
+/// can't pick how bright your face should be by looking at a slider. So it sits
 /// on the bottom of the clip you're already watching, and the picture behind it
 /// changes as you drag.
 ///
-/// Everything here is either a preset or a dial. There is no "auto", and no
-/// number is shown: a percentage invites you to get it right, and there is no
-/// right.
+/// Three dials and no presets. Presets were four names for four points somebody
+/// else picked, and the two rooms people film in most — a dim kitchen and a
+/// bright pavement — never landed on any of them. There is no "auto", and no
+/// number is shown: a figure invites you to get it right, and there is no right.
 struct LookPanel: View {
-    @Binding var look: GentleLook
+    @Binding var look: PersonalEffectParameters
     @Binding var sticky: Bool
     /// Held down = show the clip as it was filmed. Bound rather than owned,
     /// because the thing that has to change is the player above this panel.
@@ -21,7 +22,6 @@ struct LookPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            presets
             dials
             compare
             remember
@@ -56,33 +56,20 @@ struct LookPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
+            // Only offered once there is something to undo, and it resets all
+            // three at once: three dials to put back by hand is how people end
+            // up near centre but not on it, which looks like the app is broken.
+            if !look.isIdentity {
+                Button(Strings.lookReset) {
+                    withAnimation(OneDay.Motion.soft) { look = .none }
+                }
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.trailing, 4)
+            }
             Button(Strings.done, action: onDone)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
-        }
-    }
-
-    // MARK: - Presets
-
-    private var presets: some View {
-        HStack(spacing: 8) {
-            ForEach(GentleLook.presets, id: \.key) { preset in
-                let chosen = look == preset.look
-                Button {
-                    withAnimation(OneDay.Motion.soft) { look = preset.look }
-                } label: {
-                    Text(GentleLook.presetName(preset.key))
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(chosen ? OneDay.ink : .white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            Capsule().fill(chosen ? .white : .white.opacity(0.14)))
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 
@@ -90,20 +77,24 @@ struct LookPanel: View {
 
     private var dials: some View {
         VStack(spacing: 4) {
-            dial(Strings.lookSmoothing, look.smoothing) {
-                GentleLook(smoothing: $0, brightness: look.brightness, warmth: look.warmth)
+            dial(Strings.lookExposure, look.exposure) {
+                PersonalEffectParameters(
+                    exposure: $0, temperature: look.temperature, contrast: look.contrast)
             }
-            dial(Strings.lookBrightness, look.brightness) {
-                GentleLook(smoothing: look.smoothing, brightness: $0, warmth: look.warmth)
+            dial(Strings.lookTemperature, look.temperature) {
+                PersonalEffectParameters(
+                    exposure: look.exposure, temperature: $0, contrast: look.contrast)
             }
-            dial(Strings.lookWarmth, look.warmth) {
-                GentleLook(smoothing: look.smoothing, brightness: look.brightness, warmth: $0)
+            dial(Strings.lookContrast, look.contrast) {
+                PersonalEffectParameters(
+                    exposure: look.exposure, temperature: look.temperature, contrast: $0)
             }
         }
     }
 
     private func dial(
-        _ title: String, _ value: Double, set: @escaping (Double) -> GentleLook
+        _ title: String, _ value: Double,
+        set: @escaping (Double) -> PersonalEffectParameters
     ) -> some View {
         HStack(spacing: 12) {
             Text(title)
@@ -112,10 +103,21 @@ struct LookPanel: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: 54, alignment: .leading)
-            Slider(
-                value: Binding(get: { value }, set: { look = set($0) }),
-                in: 0...1)
-                .tint(.white)
+            ZStack {
+                // A tick at centre, so "off" is somewhere your thumb can find
+                // without reading anything. On a 0...1 slider off was the far
+                // left, which is a different gesture from "a bit less".
+                Rectangle()
+                    .fill(.white.opacity(0.35))
+                    .frame(width: 1, height: 10)
+                Slider(
+                    value: Binding(get: { value }, set: { look = set($0) }),
+                    in: PersonalEffectParameters.range,
+                    step: 1)
+                    .tint(.white)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(title)
         }
     }
 

@@ -70,7 +70,8 @@ struct RoomCast: Equatable {
         var known: Set<String> = [myID, RoomProgress.soloAuthorID]
         var roster = [(
             id: myID,
-            name: members.first { $0.id == myID }?.name ?? myName ?? Strings.youLabel)]
+            name: Self.firstNamed(members.first { $0.id == myID }?.name, myName)
+                ?? Strings.youLabel)]
 
         for member in members where known.insert(member.id).inserted {
             roster.append(member)
@@ -81,8 +82,12 @@ struct RoomCast: Equatable {
         // my account, which leaves out the author of a clip that arrived
         // before its membership did — and a thumbnail badged with a face the
         // roster can't account for is worse than no badge at all.
+        // An unnamed author stays unnamed. Substituting a placeholder word here
+        // is what made every nameless member render as the same fake initial
+        // over the same hashed color — two of them in one room read as one
+        // person. Empty routes `AvatarDot` to the mascot instead.
         for (authorID, authorName) in footage where known.insert(authorID).inserted {
-            roster.append((authorID, authorName ?? Strings.defaultMemberName))
+            roster.append((authorID, authorName ?? ""))
         }
 
         self.members = roster
@@ -98,6 +103,14 @@ struct RoomCast: Equatable {
                 if lhs.isMe != rhs.isMe { return lhs.isMe }
                 return lhs.name == rhs.name ? lhs.id < rhs.id : lhs.name < rhs.name
             }
+    }
+
+    /// First candidate that is actually a name. `AccountStore` stores "no name
+    /// yet" as an empty string, so empty has to coalesce exactly like nil —
+    /// otherwise `?? Strings.youLabel` stops firing for a signed-in user who
+    /// never set a name, and my own roster row goes blank instead of "you".
+    private static func firstNamed(_ candidates: String?...) -> String? {
+        candidates.compactMap { $0 }.first { !$0.isEmpty }
     }
 
     // MARK: - Who's here

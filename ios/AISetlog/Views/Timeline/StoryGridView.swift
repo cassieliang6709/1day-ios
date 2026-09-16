@@ -161,7 +161,8 @@ struct StoryGridView: View {
             authorNames: challenge.isShared ? lanes.compactMap(\.authorName) : [],
             reaction: shown?.emoji.first,
             awaitingMine: mine == nil && !slotClips.isEmpty,
-            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72
+            aspectRatio: challenge.resolvedOrientation == .landscape ? 1.43 : 0.72,
+            sourceAspect: challenge.resolvedOrientation == .landscape ? 16.0 / 9 : 9.0 / 16
         ) {
             onTap(slot)
         }

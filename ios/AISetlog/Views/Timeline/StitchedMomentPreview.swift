@@ -19,6 +19,7 @@ struct StitchedMomentPreview: View {
     let myID: String
     let onReRecord: () -> Void
 
+    @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var stitched: URL?
     @State private var stitchFailed = false
 
@@ -27,7 +28,10 @@ struct StitchedMomentPreview: View {
     /// pile up one per tap.
     private static var cache: [String: URL] = [:]
 
-    private var cacheKey: String { "\(day)-" + clips.map(\.id).joined(separator: "-") }
+    private var cacheKey: String {
+        if previewMedia != nil { return LocalRoomMediaKey.make(day: day, clips: clips) }
+        return "\(day)-" + clips.map(\.id).joined(separator: "-")
+    }
 
     private var mine: DayClip? {
         clips.first { $0.authorID == myID || $0.authorID == "local" }
@@ -42,13 +46,16 @@ struct StitchedMomentPreview: View {
     var body: some View {
         Group {
             if clips.count <= 1, let only = clips.first {
-                preview(url: only.url, authorName: only.authorName, overlayText: only.overlayText)
+                preview(url: only.url, authorName: only.authorName,
+                        overlayText: only.overlayText, sticker: only.captionSticker)
             } else if let stitched {
-                preview(url: stitched, authorName: authorLine, overlayText: nil)
+                // No caption of its own: the stitched moment has everybody's
+                // words burned into it already, each on their own half.
+                preview(url: stitched, authorName: authorLine, overlayText: nil, sticker: nil)
             } else if stitchFailed, let fallback = mine ?? clips.first {
                 // Better someone's clip than an empty sheet.
                 preview(url: fallback.url, authorName: fallback.authorName,
-                        overlayText: fallback.overlayText)
+                        overlayText: fallback.overlayText, sticker: fallback.captionSticker)
             } else {
                 loading
             }
@@ -67,13 +74,16 @@ struct StitchedMomentPreview: View {
         .background(OneDayCanvas())
     }
 
-    private func preview(url: URL, authorName: String?, overlayText: String?) -> some View {
+    private func preview(
+        url: URL, authorName: String?, overlayText: String?, sticker: CaptionSticker?
+    ) -> some View {
         ClipPreviewView(
             day: day,
             slotTitle: slotTitle,
             momentCount: momentCount,
             authorName: authorName,
             overlayText: overlayText,
+            captionSticker: sticker,
             clipLength: clipLength,
             showsPrompt: showsPrompt,
             url: url,
@@ -85,7 +95,13 @@ struct StitchedMomentPreview: View {
 
     private func stitch() async {
         guard clips.count > 1, stitched == nil else { return }
-        if let cached = Self.cache[cacheKey],
+        let cached: URL?
+        if let previewMedia {
+            cached = previewMedia.cached(cacheKey)
+        } else {
+            cached = Self.cache[cacheKey]
+        }
+        if let cached,
            FileManager.default.fileExists(atPath: cached.path) {
             stitched = cached
             return
@@ -99,9 +115,18 @@ struct StitchedMomentPreview: View {
         // filters as it plays. Baking it in here would apply it twice.
         do {
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
-            Self.cache[cacheKey] = url
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            if let previewMedia {
+                guard previewMedia.accept(url, key: cacheKey) else { return }
+            } else {
+                Self.cache[cacheKey] = url
+            }
             stitched = url
         } catch {
+            guard !Task.isCancelled, previewMedia?.isClosed != true else { return }
             print("[moment] stitch failed: \(error)")
             stitchFailed = true
         }

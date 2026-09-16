@@ -79,15 +79,21 @@ struct FirstRunOnboardingView: View {
         }
     }
 
+    /// The brand artwork, not an imitation of it.
+    ///
+    /// This was `OneDayBuddy` beside `Text("1Day")` in the system rounded face,
+    /// with a hand-picked gap — a lockup assembled in code, and the only place
+    /// in the product where the name appears at all. It drew a different
+    /// character from the one on the app icon the person had just tapped: a
+    /// gradient tile with no arms against a flat blue blob with two of them.
+    /// Every proportion in it was also somebody's guess, and the next guess
+    /// would have been a different one.
+    ///
+    /// `OneDayBrandLogo` has been in the app since the artwork was added and
+    /// had no callers. The relationship between the mark and the word lives in
+    /// the asset now, where nothing here can drift it.
     private var brand: some View {
-        HStack(spacing: 10) {
-            OneDayBuddy(size: 54)
-            Text("1Day")
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("1Day")
+        OneDayBrandLogo(width: 196)
     }
 
     private var equation: some View {

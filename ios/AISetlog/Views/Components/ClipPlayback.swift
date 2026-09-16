@@ -13,7 +13,7 @@ struct LoopingClipPlayer: View {
     var refreshToken: Date? = nil
     /// Applied as the frames come off the file. Nothing is written anywhere, so
     /// turning it off gives back exactly what the camera saw.
-    var look: GentleLook = .none
+    var look: PersonalEffectParameters = .none
 
     var body: some View {
         LoopingPlayerLayerView(url: url, look: look)
@@ -23,7 +23,7 @@ struct LoopingClipPlayer: View {
 
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
-    var look: GentleLook = .none
+    var look: PersonalEffectParameters = .none
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -35,7 +35,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         /// either one means building a new player.
         struct Request: Equatable {
             let url: URL
-            let look: GentleLook
+            let look: PersonalEffectParameters
         }
 
         var looper: AVPlayerLooper?
@@ -78,7 +78,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         // unfiltered item now and every loop after this one is unfiltered too.
         // So the layer stays black for the moment it takes to read the tracks.
         coordinator.building = Task { @MainActor in
-            let composition = await GentleLookFilter.playbackComposition(
+            let composition = await PersonalEffectFilter.playbackComposition(
                 request.look, for: AVURLAsset(url: request.url))
             guard !Task.isCancelled, coordinator.loaded == request else { return }
             play(request, composition: composition, in: view, coordinator: coordinator)
@@ -103,20 +103,71 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 }
 
+/// The shape of a video file, as it will be seen.
+enum ClipGeometry {
+    /// width / height after the file's own rotation, or nil if it can't be read.
+    ///
+    /// Worth measuring rather than assuming: a story knows which way its takes
+    /// were filmed, but a stitched moment is a different shape from the takes
+    /// inside it — two portrait takes side by side come out 9:8.
+    static func aspect(of url: URL) async -> CGFloat? {
+        guard let track = try? await AVURLAsset(url: url)
+            .loadTracks(withMediaType: .video).first,
+              let size = try? await track.load(.naturalSize),
+              let transform = try? await track.load(.preferredTransform)
+        else { return nil }
+        let visible = CGRect(origin: .zero, size: size).applying(transform)
+        guard abs(visible.height) > 0 else { return nil }
+        return abs(visible.width) / abs(visible.height)
+    }
+}
+
 /// First-frame thumbnail of a clip, loaded off the main thread.
 struct ClipThumbnail: View {
     let url: URL
     /// Changing this value (e.g. recordedAt) forces a reload after re-recording.
     var refreshToken: Date?
+    /// Fit the whole frame inside the tile, bedded on a blurred copy of itself,
+    /// instead of cropping it to fill.
+    ///
+    /// A contact sheet wants every tile the same shape, and the clips are a
+    /// different shape — a 9:16 take in a 0.72 tile. Closing that gap by
+    /// cropping takes 22% off the height and scales the remainder up 28%, and
+    /// what sits in the middle of a 1Day clip is a face. The bed keeps the
+    /// tile's shape without ever cutting the picture.
+    var bedsInsteadOfCrops = false
 
     @State private var image: UIImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+                if bedsInsteadOfCrops {
+                    // `Color.clear` takes the offered size and overlays don't
+                    // feed back into it, so the filling bed can overflow
+                    // without dragging the tile's own dimensions with it.
+                    Color.clear
+                        .overlay {
+                            // `opaque: true`: a transparent-edged blur fades
+                            // into nothing at the tile's border and leaves a
+                            // pale halo inside the corner radius.
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .blur(radius: 14, opaque: true)
+                                .overlay(Color.black.opacity(0.18))
+                        }
+                        .overlay {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                        }
+                        .clipped()
+                } else {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
             } else {
                 Color(.systemGray5)
             }

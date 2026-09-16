@@ -18,6 +18,10 @@ struct MoodStep: View {
     let sevenDayTemplates: [ChallengeTemplate]
     @Binding var selection: ComposerSelection
     let onBuildOwn: () -> Void
+    /// Poster tap is submission in the one-step flow; settings remain behind
+    /// the poster gear in the parent.
+    let onChoose: (ChallengeTemplate) -> Void
+    let onSettings: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
     /// Where a template's own cover picture lives, asked of the store rather
@@ -172,6 +176,7 @@ struct MoodStep: View {
                         isSelected: false,
                         coverURL: coverURL(template),
                         onSelect: { select(template) },
+                        onSettings: { onSettings(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
                 }
@@ -234,6 +239,7 @@ struct MoodStep: View {
 
     private func select(_ template: ChallengeTemplate) {
         selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        onChoose(template)
     }
 }
 
@@ -260,6 +266,10 @@ private struct OpenTemplateCard<Detail: View>: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 118)
                 .clipped()
+                // Clipping pixels does not clip SwiftUI's hit-test region.
+                // The scaled image otherwise covers the mode selector above.
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
@@ -288,6 +298,7 @@ private struct OpenTemplateCard<Detail: View>: View {
         }
         .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
+        .contentShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(Color.oneDayBlue.opacity(0.65), lineWidth: 2)
@@ -339,6 +350,7 @@ private struct PromptTemplateTile: View {
     let isSelected: Bool
     var coverURL: URL?
     let onSelect: () -> Void
+    var onSettings: (() -> Void)? = nil
     var subtitle: Subtitle = .prompts
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
@@ -362,6 +374,8 @@ private struct PromptTemplateTile: View {
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1.6, contentMode: .fit)
                     .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(template.displayName)
@@ -378,6 +392,21 @@ private struct PromptTemplateTile: View {
             }
             .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18))
             .clipShape(RoundedRectangle(cornerRadius: 18))
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(alignment: .topTrailing) {
+                if let onSettings {
+                    Button(action: onSettings) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(OneDay.ink)
+                            .padding(8)
+                            .background(.thinMaterial, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(7)
+                    .accessibilityLabel("设置故事")
+                }
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .strokeBorder(
@@ -430,6 +459,17 @@ struct SetupStep: View {
 
     @FocusState private var titleFocused: Bool
     @State private var momentsExpanded = false
+
+    /// The shape of the frame, as a glyph. Shared with the camera's own
+    /// orientation button so the row that sets it and the button that switches
+    /// it are never showing two different pictures of the same choice.
+    static func orientationIcon(_ orientation: Challenge.Orientation) -> String {
+        switch orientation {
+        case .portrait: "rectangle.portrait"
+        case .landscape: "rectangle"
+        case .square: "square"
+        }
+    }
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
@@ -527,7 +567,7 @@ struct SetupStep: View {
     private var momentsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionLabel(text: Strings.theMoments)
+                SectionLabel(text: Strings.theMoments(moments.count))
                 Spacer()
                 Button {
                     withAnimation(OneDay.Motion.soft) { momentsExpanded.toggle() }
@@ -673,7 +713,7 @@ struct SetupStep: View {
                 Divider().overlay(OneDay.hairline)
 
                 OptionRow(
-                    icon: orientation == .portrait ? "rectangle.portrait" : "rectangle",
+                    icon: Self.orientationIcon(orientation),
                     title: Strings.orientationRow,
                     accent: .oneDayMint
                 ) {
@@ -681,10 +721,13 @@ struct SetupStep: View {
                         options: [
                             .init(value: Challenge.Orientation.portrait, label: Strings.orientationPortrait),
                             .init(value: Challenge.Orientation.landscape, label: Strings.orientationLandscape),
+                            .init(value: Challenge.Orientation.square, label: Strings.orientationSquare),
                         ],
                         selection: $orientation,
                         compact: true)
-                        .frame(width: 172)
+                        // Three pills where there were two, and the labels are
+                        // wider in Chinese than in English.
+                        .frame(width: 236)
                 }
             }
         }

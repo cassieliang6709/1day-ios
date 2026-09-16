@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · User Journey 复盘（2026-09-15）</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --plane:          #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --now:            #eb6834;   /* 现在的路径 */
+    --next:           #2a78d6;   /* 建议的路径 */
+    --good:           #0ca30c;
+    --keep-ink:       #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --plane:          #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --now:            #d95926;
+      --next:           #3987e5;
+      --keep-ink:       #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --plane:          #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --now:            #d95926;
+    --next:           #3987e5;
+    --keep-ink:       #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 24px 72px;
+    background: var(--plane);
+    color: var(--text-primary);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1000px; margin: 0 auto; }
+
+  header { margin-bottom: 34px; }
+  h1 { font-size: 27px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .thesis {
+    font-size: 16px; color: var(--text-secondary); margin: 0; max-width: 62ch;
+  }
+  .thesis b { color: var(--text-primary); font-weight: 700; }
+  .meta { font-size: 12.5px; color: var(--text-muted); margin-top: 10px; }
+
+  h2 {
+    font-size: 12.5px; font-weight: 800; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin: 42px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  h2:first-of-type { margin-top: 34px; }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+
+  /* ---- stat tiles ---- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { background: var(--surface-1); border: 1px solid var(--border);
+          border-radius: 14px; padding: 15px 16px; }
+  .stat .v { font-size: 31px; font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
+  .stat .k { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-top: 6px; }
+  .stat .n { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  .stat.now  .v { color: var(--now); }
+  .stat.next .v { color: var(--next); }
+
+  /* ---- decision-count bars (single series, direct-labeled) ---- */
+  .bars { display: grid; gap: 14px; }
+  .bar-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 14px; }
+  .bar-row .lbl { font-size: 13.5px; font-weight: 700; color: var(--text-secondary); text-align: right; }
+  .track { position: relative; height: 30px; border-left: 2px solid var(--baseline); }
+  .fill {
+    height: 30px; border-radius: 0 4px 4px 0;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 10px; color: #fff; font-weight: 800; font-size: 14px;
+    transition: filter .12s;
+  }
+  .fill:hover { filter: brightness(1.08); }
+  .fill.now  { background: var(--now); }
+  .fill.next { background: var(--next); }
+  .bar-note { font-size: 12px; color: var(--text-muted); margin-top: 12px; }
+
+  /* ---- journey flow ---- */
+  .flow { display: grid; gap: 22px; }
+  .lane { background: var(--surface-1); border: 1px solid var(--border);
+          border-radius: 14px; padding: 16px 18px 18px; }
+  .lane-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .lane-head .tag {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; color: #fff;
+  }
+  .lane.now  .tag { background: var(--now); }
+  .lane.next .tag { background: var(--next); }
+  .lane-head .h { font-size: 15.5px; font-weight: 700; }
+  .lane-head .c { font-size: 12.5px; color: var(--text-muted); margin-left: auto; }
+
+  .steps { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .step {
+    flex: 1 1 130px; min-width: 130px;
+    border: 1px solid var(--gridline); border-radius: 11px;
+    padding: 10px 11px; background: var(--plane);
+  }
+  .step .t { font-size: 13.5px; font-weight: 700; }
+  .step .d { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.45; }
+  .step .ask {
+    font-size: 11px; font-weight: 800; margin-top: 7px;
+    display: inline-block; padding: 2px 7px; border-radius: 999px;
+  }
+  .lane.now  .step .ask { background: color-mix(in srgb, var(--now) 15%, transparent); color: var(--now); }
+  .lane.next .step .ask { background: color-mix(in srgb, var(--next) 15%, transparent); color: var(--next); }
+  .step.gone { border-style: dashed; opacity: .55; }
+  .step.gone .t { text-decoration: line-through; }
+  .arrow { align-self: center; color: var(--baseline); font-size: 15px; font-weight: 700; }
+
+  /* ---- tables ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left; font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 0 10px 9px; border-bottom: 1px solid var(--gridline);
+  }
+  td { padding: 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 700; width: 30px; }
+  code {
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--plane); border: 1px solid var(--gridline);
+    border-radius: 5px; padding: 1px 5px; color: var(--text-secondary);
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.keep { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--keep-ink); }
+  .pill.drop { background: color-mix(in srgb, var(--now) 15%, transparent); color: var(--now); }
+  .pill.move { background: color-mix(in srgb, var(--next) 15%, transparent); color: var(--next); }
+
+  /* ---- two roots diagram ---- */
+  .roots { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: stretch; }
+  .root {
+    border: 2px solid var(--now); border-radius: 14px; padding: 15px 16px;
+    background: var(--surface-1);
+  }
+  .root .t { font-size: 15px; font-weight: 800; }
+  .root .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .root ul { margin: 11px 0 0; padding-left: 17px; font-size: 12.5px; color: var(--text-secondary); }
+  .root li { margin-bottom: 4px; }
+  .bridge {
+    align-self: center; text-align: center; font-size: 12px; font-weight: 800;
+    color: var(--now); max-width: 92px; line-height: 1.4;
+  }
+
+  /* ---- ranked changes ---- */
+  .change {
+    display: grid; grid-template-columns: 34px 1fr 108px; gap: 14px;
+    align-items: start; padding: 15px 0; border-bottom: 1px solid var(--gridline);
+  }
+  .change:last-child { border-bottom: 0; }
+  .change .rank {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--next);
+    color: #fff; font-weight: 800; font-size: 15px;
+    display: grid; place-items: center;
+  }
+  .change .t { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .change .d { font-size: 13px; color: var(--text-secondary); }
+  .change .effort {
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+
+  .keepbox { border-left: 3px solid var(--good); padding-left: 15px; }
+  .keepbox p { margin: 0 0 9px; font-size: 13.5px; color: var(--text-secondary); }
+  .keepbox p:last-child { margin-bottom: 0; }
+
+  #theme {
+    position: fixed; top: 16px; right: 16px; z-index: 9;
+    font: inherit; font-size: 12px; font-weight: 700;
+    background: var(--surface-1); color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 13px; cursor: pointer;
+  }
+
+  /* ================= app mockups ================= */
+  /* 真实 token，取自 ios/AISetlog/Resources/Theme.swift（light mode）。
+     mockup 固定浅色 —— 它们是 app 截图，不跟页面主题走。 */
+  .mk {
+    --c-canvas:  #F5F8FF;
+    --c-surface: #ffffff;
+    --c-soft:    #DCEBFF;
+    --c-blue:    #1677FF;
+    --c-cyan:    #38B6FF;
+    --c-sky:     #7FB4FF;
+    --c-ink:     #0F2E6B;
+    --c-inksoft: #5B7099;
+    --c-inkfaint:#93A6C6;
+    --c-lav:     #B3A4FF;
+    --c-hair:    rgba(22,119,255,0.10);
+  }
+
+  .mk-wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+  .mk-group {
+    flex: 1 1 auto; min-width: 0;
+    border: 2px solid var(--border); border-radius: 18px;
+    padding: 14px; background: var(--surface-1);
+  }
+  .mk-group.now  { border-color: var(--now);  flex-grow: 2; }
+  .mk-group.next { border-color: var(--next); }
+  .mk-group-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 13px; flex-wrap: wrap; }
+  .mk-group-head .tag {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; color: #fff;
+  }
+  .mk-group.now  .tag { background: var(--now); }
+  .mk-group.next .tag { background: var(--next); }
+  .mk-group-head .h { font-size: 14.5px; font-weight: 700; }
+  .mk-group-head .c { font-size: 12px; color: var(--text-muted); margin-left: auto; font-weight: 700; }
+  .mk-phones { display: flex; flex-wrap: wrap; gap: 14px; }
+
+  .phone {
+    flex: 0 0 258px; width: 258px;
+    border-radius: 40px; padding: 8px;
+    background: linear-gradient(160deg, #24365c, #0F2E6B);
+    box-shadow: 0 12px 30px rgba(15,46,107,0.20);
+  }
+  .phone-cap {
+    font-size: 11.5px; font-weight: 800; color: var(--text-secondary);
+    text-align: center; margin-top: 9px; line-height: 1.4;
+  }
+  .phone-cap span { display: block; font-weight: 600; color: var(--text-muted); font-size: 11px; }
+  .screen {
+    height: 552px; border-radius: 33px; overflow: hidden;
+    background: var(--c-canvas); color: var(--c-ink);
+    display: flex; flex-direction: column;
+    font: 11px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .sbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 16px 2px; font-size: 10px; font-weight: 800; color: var(--c-ink);
+  }
+  .sbar .island { width: 52px; height: 13px; border-radius: 999px; background: #0F2E6B; }
+  .navbar {
+    display: flex; align-items: center; gap: 8px; padding: 6px 13px 8px;
+  }
+  .bubble {
+    width: 26px; height: 26px; border-radius: 999px; flex: 0 0 26px;
+    background: var(--c-surface); border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 2px 7px rgba(15,46,107,0.08);
+    display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--c-ink);
+  }
+  .navbar .stepname { flex: 1; text-align: center; font-size: 9.5px; font-weight: 700; color: var(--c-ink); }
+  .dots { display: flex; gap: 4px; justify-content: center; margin-top: 4px; }
+  .dots i { width: 5px; height: 5px; border-radius: 999px; background: rgba(127,180,255,0.38); }
+  .dots i.on { width: 15px; background: var(--c-blue); }
+
+  .body { flex: 1; position: relative; overflow: hidden; padding: 0 14px; }
+  .body.clip::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
+    background: linear-gradient(to bottom, rgba(245,248,255,0), var(--c-canvas));
+    pointer-events: none;
+  }
+  .h1s { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+  .subs { font-size: 10px; font-weight: 500; color: var(--c-inksoft); margin-top: 3px; }
+  .lbl {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--c-inkfaint); margin: 12px 0 6px;
+  }
+
+  .seg { display: flex; background: var(--c-soft); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg b {
+    flex: 1; text-align: center; font-size: 9.5px; font-weight: 700; color: var(--c-inksoft);
+    padding: 5px 2px; border-radius: 999px; white-space: nowrap;
+  }
+  .seg b.on {
+    background: var(--c-surface); color: var(--c-blue);
+    box-shadow: 0 1px 4px rgba(15,46,107,0.10);
+  }
+
+  .opencard {
+    margin-top: 8px; border-radius: 15px; overflow: hidden; background: var(--c-surface);
+    border: 2px solid rgba(22,119,255,0.65); position: relative;
+    box-shadow: 0 4px 14px rgba(15,46,107,0.09);
+  }
+  .opencard .cover { height: 52px; }
+  .opencard .tick {
+    position: absolute; top: 6px; right: 6px; width: 15px; height: 15px; border-radius: 999px;
+    background: var(--c-blue); color: #fff; font-size: 9px; font-weight: 900;
+    display: grid; place-items: center;
+  }
+  .opencard .meta { padding: 8px 9px 9px; }
+  .opencard .nm { font-size: 11.5px; font-weight: 800; }
+  .opencard .nm em { font-style: normal; font-size: 9px; font-weight: 700; color: var(--c-inksoft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .chips span {
+    font-size: 8.5px; font-weight: 700; color: var(--c-inksoft);
+    background: var(--c-soft); border-radius: 999px; padding: 3px 6px; white-space: nowrap;
+  }
+  .chips span i { font-style: normal; color: var(--c-blue); font-weight: 900; margin-right: 2px; }
+
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .tile {
+    border-radius: 13px; overflow: hidden; background: var(--c-surface);
+    border: 1px solid var(--c-hair); position: relative;
+    box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .tile .cover { height: 44px; }
+  .tile .meta { padding: 6px 7px 7px; }
+  .tile .nm { font-size: 10px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .sub { font-size: 8.5px; font-weight: 500; color: var(--c-inksoft); margin-top: 2px; line-height: 1.35; }
+  .tile .gear {
+    position: absolute; top: 5px; right: 5px; width: 16px; height: 16px; border-radius: 999px;
+    background: rgba(255,255,255,0.88); display: grid; place-items: center; font-size: 9px;
+    color: var(--c-inksoft); box-shadow: 0 1px 4px rgba(15,46,107,0.14);
+  }
+
+  .cv1 { background: linear-gradient(135deg, #FFCE73, #FF9DB3); }
+  .cv2 { background: linear-gradient(135deg, #5FD6B4, #38B6FF); }
+  .cv3 { background: linear-gradient(135deg, #1677FF, #38B6FF); }
+  .cv4 { background: linear-gradient(135deg, #B3A4FF, #FF9DB3); }
+  .cv5 { background: linear-gradient(135deg, #FF9DB3, #FFCE73); }
+  .cv6 { background: linear-gradient(135deg, #38B6FF, #B3A4FF); }
+  .cv7 { background: linear-gradient(135deg, #7FB4FF, #5FD6B4); }
+
+  .rowcard {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    background: var(--c-surface); border: 1px solid var(--c-hair);
+    border-radius: 14px; padding: 8px 9px;
+    box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .rowcard .ic {
+    width: 26px; height: 26px; border-radius: 9px; flex: 0 0 26px;
+    display: grid; place-items: center; font-size: 12px;
+    background: rgba(179,164,255,0.18); color: var(--c-lav);
+  }
+  .rowcard .ic.blue { background: rgba(22,119,255,0.12); color: var(--c-blue); }
+  .rowcard .tx { flex: 1; min-width: 0; }
+  .rowcard .t1 { font-size: 10.5px; font-weight: 800; }
+  .rowcard .t2 { font-size: 8.5px; font-weight: 500; color: var(--c-inksoft); margin-top: 1px; }
+  .rowcard .ch { color: var(--c-inkfaint); font-size: 10px; font-weight: 800; }
+
+  .field {
+    background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 14px;
+    padding: 9px 10px; margin-top: 8px; display: flex; gap: 9px; align-items: center;
+    box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .field .thumb { width: 30px; height: 30px; border-radius: 10px; flex: 0 0 30px; }
+  .field .k { font-size: 8px; font-weight: 800; color: var(--c-inkfaint); letter-spacing: 0.04em; }
+  .field .v { font-size: 12px; font-weight: 800; margin-top: 1px; }
+  .field .v b { font-weight: 800; border-right: 1.5px solid var(--c-blue); padding-right: 1px; }
+
+  .plaincard {
+    background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 14px;
+    padding: 9px 10px; margin-top: 6px; box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .lblrow { display: flex; align-items: center; margin: 12px 0 0; }
+  .lblrow .lbl { margin: 0; }
+  .lblrow .act { margin-left: auto; font-size: 9px; font-weight: 800; color: var(--c-blue); }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 7px; }
+  .duo .opt {
+    background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 14px;
+    padding: 9px; box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .duo .opt.on { border: 1.6px solid rgba(22,119,255,0.55); background: rgba(22,119,255,0.05); }
+  .duo .opt .ic {
+    width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center;
+    font-size: 11px; background: rgba(22,119,255,0.13); color: var(--c-blue);
+  }
+  .duo .opt.on .ic { background: var(--c-blue); color: #fff; }
+  .duo .opt.lav .ic { background: rgba(179,164,255,0.16); color: var(--c-lav); }
+  .duo .opt .t1 { font-size: 10.5px; font-weight: 800; margin-top: 6px; }
+  .duo .opt .t2 { font-size: 8.5px; font-weight: 500; color: var(--c-inksoft); margin-top: 2px; }
+
+  .optrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .optrow + .optrow { border-top: 1px solid var(--c-hair); margin-top: 7px; padding-top: 9px; }
+  .optrow .ic {
+    width: 24px; height: 24px; border-radius: 8px; flex: 0 0 24px; display: grid; place-items: center;
+    font-size: 11px; background: rgba(22,119,255,0.12); color: var(--c-blue);
+  }
+  .optrow .ic.mint { background: rgba(95,214,180,0.18); color: #2f9d7c; }
+  .optrow .t1 { font-size: 10.5px; font-weight: 700; flex: 1; }
+  .optrow .seg { width: 108px; flex: 0 0 108px; }
+  .optrow .seg b { font-size: 9px; padding: 4px 1px; }
+
+  .footer-cta { padding: 9px 14px 14px; }
+  .cta {
+    height: 38px; border-radius: 999px; display: grid; place-items: center;
+    background: linear-gradient(to right, #1677FF, #38B6FF); color: #fff;
+    font-size: 12.5px; font-weight: 800; box-shadow: 0 6px 16px rgba(22,119,255,0.28);
+  }
+  .footer-hint {
+    padding: 9px 14px 15px; text-align: center;
+    font-size: 10px; font-weight: 700; color: var(--c-inksoft);
+  }
+  .footer-hint em { font-style: normal; color: var(--c-blue); font-weight: 800; }
+
+  /* numbered decision markers */
+  .mkn {
+    display: inline-grid; place-items: center; flex: 0 0 15px;
+    width: 15px; height: 15px; border-radius: 999px;
+    background: var(--now); color: #fff; font-size: 9px; font-weight: 900;
+    vertical-align: middle; font-variant-numeric: tabular-nums;
+  }
+  .askline { display: flex; align-items: center; gap: 5px; margin: 11px 0 0; }
+  .askline .lbl { margin: 0; }
+  .askline .mkn { margin-left: 2px; }
+  .float-n { position: absolute; z-index: 3; }
+
+  /* ---- sheet over a dimmed screen ---- */
+  .dimmed { position: relative; }
+  .dimmed > .scrim {
+    position: absolute; inset: 0; background: rgba(15,46,107,0.34); z-index: 2;
+  }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+    background: var(--c-canvas); border-radius: 26px 26px 33px 33px;
+    padding: 8px 14px 13px; box-shadow: 0 -8px 28px rgba(15,46,107,0.22);
+  }
+  .grabber { width: 34px; height: 4px; border-radius: 999px; background: var(--c-inkfaint);
+             margin: 0 auto 9px; opacity: .5; }
+  .sheet-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .sheet-head .thumb { width: 26px; height: 26px; border-radius: 9px; flex: 0 0 26px; }
+  .sheet-head .t { font-size: 13px; font-weight: 800; flex: 1; }
+  .sheet-head .x { font-size: 12px; font-weight: 800; color: var(--c-inkfaint); }
+
+  /* ---- camera ---- */
+  .cam { background: #0a1120; color: #fff; }
+  .cam .sbar { color: #fff; }
+  .cam .sbar .island { background: #000; }
+  .cam-top { display: flex; align-items: center; gap: 8px; padding: 4px 13px 8px; }
+  .cam-btn {
+    width: 28px; height: 28px; border-radius: 999px; flex: 0 0 28px;
+    background: rgba(255,255,255,0.92); color: #0F2E6B;
+    display: grid; place-items: center; font-size: 12px; font-weight: 800;
+  }
+  .cam-title { flex: 1; text-align: center; }
+  .cam-title .lg { font-size: 12px; font-weight: 900; color: #fff; letter-spacing: -0.01em; }
+  .cam-title .mt { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.66); margin-top: 1px; }
+  .viewfinder {
+    flex: 1; margin: 0 13px; border-radius: 20px; position: relative; overflow: hidden;
+    background: linear-gradient(165deg, #6b8fd4, #c9b3a0 55%, #7d6b5c);
+  }
+  .vf-pill {
+    position: absolute; top: 9px; left: 9px; display: flex; align-items: center; gap: 4px;
+    background: rgba(10,17,32,0.62); border-radius: 999px; padding: 4px 9px;
+    font-size: 9.5px; font-weight: 800; color: #fff;
+  }
+  .vf-pill.tagged { outline: 2px solid var(--next); outline-offset: 1px; }
+  .vf-seg { display: flex; gap: 2px; background: rgba(10,17,32,0.55); border-radius: 999px; padding: 2px; }
+  .vf-seg b { font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.68); padding: 3px 7px; border-radius: 999px; }
+  .vf-seg b.on { background: #fff; color: #0F2E6B; }
+  .vf-look {
+    position: absolute; bottom: 9px; right: 9px;
+    background: rgba(10,17,32,0.62); border-radius: 999px; padding: 4px 9px;
+    font-size: 9.5px; font-weight: 800; color: #fff;
+  }
+  .cam-bottom { padding: 12px 13px 15px; text-align: center; }
+  .cam-bottom .instr { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+  .shutter {
+    width: 50px; height: 50px; border-radius: 999px; margin: 0 auto;
+    background: #fff; border: 4px solid rgba(255,255,255,0.35);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.14);
+  }
+
+  /* ---- form rows (adjust sheet) ---- */
+  .formsec { margin-top: 9px; }
+  .formsec > .cap {
+    font-size: 8.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--c-inkfaint); margin: 0 4px 5px; display: flex; align-items: center; gap: 5px;
+  }
+  .formsec > .cap .new {
+    background: var(--next); color: #fff; border-radius: 999px;
+    padding: 2px 6px; font-size: 8px; letter-spacing: 0;
+  }
+  .formcard {
+    background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 13px;
+    padding: 2px 10px; box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .formrow { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 10.5px; font-weight: 700; }
+  .formrow + .formrow { border-top: 1px solid var(--c-hair); }
+  .formrow .sp { flex: 1; }
+  .sw { width: 30px; height: 18px; border-radius: 999px; background: #c9d6ea; position: relative; flex: 0 0 30px; }
+  .sw.on { background: var(--c-blue); }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+               border-radius: 999px; background: #fff; }
+  .sw.on::after { left: 14px; }
+  .rail { flex: 1; height: 3px; border-radius: 999px; background: #c9d6ea; position: relative; }
+  .rail i { position: absolute; left: 0; top: 0; bottom: 0; width: 58%; border-radius: 999px; background: var(--c-blue); }
+  .rail b { position: absolute; left: 58%; top: -5px; width: 13px; height: 13px; margin-left: -6px;
+            border-radius: 999px; background: #fff; box-shadow: 0 1px 4px rgba(15,46,107,0.3); }
+  .formfoot { font-size: 8.5px; font-weight: 500; color: var(--c-inksoft); margin: 5px 4px 0; }
+
+  /* ---- home ---- */
+  .hhead { display: flex; align-items: center; gap: 8px; padding: 2px 0 0; }
+  .hhead .av { width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
+               background: linear-gradient(140deg,#38B6FF,#B3A4FF); }
+  .hhead .hi { font-size: 11.5px; font-weight: 900; }
+  .hhead .dl { font-size: 8.5px; font-weight: 800; color: var(--c-inksoft); margin-top: 2px;
+               display: flex; align-items: center; gap: 4px; }
+  .pips { display: flex; gap: 2.5px; }
+  .pips i { width: 4px; height: 4px; border-radius: 999px; background: rgba(127,180,255,0.45); }
+  .pips i.on { background: var(--c-blue); }
+  .hhead .plus {
+    width: 26px; height: 26px; border-radius: 999px; flex: 0 0 26px; margin-left: auto;
+    background: linear-gradient(to right,#1677FF,#38B6FF); color: #fff;
+    display: grid; place-items: center; font-size: 13px; font-weight: 800;
+  }
+  .hhead .bubble { margin-left: 0; }
+
+  .herocard {
+    border-radius: 18px; overflow: hidden; position: relative; margin-top: 6px;
+    background: var(--c-surface); box-shadow: 0 5px 18px rgba(15,46,107,0.12);
+  }
+  .herocard .cover { height: 92px; position: relative; }
+  .herocard .cover .scr {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 42%, rgba(0,0,0,0.66));
+  }
+  .herocard .cover .on-cover {
+    position: absolute; left: 10px; right: 10px; bottom: 8px; color: #fff;
+  }
+  .herocard .cover .nm { font-size: 13px; font-weight: 900; }
+  .herocard .cover .st { font-size: 8.5px; font-weight: 700; opacity: .9; margin-top: 1px; }
+  .herocard .foot { display: flex; align-items: center; gap: 8px; padding: 9px 10px; }
+  .herocard .foot .pg { font-size: 9px; font-weight: 800; color: var(--c-inksoft); flex: 1; }
+  .minicta {
+    background: linear-gradient(to right,#1677FF,#38B6FF); color: #fff;
+    border-radius: 999px; padding: 6px 12px; font-size: 10px; font-weight: 800;
+  }
+  .draftbar {
+    display: flex; align-items: center; gap: 7px; margin-top: 7px;
+    background: rgba(179,164,255,0.14); border: 1px dashed var(--c-lav);
+    border-radius: 13px; padding: 8px 10px;
+  }
+  .draftbar .ic { font-size: 11px; color: var(--c-lav); }
+  .draftbar .t { font-size: 10px; font-weight: 800; flex: 1; }
+  .draftbar .ch { font-size: 10px; font-weight: 800; color: var(--c-inkfaint); }
+  .storyrow {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+    background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 13px;
+    padding: 7px 9px; box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .storyrow .th { width: 32px; height: 32px; border-radius: 10px; flex: 0 0 32px; }
+  .storyrow .t1 { font-size: 10.5px; font-weight: 800; }
+  .storyrow .t2 { font-size: 8.5px; font-weight: 600; color: var(--c-inksoft); margin-top: 1px; }
+
+  .tabbar {
+    display: flex; gap: 3px; margin: 0 auto 12px; width: 150px; padding: 4px;
+    background: rgba(255,255,255,0.92); border-radius: 999px;
+    box-shadow: 0 5px 16px rgba(15,46,107,0.16);
+  }
+  .tabbar b {
+    flex: 1; text-align: center; font-size: 9px; font-weight: 800; padding: 6px 0;
+    border-radius: 999px; color: var(--c-inksoft);
+  }
+  .tabbar b.on { background: var(--c-blue); color: #fff; }
+  .fab-wrap { display: flex; justify-content: center; padding-bottom: 13px; }
+  .fab {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.94); border-radius: 999px; padding: 8px 15px;
+    font-size: 11px; font-weight: 800; color: var(--c-ink);
+    box-shadow: 0 5px 16px rgba(15,46,107,0.16);
+  }
+  .fab .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--c-blue); }
+  .frameglyph {
+    display: block; width: 10px; height: 14px; border-radius: 2.5px;
+    border: 2px solid currentColor;
+  }
+  /* The "不动" group hugs its phone and explains itself beside it. */
+  .mk-group.hug { flex-grow: 0; }
+  .mk-group.hug .mk-phones { align-items: flex-start; }
+  .keep-aside { flex: 1 1 250px; min-width: 220px; padding: 2px 4px; }
+  .keep-aside p { margin: 0 0 11px; font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+  .keep-aside p:last-child { margin-bottom: 0; }
+  .keep-aside strong { color: var(--text-primary); }
+
+  /* ---- timeline ---- */
+  .progbar { height: 5px; border-radius: 999px; background: rgba(127,180,255,0.3); margin-top: 9px; }
+  .progbar i { display: block; height: 5px; width: 29%; border-radius: 999px;
+               background: linear-gradient(to right,#1677FF,#38B6FF); }
+  .slotcard {
+    margin-top: 6px; border-radius: 14px; overflow: hidden;
+    background: var(--c-surface); border: 1px solid var(--c-hair);
+    box-shadow: 0 2px 8px rgba(15,46,107,0.06);
+  }
+  .slotrow { display: flex; align-items: center; gap: 8px; padding: 9px 10px; }
+  .slotrow + .slotrow { border-top: 1px solid var(--c-hair); }
+  .slotrow.sug { background: rgba(22,119,255,0.06); }
+  .slotrow .ic {
+    width: 24px; height: 24px; border-radius: 999px; flex: 0 0 24px; display: grid; place-items: center;
+    background: var(--c-soft); color: var(--c-blue); font-size: 10px;
+  }
+  .slotrow .t1 { font-size: 10.5px; font-weight: 700; flex: 1; }
+  .slotrow .q { font-size: 11px; font-weight: 900; color: var(--c-blue); }
+  .slotrow .ch { font-size: 10px; font-weight: 800; color: var(--c-inkfaint); }
+  .sqgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .sq { aspect-ratio: 3/4; border-radius: 11px; position: relative; overflow: hidden; }
+  .sq span {
+    position: absolute; left: 5px; bottom: 4px; color: #fff; font-size: 8px; font-weight: 800;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  .tlhead { display: flex; align-items: center; gap: 7px; }
+  .tlhead .t { font-size: 14px; font-weight: 900; flex: 1; }
+  .invite {
+    font-size: 9px; font-weight: 800; color: var(--c-blue);
+    background: var(--c-surface); border-radius: 999px; padding: 5px 9px;
+    box-shadow: 0 2px 7px rgba(15,46,107,0.09);
+  }
+
+  .mk-delta {
+    margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .mk-delta div {
+    flex: 1 1 210px; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 11px 13px;
+  }
+  .mk-delta .t { font-size: 12.5px; font-weight: 800; margin-bottom: 4px; }
+  .mk-delta .d { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .mk-delta .t.gone { color: var(--now); }
+  .mk-delta .t.new  { color: var(--next); }
+
+  @media (max-width: 820px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .roots { grid-template-columns: 1fr; }
+    .bridge { max-width: none; }
+    .bar-row { grid-template-columns: 1fr; }
+    .bar-row .lbl { text-align: left; }
+    .change { grid-template-columns: 34px 1fr; }
+    .change .effort { grid-column: 2; text-align: left; }
+  }
+  @media print {
+    body { padding: 0; background: #fff; }
+    #theme { display: none; }
+  }
+</style>
+</head>
+<body>
+<button id="theme" type="button">切换深浅</button>
+
+<main>
+<header>
+  <h1>1Day · User Journey 复盘</h1>
+  <p class="thesis">
+    「这个 app 很复杂」不是因为功能多。是因为<b>拍第一帧之前要做 8 个决定，其中 6 个已经有正确的默认值</b>。
+    而且根界面有<b>两个并列的世界</b>（Plans / Camera），打开 app 得先知道自己在哪一个里。
+  </p>
+  <p class="meta">2026-09-15 · 读自 <code>RootShellView</code> · <code>StoryComposerView</code> · <code>ComposerSteps</code> · <code>PlansHomeView</code> · <code>StoryTimelineView</code></p>
+</header>
+
+<h2>四个数</h2>
+<div class="stats">
+  <div class="stat now">
+    <div class="v">8</div>
+    <div class="k">建故事时要答的决定</div>
+    <div class="n">分布在 2 屏</div>
+  </div>
+  <div class="stat">
+    <div class="v" style="color:var(--keep-ink)">6</div>
+    <div class="k">已经有正确默认值的</div>
+    <div class="n">也就是说本来不必问</div>
+  </div>
+  <div class="stat now">
+    <div class="v">2</div>
+    <div class="k">并列的根界面</div>
+    <div class="n">Plans 与 Camera，两套心智模型</div>
+  </div>
+  <div class="stat next">
+    <div class="v">1</div>
+    <div class="k">首次用户到相机的 tap 数</div>
+    <div class="n">走 <code>.quickStart</code>，跳过 composer</div>
+  </div>
+</div>
+
+<h2>最扎眼的矛盾：解法你已经写出来了</h2>
+<div class="card">
+  <div class="bars">
+    <div class="bar-row">
+      <div class="lbl">首次用户</div>
+      <div class="track">
+        <div class="fill next" style="width:12.5%" title="1 个决定：点「开始」→ createQuickStart() → 直接进 timeline">1</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="lbl">第二次以后</div>
+      <div class="track">
+        <div class="fill now" style="width:100%" title="8 个决定：style、mode、template、名字、moments、solo/friends、clip 长度、横竖屏">8</div>
+      </div>
+    </div>
+  </div>
+  <p class="bar-note">
+    <code>FirstRunOnboardingView</code> 的按钮走 <code>.quickStart</code> → <code>ChallengeStore.createQuickStart()</code>
+    → 固定三个 moment，直接 push 到 timeline，整个 composer 被跳过。<strong>同一个 app 里，
+    对新人的流程比对老用户的流程简单 8 倍。</strong>建议里的第 1 条就是把这条已有的路径接到首页的 <code>+</code> 上。
+  </p>
+</div>
+
+<h2>路径对比</h2>
+<div class="flow">
+
+  <div class="lane now">
+    <div class="lane-head">
+      <span class="tag">现在</span>
+      <span class="h">首页 <code>+</code> → 拍第一帧</span>
+      <span class="c">8 个决定 · 3 屏</span>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="t">首页</div>
+        <div class="d">hero card，右上 <code>+</code></div>
+        <div class="ask">0 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="t">Step 1/2 选拍法</div>
+        <div class="d">style pill、mode pill、template grid、自定义入口 —— 四个控件回答同一个问题</div>
+        <div class="ask">3 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="t">Step 2/2 设置故事</div>
+        <div class="d">名字、moments 列表、自己/朋友、clip 长度、横竖屏</div>
+        <div class="ask">5 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="t">Timeline</div>
+        <div class="d">还没拍的 → 点一行进相机</div>
+        <div class="ask">1 tap</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane next">
+    <div class="lane-head">
+      <span class="tag">建议</span>
+      <span class="h">首页 <code>+</code> → 拍第一帧</span>
+      <span class="c">1 个决定 · 2 屏</span>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="t">首页</div>
+        <div class="d">不变</div>
+        <div class="ask">0 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="t">选一张 poster</div>
+        <div class="d">一行 4 选 1（一天 / 七天 / 按时间 / 自定义）+ template grid。点一张就建好了</div>
+        <div class="ask">1 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step gone">
+        <div class="t">Step 2/2</div>
+        <div class="d">降级成 poster 上的「设置」小入口，想调的人才进</div>
+        <div class="ask">0 个决定</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="t">Timeline</div>
+        <div class="d">不变</div>
+        <div class="ask">1 tap</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>UI 长什么样</h2>
+<div class="mk">
+<div class="mk-wrap">
+
+  <!-- ============ 现在 ============ -->
+  <div class="mk-group now">
+    <div class="mk-group-head">
+      <span class="tag">现在</span>
+      <span class="h">两屏 composer</span>
+      <span class="c">8 个决定 · 2 个底部按钮</span>
+    </div>
+    <div class="mk-phones">
+
+      <!-- 现在 · Step 1/2 -->
+      <div>
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="navbar">
+          <div class="bubble">✕</div>
+          <div class="stepname">1/2 选拍法<div class="dots"><i class="on"></i><i></i></div></div>
+          <div style="flex:0 0 26px"></div>
+        </div>
+        <div class="body clip">
+          <div class="h1s">今天会是什么故事？</div>
+          <div class="subs">跟着题目拍，或者按时间随手拍。</div>
+
+          <div class="askline"><span class="mkn">1</span>
+            <span class="lbl" style="color:var(--now)">拍法</span></div>
+          <div class="seg" style="margin-top:5px">
+            <b class="on">跟着题目拍</b><b>按时间拍</b>
+          </div>
+
+          <div class="askline"><span class="mkn">2</span>
+            <span class="lbl" style="color:var(--now)">选一组题目 / 一日或七日</span></div>
+          <div class="seg" style="margin-top:5px"><b class="on">一日</b><b>七日</b></div>
+
+          <div class="askline"><span class="mkn">3</span>
+            <span class="lbl" style="color:var(--now)">挑一个 template</span></div>
+          <div class="opencard">
+            <div class="cover cv1"></div>
+            <div class="tick">✓</div>
+            <div class="meta">
+              <div class="nm">完美的一天 <em>· 7 个题目</em></div>
+              <div class="chips">
+                <span><i>1</i>起床</span><span><i>2</i>咖啡</span><span><i>3</i>收拾出门</span>
+                <span><i>4</i>出门</span><span><i>5</i>正午</span><span><i>6</i>傍晚的光</span>
+                <span><i>7</i>睡前放松</span>
+              </div>
+            </div>
+          </div>
+          <div class="tiles">
+            <div class="tile"><div class="cover cv2"></div><div class="meta">
+              <div class="nm">慢慢重启</div><div class="sub">一团糟的开始 · 清掉一件事…</div></div></div>
+            <div class="tile"><div class="cover cv3"></div><div class="meta">
+              <div class="nm">进入状态</div><div class="sub">布置桌面 · 第一轮冲刺…</div></div></div>
+            <div class="tile"><div class="cover cv4"></div><div class="meta">
+              <div class="nm">我的主角日</div><div class="sub">晨光 · 今日穿搭…</div></div></div>
+            <div class="tile"><div class="cover cv5"></div><div class="meta">
+              <div class="nm">和我做饭</div><div class="sub">备料 · 处理食材…</div></div></div>
+          </div>
+          <div class="rowcard">
+            <div class="ic">✎</div>
+            <div class="tx"><div class="t1">自己写题目</div>
+              <div class="t2">先写几个想拍的，之后随时可以改</div></div>
+            <div class="ch">›</div>
+          </div>
+        </div>
+        <div class="footer-cta"><div class="cta">下一步 →</div></div>
+      </div></div>
+      <div class="phone-cap">现在 · Step 1/2<span>4 个控件回答同一个问题</span></div>
+      </div>
+
+      <!-- 现在 · Step 2/2 -->
+      <div>
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="navbar">
+          <div class="bubble">‹</div>
+          <div class="stepname">2/2 设置故事<div class="dots"><i class="on"></i><i class="on"></i></div></div>
+          <div style="flex:0 0 26px"></div>
+        </div>
+        <div class="body clip">
+          <div class="h1s">设置</div>
+          <div class="subs">几个小设置，今天就开始。</div>
+
+          <div class="askline"><span class="mkn">4</span>
+            <span class="lbl" style="color:var(--now)">故事名字</span></div>
+          <div class="field" style="margin-top:5px">
+            <div class="thumb cv1"></div>
+            <div><div class="k">故事名字</div><div class="v">完美的一天<b></b></div></div>
+          </div>
+
+          <div class="askline"><span class="mkn">5</span>
+            <span class="lbl" style="color:var(--now)">7 个瞬间</span>
+            <span style="margin-left:auto;font-size:9px;font-weight:800;color:var(--c-blue)">查看/编辑 ⌄</span>
+          </div>
+          <div class="plaincard">
+            <div class="chips">
+              <span>起床</span><span>咖啡</span><span>收拾出门</span><span>出门</span>
+              <span>正午</span><span>傍晚的光</span><span>睡前放松</span>
+            </div>
+          </div>
+
+          <div class="askline"><span class="mkn">6</span>
+            <span class="lbl" style="color:var(--now)">谁来拍</span></div>
+          <div class="duo">
+            <div class="opt on"><div class="ic">👤</div>
+              <div class="t1">自己来</div><div class="t2">只在这台设备上</div></div>
+            <div class="opt lav"><div class="ic">👥</div>
+              <div class="t1">一起拍</div><div class="t2">分享邀请码一起拍</div></div>
+          </div>
+
+          <div class="askline">
+            <span class="mkn">7</span><span class="mkn">8</span>
+            <span class="lbl" style="color:var(--now)">片段时长 / 画面方向</span></div>
+          <div class="plaincard">
+            <div class="optrow">
+              <div class="ic">⏱</div><div class="t1">片段时长</div>
+              <div class="seg"><b class="on">2s</b><b>5s</b><b>10s</b></div>
+            </div>
+            <div class="optrow">
+              <div class="ic mint">▯</div><div class="t1">画面方向</div>
+              <div class="seg"><b class="on">竖屏</b><b>横屏</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer-cta"><div class="cta">✨ 创建故事</div></div>
+      </div></div>
+      <div class="phone-cap">现在 · Step 2/2<span>5 个控件，5 个都有正确默认值</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ 建议 ============ -->
+  <div class="mk-group next">
+    <div class="mk-group-head">
+      <span class="tag">建议</span>
+      <span class="h">一屏</span>
+      <span class="c">1 个决定 · 0 个底部按钮</span>
+    </div>
+    <div class="mk-phones">
+      <div>
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="navbar">
+          <div class="bubble">✕</div>
+          <div class="stepname" style="color:var(--c-inkfaint)">没有进度点 —— 只有一步</div>
+          <div style="flex:0 0 26px"></div>
+        </div>
+        <div class="body clip">
+          <div class="h1s">今天会是什么故事？</div>
+          <div class="subs">选一张，直接开始拍。</div>
+
+          <div class="seg" style="margin-top:12px">
+            <b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b>
+          </div>
+          <div class="lbl" style="margin-top:10px">选一张，就建好了</div>
+
+          <div class="tiles" style="margin-top:0">
+            <div class="tile"><div class="cover cv1"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">完美的一天</div><div class="sub">起床 · 咖啡 · 收拾出门…</div></div></div>
+            <div class="tile"><div class="cover cv2"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">慢慢重启</div><div class="sub">一团糟的开始 · 清掉一件事…</div></div></div>
+            <div class="tile"><div class="cover cv4"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">我的主角日</div><div class="sub">晨光 · 今日穿搭 · 在路上…</div></div></div>
+            <div class="tile"><div class="cover cv3"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">进入状态</div><div class="sub">布置桌面 · 第一轮冲刺…</div></div></div>
+            <div class="tile"><div class="cover cv5"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">和我做饭</div><div class="sub">备料 · 处理食材 · 下锅…</div></div></div>
+            <div class="tile"><div class="cover cv6"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">出门冒险</div><div class="sub">出发 · 第一站 · 街边小吃…</div></div></div>
+            <div class="tile"><div class="cover cv7"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">和我过一天</div><div class="sub">没有题目，只记录此刻</div></div></div>
+          </div>
+        </div>
+        <div class="footer-hint">点一张 poster <em>就是提交</em> —— 直接进 timeline</div>
+      </div></div>
+      <div class="phone-cap">建议 · 一屏<span>⚙ 是想调设置的人的入口</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="mk-delta">
+  <div>
+    <div class="t gone">没了：底部主按钮</div>
+    <div class="d">
+      「下一步 →」和「✨ 创建故事」都删掉。点一张 poster 本身就是提交。
+      少一个按钮，也少一个「我选完了还要再确认一次」的步骤。
+    </div>
+  </div>
+  <div>
+    <div class="t gone">没了：进度点 1/2</div>
+    <div class="d">
+      一步的流程不需要进度条 —— <code>StepDots</code> 本身就在告诉用户「这事有几关」。
+      看到 <code>1/2</code> 的第一反应是「还有一屏要填」。
+    </div>
+  </div>
+  <div>
+    <div class="t gone">没了：两个竖着叠的 pill</div>
+    <div class="d">
+      「跟着题目拍 / 按时间拍」和「一日 / 七日」合成一行 4 选 1，
+      中间那个 SectionLabel 也一起去掉。
+    </div>
+  </div>
+  <div>
+    <div class="t new">新增：poster 角上的 ⚙</div>
+    <div class="d">
+      改名字、改 moments、约朋友一起拍 —— 全部搬到这一个入口后面。
+      默认路径碰不到它；想调的人一眼就看得见。
+    </div>
+  </div>
+  <div>
+    <div class="t new">变了：选中的 poster 不再「展开」</div>
+    <div class="d">
+      现在选中的 template 会升到顶部、展开成大卡片（<code>OpenTemplateCard</code>），
+      导致「选中」和「提交」是两件事。改成：所有 poster 平级，点下去就走。
+      题目预览留在 tile 的第二行（<code>起床 · 咖啡 · 收拾出门…</code>）。
+    </div>
+  </div>
+  <div>
+    <div class="t new">变了：时长 / 画幅 搬进相机</div>
+    <div class="d">
+      这两个是<strong>拍摄参数</strong>，不是导出参数 —— <code>RecordClipView</code> 靠它们锁相机，
+      事后改不回来。所以该待的地方是相机，不是 composer，也不是 FilmView。
+      ▯ 其实<strong>已经在相机里了</strong>（<code>RecordClipView.swift:561</code>，而且比 composer 多一个正方形画幅）。
+    </div>
+  </div>
+</div>
+<p class="bar-note">
+  色板取自 <code>ios/AISetlog/Resources/Theme.swift</code>（<code>#1677FF</code> → <code>#38B6FF</code> 品牌渐变、
+  <code>#F5F8FF</code> canvas、<code>#0F2E6B</code> ink），文案取自 <code>Localization.swift</code>，
+  题目名取自 <code>MomentCatalog.swift</code>。poster 封面用渐变代替真实 cover art。
+</p>
+</div>
+
+<h2>还有这四屏</h2>
+<p class="thesis" style="font-size:14px;margin-bottom:16px">
+  前三屏是<b>建议里目前只存在于文字的界面</b> —— 不画出来没法判断好坏。
+  第四屏是 timeline 的现状，放在旁边当对照：它已经是对的，别动。
+</p>
+<div class="mk">
+<div class="mk-wrap">
+
+  <!-- ============ 建议：新界面 ============ -->
+  <div class="mk-group next">
+    <div class="mk-group-head">
+      <span class="tag">建议</span>
+      <span class="h">三个还没存在的界面</span>
+      <span class="c">改动 1 / 3 / 4 各一屏</span>
+    </div>
+    <div class="mk-phones">
+
+      <!-- ⚙ 设置 sheet -->
+      <div>
+      <div class="phone"><div class="screen dimmed">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="navbar">
+          <div class="bubble">✕</div>
+          <div class="stepname" style="color:var(--c-inkfaint)">今天会是什么故事？</div>
+          <div style="flex:0 0 26px"></div>
+        </div>
+        <div class="body">
+          <div class="tiles" style="margin-top:4px">
+            <div class="tile"><div class="cover cv1"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">完美的一天</div><div class="sub">起床 · 咖啡…</div></div></div>
+            <div class="tile"><div class="cover cv2"></div><div class="gear">⚙</div><div class="meta">
+              <div class="nm">慢慢重启</div><div class="sub">一团糟的开始…</div></div></div>
+            <div class="tile"><div class="cover cv4"></div><div class="meta">
+              <div class="nm">我的主角日</div><div class="sub">晨光 · 今日穿搭…</div></div></div>
+            <div class="tile"><div class="cover cv3"></div><div class="meta">
+              <div class="nm">进入状态</div><div class="sub">布置桌面…</div></div></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="sheet-head">
+            <div class="thumb cv1"></div>
+            <div class="t">完美的一天</div>
+            <div class="x">✕</div>
+          </div>
+          <div class="field" style="margin-top:7px">
+            <div><div class="k">故事名字</div><div class="v">完美的一天<b></b></div></div>
+          </div>
+          <div class="lblrow" style="margin-top:9px">
+            <span class="lbl">7 个瞬间</span>
+            <span class="act">查看/编辑 ⌄</span>
+          </div>
+          <div class="plaincard">
+            <div class="chips">
+              <span>起床</span><span>咖啡</span><span>收拾出门</span><span>出门</span>
+              <span>正午</span><span>傍晚的光</span><span>睡前放松</span>
+            </div>
+          </div>
+          <div class="lbl" style="margin-top:10px">谁来拍</div>
+          <div class="duo" style="margin-top:0">
+            <div class="opt on"><div class="ic">👤</div>
+              <div class="t1">自己来</div><div class="t2">只在这台设备上</div></div>
+            <div class="opt lav"><div class="ic">👥</div>
+              <div class="t1">一起拍</div><div class="t2">分享邀请码一起拍</div></div>
+          </div>
+          <div style="margin-top:11px"><div class="cta">✨ 开始拍</div></div>
+        </div>
+      </div></div>
+      <div class="phone-cap">改动 1 · poster ⚙ 打开后<span>旧 step 2 的全部内容，变成可选</span></div>
+      </div>
+
+      <!-- 相机，⏱/▯ 在里面 -->
+      <div>
+      <div class="phone"><div class="screen cam">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="cam-top">
+          <div class="cam-btn"><span class="frameglyph"></span></div>
+          <div class="cam-title">
+            <div class="lg">1Day</div>
+            <div class="mt">咖啡 · 2/7</div>
+          </div>
+          <div class="cam-btn">⟲</div>
+        </div>
+        <div class="viewfinder">
+          <div class="vf-pill tagged">每段 2s</div>
+          <div class="vf-look">柔和</div>
+        </div>
+        <div class="cam-bottom">
+          <div class="instr">点一下开始拍</div>
+          <div class="shutter"></div>
+        </div>
+      </div></div>
+      <div class="phone-cap">改动 3 · 相机<span>「每段 2s」加进来；画幅按钮已经在左上角</span></div>
+      </div>
+
+      <!-- 首页，Camera 降级后 -->
+      <div>
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="body clip" style="padding-top:6px">
+          <div class="hhead">
+            <div class="av"></div>
+            <div>
+              <div class="hi">早上好</div>
+              <div class="dl">9月15日 · 2/7
+                <span class="pips"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span>
+              </div>
+            </div>
+            <div class="bubble" style="margin-left:auto;font-size:9px">邀</div>
+            <div class="plus" style="margin-left:0">＋</div>
+          </div>
+
+          <div class="lbl" style="margin-top:12px">今天的故事</div>
+          <div class="herocard" style="margin-top:0">
+            <div class="cover cv1">
+              <div class="scr"></div>
+              <div class="on-cover">
+                <div class="nm">完美的一天</div>
+                <div class="st">还没拍：咖啡</div>
+              </div>
+            </div>
+            <div class="foot">
+              <span class="pg">2 / 7 个瞬间</span>
+              <span class="minicta">继续拍 →</span>
+            </div>
+          </div>
+
+          <div class="draftbar">
+            <span class="ic">▤</span>
+            <span class="t">2 段待归档</span>
+            <span class="ch">›</span>
+          </div>
+
+          <div class="lbl" style="margin-top:12px">你的故事</div>
+          <div style="font-size:9px;font-weight:900;color:var(--c-inkfaint)">昨天</div>
+          <div class="storyrow">
+            <div class="th cv6"></div>
+            <div><div class="t1">出门冒险</div><div class="t2">影片已经准备好了</div></div>
+          </div>
+          <div class="storyrow">
+            <div class="th cv5"></div>
+            <div><div class="t1">和我做饭</div><div class="t2">5 / 7 个瞬间</div></div>
+          </div>
+        </div>
+        <div class="fab-wrap"><div class="fab"><span class="dot"></span>随手拍一段</div></div>
+      </div></div>
+      <div class="phone-cap">改动 4 · 首页<span>tab bar → 一个相机按钮；散片挂在 hero 下面</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ 对照：不动 ============ -->
+  <div class="mk-group hug" style="border-color:#0ca30c">
+    <div class="mk-group-head">
+      <span class="tag" style="background:#0ca30c">不动</span>
+      <span class="h">timeline 现状</span>
+      <span class="c">已经是对的</span>
+    </div>
+    <div class="mk-phones">
+      <div>
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮▮</span></div>
+        <div class="navbar">
+          <div class="bubble">‹</div>
+          <div style="flex:1"></div>
+          <div class="invite">邀请</div>
+          <div class="bubble">⋯</div>
+        </div>
+        <div class="body clip">
+          <div class="tlhead">
+            <div class="t">完美的一天</div>
+          </div>
+          <div class="subs">今天 · 2 / 7 个瞬间</div>
+          <div class="progbar"><i></i></div>
+
+          <div class="lbl" style="margin-top:13px">还没拍的</div>
+          <div class="slotcard" style="margin-top:0">
+            <div class="slotrow sug">
+              <div class="ic">☕</div><div class="t1">咖啡</div>
+              <div class="q">?</div><div class="ch">›</div>
+            </div>
+            <div class="slotrow"><div class="ic">👕</div><div class="t1">收拾出门</div><div class="ch">›</div></div>
+            <div class="slotrow"><div class="ic">🚪</div><div class="t1">出门</div><div class="ch">›</div></div>
+            <div class="slotrow"><div class="ic">☀</div><div class="t1">正午</div><div class="ch">›</div></div>
+            <div class="slotrow"><div class="ic">🌇</div><div class="t1">傍晚的光</div><div class="ch">›</div></div>
+          </div>
+
+          <div class="lbl" style="margin-top:13px">拍过的</div>
+          <div class="sqgrid" style="margin-top:0">
+            <div class="sq cv1"><span>起床</span></div>
+            <div class="sq cv7"><span>睡前放松</span></div>
+          </div>
+        </div>
+        <div class="footer-hint" style="padding-bottom:12px">
+          <div class="tabbar" style="margin-bottom:0"><b class="on">计划</b><b>拍摄</b></div>
+        </div>
+      </div></div>
+      <div class="phone-cap">现状 · timeline<span>平级列表，不是队列 —— 这是对的</span></div>
+      </div>
+
+      <div class="keep-aside">
+        <p><strong>五个「还没拍的」平级排着</strong>，只有「咖啡」那行带浅蓝底和一个
+        <code>?</code>（<code>agenda.isSuggested</code>）。</p>
+        <p>它不说「下一个必须是这个」，只说「要是没主意就拍这个」。
+        这个分寸很难得 —— 一天是按实际发生顺序拍的，散步的时候拍散步，
+        队列会骗人说「其余的在等着轮到它」。</p>
+        <p><strong>别为了「更清晰」把它改成队列。</strong>
+        <code>StoryTimelineView</code> 顶上那段注释记着这个页面已经来回改过两次：
+        先是一墙一样的格子（问了七个问题、一个没答），
+        然后过度矫正成一张「下一个」大卡片（另一种谎）。现在这版是第三次，是对的。</p>
+        <p style="font-size:12px;color:var(--text-muted)">同理不动：progress bar、
+        拍满自动进 FilmView 的 celebration、<code>StoryAgenda</code> 这个抽象。</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="mk-delta">
+  <div>
+    <div class="t new">⚙ sheet 的关键：底部是「开始拍」</div>
+    <div class="d">
+      不是「保存设置」。进了这个 sheet 的人也是要去拍的，
+      所以它的出口和 poster 的出口是同一个 —— 不会走进一条死路再退回来。
+    </div>
+  </div>
+  <div>
+    <div class="t new">相机那屏：时长和画幅是一对</div>
+    <div class="d">
+      画幅按钮已经在左上角了（<code>RecordClipView.swift:561</code>）。
+      「每段 2s」放取景框里同一层，两个都要在<strong>录制开始后自动禁用</strong> ——
+      现有的画幅按钮就是这么做的（<code>.disabled(recorder.state == .recording)</code>），照抄。
+    </div>
+  </div>
+  <div>
+    <div class="t new">首页那屏：底部从 tab bar 变成一个按钮</div>
+    <div class="d">
+      「计划 / 拍摄」两个 tab → 一个「随手拍一段」。
+      打开 app 不用先选世界了；散片变成 hero card 下面的一条虚线提示，
+      而不是另一个界面里的一个角标。
+    </div>
+  </div>
+  <div>
+    <div class="t new">这三屏的共同点：都不是新功能</div>
+    <div class="d">
+      ⚙ sheet 是旧 step 2 换了个触发方式；相机那个是把重复的控件收回它该在的地方；
+      首页那个是砍掉一个 tab。<strong>没有一条需要写新的 model 或 service。</strong>
+    </div>
+  </div>
+</div>
+</div>
+
+<h2>那 8 个控件，逐个处置</h2>
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>控件</th>
+      <th>位置</th>
+      <th>默认值</th>
+      <th>处置</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="num">1</td>
+      <td>按提示拍 / 按时间拍</td>
+      <td><code>ComposerSteps.swift:83</code></td>
+      <td>prompted</td>
+      <td><span class="pill move">合进一行 4 选 1</span></td>
+    </tr>
+    <tr>
+      <td class="num">2</td>
+      <td>一天 / 七天</td>
+      <td><code>ComposerSteps.swift:149</code></td>
+      <td>oneDay</td>
+      <td><span class="pill move">合进一行 4 选 1</span></td>
+    </tr>
+    <tr>
+      <td class="num">3</td>
+      <td>选 template</td>
+      <td>poster grid</td>
+      <td>第一个</td>
+      <td><span class="pill keep">留着 —— 这是唯一值得问的那个</span></td>
+    </tr>
+    <tr>
+      <td class="num">4</td>
+      <td>故事名字</td>
+      <td><code>ComposerSteps.swift:503</code></td>
+      <td>跟 template</td>
+      <td><span class="pill move">进「设置」入口</span></td>
+    </tr>
+    <tr>
+      <td class="num">5</td>
+      <td>改 moments 列表</td>
+      <td><code>ComposerSteps.swift:535</code></td>
+      <td>template 自带</td>
+      <td><span class="pill move">进「设置」入口<br>（timeline 已有 <code>EditPlanSheet</code>）</span></td>
+    </tr>
+    <tr>
+      <td class="num">6</td>
+      <td>自己 / 和朋友</td>
+      <td><code>ComposerSteps.swift:626</code></td>
+      <td>自己</td>
+      <td><span class="pill move">进「设置」入口<br>（timeline 已有 invite）</span></td>
+    </tr>
+    <tr>
+      <td class="num">7</td>
+      <td>clip 长度 2/5/10s</td>
+      <td><code>ComposerSteps.swift:671</code></td>
+      <td><code>.tiny</code></td>
+      <td><span class="pill drop">搬进相机 / Settings</span></td>
+    </tr>
+    <tr>
+      <td class="num">8</td>
+      <td>横屏 / 竖屏</td>
+      <td><code>ComposerSteps.swift:683</code></td>
+      <td>portrait</td>
+      <td><span class="pill drop">删掉 —— 相机里已经有了<br><code>RecordClipView.swift:561</code></span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>第二个结构问题：根界面的两个世界</h2>
+<div class="roots">
+  <div class="root">
+    <div class="t">Plans</div>
+    <div class="sub">故事优先</div>
+    <ul>
+      <li>先有故事，再有片段</li>
+      <li>片段落进某个 moment 格子</li>
+      <li>拍满 → 自动出片</li>
+    </ul>
+  </div>
+  <div class="bridge">drafts<br>只为了搭这座桥而存在</div>
+  <div class="root">
+    <div class="t">Camera</div>
+    <div class="sub">片段优先</div>
+    <ul>
+      <li>随手拍，不属于任何故事</li>
+      <li>存成 draft，等着被「归档」</li>
+      <li>要自己想清楚归到哪</li>
+    </ul>
+  </div>
+</div>
+<p class="bar-note">
+  <code>RootShellView</code> 用一个浮动胶囊在这两个界面之间切换。问题不是 Camera 这个功能没用，
+  是它跟 Plans 平级 —— 打开 app 先要选世界。<code>drafts</code> 这个概念的存在理由，
+  全部来自「有个地方会产出无主的片段」。<strong>建议：Camera 从 tab 降级成 Plans 上的一个相机按钮，
+  drafts 直接挂在 hero card 下面（「有 2 个散片没归档」）。</strong>
+  这条会动到 <code>UnfiledClipGuard</code> 那套「离开时要不要保留」的逻辑，所以排在最后做。
+</p>
+
+<h2>改动排序</h2>
+<div class="card">
+  <div class="change">
+    <div class="rank">1</div>
+    <div>
+      <div class="t">默认路径砍掉 step 2/2</div>
+      <div class="d">
+        MoodStep 里点一张 poster = 直接建故事、直接进 timeline。控件 4–8 全用默认值。
+        step 2 变成 poster 上的「设置」小入口。进度点从 <code>1/2</code> 变成没有 —— 一步的流程不需要进度条。
+        <br><strong>收益最大：8 个决定 → 1 个。</strong>
+      </div>
+    </div>
+    <div class="effort">约 3 小时<br><span style="font-weight:400">含测试</span></div>
+  </div>
+
+  <div class="change">
+    <div class="rank">2</div>
+    <div>
+      <div class="t">两个 pill 合成一行</div>
+      <div class="d">
+        现在 style pill（<code>:83</code>）和 mode pill（<code>:149</code>）竖着叠，中间还夹一个 SectionLabel。
+        三个片段在回答同一个问题「今天拍什么样的」。合成一个 4 选 1：
+        <code>一天 · 七天 · 按时间 · 自定义</code>。
+      </div>
+    </div>
+    <div class="effort">约 1 小时</div>
+  </div>
+
+  <div class="change">
+    <div class="rank">3</div>
+    <div>
+      <div class="t">clip 长度 / 画幅 移进相机</div>
+      <div class="d">
+        这两个是拍摄参数，<code>RecordClipView</code> 要靠它们锁相机，导出时改不回来 ——
+        所以不能搬去 FilmView，该搬进相机本身。
+        <strong>画幅甚至可以直接删掉：相机里已经有一个画幅切换按钮</strong>
+        （<code>RecordClipView.swift:561</code>），而且它有三档（竖 / 横 / <strong>方</strong>），
+        composer 只有两档。composer 那个是重复的，而且是更差的那一份。
+        全局默认留在 Settings。
+      </div>
+    </div>
+    <div class="effort">约 2 小时</div>
+  </div>
+
+  <div class="change">
+    <div class="rank">4</div>
+    <div>
+      <div class="t">Camera tab 从根级降级</div>
+      <div class="d">
+        见上面「两个世界」。要动 <code>UnfiledClipGuard</code>，需要先把「离开相机时手上还有片段」
+        的几种情况列清楚再改，所以放最后。
+      </div>
+    </div>
+    <div class="effort">约半天<br><span style="font-weight:400">先设计再动手</span></div>
+  </div>
+</div>
+
+<h2>不要动的部分</h2>
+<div class="keepbox">
+  <p><strong>Timeline 页（<code>StoryTimelineView</code>）已经很干净。</strong>
+  progress bar → 还没拍的 → 拍过的 → film，从上到下就是一天的读法。</p>
+  <p><strong><code>agenda.openToMe</code> 把还没拍的 moment 做成平级列表，而不是队列</strong>——
+  这是对的。一天是按实际发生顺序拍的（散步的时候拍散步），队列会骗人说「其余的在等着轮到它」。</p>
+  <p><strong>最后一格落地 → celebration → 自动进 FilmView</strong>，没有按钮要用户去发现。
+  这是整个 app 最好的一段。</p>
+</div>
+
+</main>
+
+<script>
+  const btn = document.getElementById('theme');
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const isDark = cur === 'dark' ||
+      (!cur && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  });
+</script>
+</body>
+</html>

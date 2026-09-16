@@ -64,7 +64,8 @@ function systemPrompt(count, language) {
     '- Concrete and filmable. "The first box" beats "reflect on the move".',
     `- Write them in ${inChinese ? 'Simplified Chinese' : 'English'}.`,
     '- No numbering, no trailing punctuation, no commentary.',
-    'Reply with json in exactly this shape: {"prompts": ["…", "…"]}',
+    `- Also write a short story title in ${inChinese ? 'Simplified Chinese (at most 12 characters)' : 'English (at most 6 words)'}.`,
+    'Reply with json in exactly this shape: {"title": "…", "prompts": ["…", "…"]}',
   ].join('\n');
 }
 
@@ -98,6 +99,19 @@ export function parsePrompts(text, count) {
     if (prompts.length >= MIN_COUNT) return prompts;
   }
   return null;
+}
+
+export function parseStory(text, count) {
+  const prompts = parsePrompts(text, count);
+  if (!prompts) return null;
+  let title;
+  try {
+    const object = JSON.parse(sliceBetween(text, '{', '}'));
+    if (typeof object?.title === 'string') {
+      title = [...object.title.trim()].slice(0, 80).join('') || undefined;
+    }
+  } catch { /* Legacy bare arrays still work. */ }
+  return title ? { title, prompts } : { prompts };
 }
 
 function sliceBetween(text, open, close) {
@@ -201,13 +215,13 @@ export default {
       }
 
       const payload = await upstream.json();
-      const prompts = parsePrompts(
+      const story = parseStory(
         String(payload?.choices?.[0]?.message?.content ?? ''),
         count
       );
-      if (!prompts) return json({ error: 'unavailable' }, 502);
+      if (!story) return json({ error: 'unavailable' }, 502);
 
-      return json({ prompts });
+      return json(story);
     } catch (error) {
       console.error('failed', error?.name ?? 'error');
       return json({ error: 'unavailable' }, 502);

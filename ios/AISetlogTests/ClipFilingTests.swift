@@ -41,6 +41,21 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertEqual(forLandscape.map(\.id), [landscape.id])
     }
 
+    /// Square is a third frame, not a kind of portrait. A square clip in a
+    /// portrait story would be the one thing the per-challenge lock exists to
+    /// prevent: two shapes in one film.
+    func testSquareStoriesAndSquareClipsOnlyMatchEachOther() {
+        let portrait = story(startDay: 1, orientation: .portrait)
+        let landscape = story(startDay: 1, orientation: .landscape)
+        let square = story(startDay: 1, orientation: .square)
+        let all = [portrait, landscape, square]
+
+        XCTAssertEqual(
+            ClipFiling.candidates(in: all, orientation: .square).map(\.id), [square.id])
+        XCTAssertEqual(
+            ClipFiling.candidates(in: all, orientation: .portrait).map(\.id), [portrait.id])
+    }
+
     /// Stories saved before the orientation field existed decode as nil and
     /// are all portrait; they must still show up for a portrait clip.
     func testLegacyStoriesWithNoOrientationCountAsPortrait() {

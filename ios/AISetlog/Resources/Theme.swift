@@ -51,6 +51,20 @@ extension UIColor {
     static let oneDayMint = UIColor(hex: 0x5FD6B4)
     static let oneDayButter = UIColor(hex: 0xFFCE73)
     static let oneDayBlush = UIColor(hex: 0xFF9DB3)
+
+    // Identity hues. Deeper than the accents above because `AvatarDot` draws a
+    // white initial on top — every one of these clears 4:1 against white, which
+    // the pastel accents do not (#FFCE73 is 1.8:1). Not interchangeable with
+    // them: an accent tints a surface, these carry text.
+    /// #E14C3C — 4.0:1 on white.
+    static let oneDayCoral = UIColor(hex: 0xE14C3C)
+    /// #B5610A — 4.5:1 on white.
+    static let oneDayAmber = UIColor(hex: 0xB5610A)
+    /// #0E8A5F — 4.3:1 on white. Distinct from `oneDayMint`, which rings "this
+    /// is you" — an identity that *was* mint would erase its own ring.
+    static let oneDayEmerald = UIColor(hex: 0x0E8A5F)
+    /// #6E4FE0 — 5.4:1 on white.
+    static let oneDayGrape = UIColor(hex: 0x6E4FE0)
 }
 
 extension Color {
@@ -65,6 +79,10 @@ extension Color {
     static let oneDayMint = Color(uiColor: .oneDayMint)
     static let oneDayButter = Color(uiColor: .oneDayButter)
     static let oneDayBlush = Color(uiColor: .oneDayBlush)
+    static let oneDayCoral = Color(uiColor: .oneDayCoral)
+    static let oneDayAmber = Color(uiColor: .oneDayAmber)
+    static let oneDayEmerald = Color(uiColor: .oneDayEmerald)
+    static let oneDayGrape = Color(uiColor: .oneDayGrape)
 }
 
 /// Semantic tokens. Prefer these over the raw palette in view code: `OneDay.ink`

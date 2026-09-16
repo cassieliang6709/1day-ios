@@ -29,11 +29,15 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
     /// `TemplateCoverStore`. Nil means nobody picked one, and the cover is
     /// matched from the moments instead — see `TemplateCoverMatcher`.
     var coverFileName: String?
+    /// Bundled cover explicitly chosen from the preset library. This wins over
+    /// automatic matching, while an uploaded photo still wins over both.
+    var presetCoverAssetName: String?
 
     init(id: UUID = UUID(), emoji: String = "", symbol: String? = nil,
          name: LocalizedText, momentKeys: [String]?,
          blurb: LocalizedText? = nil, isCustom: Bool = false,
-         coverFileName: String? = nil) {
+         coverFileName: String? = nil,
+         presetCoverAssetName: String? = nil) {
         self.id = id
         self.emoji = emoji
         self.symbol = symbol
@@ -42,6 +46,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         self.blurb = blurb
         self.isCustom = isCustom
         self.coverFileName = coverFileName
+        self.presetCoverAssetName = presetCoverAssetName
     }
 
     /// Name in the active language.
@@ -207,7 +212,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, emoji, symbol, name, momentKeys, momentTitles, blurb, isCustom
-        case coverFileName
+        case coverFileName, presetCoverAssetName
     }
 
     init(from decoder: Decoder) throws {
@@ -220,6 +225,7 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         // Absent in everything saved before covers existed: those templates
         // simply get a matched cover instead of an uploaded one.
         coverFileName = try? c.decodeIfPresent(String.self, forKey: .coverFileName)
+        presetCoverAssetName = try? c.decodeIfPresent(String.self, forKey: .presetCoverAssetName)
         // name: new bilingual object, or a legacy plain string.
         if let loc = try? c.decode(LocalizedText.self, forKey: .name) {
             name = loc
@@ -247,5 +253,6 @@ struct ChallengeTemplate: Identifiable, Equatable, Codable {
         try c.encodeIfPresent(symbol, forKey: .symbol)
         try c.encode(isCustom, forKey: .isCustom)
         try c.encodeIfPresent(coverFileName, forKey: .coverFileName)
+        try c.encodeIfPresent(presetCoverAssetName, forKey: .presetCoverAssetName)
     }
 }

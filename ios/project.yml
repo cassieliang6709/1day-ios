@@ -20,7 +20,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.2"
-        CURRENT_PROJECT_VERSION: "10"
+        CURRENT_PROJECT_VERSION: "21"
       configs:
         Debug:
           APS_ENVIRONMENT: development
@@ -57,6 +57,7 @@ targets:
     sources: [AISetlogTests]
     settings:
       base:
+        DEVELOPMENT_TEAM: M7BPQ88622
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: AISetlog
@@ -66,6 +67,7 @@ targets:
     sources: [AISetlogUITests]
     settings:
       base:
+        DEVELOPMENT_TEAM: M7BPQ88622
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: AISetlog

@@ -1,92 +1,85 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AppleLogo, ArrowRight, CalendarBlank, Camera, Check, FilmStrip, LockKey, Smiley, UsersThree } from '@phosphor-icons/react';
+import { useEffect, useState } from 'react';
+import { AppleLogo, ArrowRight, CalendarBlank, Camera, FilmStrip, LockKey, UsersThree } from '@phosphor-icons/react';
 
-const APP_STORE_URL = 'https://apps.apple.com/us/app/1-day/id6794565199';
+export const APP_STORE_URL = 'https://apps.apple.com/cn/app/1-day/id6794565199?uo=4';
 
 const themes = [
-  { id: 'perfect', en: 'Perfect Day', zh: '完美的一天', enNote: 'Capture the little things that made today good.', zhNote: '记下那些让今天变好的小事。', image: '/assets/moment-1.jpg' },
-  { id: 'reset', en: 'Soft Reset', zh: '轻轻重启', enNote: 'A fresh start. Reset your day, your way.', zhNote: '重新开始，按自己的节奏来。', image: '/assets/moment-4.jpg' },
-  { id: 'lockin', en: 'Study Lock-in', zh: '专注时刻', enNote: 'Focus, progress, repeat.', zhNote: '专注、进步、重复。', image: '/assets/moment-3.jpg' },
-  { id: 'main', en: 'Main Character', zh: '主角时刻', enNote: "It's your story. Own the plot.", zhNote: '这是你的故事，由你做主。', image: '/assets/moment-5.jpg' },
+  { id: 'perfect', image: '/assets/blue-perfect.jpg', en: 'Perfect Day', zh: '完美的一天', enDescription: 'Give an ordinary day a little ceremony.', zhDescription: '给平常的一天一点仪式感。', enPrompts: ['A slow first moment', 'Something you chose just for yourself', 'The light you want to remember'], zhPrompts: ['醒来后的第一眼', '专门留给自己的一刻', '想记住的光'] },
+  { id: 'reset', image: '/assets/blue-reset.jpg', en: 'Soft Reset', zh: '慢慢重启', enDescription: 'Make room to breathe and begin again.', zhDescription: '留一点空白，再慢慢开始。', enPrompts: ['Open the window', 'A walk without a destination', 'One thing that made today lighter'], zhPrompts: ['打开窗的那一刻', '没有目的地的一段路', '今天让你轻一点的小事'] },
+  { id: 'lockin', image: '/assets/blue-focus.jpg', en: 'Lock In', zh: '进入状态', enDescription: 'Follow a rhythm that belongs to you.', zhDescription: '跟着自己的节奏，专注一会儿。', enPrompts: ['Your desk, before you begin', 'The work in progress', 'The moment you call it a day'], zhPrompts: ['开始前的桌面', '正在发生的专注', '今天收尾的瞬间'] },
 ];
+
+export const metadata = {
+  zh: { title: '1Day — 今天，想怎么过？', description: '给今天一个主题，和自己或朋友一起，把它过成一支 Vlog。跟着瞬间提示去经历今天，留下一段值得回看的记忆。', privacyTitle: '1Day 视频日记隐私政策', privacyDescription: '了解 1Day 如何处理单人故事、共享房间和可选提示建议的数据。', og: '/assets/og-zh.png' },
+  en: { title: '1Day — How do you want to spend today?', description: 'Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog. Follow moment prompts and keep a memory of the day.', privacyTitle: '1Day Video Diary Privacy Policy', privacyDescription: 'Learn how 1Day handles data for solo stories, shared rooms, and optional prompt suggestions.', og: '/assets/og-en.png' },
+};
+
+export function pageMetadata(locale, isPrivacy = false) {
+  const base = metadata[locale];
+  return isPrivacy ? { ...base, title: base.privacyTitle, description: base.privacyDescription } : base;
+}
 
 const copy = {
   zh: {
-    nav: ['使用方式', '你能做什么', '隐私'], storeAria: '在 App Store 下载 1Day', storeSmall: '在', storeLarge: 'App Store 下载', storeCompact: 'App Store', heroNote: '你的每一天，都值得留成故事。',
-    title: <>把琐事<br />拍成 <em>电影</em><br />让生活更有意思。</>,
-    lede: '录下 2 秒、5 秒或 10 秒的片段。1Day 会把它们编成一支完整的每日短片——一个人，或和朋友一起。', learn: '看看它如何工作', themeTitle: '选择你的故事主题', allThemes: '查看全部主题',
-    how: '1Day 如何工作', howNote: '从一个小小的故事开始，把散落的瞬间留成完整的一天。',
-    steps: [
-      ['开始一个故事', '选一个主题，开启属于你的一天或七天挑战。', CalendarBlank],
-      ['记录瞬间', '用前后镜头拍下 2 秒、5 秒或 10 秒的短片，也能保留声音。', Camera],
-      ['添一点细节', '名字、文字、回应和评论，让你的故事慢慢有了生命。', Smiley],
-      ['观看成片', '1Day 自动整理所有片段，完成一支好看的每日短片。', FilmStrip],
+    nav: ['如何记录', '每日影片', '隐私'], storeAria: '在 App Store 下载 1Day', storeLabel: '下载 1Day', storeCompact: 'App Store', eyebrow: '给今天一个主题',
+    title: <>今天，<br /><em>想怎么过？</em></>, lede: '给今天一个主题，和自己或朋友一起，把它过成一支 Vlog。', learn: '看看今天的主题', heroAlt: '小蓝在一次晴朗的出行中',
+    chooser: '01 · 给今天一个主题', chooserTitle: '从一个主题，开始属于你的一天。', chooserNote: '不用先想好要拍什么。选一个现在的心情，1Day 会给你几个值得留意的瞬间。', previewTitle: '今天可以拍下', timedNote: '也可以随时自由拍摄，或按时间记录当下。',
+    storyLabel: '02 · 跟着瞬间去经历', storyTitle: ['让一天慢慢发生，', '再拍下它。'], storyText: '不用为了拍而拍。主题只是轻轻提醒你：留意醒来的光、路上的风，或一个让人微笑的小小瞬间。', guided: '几个轻轻的拍摄提醒', timed: '自由记录，也按自己的节奏', momentCaptions: ['早晨的第一束光', '一起做点好吃的', '走出去，看看今天'],
+    togetherLabel: '03 · 一个人，或一起', togetherTitle: <>一个人也很好。<br />朋友来了，更好。</>, togetherText: '小蓝安静地陪你开始。想和朋友一起过这一天，就发出邀请；每个人拍下自己的视角，故事会在同一支影片里相遇。', solo: '一个人，也能开始', friends: '邀请朋友，一起拍同一天', inviteCaption: '真实 App 界面 · 示例朋友与故事', inviteAlt: '1Day 合拍时间轴，小蓝、Mia 和 Sam 的示例片段',
+    rewardLabel: '04 · 留下今天的 Vlog', rewardTitle: <>一天结束，<br />故事留下。</>, rewardText: '1Day 把拍下的瞬间串成属于你或你们的 Vlog。调整字幕和转场，预览后保存或分享。', growth: '日子慢慢积累，回头看看，你已经经历了这么多。', privacy: '单人片段保存在设备上；朋友房间和可选的提示建议会使用网络。', appFilmAlt: '1Day 中文版每日影片预览', footer: ['隐私政策', 'App Store', '支持'], portfolio: 'Cassie 的个人主页', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 9 月 7 日',
+    privacySections: [
+      ['概览', '1Day 帮你记录短视频瞬间，并将它们编成一支影片。单人故事的片段和故事数据保存在你的设备上。共享房间使用 Apple iCloud，并需要“通过 Apple 登录”。'],
+      ['我们处理的信息', '应用可能会处理“通过 Apple 登录”提供的名称与稳定标识符、挑战详情、房间成员、文字说明，以及你选择上传到共享房间的视频片段。相机、麦克风和照片图库仅在你授权后使用。'],
+      ['存储与分享', '单人故事数据和片段存储在你的设备上。共享房间的数据和你选择上传的片段存储于 Apple CloudKit。房间码是邀请方式，而非密码；收到房间码的人可以加入并访问其中的共享内容。成片只会在你选择保存或分享时离开应用。'],
+      ['可选的提示建议', '如果你选择用一句话生成拍摄提示，应用会向 1Day 的提示服务发送这句话、所需提示数量、所选语言和一个随机的安装标识符（用于限流）。该服务将你的这句话和生成提示所需的系统指令发送给 DeepSeek API。它不会发送你的影片、照片或安装标识符给 DeepSeek。此功能是可选的；你也可以自己写提示，或按时间记录。'],
     ],
-    finished: '在 iPhone 上完成', filmTitle: <>每一段。<br />一个完整故事。</>, filmText: '随时预览最后的竖版短片；想和朋友一起看时切成网格，然后保存到照片或通过 iOS 分享。', privacy: '单人故事只留在你的设备上。要不要保存或分享，始终由你决定。',
-    modes: [['独自记录', '只关于你和你的这一天。', UsersThree], ['朋友房间', '无论身处哪里，一起记录。', UsersThree], ['每日成片', '每天一支，都是故事。', FilmStrip]], footer: ['隐私政策', 'App Store', '支持'], filmNote: '真实成片 · 7 个瞬间 · 11 秒', filmAria: '1Day 生成的样片', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 7 月 24 日',
   },
   en: {
-    nav: ['How it works', 'What you can do', 'Privacy'], storeAria: 'Download 1Day on the App Store', storeSmall: 'Download on the', storeLarge: 'App Store', storeCompact: 'App Store', heroNote: 'Your day is a story worth keeping.',
-    title: <>Turn everyday<br />moments into <em>film</em>.<br />Make life more fun.</>,
-    lede: 'Record 2, 5, or 10-second clips of your day. 1Day turns them into a beautiful daily film—solo or with friends.', learn: 'Learn how it works', themeTitle: 'Choose your story theme', allThemes: 'See all themes',
-    how: 'How 1Day works', howNote: 'Start with a small story, then keep the moments that make up a complete day.',
-    steps: [
-      ['Start a story', 'Choose a theme and start your one-day or seven-day challenge.', CalendarBlank],
-      ['Record moments', 'Capture 2, 5, or 10-second clips with the front or rear camera, with audio.', Camera],
-      ['Add the little things', 'Names, captions, reactions, and comments make your story come alive.', Smiley],
-      ['Watch your film', '1Day orders every clip and turns it into a beautiful daily film.', FilmStrip],
+    nav: ['How it works', 'Daily film', 'Privacy'], storeAria: 'Download 1Day on the App Store', storeLabel: 'Get 1Day', storeCompact: 'App Store', eyebrow: 'Give today a theme',
+    title: <>How will you<br /><em>spend today?</em></>, lede: 'Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.', learn: 'Explore today’s themes', heroAlt: 'Blue on a sunny small adventure',
+    chooser: '01 · Give today a theme', chooserTitle: 'One theme. A day that feels like yours.', chooserNote: 'You do not have to know what to film. Choose a feeling for today and 1Day gives you a few moments to notice.', previewTitle: 'A few moments for today', timedNote: 'You can always film freely or capture the day as it unfolds.',
+    storyLabel: '02 · Follow the moments', storyTitle: ['Let the day unfold.', 'Then capture it.'], storyText: 'There is no need to perform for the camera. Your theme simply helps you notice the morning light, air on a walk, or a small thing that makes you smile.', guided: 'A few gentle filming prompts', timed: 'Capture it in your own rhythm', momentCaptions: ['First light in the morning', 'Make something good together', 'Step out and see the day'],
+    togetherLabel: '03 · On your own, or together', togetherTitle: <>A day of your own.<br />Better with friends, too.</>, togetherText: 'Blue quietly keeps you company as you begin. Want to share the day? Send an invite; everyone captures their own perspective, then the stories meet in one film.', solo: 'Start on your own', friends: 'Invite friends for the same day', inviteCaption: 'Real app UI · Demo friends and story', inviteAlt: '1Day shared timeline with demo clips from Blue, Mia and Sam',
+    rewardLabel: '04 · A vlog to keep', rewardTitle: <>The day ends.<br />The story stays.</>, rewardText: '1Day brings your moments into a vlog of your own or a shared day. Adjust captions and transitions, then preview, save or share.', growth: 'As the days add up, look back at all the little things you have lived.', privacy: 'Solo footage stays on-device; shared rooms and optional prompt suggestions use the network.', appFilmAlt: '1Day English daily film preview', footer: ['Privacy Policy', 'App Store', 'Support'], portfolio: 'Made by Cassie', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective September 7, 2026',
+    privacySections: [
+      ['Overview', '1Day helps you record short video moments and assemble them into a film. Solo story data and footage stay on your device. Shared rooms use Apple iCloud and require Sign in with Apple.'],
+      ['Information we handle', 'The app may handle the name and stable identifier provided through Sign in with Apple, challenge details, room membership, captions, and video clips you choose to upload to a shared room. Camera, microphone, and photo-library access are used only after you grant permission.'],
+      ['Storage and sharing', 'Solo story data and clips are stored on your device. Shared-room data and clips you choose to upload are stored in Apple CloudKit. A room code is an invitation, not a password: people who receive it can join that room and access its shared content. Finished films leave the app only when you choose to save or share them.'],
+      ['Optional prompt suggestions', 'If you choose to generate filming prompts from one sentence, the app sends that sentence, the requested prompt count, selected language, and a random installation identifier for rate limiting to 1Day’s prompt service. The service sends your sentence and the system instructions needed to generate prompts to the DeepSeek API. It does not send your videos, photos, or installation identifier to DeepSeek. This feature is optional: you can write prompts yourself or record by time.'],
     ],
-    finished: 'Finished on your iPhone', filmTitle: <>Every clip.<br />One complete story.</>, filmText: 'Preview the finished vertical film, turn shared clips into a grid when you want, then save it to Photos or share it through iOS.', privacy: 'Solo stories stay on your device. You decide what to save or share.',
-    modes: [['Solo', 'Just you and your day.', UsersThree], ['Friends Room', 'Capture together, from anywhere.', UsersThree], ['Daily Film', 'One film. Every day.', FilmStrip]], footer: ['Privacy Policy', 'App Store', 'Support'], filmNote: 'A real film · 7 moments · 11s', filmAria: 'Sample film made by 1Day', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective July 24, 2026',
   },
 };
 
-function StoreButton({ locale, compact = false }) {
-  const t = copy[locale];
-  return <a className={`store-button ${compact ? 'compact' : ''}`} href={APP_STORE_URL} target="_blank" rel="noreferrer" aria-label={t.storeAria}><AppleLogo weight="fill" /><span><small>{t.storeSmall}</small>{compact ? t.storeCompact : t.storeLarge}</span></a>;
+function StoreButton({ locale, compact = false }) { const t = copy[locale]; return <a className={`store-button ${compact ? 'compact' : ''}`} href={APP_STORE_URL} target="_blank" rel="noreferrer" aria-label={t.storeAria}><AppleLogo weight="fill" /><span>{compact ? t.storeCompact : t.storeLabel}</span></a>; }
+function AppScreen({ screen, locale, caption, className = '' }) {
+  const names = { home: ['首页', 'Home'], theme: ['选择主题', 'Theme chooser'], moments: ['故事时间轴', 'Story timeline'] };
+  return <figure className={`app-proof ${className}`}><img width="660" height="1434" src={`/assets/app-${screen}-${locale}.png`} alt={`1Day · ${names[screen]?.[locale === 'zh' ? 0 : 1] ?? screen}`} loading={screen === 'home' ? 'eager' : 'lazy'} /><figcaption>{caption ?? (locale === 'zh' ? '真实 App 界面 · 示例故事' : 'Real app UI · Demo story')}</figcaption></figure>;
+}
+function PrivacyPolicy({ locale }) { const t = copy[locale]; const zh = locale === 'zh'; return <main className="legal-page"><header className="nav shell"><a href={zh ? '/' : '/en'} className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="1Day" /></a><a className="language" href={zh ? '/en/privacy' : '/privacy'}>{zh ? 'EN' : '中文'}</a></header><article className="legal-copy"><p className="eyebrow">1Day</p><h1>{t.privacyTitle}</h1><p className="legal-updated">{t.privacyDate}</p>{t.privacySections.map(([heading, body]) => <section key={heading}><h2>{heading}</h2><p>{body}</p></section>)}<h2>{zh ? '联系我们' : 'Contact'}</h2><p>{zh ? '问题或数据删除请求：' : 'Questions or deletion requests: '}<a href="mailto:liangyue3666@gmail.com">liangyue3666@gmail.com</a></p><p><a className="text-link legal-back" href={zh ? '/' : '/en'}>{t.back}</a></p></article></main>; }
+
+const updates = [
+  {version: '1.2', pending: true, zh: '按自己的方式，过好、拍下、回看一天', en: 'Plan, capture, and revisit a day your way', zhItems: ['说一句今天想做什么，获得一组拍摄提示，再按自己的想法修改。', '把自定义题目存进模板库，配上喜欢的封面，下次还能继续用。', '想拍哪个瞬间就先拍哪个，不必按照题目顺序完成。', '全屏回看片段，左右滑动就能接着看下一刻。', '调整柔和度、亮度和暖色效果，让回看与成片更合心意，保留原始素材。', '合拍时更清楚地看到谁在房间里、谁已经拍了，以及还有谁尚未记录。'], enItems: ['Describe what you want to do today, get filming prompts, and make them your own.', 'Save your custom prompts to the template library with a cover you love, ready to use again.', 'Capture any available moment first, without following a fixed order.', 'Review clips full-screen and swipe to the next moment.', 'Adjust softness, brightness, and warmth for playback and the finished film while preserving the original footage.', 'See who is in a shared room, who has filmed, and who has yet to contribute.']},
+  {version: '1.1', date: '2026-08-25', zh: '给平常的一天，留下一支短片', en: 'A short film of an ordinary day', zhItems: ['选择完美的一天、慢慢重启等主题，跟着瞬间提示拍摄。', '通过房间码邀请朋友，把不同视角留在同一个故事里。', '在时间轴与网格之间切换，回看已经拍下的瞬间。', '在手机上将片段串成影片，也可以创建自己的拍摄题目。'], enItems: ['Choose a theme such as Perfect Day or Soft Reset and follow moment prompts.', 'Invite friends with a room code and bring different perspectives into one story.', 'Switch between a timeline and a grid to revisit your moments.', 'Assemble clips into a film on your phone, or create your own filming prompts.']},
+];
+function Changelog({locale}) {
+  const zh = locale === 'zh'; const home = zh ? '/' : '/en';
+  return <main className="updates-page"><header className="nav shell"><a href={home} className="brand"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="1Day" /></a><a className="updates-home" href={home}>{zh ? '返回首页' : 'Back to home'}</a><a className="language" href={zh ? '/en/updates' : '/updates'}>{zh ? 'EN' : '中文'}</a></header><div className="updates-layout shell"><aside className="updates-months"><p>{zh ? '按版本浏览' : 'Browse by version'}</p>{updates.map(entry=><a key={entry.version} href={`#version-${entry.version.replace('.', '-')}`}>v{entry.version}<span>{entry.pending ? (zh ? '待发布' : 'Upcoming') : (zh ? '已发布' : 'Released')}</span></a>)}</aside><article><p className="eyebrow">1Day · {zh ? '一点点变好' : 'A little better, every day'}</p><h1>{zh ? 'App 版本更新' : 'App release notes'}</h1><p className="updates-intro">{zh ? '看看每个版本带来的新功能与体验改进。' : 'New features and improvements, version by version.'}</p><div className="updates-timeline">{updates.map(entry=><section id={`version-${entry.version.replace('.', '-')}`} key={entry.version}><div className="update-date"><strong>v{entry.version}</strong><span>{entry.pending ? (zh ? '待发布' : 'Upcoming') : (zh ? '已发布' : 'Released')}</span>{entry.date && <time dateTime={entry.date}>{new Date(entry.date+'T12:00:00Z').toLocaleDateString(zh ? 'zh-CN' : 'en-US', {year:'numeric',month:'long',day:'numeric',timeZone:'UTC'})}</time>}</div><h2>{entry[locale]}</h2><p className="release-note">{entry.pending ? (zh ? '以下为下一版更新预告，尚未在 App Store 上线。' : 'A preview of the next release, not yet available on the App Store.') : (zh ? '此版本的主要功能' : 'Features available in this version')}</p><ul>{entry[zh ? 'zhItems' : 'enItems'].map(item=><li key={item}>{item}</li>)}</ul></section>)}</div></article></div></main>;
 }
 
-function PrivacyPolicy({ locale }) {
-  const t = copy[locale];
-  const zh = locale === 'zh';
-  return <main className="legal-page"><header className="nav shell"><a href={zh ? '/' : '/en'} className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="" /></a><a className="language" href={zh ? '/en/privacy' : '/privacy'}>{zh ? 'EN' : '中文'}</a></header><article className="legal-copy">
-    <p className="eyebrow">1Day</p><h1>{t.privacyTitle}</h1><p className="legal-updated">{t.privacyDate}</p>
-    <h2>{zh ? '概览' : 'Overview'}</h2><p>{zh ? '1Day 帮你记录短视频瞬间，并将它们编成一支短片。单人挑战保存在你的设备上；共享挑战使用 Apple iCloud，并需要“通过 Apple 登录”。' : '1Day helps you record short video moments and assemble them into a film. Solo challenges stay on your device. Shared challenges use Apple iCloud and require Sign in with Apple.'}</p>
-    <h2>{zh ? '我们处理的信息' : 'Information we handle'}</h2><p>{zh ? '应用可能会处理“通过 Apple 登录”提供的名称与稳定标识符、挑战详情、房间成员、文字说明，以及你选择上传到共享房间的视频片段。相机、麦克风和照片图库仅在你授权后使用。' : 'The app may handle the name and stable identifier provided through Sign in with Apple, challenge details, room membership, captions, and video clips you choose to upload to a shared room. Camera, microphone, and photo-library access are used only after you grant permission.'}</p>
-    <h2>{zh ? '存储与分享' : 'Storage and sharing'}</h2><p>{zh ? '单人挑战数据和片段只存储在你的设备上。共享房间的数据和片段存储于 Apple CloudKit。房间码是邀请方式，而非密码；收到房间码的人可以加入并访问其中的共享内容。成片只会在你选择保存或分享时离开应用。' : 'Solo challenge data and clips are stored locally on your device. Shared-room data and clips are stored in Apple CloudKit. A room code is an invitation, not a password: people who receive it can join that room and access its shared content. Finished films leave the app only when you choose to save or share them.'}</p>
-    <h2>{zh ? '联系我们' : 'Contact'}</h2><p>{zh ? '问题或数据删除请求：' : 'Questions or deletion requests: '}<a href="mailto:liangyue3666@gmail.com">liangyue3666@gmail.com</a></p><p><a className="text-link" href={zh ? '/' : '/en'}>{t.back}</a></p>
-  </article></main>;
-}
-
-export function App() {
-  const path = window.location.pathname;
-  const locale = path.startsWith('/en') ? 'en' : 'zh';
-  const t = copy[locale];
-  useEffect(() => {
-    const english = locale === 'en';
-    document.documentElement.lang = english ? 'en' : 'zh-CN';
-    document.title = english ? '1Day — Turn everyday moments into film.' : '1Day — 把琐事拍成电影，让生活更有意思。';
-    const description = document.querySelector('meta[name="description"]');
-    if (description) description.content = english
-      ? '1Day is an iOS video diary. Record small moments from your day, then keep them as one finished daily film.'
-      : '1Day 是一款 iOS 视频日记。记录一天里的短短片段，留成一支完整的每日短片。';
-  }, [locale]);
-  if (path.endsWith('/privacy') || path.endsWith('/privacy/')) return <PrivacyPolicy locale={locale} />;
-  const [selectedTheme, setSelectedTheme] = useState(themes[0].id);
-  const selected = useMemo(() => themes.find((theme) => theme.id === selectedTheme), [selectedTheme]);
-  const home = locale === 'zh' ? '' : '/en';
-  const themeName = selected[locale];
-
+export function App({ pathname }) {
+  const path = pathname ?? (typeof window === 'undefined' ? '/' : window.location.pathname); const locale = path.startsWith('/en') ? 'en' : 'zh'; const isPrivacy = path.endsWith('/privacy') || path.endsWith('/privacy/'); const isUpdates = /\/updates\/?$/.test(path); const page = isUpdates ? {title: locale === 'zh' ? '更新日志 — 1Day' : 'What’s new — 1Day', description: locale === 'zh' ? '看看每个版本带来的新功能与体验改进。' : 'New features and improvements, version by version.'} : pageMetadata(locale, isPrivacy); const t = copy[locale]; const home = locale === 'zh' ? '' : '/en';
+  const [selectedTheme, setSelectedTheme] = useState(themes[0].id); const activeTheme = themes.find((theme) => theme.id === selectedTheme) ?? themes[0];
+  useEffect(() => { document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'; document.title = page.title; const description = document.querySelector('meta[name="description"]'); if (description) description.content = page.description; }, [locale, page.description, page.title]);
+  if (isUpdates) return <Changelog locale={locale} />;
+  if (isPrivacy) return <PrivacyPolicy locale={locale} />;
+  const prompts = locale === 'zh' ? activeTheme.zhPrompts : activeTheme.enPrompts;
   return <main className="site-page">
-    <header className="nav shell"><a href="#top" className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="" /></a><nav aria-label="Main navigation"><a href="#how">{t.nav[0]}</a><a href="#film">{t.nav[1]}</a><a href={`${home}/privacy`}>{t.nav[2]}</a></nav><div className="nav-actions"><a className="language" href={locale === 'zh' ? '/en' : '/'}>{locale === 'zh' ? 'EN' : '中文'}</a><StoreButton locale={locale} compact /></div></header>
-    <section id="top" className="hero shell">
-      <div className="hero-copy"><p className="scribble">{t.heroNote}</p><h1>{t.title}</h1><p className="lede">{t.lede}</p><div className="hero-actions"><StoreButton locale={locale} /><a className="text-link" href="#how">{t.learn} <ArrowRight /></a></div></div>
-      <div className="phone-wrap"><div className="phone"><div className="speaker" /><img src="/assets/app-screen-current.jpg" alt={locale === 'zh' ? '1Day 应用主页预览' : '1Day app home preview'} /></div><p className="phone-callout">{locale === 'zh' ? '短短片段，一支完整短片。' : 'Short clips. One beautiful film.'}</p></div>
-      <aside className="theme-panel" aria-label={t.themeTitle}><h2>{t.themeTitle}</h2><div className="theme-options">{themes.map((theme) => <button type="button" key={theme.id} className={selectedTheme === theme.id ? 'selected' : ''} onClick={() => setSelectedTheme(theme.id)} aria-pressed={selectedTheme === theme.id}><img src={theme.image} alt="" /><span><strong>{theme[locale]}</strong><small>{theme[`${locale}Note`]}</small></span>{selectedTheme === theme.id ? <Check weight="bold" /> : <i />}</button>)}</div><a href="#how" className="text-link">{t.allThemes} <ArrowRight /></a><p className="selected-theme" aria-live="polite">{themeName}</p></aside>
-    </section>
-    <section id="how" className="how shell"><div className="how-heading"><p className="eyebrow">{t.how}</p><p>{t.howNote}</p></div><div className="steps">{t.steps.map(([title, note, Icon], index) => <article className="step" key={title}><div className="step-icon"><Icon weight="fill" /></div><div><p><b>{index + 1}</b> {title}</p><small>{note}</small></div>{index < t.steps.length - 1 && <ArrowRight className="step-arrow" />}</article>)}</div></section>
-    <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.finished}</p><h2>{t.filmTitle}</h2><p>{t.filmText}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><figure className="movie"><video className="sample-film" src="/assets/sample-film.mp4" poster="/assets/sample-film-poster.jpg" autoPlay muted loop playsInline preload="metadata" aria-label={t.filmAria} /><figcaption>{t.filmNote}</figcaption></figure></section>
-    <section className="modes shell">{t.modes.map(([title, note, Icon], index) => <div key={title}><Icon weight="fill" /><span><small>0{index + 1}</small><strong>{title}</strong><em>{note}</em></span></div>)}</section>
-    <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/privacy`}>{t.footer[0]}</a><a href={APP_STORE_URL}>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a></div></footer>
+    <header className="nav shell"><a href="#top" className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="1Day" /></a><nav aria-label="Main navigation"><a href="#how">{t.nav[0]}</a><a href="#film">{t.nav[1]}</a><a href={`${home}/updates`}>{locale === 'zh' ? '更新日志' : 'Updates'}</a><a href={`${home}/privacy`}>{t.nav[2]}</a></nav><div className="nav-actions"><a className="language" href={locale === 'zh' ? '/en' : '/'}>{locale === 'zh' ? 'EN' : '中文'}</a><StoreButton locale={locale} compact /></div></header>
+    <section id="top" className="hero shell"><div className="hero-copy"><p className="eyebrow">{t.eyebrow}</p><h1>{t.title}</h1><p className="lede">{t.lede}</p><div className="hero-actions"><StoreButton locale={locale} /><a className="text-link" href="#how">{t.learn} <ArrowRight /></a></div></div><div className="hero-product"><div className="hero-art"><img src="/assets/blue-adventure.jpg" alt={t.heroAlt} /><img src="/assets/blue-friends.jpg" alt="" /></div><AppScreen screen="home" locale={locale} /></div></section>
+    <section id="how" className="theme-section shell"><div className="section-intro"><p className="eyebrow">{t.chooser}</p><h2>{t.chooserTitle}</h2><p>{t.chooserNote}</p></div><div className="theme-options">{themes.map((theme) => <button type="button" key={theme.id} className={selectedTheme === theme.id ? 'selected' : ''} aria-pressed={selectedTheme === theme.id} onClick={() => setSelectedTheme(theme.id)}><img src={theme.image} alt="" /><span><strong>{theme[locale]}</strong><small>{locale === 'zh' ? theme.zhDescription : theme.enDescription}</small></span></button>)}</div><aside className="theme-preview" aria-live="polite"><div><p>{t.previewTitle}</p><strong>{activeTheme[locale]}</strong></div><ol>{prompts.map((prompt, index) => <li key={prompt}><span>0{index + 1}</span>{prompt}</li>)}</ol><p>{t.timedNote}</p></aside><div className="theme-app"><AppScreen screen="theme" locale={locale} /></div></section>
+    <section className="moment-section shell"><div className="flow-copy"><p className="eyebrow">{t.storyLabel}</p><h2>{t.storyTitle[0]}<br />{t.storyTitle[1]}</h2><p>{t.storyText}</p><div className="flow-notes"><span><Camera weight="fill" />{t.guided}</span><span><CalendarBlank weight="fill" />{t.timed}</span></div></div><div className="moment-product"><AppScreen screen="moments" locale={locale} /><div className="moment-portraits">{['blue-morning.jpg', 'blue-cooking.jpg', 'blue-adventure.jpg'].map((image, index) => <figure key={image}><img src={`/assets/${image}`} alt="" loading="lazy" /><figcaption>{t.momentCaptions[index]}</figcaption></figure>)}</div></div></section>
+    <section className="together-section shell"><div className="together-copy"><p className="eyebrow">{t.togetherLabel}</p><h2>{t.togetherTitle}</h2><p>{t.togetherText}</p><div className="modes"><span><UsersThree weight="fill" />{t.solo}</span><span><FilmStrip weight="fill" />{t.friends}</span></div></div><div className="together-visual"><img className="friends-image" src="/assets/blue-friends.jpg" alt="" /><figure className="invite-screen"><img width="660" height="1434" src={`/assets/app-friends-${locale}.png`} alt={t.inviteAlt} loading="lazy" /><figcaption>{t.inviteCaption}</figcaption></figure></div></section>
+    <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.rewardLabel}</p><h2>{t.rewardTitle}</h2><p>{t.rewardText}</p><p>{t.growth}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><div className="film-result"><figure className="film-screen"><img width="660" height="1434" src={`/assets/app-film-${locale}.png`} alt={t.appFilmAlt} loading="lazy" /><figcaption>{locale === 'zh' ? '真实 App 成片界面 · 示例故事' : 'Real app film screen · Demo story'}</figcaption></figure><figure className="demo-film"><video controls playsInline preload="none" poster="/assets/blue-morning.jpg" aria-label={locale === 'zh' ? '播放小蓝的一天示例影片' : 'Play Blue’s day demo film'} src="/assets/blue-day.mp4"><track key={locale} default kind="captions" src={`/assets/blue-day-${locale}.vtt`} srcLang={locale === 'zh' ? 'zh-CN' : 'en'} label={locale === 'zh' ? '中文' : 'English'} /></video><figcaption>{locale === 'zh' ? '小蓝的一天 · 由 App 串联的插画示例影片' : 'Blue’s day · An illustrated demo film assembled by the app'}</figcaption></figure></div></section>
+    <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/updates`}>{locale === 'zh' ? '更新日志' : 'Updates'}</a><a href={`${home}/privacy`}>{t.footer[0]}</a><a href={APP_STORE_URL}>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a><a href="https://liangyue.site" target="_blank" rel="noreferrer">{t.portfolio}</a></div></footer>
   </main>;
 }

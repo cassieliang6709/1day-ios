@@ -151,12 +151,18 @@ struct ClipThumb: View {
     /// means "play what's here".
     var awaitingMine = false
     var aspectRatio: CGFloat = 0.72
+    /// The shape the takes were filmed in, which is what decides how the film
+    /// splits them up. It is not the shape of this tile: the tile is 103pt of
+    /// a scrolling grid and the film is a 9:8 diptych, and asking the tile's
+    /// own proportions which way the film splits is how the thumbnail ended up
+    /// stacking two people the film had put side by side.
+    var sourceAspect: CGFloat = 9.0 / 16
     let onTap: () -> Void
 
     private let radius: CGFloat = 16
 
     private var grid: (rows: Int, columns: Int) {
-        VideoStitcher.grid(for: lanes.count, in: CGSize(width: 100, height: 140))
+        VideoStitcher.grid(for: lanes.count, sourceAspect: sourceAspect)
     }
 
     var body: some View {
@@ -190,15 +196,22 @@ struct ClipThumb: View {
 
     private var frames: some View {
         let split = grid
-        return VStack(spacing: 1) {
+        // No gaps, because the film has none: its cells tile the canvas.
+        return VStack(spacing: 0) {
             ForEach(
                 Array(StoryGridView.rows(of: lanes, columns: split.columns).enumerated()),
                 id: \.offset
             ) { _, row in
-                HStack(spacing: 1) {
+                HStack(spacing: 0) {
                     ForEach(row) { lane in
                         if let clip = lane.clip {
-                            ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                            // Bedded, not cropped: the tile is 0.72 and the
+                            // take is 9:16, and cropping that difference away
+                            // lands squarely on whatever is mid-frame.
+                            ClipThumbnail(
+                                url: clip.url,
+                                refreshToken: clip.recordedAt,
+                                bedsInsteadOfCrops: true)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .clipped()
                         }

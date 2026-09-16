@@ -72,6 +72,8 @@ struct StoryComposerView: View {
                         sevenDayTemplates: sevenDayTemplates,
                         selection: $selection,
                         onBuildOwn: beginCustomPromptFlow,
+                        onChoose: createFromPoster,
+                        onSettings: openSettings,
                         onEdit: { editingTemplate = $0 },
                         onDelete: deleteTemplate,
                         coverURL: { store.coverURL(for: $0) })
@@ -151,7 +153,17 @@ struct StoryComposerView: View {
 
             Spacer()
 
-            StepDots(count: 2, index: step.rawValue)
+            VStack(spacing: 6) {
+                Text(appLanguage.resolved == .chinese
+                     ? (step == .mood ? "1/2 选拍法" : "2/2 设置故事")
+                     : (step == .mood ? "1/2 Choose a style" : "2/2 Set up your story"))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("composer-step")
+                StepDots(count: 2, index: step.rawValue)
+                    .accessibilityHidden(true)
+            }
 
             Spacer()
 
@@ -175,6 +187,15 @@ struct StoryComposerView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
+            }
+
+            if step == .setup && title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(Strings.storyNameNeeded)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("composer-name-needed")
             }
 
             Button(action: advance) {
@@ -277,6 +298,33 @@ struct StoryComposerView: View {
         showGuided = true
     }
 
+    /// A poster is the submit button. The old setup step remains reachable
+    /// through the poster's settings affordance, but defaults should get a
+    /// first-time user to the camera without another decision screen.
+    private func openSettings(_ template: ChallengeTemplate) {
+        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        isCustomPromptStory = false
+        syncTitleToTemplate()
+        withAnimation(OneDay.Motion.soft) { step = .setup }
+    }
+
+    private func createFromPoster(_ template: ChallengeTemplate) {
+        guard !creating else { return }
+        let mode: Challenge.Mode = template.isTimeOnly ? .oneDay :
+            (sevenDayTemplates.contains(where: { $0.id == template.id }) ? .sevenDay : .oneDay)
+        let moments = template.momentKeys?.map { MomentCatalog.localize($0) } ?? []
+        creating = true
+        let challenge = store.create(
+            title: template.displayName,
+            mode: mode,
+            clipLength: .tiny,
+            orientation: .portrait,
+            templateName: template.identityKey,
+            momentTitles: moments)
+        dismiss()
+        onCreate(challenge.id)
+    }
+
     /// What the guided flow wrote, applied to this story — and, if the user
     /// asked for it, kept as a template first.
     ///
@@ -296,7 +344,8 @@ struct StoryComposerView: View {
                     momentKeys: draft.moments.map {
                         MomentCatalog.key(forDisplay: $0) ?? $0
                     },
-                    isCustom: true),
+                    isCustom: true,
+                    presetCoverAssetName: draft.presetCoverAssetName),
                 coverImageData: draft.coverImageData)
             isCustomPromptStory = false
             selection.select(

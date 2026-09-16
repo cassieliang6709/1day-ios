@@ -1,159 +1,165 @@
-# 1Day 1.2 App Store metadata
+# 1Day 1.2 — App Store copy
 
-Prepared for the 1.2 release. Character counts include spaces and punctuation.
+Prepared 2026-09-07. App Store optimization is ASO; website discoverability is SEO.
 
-## Why this changes
+## Positioning
 
-The live U.S. listing was checked on 2026-08-31:
+选个主题，把日常拍成 Vlog。Lead with filming inspiration, short capture, and automatic editing. Blue adds warmth; shared stories offer optional connection with friends. Seven-day challenges support reflection and growth. Keep local-video claims separate from online prompt suggestions.
 
-- Version 1.1 is live as `1_Day`, which uses only the generic word `Day` in the
-  30-character name field.
-- The first three U.S. screenshots show a Simplified Chinese interface. This is
-  a conversion problem even if search visibility improves.
-- ASO Scout reports that `day` has popularity 5, competition 57, and no top-200
-  position. It also suggests fitness terms based on incidental rankings. Those
-  terms are not relevant to the product and must not be added.
+## en-US
 
-The 1.2 positioning is deliberately specific: **a private video diary that turns
-short daily clips into a film, alone or with friends**.
-
-## English (U.S.)
-
-### Search metadata
-
-- Name (27/30): `1Day: Video Diary & Journal`
-- Subtitle (29/30): `Daily Vlog Maker with Friends`
-- Keywords (100/100):
-  `memory,moments,story,camera,clips,cinematic,challenge,recap,private,collage,record,life,shared,group`
-
-Do not repeat `1Day`, `video`, `diary`, `journal`, `daily`, `vlog`, `maker`, or
-`friends` in the keyword field: Apple already indexes them from the name and
-subtitle. Do not use `workout tracker`, `home fitness`, `gym log`, competitor
-names, or `AI`; they misdescribe the app.
-
-### Promotional text (142/170)
-
-`Film three tiny moments and get one daily movie—made privately on your iPhone. Record solo or invite friends to capture the same day together.`
-
-### Description
+### Name (27 characters)
 
 ```text
-1Day turns three tiny moments into a daily film worth keeping.
-
-Record a few 2, 5, or 10-second clips as your day happens. 1Day puts them in order and makes one finished video diary on your iPhone—no editing timeline and no endless camera-roll cleanup.
-
-START SMALL
-Choose a ready-made story such as Perfect Day, Soft Reset, or Little Adventure. Your prompts tell you what to capture next, so you can stay present instead of planning a vlog.
-
-MAKE A DAILY FILM
-When the last moment is ready, 1Day combines your clips with sound, captions, dates, title cards, and smooth transitions. Preview the film, adjust it, then save it to Photos or share the MP4.
-
-FILM WITH FRIENDS
-Create a shared room, share its six-character invitation code, and capture the same day from different places. Friends can add reactions and comments that become part of the finished story.
-
-WRITE YOUR OWN STORY
-Build a custom sequence of moments, choose portrait or landscape, and make it a one-day story or a seven-day challenge.
-
-PRIVATE BY DEFAULT
-Solo stories stay on your device and work without an account or network connection. Films are rendered on-device. Sign in with Apple is only needed when you choose to create or join a shared room.
-
-Everyday life goes quickly. A few seconds is enough to remember it.
+1Day: Video Diary & Journal
 ```
 
-### What's New
+### Subtitle (26 characters)
 
 ```text
-Your first film now starts with just three two-second moments.
-
-• A redesigned first experience gets you from open to filming faster.
-• New Story is easier to find.
-• Record solo or invite friends to capture the same day together.
+Pick a Theme. Make a Vlog.
 ```
 
-## Simplified Chinese
-
-### 搜索元数据
-
-- 名称（16/30）：`1Day · 视频日记与生活记录`
-- 副标题（13/30）：`三个瞬间，自动生成每日短片`
-- 关键词（77/100）：
-  `Vlog,相机,回忆,影像,打卡,挑战,朋友,合拍,日常,成长,自律,习惯,相册,胶片,时间轴,故事,拍摄,剪辑,电影,私密,本地,共同创作,朋友圈,治愈`
-
-### 推广文本
-
-`拍下三个短短的瞬间，自动留成一支每日影片。可以独自记录，也可以邀请朋友从不同地方一起拍同一天。单人故事只留在你的 iPhone。`
-
-### 描述
+### Keywords (90 characters)
 
 ```text
-1Day 把三个短短的瞬间，留成一支值得重看的每日影片。
-
-在一天自然发生的时候，拍下几段 2 秒、5 秒或 10 秒的片段。1Day 会按顺序整理它们，并直接在 iPhone 上生成一支完整的视频日记——不需要学习剪辑，也不用留下满相册的素材。
-
-从一个小故事开始
-选择「完美的一天」「慢慢重启」「小小冒险」等现成主题。每个瞬间都有提示，你只管生活，不必先写好脚本。
-
-自动生成每日影片
-拍完最后一个瞬间后，1Day 会加入声音、字幕、日期、片头和转场，完成一支短片。你可以预览、调整，再保存到照片或直接分享。
-
-和朋友一起拍
-创建房间并分享六位邀请码，即使身处不同地方，也能记录同一天。朋友可以留下回应和评论，让彼此的片段成为同一个故事。
-
-写自己的故事
-自定义想记录的瞬间，选择横屏或竖屏，完成一日故事，也可以开始七日挑战。
-
-默认保护隐私
-单人故事只保存在你的设备上，不需要账号，也不需要联网；影片在本机生成。只有当你主动创建或加入朋友房间时，才需要「通过 Apple 登录」。
-
-日常过得很快，几秒钟就足够记住今天。
+memory,moments,camera,clips,recap,private,record,life,shared,friends,daily,travel,captions
 ```
 
-### 此版本更新
+### Promotional text (161 characters)
 
 ```text
-第一支影片，现在只需要三个 2 秒瞬间。
-
-• 全新的首次体验，让你打开后更快开始拍摄。
-• 「新建故事」现在更容易找到。
-• 可以独自记录，也可以邀请朋友一起拍下同一天。
+Not sure what to film? Pick a theme, capture a few seconds, and let 1Day put it together. Keep a day with Blue, or invite friends to add their side of the story.
 ```
 
-## Screenshot localization and order
+### Description (1660 characters)
 
-Do not reuse the current Chinese screenshots for the U.S. localization. Capture
-the app with its language set to English and use benefit-led artwork. The first
-three matter most because they can appear in search results.
+```text
+Pick a theme. Turn your day into a vlog.
 
-| Order | English headline | Chinese headline | Required screen |
-| --- | --- | --- | --- |
-| 1 | `3 moments. 1 daily film.` | `三个瞬间，一支每日影片` | First-run promise plus a visible finished-film preview |
-| 2 | `Film your day in 2-second clips` | `用 2 秒片段，拍下这一天` | Populated story timeline |
-| 3 | `Your video diary edits itself` | `不用剪辑，自动成片` | Finished film player, not another planning screen |
-| 4 | `Capture the same day together` | `相隔再远，也能合拍同一天` | A real shared room with multiple people |
-| 5 | `Private by default. Made on iPhone.` | `默认私密，只在本机生成` | Save/share result with a concise privacy callout |
+The first bite of breakfast. A sunset on the way home. A new hobby you finally tried. 1Day helps you find something worth filming and turn short clips into a video diary you can come back to.
 
-Requirements:
+A THEME TO GET YOU STARTED
+Choose Perfect Day, Soft Reset, or Little Adventure. Follow prompts to notice what is around you, write your own, or record by time. No script needed.
 
-- Export separate English and Simplified Chinese sets at 1320×2868.
-- Keep the app UI truthful; marketing headlines may sit outside the device UI.
-- Use large, short headlines and keep important text away from rounded corners.
-- Show the blue mascot and the finished-film payoff in the first screenshot.
-- Add a 15–20 second App Preview later: moments → recording → automatic film.
+FILM A FEW SECONDS. LET IT COME TOGETHER.
+Start your first story with three 2-second clips. For later stories, choose 2, 5, or 10-second moments. 1Day assembles your film on your iPhone. Adjust captions, title cards, and transitions, then save it to Photos or share the MP4.
 
-## Category and experiment plan
+A LITTLE COMPANY, OR A SHARED STORY
+Blue, your little mascot companion, brings some warmth to recording on your own. Want to see a friend's day? Invite them to a shared room with a six-character code. Bring different perspectives into one story and leave reactions and comments. Shared rooms require iCloud and Sign in with Apple.
 
-- Primary category: `Lifestyle`
-- Secondary category: `Photo & Video`
-- Do not change all fields repeatedly. Ship this set, record the date, then give
-  search indexing 2–4 weeks before evaluating keyword movement.
-- Track App Store Connect impressions → product page views → downloads by
-  territory. Search rank without conversion is not the goal.
-- Once traffic is sufficient, run Product Page Optimization on the first three
-  screenshots. Keep metadata fixed during that test so the result is readable.
+ONE DAY, OR A WEEK OF SMALL CHANGES
+Keep a day out, a focused afternoon, or a seven-day challenge. Come back later to see the little changes you might have missed.
 
-## Release identifiers
+CHOOSE WHAT YOU SHARE
+Solo recording needs no account. Solo clips stay on your iPhone, and films are rendered on-device. Shared rooms upload content you choose to share to Apple CloudKit. Optional smart prompt suggestions send your typed idea to an online service; your video clips are not sent for this feature.
 
-- App ID: `6794565199`
-- Bundle ID: `com.cassie.AISetlog`
-- Version: `1.2`
-- Build: `6`
+Available in English and Simplified Chinese.
+
+Start with one small thing today.
+
+Privacy: https://1day.liangyue.site/en/privacy
+Support: liangyue3666@gmail.com
+```
+
+### What's New (264 characters)
+
+```text
+An easier start to your daily vlog.
+
+• Start your first story with three 2-second moments.
+• Follow filming prompts, write your own, or record by time.
+• Find New Story directly from the home screen.
+• Keep a solo video diary or invite friends into a shared story.
+```
+
+## zh-Hans
+
+### Name (16 characters)
+
+```text
+1Day · 视频日记与生活记录
+```
+
+### Subtitle (15 characters)
+
+```text
+选个主题，把日常拍成 Vlog
+```
+
+### Keywords (53 characters)
+
+```text
+拍摄,剪辑,回忆,相机,影像,朋友,合拍,成长,相册,时间轴,故事,私密,本地,共同创作,旅行,片段,字幕
+```
+
+### Promotional text (66 characters)
+
+```text
+不知道拍什么？选个主题，跟着提示记录几秒，1Day 帮你自动成片。一个人有小蓝作伴，也能邀请朋友一起拍，把各自的日常放进同一个故事。
+```
+
+### Description (656 characters)
+
+```text
+选个主题，把日常拍成 Vlog。
+
+早餐的第一口、下班路上的晚霞、终于开始的新爱好——这些都值得被记住。1Day 帮你找到拍摄灵感，用几段短视频，把今天留成可以回看的故事。
+
+有主题，就有开始的灵感
+选「完美的一天」「慢慢重启」或「小小冒险」，跟着提示发现身边值得拍的事。也可以自己写题目，或按时间自由记录，不必提前想好脚本。
+
+拍几秒，自动连成 Vlog
+第一次记录，从三个 2 秒片段开始。之后可选择 2 秒、5 秒或 10 秒，随手拍下想留下的瞬间。1Day 在 iPhone 上合成影片，你可以调整字幕、片头和转场，再保存到照片或分享 MP4。
+
+一个人有小蓝，也能和朋友一起拍
+可爱的小蓝陪你开始今天的记录。想看看朋友的一天？创建共享房间，用六位邀请码邀请他们，把不同视角放进同一个故事，留下回应和评论。共享房间需要 iCloud 和「通过 Apple 登录」。
+
+留住一天，也看看自己的变化
+记录一次出门、一段专注时光，或开启七日挑战。过些日子再回看，看看那些当时没留意的小变化。
+
+你的记录，由你决定怎么分享
+独自记录无需账号，单人片段保存在本机，影片在设备上合成。共享房间将你选择分享的内容上传到 Apple CloudKit。可选的智能题目建议会把你输入的想法发送给在线服务，该功能不会发送你的视频片段。
+
+支持简体中文和英文。
+
+从今天的一件小事开始。
+
+隐私政策：https://1day.liangyue.site/privacy
+支持与反馈：liangyue3666@gmail.com
+```
+
+### What's New (100 characters)
+
+```text
+更轻松地开始今天的 Vlog。
+
+• 第一支故事从三个 2 秒瞬间开始。
+• 跟着题目拍、自己写题目，或按时间记录当下。
+• 在首页直接找到「新建故事」。
+• 独自留存视频日记，也能邀请朋友共同记录。
+```
+
+## Screenshots and handoff
+
+The upload files and individual copy fields are in [store-kit](store-kit/README.md). Use the English set for English (U.S.) and the Simplified Chinese set for Simplified Chinese. Do not put Chinese UI screenshots into the English localization.
+
+Current project: version 1.2, build 10, bundle ID `com.cassie.AISetlog`, App ID `6794565199`. This package does not upload a binary or submit App Review. Check the selected build in App Store Connect before publishing.
+
+## ASO rationale
+
+- English name covers video diary and journal; subtitle introduces themes and vlogs. The keyword field adds relevant concepts without repeating those exact words.
+- Chinese name and subtitle explain the job plainly; keywords add capture, editing, memory, travel, sharing, and captions.
+- No competitor names, invented popularity scores, fitness keywords, AI-editor claims, or unsupported ratings.
+- Suggested categories: Lifestyle, then Photo & Video. These are positioning recommendations, not a claim about current store settings.
+- Observe impressions, page views and downloads by territory. Compare first-film completion through an opt-in beta; the app has no verified analytics funnel. Avoid changing every metadata field weekly.
+
+## Website SEO
+
+Chinese `/` and English `/en` each have localized static content and metadata. Canonical URLs, reciprocal hreflang, sitemap, robots, share cards and truthful software structured data support indexing. No ranking, rating or pricing claims are fabricated.
+
+## Sources checked 2026-09-07
+
+- [Apple product page guidance](https://developer.apple.com/app-store/product-page/): name/subtitle 30 characters each, keyword field 100, promotional text 170.
+- [Apple screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications): 1320 × 2868 accepted for the 6.9-inch screenshot set.
+- [Google localized pages](https://developers.google.com/search/docs/specialty/international/localized-versions): reciprocal, absolute hreflang URLs.

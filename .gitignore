@@ -45,3 +45,7 @@ build-teammate/
 
 # Wrangler local state
 .wrangler/
+
+# Packaged App Store deliverable. The unpacked `ios/release/*/store-kit/` is the
+# source of truth; the zip is the same 55MB of screenshots a second time.
+ios/release/*/*App-Store-Kit-*.zip

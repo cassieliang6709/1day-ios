@@ -126,7 +126,7 @@ struct OneDayBrandLogo: View {
             .resizable()
             .scaledToFit()
             .frame(width: width, height: width * 0.49)
-            .accessibilityLabel("1day")
+            .accessibilityLabel("1Day")
     }
 }
 
@@ -169,17 +169,13 @@ struct OneDayBuddy: View {
                 .fill(OneDay.brand)
                 .frame(width: size, height: size * (breathe ? 0.94 : 1))
 
-            HStack(spacing: size * 0.18) {
+            HStack(spacing: size * 0.2) {
                 eye
                 eye
             }
-            .offset(y: -size * 0.04)
+            .offset(y: -size * 0.06)
 
-            // A little smile.
-            Capsule()
-                .fill(.white.opacity(0.85))
-                .frame(width: size * 0.22, height: size * 0.06)
-                .offset(y: size * 0.2)
+            smile
         }
         .frame(width: size, height: size)
         .onAppear {
@@ -190,10 +186,31 @@ struct OneDayBuddy: View {
         }
     }
 
+    /// The bottom quarter of a circle, stroked — a curve that reads as a smile.
+    ///
+    /// It was a `Capsule` of the same width and a sixteenth of the height,
+    /// under a comment calling it a little smile. A capsule that wide and that
+    /// flat is a straight line, so the face it drew was expressionless: the
+    /// brand mark on the first screen of the app looked mildly annoyed.
+    ///
+    /// `trim` starts at 3 o'clock and runs clockwise, so 0.125–0.375 is the arc
+    /// from the lower right to the lower left — the mouth, and nothing above it.
+    private var smile: some View {
+        Circle()
+            .trim(from: 0.125, to: 0.375)
+            .stroke(
+                .white.opacity(0.95),
+                style: StrokeStyle(lineWidth: size * 0.055, lineCap: .round))
+            .frame(width: size * 0.34, height: size * 0.34)
+            // Positioned by the arc's own middle rather than its box, which is
+            // the full circle and mostly empty.
+            .offset(y: size * 0.07)
+    }
+
     private var eye: some View {
         Circle()
             .fill(.white)
-            .frame(width: size * 0.13, height: size * 0.13)
+            .frame(width: size * 0.135, height: size * 0.135)
     }
 }
 

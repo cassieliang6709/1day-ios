@@ -13,6 +13,19 @@ import Foundation
 /// here, because the thing they were doing still works.
 protocol PromptSuggesting: Sendable {
     func suggest(intent: String, count: Int, language: AppLanguage) async throws -> [String]
+    func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion
+}
+
+struct StorySuggestion: Equatable, Sendable {
+    var title: String?
+    var prompts: [String]
+}
+
+extension PromptSuggesting {
+    /// Existing injected services remain source-compatible and need no title.
+    func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
+        StorySuggestion(title: nil, prompts: try await suggest(intent: intent, count: count, language: language))
+    }
 }
 
 enum PromptSuggestionError: Error, Equatable {
@@ -42,6 +55,10 @@ struct RemotePromptSuggestionService: PromptSuggesting {
     var deviceID: String = DeviceIdentity.installID
 
     func suggest(intent: String, count: Int, language: AppLanguage) async throws -> [String] {
+        try await suggestStory(intent: intent, count: count, language: language).prompts
+    }
+
+    func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = Self.timeout
@@ -65,7 +82,7 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         if status == 429 { throw PromptSuggestionError.rateLimited }
         guard status == 200 else { throw PromptSuggestionError.unavailable }
 
-        return try Self.prompts(from: data, wanted: count)
+        return try Self.story(from: data, wanted: count)
     }
 
     /// Split out from the request so the parsing rules can be tested without a
@@ -84,6 +101,14 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         // that isn't a shorter answer, it's a broken one.
         guard prompts.count >= 2 else { throw PromptSuggestionError.malformed }
         return Array(prompts)
+    }
+
+    static func story(from data: Data, wanted: Int) throws -> StorySuggestion {
+        let prompts = try prompts(from: data, wanted: wanted)
+        // An invalid optional title must not discard otherwise usable prompts.
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let title = (object?["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return StorySuggestion(title: title.flatMap { $0.isEmpty ? nil : String($0.prefix(80)) }, prompts: prompts)
     }
 
     private struct Request: Encodable {
