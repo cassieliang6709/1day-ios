@@ -372,6 +372,8 @@ enum Strings {
     static var tagline: String {
         lang == .chinese ? "7 个瞬间，一支小短片。" : "7 moments. One tiny vlog."
     }
+    /// On the header pill next to 新建, so the icon isn't the only clue.
+    static var joinShort: String { lang == .chinese ? "加入" : "Join" }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
     static var firstRunHeadline: String {
         lang == .chinese ? "把今天，留成一支片" : "Turn today into one film"
@@ -1134,6 +1136,17 @@ enum Strings {
     }
 
     // MARK: - A story's cover
+
+    /// On the home card when the button opens a day that isn't today, because
+    /// today's is already filmed and an earlier one is missing.
+    static func catchUpDayLabel(day: Int, moment: String) -> String {
+        lang == .chinese ? "补第 \(day) 天 · \(moment)" : "Catch up day \(day) · \(moment)"
+    }
+
+    /// Next to the "needs photo access" line, so the dead end has a door.
+    static var openSystemSettings: String {
+        lang == .chinese ? "打开系统设置" : "Open Settings"
+    }
 
     static var storyCoverTitle: String { lang == .chinese ? "换封面" : "Change cover" }
     /// First of the three sources, because a frame out of the day is the most

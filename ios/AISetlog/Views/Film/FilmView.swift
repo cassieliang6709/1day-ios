@@ -21,6 +21,9 @@ struct FilmView: View {
     @State private var errorMessage: String?
     @State private var isSaving = false
     @State private var saveMessage: String?
+    /// Whether the last save was refused for want of photo-library access —
+    /// the only saveMessage iOS Settings can do something about.
+    @State private var photosDenied = false
     /// How far the staged progress animation has got. Cosmetic — the stitcher
     /// gives no progress callbacks, so this paces the copy honestly by naming
     /// what is actually happening rather than claiming a percentage.
@@ -49,6 +52,7 @@ struct FilmView: View {
                     filmURL: exportURL,
                     isSaving: isSaving,
                     saveMessage: saveMessage,
+                    onOpenSettings: photosDenied ? openSystemSettings : nil,
                     onSave: { Task { await saveToPhotos(exportURL) } },
                     onAdjust: { showAdjust = true })
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -214,6 +218,11 @@ struct FilmView: View {
 
     // MARK: - Saving
 
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
     private func saveToPhotos(_ url: URL) async {
         // Local previews do not write into the user's photo library.
         guard previewMedia == nil else { return }
@@ -224,8 +233,10 @@ struct FilmView: View {
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else {
             saveMessage = Strings.photosDenied
+            photosDenied = true
             return
         }
+        photosDenied = false
         do {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)

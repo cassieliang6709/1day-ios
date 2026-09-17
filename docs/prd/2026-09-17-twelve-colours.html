@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · 十二个颜色 —— 2026-09-17</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface-1:#fcfcfb;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --gridline:#e1e0d9; --border:rgba(11,11,11,0.10);
+    --good:#0ca30c; --stop:#c0392b; --now:#eb6834;
+    --canvas:#f5f8ff; --ink:#0f2e6b; --inksoft:#4a6aa8; --inkfaint:#8ea4cd;
+    --hair:rgba(15,46,107,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark; --plane:#0d0d0d; --surface-1:#1a1a19;
+      --text-primary:#fff; --text-secondary:#c3c2b7; --gridline:#2c2c2a;
+      --border:rgba(255,255,255,0.10);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:38px 24px 80px;background:var(--plane);color:var(--text-primary);
+       font:15px/1.7 system-ui,-apple-system,sans-serif}
+  main{max-width:1060px;margin:0 auto}
+  h1{font-size:26px;font-weight:800;margin:0 0 8px}
+  .lead{font-size:16px;color:var(--text-secondary);margin:0;max-width:60ch}
+  .lead b{color:var(--text-primary)}
+  .meta{font-size:12.5px;color:var(--text-muted);margin-top:9px}
+  h2{font-size:12.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+     color:var(--text-muted);margin:42px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--gridline)}
+  p{max-width:62ch}
+  code{font:12.5px/1.4 ui-monospace,Menlo,monospace;background:rgba(11,11,11,0.05);
+       padding:1.5px 5px;border-radius:4px}
+  @media (prefers-color-scheme: dark){code{background:rgba(255,255,255,0.08)}}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--gridline);vertical-align:middle}
+  th{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+  .bad{color:var(--stop);font-weight:700}
+  .ok{color:var(--good);font-weight:700}
+
+  /* 颜色卡 */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px}
+  .swatch{border-radius:18px;padding:14px;background:var(--canvas);border:1px solid var(--hair)}
+  .top{display:flex;align-items:center;gap:10px}
+  .dot{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;
+       color:#fff;font-weight:800;font-size:17px;border:2.5px solid #fff;
+       box-shadow:0 2px 8px rgba(15,46,107,.18)}
+  .who{font-size:14.5px;font-weight:800;color:var(--ink)}
+  .hex{font:11.5px/1.3 ui-monospace,Menlo,monospace;color:var(--inksoft)}
+  .cta{margin-top:11px;border-radius:99px;padding:10px 0;text-align:center;
+       font-size:13px;font-weight:800;color:#fff}
+  .pillrow{display:flex;gap:6px;margin-top:8px;align-items:center}
+  .pill{border-radius:99px;padding:6px 12px;font-size:11px;font-weight:800;color:#fff}
+  .ghost{border-radius:99px;padding:6px 12px;font-size:11px;font-weight:800;
+         background:#fff;color:var(--ink);border:1px solid var(--hair)}
+  .mascot{width:26px;height:26px;border-radius:50%;background:linear-gradient(150deg,#1677ff,#38b6ff);
+          border:2px solid #fff;box-shadow:0 1px 5px rgba(15,46,107,.2);flex:none}
+  .cr{font-size:11px;font-weight:700;color:var(--inksoft);margin-left:auto}
+  .cap{font-size:12.5px;color:var(--text-muted);margin-top:8px}
+  .note{font-size:13px;color:var(--text-muted);max-width:64ch;margin-top:12px}
+  .pick{border-left:3px solid var(--now);padding-left:13px;margin-top:16px}
+  .pick .q{font-weight:800;margin-bottom:3px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>十二个颜色</h1>
+<p class="lead">每个颜色要同时当三样东西用：<b>头像的底</b>（上面写白色首字母）、<b>按钮的填充</b>（上面写白字）、<b>整个 app 的主色</b>。所以选色不是挑好看，是挑<b>白字在上面读得清</b>的那些 —— 对比度至少 4.5:1。下面每个数字都是算出来的，不是看出来的。</p>
+<p class="meta">2026-09-17 · 现有 7 个里有 2 个不合格，见下一节</p>
+
+<h2>先说现有的七个</h2>
+<p>代码注释写的是「这七个每一个都过 4:1」。<b>算下来有两个没过</b>：</p>
+<table>
+  <thead><tr><th>颜色</th><th>色值</th><th>白字对比度</th><th>判定</th></tr></thead>
+  <tbody>
+    <tr><td><span class="dot" style="background:#0F2E6B;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 墨蓝</td><td><code>#0F2E6B</code></td><td>12.94:1</td><td class="ok">留</td></tr>
+    <tr><td><span class="dot" style="background:#1677FF;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 品牌蓝</td><td><code>#1677FF</code></td><td>4.10:1</td><td class="ok">留</td></tr>
+    <tr><td><span class="dot" style="background:#38B6FF;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 青</td><td><code>#38B6FF</code></td><td>2.26:1</td><td class="bad">换掉 —— 白字基本读不出来</td></tr>
+    <tr><td><span class="dot" style="background:#E14C3C;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 珊瑚</td><td><code>#E14C3C</code></td><td>3.96:1</td><td class="bad">压深一点，差一点点</td></tr>
+    <tr><td><span class="dot" style="background:#B5610A;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 琥珀</td><td><code>#B5610A</code></td><td>4.49:1</td><td class="ok">留</td></tr>
+    <tr><td><span class="dot" style="background:#0E8A5F;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 森绿</td><td><code>#0E8A5F</code></td><td>4.36:1</td><td class="ok">留</td></tr>
+    <tr><td><span class="dot" style="background:#6E4FE0;width:22px;height:22px;font-size:0;border-width:1.5px"></span> 葡萄</td><td><code>#6E4FE0</code></td><td>5.44:1</td><td class="ok">留</td></tr>
+  </tbody>
+</table>
+<p class="note">这不是小事：青色那个就是你现在如果挑了它，头像上的首字母和按钮上的字都会糊成一片。</p>
+
+<h2>提案：这十二个</h2>
+<p>五个保留、七个新画。每张卡里画的就是它当头像、当主按钮、当胶囊时的样子，底色是 app 真实的画布 <code>#F5F8FF</code>，旁边那个蓝球是吉祥物 —— 用来看这个颜色和它放一起会不会打架。</p>
+
+<div class="grid">
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#0F2E6B">周</div>
+      <div><div class="who">墨蓝</div><div class="hex">#0F2E6B</div></div>
+      <div class="cr">12.9:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#0F2E6B,#2A4F9E)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#0F2E6B">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">最稳的一个。和吉祥物同色系，不会打架。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#1677FF">周</div>
+      <div><div class="who">品牌蓝</div><div class="hex">#1677FF</div></div>
+      <div class="cr">4.1:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#1677FF,#38B6FF)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#1677FF">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">现在的默认。不选任何颜色时就是它。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#1678B1">周</div>
+      <div><div class="who">天蓝</div><div class="hex">#1678B1</div></div>
+      <div class="cr">4.8:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#1678B1,#2E9AD4)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#1678B1">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">换掉那个读不清的青。同一个方向，压深到能写白字。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#107C84">周</div>
+      <div><div class="who">孔雀</div><div class="hex">#107C84</div></div>
+      <div class="cr">5.0:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#107C84,#1A9FA8)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#107C84">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">蓝和绿之间。冷但不是蓝，和吉祥物拉开了距离又不冲突。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#0E8A5F">周</div>
+      <div><div class="who">森绿</div><div class="hex">#0E8A5F</div></div>
+      <div class="cr">4.4:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#0E8A5F,#17AB78)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#0E8A5F">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">保留。你现在的头像就是这个色。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#4B7F10">周</div>
+      <div><div class="who">苔绿</div><div class="hex">#4B7F10</div></div>
+      <div class="cr">4.8:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#4B7F10,#639F1C)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#4B7F10">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">偏黄的绿。十二个里最「不像 app 的颜色」，也因此最有个人感。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#8A710F">周</div>
+      <div><div class="who">芥末</div><div class="hex">#8A710F</div></div>
+      <div class="cr">4.7:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#8A710F,#AC8F1B)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#8A710F">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">暖的中间色。想要暖 UI 但不想要橙色的话就是它。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#B5610A">周</div>
+      <div><div class="who">琥珀</div><div class="hex">#B5610A</div></div>
+      <div class="cr">4.5:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#B5610A,#D67C18)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#B5610A">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">保留。最接近你说的「暖色 UI」的那一个。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#C34B18">周</div>
+      <div><div class="who">橙红</div><div class="hex">#C34B18</div></div>
+      <div class="cr">4.8:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#C34B18,#E06626)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#C34B18">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">把那个差一点点的珊瑚压深。现在白字站得住。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#DA1B4E">周</div>
+      <div><div class="who">玫红</div><div class="hex">#DA1B4E</div></div>
+      <div class="cr">4.9:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#DA1B4E,#F03E6C)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#DA1B4E">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">十二个里最响的一个。和蓝吉祥物是对撞色，喜欢的人会很喜欢。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#CC19A8">周</div>
+      <div><div class="who">梅紫</div><div class="hex">#CC19A8</div></div>
+      <div class="cr">4.9:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#CC19A8,#E23BC0)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#CC19A8">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">紫和粉之间。这个是我最不确定的一个 —— 可能太荧光。</div>
+  </div>
+
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#6E4FE0">周</div>
+      <div><div class="who">葡萄</div><div class="hex">#6E4FE0</div></div>
+      <div class="cr">5.4:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#6E4FE0,#8B72EE)">开始今天的故事</div>
+    <div class="pillrow"><div class="pill" style="background:#6E4FE0">计划</div><div class="ghost">拍摄</div><div class="mascot"></div></div>
+    <div class="cap">保留。和吉祥物的蓝挨得近，换上去最不突兀。</div>
+  </div>
+
+</div>
+
+<h2>四个备选，可以换掉上面任何一个</h2>
+<div class="grid">
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#5A6C8C">周</div>
+      <div><div class="who">石墨</div><div class="hex">#5A6C8C</div></div>
+      <div class="cr">5.3:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#5A6C8C,#7385A6)">开始今天的故事</div>
+    <div class="cap">近中性。想要「没有颜色」的那种克制感。</div>
+  </div>
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#4558D3">周</div>
+      <div><div class="who">靛蓝</div><div class="hex">#4558D3</div></div>
+      <div class="cr">5.9:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#4558D3,#6272E4)">开始今天的故事</div>
+    <div class="cap">比品牌蓝更深更沉的蓝。</div>
+  </div>
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#157F6A">周</div>
+      <div><div class="who">湖绿</div><div class="hex">#157F6A</div></div>
+      <div class="cr">4.9:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#157F6A,#1EA085)">开始今天的故事</div>
+    <div class="cap">森绿和孔雀之间。如果觉得那两个太像，用它替一个。</div>
+  </div>
+  <div class="swatch">
+    <div class="top">
+      <div class="dot" style="background:#C24B38">周</div>
+      <div><div class="who">砖褐</div><div class="hex">#C24B38</div></div>
+      <div class="cr">4.8:1</div>
+    </div>
+    <div class="cta" style="background:linear-gradient(100deg,#C24B38,#D9654F)">开始今天的故事</div>
+    <div class="cap">比橙红更收一点的红。想要老照片那种暖。</div>
+  </div>
+</div>
+
+<h2>选的时候看这三件事</h2>
+<ol>
+  <li><b>和吉祥物放一起</b> —— 每张卡右下角那个蓝球就是它。暖色（琥珀、橙红、玫红）和它对比最强，冷色（墨蓝、葡萄、孔雀）最融。</li>
+  <li><b>方差够不够</b> —— 现在这十二个覆盖了蓝、青、绿、黄绿、黄、橙、红、玫、紫，中间没有两个挨太近的。唯一可争的是森绿和孔雀，想拉开就用备选里的湖绿替一个。</li>
+  <li><b>白字读得清</b> —— 每张卡右上角那个数字。4.5 以上都安全，最低的品牌蓝 4.1 是现在就在用的。</li>
+</ol>
+
+<div class="pick">
+  <p class="q">我要你回一句</p>
+  <p style="margin:0">「就这十二个」，或者告诉我拿备选里的哪个换掉哪个。梅紫我自己最没把握，你要是也觉得太荧光，换成砖褐或石墨。</p>
+</div>
+
+</main>
+</body>
+</html>

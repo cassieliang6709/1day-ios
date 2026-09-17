@@ -84,6 +84,16 @@ final class RoomSyncService {
         }
     }
 
+    /// Caption edited after the take. Failure is swallowed the same way a
+    /// reaction's is: the words are already saved on this device, and the next
+    /// upload of that clip carries them.
+    @MainActor
+    func updateClipCaption(
+        code: String, day: Int, authorID: String, overlayText: String?
+    ) async {
+        try? await transport.updateClipCaption(code, day, authorID, overlayText)
+    }
+
     func setReaction(code: String, day: Int, authorID: String, authorName: String,
                      targetAuthorID: String, emoji: String, on: Bool) async {
         try? await transport.setReaction(

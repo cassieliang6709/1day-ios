@@ -57,7 +57,13 @@ struct ClipDeckReview: View {
                     .tag(position)
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
+        // Page dots, not `.never`. A black full-bleed pager with no dots, no
+        // peeking edge and no arrows is indistinguishable from a single clip:
+        // the only people who found out a story's other takes were behind a
+        // swipe were the ones who swiped by accident. `.always` keeps them on
+        // a one-clip story too, which is honest — one dot says "one".
+        .tabViewStyle(.page(indexDisplayMode: .always))
+        .indexViewStyle(.page(backgroundDisplayMode: .interactive))
         .ignoresSafeArea()
         .background(Color.black.ignoresSafeArea())
         // Again out here: a page's own preference doesn't reach the window

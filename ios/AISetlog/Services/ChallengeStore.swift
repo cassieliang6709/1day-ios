@@ -502,8 +502,13 @@ final class ChallengeStore {
         return fileStore.clipURL(fileName: name, challengeID: challengeID)
     }
 
-    /// Edit a clip's center caption after the fact (from the preview). Local
-    /// only for now — room sync of caption edits rides the next clip upload.
+    /// Edit a clip's center caption after the fact (from the preview).
+    ///
+    /// Pushed to the room as well, not just saved locally. It used to say
+    /// "room sync of caption edits rides the next clip upload", which in
+    /// practice meant never: most captions are written *after* the take, so a
+    /// friend saw the words you typed at record time and nothing you changed
+    /// afterwards — including a caption you deleted.
     func updateOverlayText(_ text: String?, day: Int, challengeID: UUID) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
@@ -511,6 +516,7 @@ final class ChallengeStore {
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let words = trimmed?.isEmpty == true ? nil : trimmed
         challenges[ci].cards[idx].overlayText = words
+        pushCaptionToRoom(words, day: day, challengeIndex: ci)
         // Clearing the words clears where they were. Otherwise a caption
         // deleted and typed again would reappear wherever the last one was
         // dragged to, which reads as the app remembering something you threw
@@ -527,6 +533,21 @@ final class ChallengeStore {
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
         else { return }
         challenges[ci].cards[idx].captionSticker = sticker
+    }
+
+    /// Sends an edited caption to the room, when there is one to send to.
+    ///
+    /// Words only. Where the caption sits is `CaptionSticker`, which rides the
+    /// clip record's own field and is rewritten by the next upload — moving
+    /// that to its own round trip is a bigger change than this, and a friend
+    /// reading the wrong *position* is a much smaller wrong than a friend
+    /// reading words you deleted.
+    private func pushCaptionToRoom(_ words: String?, day: Int, challengeIndex ci: Int) {
+        guard let code = challenges[ci].roomCode, let me = account?.account else { return }
+        Task { @MainActor in
+            await roomSync.updateClipCaption(
+                code: code, day: day, authorID: me.id, overlayText: words)
+        }
     }
 
     // MARK: - Reactions & comments (local-first)

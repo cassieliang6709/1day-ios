@@ -112,6 +112,17 @@ struct PlansHomeView: View {
         )) {
             SignInView { afterSignIn?() }
                 .presentationDetents([.medium])
+                // Cancelling sign-in used to drop the six digits with the
+                // pending action: the sheet closed, `afterSignIn` was cleared,
+                // and reopening 加入 started from an empty field. The code the
+                // friend sent is the one thing here the app can't reproduce,
+                // so cancelling puts the sheet back with it still typed.
+                .onDisappear {
+                    guard afterSignIn == nil, !joinCode.isEmpty,
+                          !account.isSignedIn
+                    else { return }
+                    showJoin = true
+                }
         }
         .alert(Strings.couldntJoin, isPresented: Binding(
             get: { errorText != nil }, set: { if !$0 { errorText = nil } }
@@ -215,11 +226,29 @@ struct PlansHomeView: View {
 
             Spacer(minLength: 6)
 
-            IconBubble(systemName: "person.2.badge.plus", size: 36) {
+            // A 36pt wordless icon was the only permanent way into a room
+            // after onboarding, wedged between the settings avatar and 新建.
+            // Now it says what it is.
+            Button {
                 joinCode = ""
                 showJoin = true
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "person.2.badge.plus")
+                        .font(.system(size: 13, weight: .bold))
+                    Text(Strings.joinShort)
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(OneDay.ink)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(OneDay.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+                .oneDaySoftShadow(strength: 0.5)
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(Strings.enterInviteCode)
+            .accessibilityIdentifier("home-join-room")
 
             Button {
                 showComposer = true
@@ -333,6 +362,17 @@ struct PlansHomeView: View {
             Button(Strings.startTodaysStory) { showComposer = true }
                 .buttonStyle(.primaryAction)
                 .padding(.top, 4)
+
+            // The empty state used to offer one door. Somebody whose first
+            // contact with 1Day is a friend's six-digit code had to find the
+            // icon in the header instead.
+            Button(Strings.haveInviteCode) {
+                joinCode = ""
+                showJoin = true
+            }
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.oneDayBrand)
+            .accessibilityIdentifier("empty-join-room")
         }
         .padding(26)
         .glassSurface(radius: OneDay.Radius.hero)
@@ -433,10 +473,12 @@ struct PlansHomeView: View {
            card.clipFileName == nil {
             return card.day
         }
-        // The first moment *nobody* has filmed. Defaulting to one a friend
-        // already covered, while an untouched one waits further down, is how a
-        // room ends up with three takes of breakfast and no evening.
-        return cardState(for: challenge).progress.nextOpenMoment
+        // Today's, when today is still empty — see `RoomProgress.slotToOffer`.
+        // Otherwise the first moment *nobody* has filmed: defaulting to one a
+        // friend already covered, while an untouched one waits further down, is
+        // how a room ends up with three takes of breakfast and no evening.
+        return cardState(for: challenge).progress.slotToOffer(
+            today: challenge.isOneDay ? nil : challenge.currentDay)
     }
 
     // MARK: - Routing

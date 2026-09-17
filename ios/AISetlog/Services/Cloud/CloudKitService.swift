@@ -208,6 +208,26 @@ enum CloudKitService {
     }
 
     /// Upload (or overwrite) my clip for a given day.
+    /// Rewrites just the caption on a clip that is already in the room.
+    ///
+    /// Fetch-and-set rather than a fresh record: the video is a `CKAsset` and
+    /// re-uploading it to change three words would cost the friend a download
+    /// of the same take. A clip that isn't up yet is not an error — the next
+    /// upload carries whatever the caption says by then.
+    static func updateClipCaption(
+        code: String, day: Int, authorID: String, overlayText: String?
+    ) async throws {
+        try await ensureAccountAvailable()
+        let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
+        guard let record = try? await db.record(for: id) else { return }
+        if let overlayText, !overlayText.isEmpty {
+            record["overlayText"] = overlayText as CKRecordValue
+        } else {
+            record["overlayText"] = nil
+        }
+        _ = try await db.save(record)
+    }
+
     static func uploadClip(
         code: String,
         day: Int,
