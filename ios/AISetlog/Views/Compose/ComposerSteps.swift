@@ -136,6 +136,10 @@ struct MoodStep: View {
                         onSelect: { onChoose(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
+                        // The poster is the only way to the settings page now
+                        // that the gear is gone, so a test needs to be able to
+                        // find one without knowing which rack it is on.
+                        .accessibilityIdentifier("poster-tile")
                 }
             }
             .padding(.horizontal, 20)
@@ -509,6 +513,10 @@ struct SetupStep: View {
                     accent: .oneDayBrand,
                     isOn: !withFriends
                 ) { withFriends = false }
+                    // The drawn label is a stack of three things, so its
+                    // accessibility label is all three concatenated and an
+                    // exact-string lookup cannot find it.
+                    .accessibilityIdentifier("company-solo")
 
                 CompanyOption(
                     icon: "person.2.fill",
@@ -517,6 +525,7 @@ struct SetupStep: View {
                     accent: .oneDayLavender,
                     isOn: withFriends
                 ) { withFriends = true }
+                    .accessibilityIdentifier("company-with-friends")
             }
 
             // No faces here. A room that hasn't been created yet has nobody in

@@ -15,9 +15,11 @@ final class SevenDayVisibilityUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
-        let create = app.buttons["新建故事"]
-        XCTAssertTrue(create.waitForExistence(timeout: 15))
-        create.tap()
+        // The composer is the left tab as of 1.3; the plus in the home header
+        // is gone.
+        let plan = app.buttons["计划"]
+        XCTAssertTrue(plan.waitForExistence(timeout: 15), "计划 tab missing")
+        plan.tap()
         let seven = app.buttons["七日"]
         XCTAssertTrue(seven.waitForExistence(timeout: 15))
         seven.tap()
@@ -32,10 +34,15 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch.waitForExistence(timeout: 15))
         seven.tap()
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
-        // The poster is the submit button: one tap makes the story and leaves
-        // for it, named after the template the way the old step 2 pre-filled.
+        // A poster opens the settings page as of 1.3 — it used to create the
+        // story outright. The name is pre-filled from the template there, in a
+        // field, which is also the first chance anybody gets to change it.
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "7 天早起的人")).firstMatch.waitForExistence(timeout: 15))
+        let name = app.textFields.firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 15))
+        XCTAssertEqual(name.value as? String, "7 天早起的人")
+        // And the page asks who you are filming with before anything exists.
+        XCTAssertTrue(app.buttons["company-solo"].exists)
     }
 
     func testDemoIsReachableFromHomeWithoutSharedRoom() {
