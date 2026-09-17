@@ -36,7 +36,6 @@ struct StoryTimelineView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     /// Timeline or contact sheet. Persisted, so the choice sticks.
-    @AppStorage(StoryViewMode.storageKey) private var viewMode: StoryViewMode = .timeline
 
     private var challenge: Challenge? { store.challenge(challengeID) }
 
@@ -179,8 +178,6 @@ struct StoryTimelineView: View {
                 TimelineHeader(
                     challenge: challenge,
                     cast: cast,
-                    viewMode: $viewMode,
-                    showsViewModeToggle: false,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
 
                 StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
@@ -190,35 +187,27 @@ struct StoryTimelineView: View {
                     FilmReadyCard(clipCount: clips.count) { showFilm = true }
                 }
 
-                // Above the archive: what you can still do outranks what's
-                // already done, and this list is the page's way into the
-                // camera now that no single moment owns one.
-                if !agenda.openToMe.isEmpty {
-                    section(Strings.stillOpenHeader) {
-                        openList(challenge, agenda: agenda)
-                    }
-                }
-
-                if !agenda.filmed.isEmpty {
-                    section(Strings.filmedHeader) {
-                        StoryGridView(
-                            challenge: challenge,
-                            clips: clips,
-                            members: members,
-                            myID: myID,
-                            slots: agenda.filmed,
-                            // A moment in a story only you filmed is one clip,
-                            // so it opens as a page in the day and you swipe
-                            // on. In a shared room it is still the whole moment
-                            // with everyone stacked in it, which isn't a page —
-                            // that's what `.moment` is for.
-                            onTap: { day in
-                                sheet = challenge.isShared
-                                    ? .moment(day: day)
-                                    : .preview(day: day, authorID: nil)
-                            })
-                    }
-                }
+                // One list, in the order the day happens. It was two — 还没拍的
+                // as a card of rows, then 拍过的 as a contact sheet — which cut
+                // the day in half and re-sorted each half by state, so a moment
+                // that is second in the plan and filmed sat below one that is
+                // fifth and empty. See `MomentTimeline`.
+                MomentTimeline(
+                    challenge: challenge,
+                    clips: clips,
+                    members: members,
+                    myID: myID,
+                    agenda: agenda,
+                    // A moment in a story only you filmed is one clip, so it
+                    // opens as a page in the day and you swipe on. In a shared
+                    // room it is still the whole moment with everyone stacked
+                    // in it, which isn't a page — that's what `.moment` is for.
+                    onPlay: { day in
+                        sheet = challenge.isShared
+                            ? .moment(day: day)
+                            : .preview(day: day, authorID: nil)
+                    },
+                    onFilm: { day in sheet = .record(day: day) })
 
             }
             .padding(.horizontal, 20)
@@ -272,43 +261,10 @@ struct StoryTimelineView: View {
     /// Nothing is held back for a card above and nothing is skipped: the list
     /// *is* the offer, so whichever moment is actually happening right now is
     /// one tap away instead of three rows into a queue.
-    private func openList(_ challenge: Challenge, agenda: StoryAgenda) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(agenda.openToMe.enumerated()), id: \.element) { index, slot in
-                if index > 0 {
-                    Divider().overlay(OneDay.hairline).padding(.leading, 60)
-                }
-                OpenSlotRow(
-                    momentTitle: slotHeadline(challenge, slot: slot),
-                    momentIcon: slotIcon(challenge, slot: slot),
-                    awaitingMine: agenda.isAwaitingMine(slot: slot),
-                    isSuggested: agenda.isSuggested(slot: slot)
-                ) {
-                    sheet = .record(day: slot)
-                }
-            }
-        }
-        // Clipped before the surface goes on: the suggested row's wash runs
-        // the full width of its row, and the top and bottom rows have to give
-        // it the card's rounded corners.
-        .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
-        .glassSurface(radius: OneDay.Radius.card)
-    }
 
     /// A story recorded by time has no prompts, so its moments are called by
     /// their place in the day. Falling back to the prompt title would print
     /// "Day 3" down a story that lasts one day.
-    private func slotHeadline(_ challenge: Challenge, slot: Int) -> String {
-        challenge.isTimeOnly
-            ? Strings.lockedSlot(oneDay: challenge.isOneDay, day: slot)
-            : ChallengePresenter(challenge: challenge).title(forSlot: slot)
-    }
-
-    private func slotIcon(_ challenge: Challenge, slot: Int) -> String {
-        challenge.isTimeOnly
-            ? "camera.fill"
-            : MomentCatalog.icon(for: challenge.momentValue(forSlot: slot))
-    }
 
     // MARK: - Chrome
 

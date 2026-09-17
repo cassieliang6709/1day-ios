@@ -9,8 +9,6 @@ struct TimelineHeader: View {
     let challenge: Challenge
     /// Who's in the room. Nil for a solo story, which has nobody to name.
     let cast: RoomCast?
-    @Binding var viewMode: StoryViewMode
-    var showsViewModeToggle = true
     var isSyncing = false
 
     @Environment(\.roomPreviewMediaScope) private var previewMedia
@@ -28,13 +26,6 @@ struct TimelineHeader: View {
 
             if previewMedia == nil, challenge.isShared, let code = challenge.roomCode {
                 inviteCode(code)
-            }
-
-            if showsViewModeToggle {
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    ViewModeToggle(mode: $viewMode)
-                }
             }
         }
     }

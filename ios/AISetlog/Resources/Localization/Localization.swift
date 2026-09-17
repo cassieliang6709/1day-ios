@@ -1214,8 +1214,6 @@ enum Strings {
     static var everyonesMoments: String {
         lang == .chinese ? "大家的瞬间" : "Everyone's moments"
     }
-    static var viewTimeline: String { lang == .chinese ? "时间线视图" : "Timeline view" }
-    static var viewGrid: String { lang == .chinese ? "网格视图" : "Grid view" }
     static var tapToFilm: String { lang == .chinese ? "点一下开拍" : "Tap to film" }
     /// Row labels. `clipLengthHeader` / `orientationHeader` are the older
     /// all-caps section headers and wrap awkwardly inside an `OptionRow`.
@@ -1258,8 +1256,6 @@ enum Strings {
     static func filmFromMoments(_ clips: Int) -> String {
         lang == .chinese ? "\(clips) 个片段，缝成一部" : "\(clips) clips, one film"
     }
-    static var filmedHeader: String { lang == .chinese ? "拍过的" : "Filmed" }
-    static var stillOpenHeader: String { lang == .chinese ? "还没拍的" : "Still open" }
     /// The one row that's a suggestion. A question, because that's all it is —
     /// every other row does exactly the same thing when you tap it.
     static var startHere: String { lang == .chinese ? "先拍这个？" : "Start here?" }

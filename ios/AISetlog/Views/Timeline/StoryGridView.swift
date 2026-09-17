@@ -1,63 +1,17 @@
 import SwiftUI
 
-/// The story so far: a dense 3-column contact sheet of the moments that exist.
+/// Lane maths for a moment with more than one person in it, plus the contact
+/// sheet that used to be the story page's lower half.
 ///
-/// It used to hold every slot, filmed or not, at the same size and weight —
-/// which made "what's left" and "what happened" the same picture. Empty slots
-/// have moved out to the next-up card and the quiet list, so this sheet is
-/// only ever a record of the day.
-
-/// Which layout the story is being read in. Persisted, so the choice sticks
-/// across stories and launches.
-enum StoryViewMode: String, CaseIterable {
-    case timeline, grid
-
-    static let storageKey = "story.viewMode"
-
-    var icon: String {
-        switch self {
-        case .timeline: "list.bullet.indent"
-        case .grid: "square.grid.3x3.fill"
-        }
-    }
-}
-
-/// Two icon segments. Deliberately unlabelled — it sits next to the story's
-/// stats and shouldn't compete with them for reading.
-struct ViewModeToggle: View {
-    @Binding var mode: StoryViewMode
-    @Namespace private var indicator
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(StoryViewMode.allCases, id: \.self) { option in
-                let isOn = option == mode
-                Button {
-                    withAnimation(OneDay.Motion.snap) { mode = option }
-                } label: {
-                    Image(systemName: option.icon)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(isOn ? .white : OneDay.inkFaint)
-                        .frame(width: 34, height: 27)
-                        .background {
-                            if isOn {
-                                Capsule()
-                                    .fill(Color.oneDayBrand)
-                                    .matchedGeometryEffect(id: "viewmode", in: indicator)
-                            }
-                        }
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    option == .timeline ? Strings.viewTimeline : Strings.viewGrid)
-            }
-        }
-        .padding(3)
-        .background(OneDay.surfaceSoft.opacity(0.85), in: Capsule())
-        .sensoryFeedback(.selection, trigger: mode)
-    }
-}
+/// `StoryGridView` itself has no call sites as of 1.3 — `MomentTimeline`
+/// replaced the two-list page — but `lanes`, `rows` and `mineAmong` are the
+/// only implementation of "who is in this moment, in the order the film stacks
+/// them", and both the timeline and `ClipThumb` read them. They are static and
+/// pure, and `GridTapTests` covers them.
+///
+/// The view is kept rather than deleted because the grid is still the right
+/// shape for a finished story and 6.1 (下线片段左右滑) may want it back; it is
+/// eleven lines that compile and nothing else depends on.
 
 // MARK: - Grid
 
