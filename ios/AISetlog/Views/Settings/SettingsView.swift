@@ -25,9 +25,6 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
-    /// Read, not written, here: the row shows which look is on and the page
-    /// behind it does the setting.
-    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
     @AppStorage(NotificationPreferences.eveningEnabledKey)
     private var eveningEnabled = false
     @AppStorage(NotificationPreferences.sharedEnabledKey)
@@ -330,7 +327,11 @@ struct SettingsView: View {
 
         if eveningEnabled {
             rowDivider
-            HStack {
+            // The icon is not decoration: every other row in this card has one,
+            // and a row without it reads as a different kind of thing — which
+            // this isn't, it's the setting belonging to the switch above it.
+            HStack(spacing: 11) {
+                SettingsIcon(symbol: "clock.fill", accent: .oneDayLavender)
                 DatePicker(
                     Strings.reminderTime,
                     selection: reminderTime,
@@ -340,6 +341,23 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 8)
+
+            // What the switch and the time actually add up to. Without this the
+            // whole feature is invisible until it either fires or doesn't:
+            // there is nothing to remind about once every moment is filmed, and
+            // a time already past today waits for tomorrow — both correct, both
+            // indistinguishable from broken.
+            HStack(spacing: 11) {
+                SettingsIcon(symbol: "bell.badge.fill", accent: .oneDayMint)
+                Text(nextReminderText)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 13)
+            .padding(.bottom, 9)
+            .accessibilityIdentifier("next-reminder")
         }
 
         rowDivider
@@ -404,15 +422,10 @@ struct SettingsView: View {
     /// fine-tuning stays on the screen with the picture on it.
     @ViewBuilder
     private var displayRows: some View {
-        SettingsLinkRow(
-            symbol: "wand.and.sparkles",
-            accent: .oneDayMint,
-            title: Strings.lookSetting,
-            value: LookSettingsView.summary(for: look)
-        ) {
-            LookSettingsView()
-        }
-        rowDivider
+        // 回看的样子 used to be the first row here. It is gone on purpose: the
+        // three dials only mean anything with a picture behind them, and that
+        // is the review screen's own ✦ button. A settings page that can change
+        // how your films look, with no film on it, is a page you set blind.
         SettingsLinkRow(
             symbol: "circle.lefthalf.filled",
             accent: .oneDayNavy,
@@ -534,6 +547,24 @@ struct SettingsView: View {
             NotificationPreferences.eveningMinute = components.minute ?? 30
             ReminderService.reconcile(for: store.challenges)
         }
+    }
+
+    /// When the next evening reminder will actually fire, in words.
+    ///
+    /// Read straight off `ReminderService.plannedReminders` — the same pure
+    /// function the scheduler feeds from — so this line cannot claim a
+    /// reminder the system isn't holding.
+    private var nextReminderText: String {
+        guard authorizationStatus != .denied else { return Strings.reminderBlocked }
+        let next = ReminderService.plannedReminders(for: store.challenges)
+            .map(\.fireDate)
+            .filter { $0 > .now }
+            .min()
+        guard let next else { return Strings.reminderNothingToNudge }
+        return Strings.nextReminderAt(
+            next.formatted(
+                .dateTime.weekday(.abbreviated).hour().minute()
+                    .locale(Locale(identifier: appLanguage.resolved.localeCode))))
     }
 
     private func setEveningEnabled(_ enabled: Bool) {

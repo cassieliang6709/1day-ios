@@ -449,8 +449,8 @@ enum Strings {
     }
     static var inviteCodeFormatHint: String {
         lang == .chinese
-            ? "可以直接粘贴整段邀请文字；1Day 会自动找出 6 位邀请码。"
-            : "Paste the whole invite if you have it — 1Day will find the 6-character code."
+            ? "可以直接粘贴整段邀请文字。"
+            : "Paste the whole invite if you have it."
     }
     static var joinFriendsWithCode: String {
         lang == .chinese ? "用邀请码加入朋友" : "Join friends with a code"
@@ -1131,6 +1131,46 @@ enum Strings {
     /// worth saying out loud — numbered so VoiceOver can count them.
     static func avatarColourN(_ number: Int) -> String {
         lang == .chinese ? "头像颜色 \(number)" : "Avatar colour \(number)"
+    }
+
+    // MARK: - A story's cover
+
+    static var storyCoverTitle: String { lang == .chinese ? "换封面" : "Change cover" }
+    /// First of the three sources, because a frame out of the day is the most
+    /// honest cover a story can have.
+    static var coverFromClips: String {
+        lang == .chinese ? "从拍好的片段里选" : "From what you filmed"
+    }
+    static var coverFromPhotos: String {
+        lang == .chinese ? "从相册选一张" : "Choose from photos"
+    }
+    static var coverFromLibrary: String { lang == .chinese ? "素材库" : "Cover library" }
+    /// Confirms the lifted frame. The frame is on screen above it, so the word
+    /// is 这张 and not "保存".
+    static var useThisFrame: String { lang == .chinese ? "用这张" : "Use this one" }
+    /// Back to the automatic cover — newest clip, then the poster. Named after
+    /// what it does next, not after "reset".
+    static var coverKeepFilming: String {
+        lang == .chinese ? "改回跟着拍摄变" : "Follow what I film"
+    }
+    /// Under the evening reminder switch: when it will actually go off.
+    static func nextReminderAt(_ when: String) -> String {
+        lang == .chinese ? "下一次提醒：\(when)" : "Next reminder: \(when)"
+    }
+    /// Nothing unfilmed means nothing to nudge about — true, and worth saying,
+    /// because it is otherwise identical to a broken switch.
+    static var reminderNothingToNudge: String {
+        lang == .chinese
+            ? "今天没有要提醒的故事 —— 建一个就会排上"
+            : "Nothing to remind you about yet — start a story and it'll queue up"
+    }
+    static var reminderBlocked: String {
+        lang == .chinese
+            ? "系统里关掉了通知，到「设置 › 通知 › 1Day」打开"
+            : "Notifications are off in iOS Settings › Notifications › 1Day"
+    }
+    static var coverFrameFailed: String {
+        lang == .chinese ? "这张图没读出来，换一张试试" : "Couldn't read that picture. Try another."
     }
     /// The two halves of the one pill selector at the top of the screen. They
     /// filter what's below; they are not themselves a thing you "pick", which
