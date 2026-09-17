@@ -1095,6 +1095,43 @@ enum Strings {
     static var pickOneCreatesIt: String {
         lang == .chinese ? "选一张，就建好了" : "One tap creates it"
     }
+    /// Shown under a caption the first time it is selected, then never again.
+    /// Three gestures, in the order people reach for them.
+    static var captionGestureHint: String {
+        lang == .chinese
+            ? "拖动移位置 · 两指捏大小 · 两指转角度"
+            : "Drag to move · Pinch to resize · Twist to turn"
+    }
+    /// The ✕ on the selected caption's box, and the corner opposite it. Both
+    /// are icon-only on screen, so these exist for VoiceOver and for the tests.
+    static var deleteCaptionAction: String {
+        lang == .chinese ? "删除字幕" : "Delete caption"
+    }
+    static var captionResizeHandle: String {
+        lang == .chinese ? "缩放和旋转字幕" : "Resize and rotate caption"
+    }
+    /// What the four backing samples say. One character in Chinese, two letters
+    /// in English — enough to show the colour on the backing, short enough that
+    /// four samples fit a phone's width.
+    static var captionPlateSample: String { lang == .chinese ? "字" : "Aa" }
+    /// The samples are pictures, so these exist for VoiceOver and the tests.
+    static func captionPlateName(_ style: CaptionSticker.Style) -> String {
+        switch style {
+        case .outline, .headline: lang == .chinese ? "不加底" : "No backing"
+        case .band: lang == .chinese ? "半透明黑底" : "Dimmed backing"
+        case .solid: lang == .chinese ? "纯黑底" : "Solid backing"
+        case .light: lang == .chinese ? "白底" : "Light backing"
+        }
+    }
+    /// On the button once a caption exists: it edits rather than adds.
+    static var captionEditAction: String { lang == .chinese ? "改字幕" : "Edit caption" }
+    /// Beside two other buttons on one row, so it is the short form.
+    static var chatShort: String { lang == .chinese ? "聊天" : "Chat" }
+    /// The seven dots under your avatar are colours, and a colour has no name
+    /// worth saying out loud — numbered so VoiceOver can count them.
+    static func avatarColourN(_ number: Int) -> String {
+        lang == .chinese ? "头像颜色 \(number)" : "Avatar colour \(number)"
+    }
     /// The two halves of the one pill selector at the top of the screen. They
     /// filter what's below; they are not themselves a thing you "pick", which
     /// is why they're pills and not two posters the size of the templates.

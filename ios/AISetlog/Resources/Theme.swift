@@ -183,17 +183,48 @@ extension CaptionSticker.Tint {
     /// through `UIColor.themed` would mean the same story exports with dark
     /// ink on a light-mode phone and pale blue on a dark-mode one — the
     /// device's appearance setting deciding what somebody's film looks like
-    /// forever. These six are the palette's own values, pinned.
+    /// forever. These twelve are pinned values.
     var uiColor: UIColor {
         switch self {
         case .white: .white
+        // Not `.black`: a pure black caption on video reads as a hole, and
+        // clips to nothing on the darker end of an HDR frame.
+        case .black: UIColor(hex: 0x111111)
         case .blue: UIColor(hex: 0x1677FF)
         case .cyan: UIColor(hex: 0x38B6FF)
-        case .lavender: UIColor(hex: 0xB3A4FF)
         case .mint: UIColor(hex: 0x4FD1A5)
+        case .butter: UIColor(hex: 0xFFCE73)
+        case .coral: UIColor(hex: 0xFF6B4A)
+        case .rose: UIColor(hex: 0xE8407A)
+        case .lavender: UIColor(hex: 0xB3A4FF)
+        case .violet: UIColor(hex: 0x7B5CFF)
+        case .blush: UIColor(hex: 0xFF9DB3)
         case .ink: UIColor(hex: 0x0F2E6B)
         }
     }
 
     var color: Color { Color(uiColor: uiColor) }
+}
+
+// MARK: - Caption plates
+
+extension CaptionSticker {
+    /// The colour of the bar behind the words, or `nil` for the two styles that
+    /// have no bar.
+    ///
+    /// One function for the screen and the exporter, because they have to
+    /// agree: the review screen is the only place a caption's look is chosen,
+    /// and the film is the only place it matters.
+    var plateUIColor: UIColor? {
+        guard let plate = style.plate else { return nil }
+        // No cleverness here on purpose. An illegible pair — white words on the
+        // white bar, black words on the black one — is prevented at the moment
+        // it is picked (`CaptionSticker.legible…`), which is the only place a
+        // correction can be *seen*. Doing it here instead meant tapping 白底
+        // and getting a black bar, with the white square still lit.
+        let base: UIColor = plate.isWhite ? .white : UIColor(hex: 0x111111)
+        return base.withAlphaComponent(plate.opacity)
+    }
+
+    var plateColor: Color? { plateUIColor.map(Color.init(uiColor:)) }
 }

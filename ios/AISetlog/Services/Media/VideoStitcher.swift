@@ -806,7 +806,11 @@ enum VideoStitcher {
     ) -> CALayer {
         let minEdge = min(frame.width, frame.height)
         let maxWidth = frame.width * 0.76
-        let banded = sticker.style == .band
+        // The bar behind the words, described once in `CaptionSticker.Style`
+        // and read here and on the review screen. Four styles have one shape
+        // each; two have none.
+        let plate = sticker.style.plate
+        let banded = plate != nil
         // `scale` is what the pinch gesture committed. It goes in here rather
         // than as a layer transform so the shrink-to-fit loop below sees the
         // real size: scaling the layer afterwards would push a caption
@@ -820,13 +824,14 @@ enum VideoStitcher {
                 .font: roundedFont(size: fontSize, weight: weight),
                 .foregroundColor: ink,
             ])
-            if attributed.size().width + (banded ? fontSize * 1.6 : 0) <= maxWidth { break }
+            let plateWidth = (plate?.padH ?? 0) * 2 * fontSize
+            if attributed.size().width + plateWidth <= maxWidth { break }
             fontSize *= 0.92
         } while fontSize > 10
 
         let textSize = attributed.size()
-        let padH = banded ? fontSize * 0.8 : 0
-        let padV = banded ? fontSize * 0.42 : 0
+        let padH = (plate?.padH ?? 0) * fontSize
+        let padV = (plate?.padV ?? 0) * fontSize
         let box = CGSize(
             width: min(textSize.width, maxWidth) + padH * 2,
             height: textSize.height + padV * 2)
@@ -842,9 +847,9 @@ enum VideoStitcher {
         container.frame = CGRect(
             x: x, y: renderSize.height - yFromTop - box.height / 2,
             width: box.width, height: box.height)
-        if banded {
-            container.backgroundColor = UIColor.black.withAlphaComponent(0.45).cgColor
-            container.cornerRadius = box.height * 0.34
+        if let plate, let fill = sticker.plateUIColor {
+            container.backgroundColor = fill.cgColor
+            container.cornerRadius = box.height * plate.radius
         }
         if sticker.angle != 0 {
             // Around the container's own middle, which is already where the
