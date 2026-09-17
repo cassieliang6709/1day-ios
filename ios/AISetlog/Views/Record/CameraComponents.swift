@@ -260,10 +260,27 @@ struct MomentStampOverlay: View {
 /// `videoZoomFactor`. Which presets arrive is the recorder's decision — a
 /// front camera has no ultra-wide, so it sends two chips instead of three.
 ///
-/// It sits in the control bar under the picture rather than on top of it, the
-/// way the system camera does: the bottom of the frame is already spoken for
-/// by the moment's name and the story's progress bars, and both of those are
-/// promises about the export that a row of chips must not cover.
+/// It sits in the control bar under the picture rather than on top of it.
+/// Apple floats its lens picker over the frame; this app cannot, because the
+/// bottom of the frame is already spoken for by the moment's name and the
+/// story's progress bars, and both of those are promises about the export that
+/// a row of chips must not cover. So the Apple lesson taken here is the other
+/// one: make the controls small enough that the picture is the screen.
+///
+/// One ticked capsule as of 1.3, replacing four 64×34 chips and a word-width
+/// 「自定义」 — 260pt of chrome under a picture that wanted the room.
+///
+/// The ticks are not decoration. The row had a horizontal drag before this and
+/// nothing said so, so nobody used it: a row of discrete buttons reads as
+/// buttons, and a person who wants 1.4x pinches the picture instead. Marks
+/// between the numbers is how the system camera says "this is continuous", and
+/// it is the cheapest possible signal — no label, no hint, no onboarding.
+///
+/// Three ways to the same value, in the order they cost: tap a number to jump;
+/// drag anywhere along the capsule for anything in between; tap the number you
+/// are already on for the fine slider. There is no separate 「自定义」 button —
+/// off-preset, the pinched value takes its own slot, already selected, so 1.8x
+/// has somewhere to show up and somewhere to be adjusted from.
 struct ZoomControlRow: View {
     let presets: [CGFloat]
     let capabilities: CameraZoom
@@ -274,76 +291,144 @@ struct ZoomControlRow: View {
     /// Whether the fine slider has replaced the chips.
     @Binding var showsSlider: Bool
 
+    /// The zoom the current drag began at. Held for the length of the gesture
+    /// so the mapping is relative to where your finger went down rather than
+    /// to wherever the lens happens to be mid-drag.
+    @State private var dragStartZoom: CGFloat?
+
     /// Whether the zoom is somewhere the chips don't name — after a pinch, or
     /// after the slider.
     private var isOffPreset: Bool {
         !presets.contains { CameraZoom.isSame($0, zoom) }
     }
 
+    /// The height of one number on the track, and therefore of the control.
+    /// Apple's lens picker is about this; the previous 36pt circles plus their
+    /// own row padding were the thing eating the picture's height.
+    private static let pill: CGFloat = 30
+
     var body: some View {
         Group {
             if showsSlider {
                 sliderRow
             } else {
-                HStack(spacing: 8) {
-                    ForEach(presets, id: \.self) { chip($0) }
-                    customChip
-                }
+                track
             }
         }
-        // Four capsules of two or three characters each have to fit the width
-        // of the narrowest phone this app runs on, and at accessibility sizes
-        // they stop fitting. Capped here rather than left to shrink the
-        // picture above it or slide off the screen; VoiceOver reads the
-        // accessibility labels at full size regardless of the drawn text.
+        // The row has to fit the width of the narrowest phone this app runs on,
+        // and at accessibility sizes the numbers stop fitting their circles.
+        // Capped here rather than left to shrink the picture above it or slide
+        // off the screen; VoiceOver reads the accessibility labels at full size
+        // regardless of the drawn text.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
+    /// The capsule: numbers with tick marks between them, and a drag across
+    /// the whole thing.
+    private var track: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(presets.enumerated()), id: \.element) { index, preset in
+                if index > 0 { ticks }
+                chip(preset)
+            }
+            // Only when the zoom is somewhere the presets don't name. On-preset
+            // there is nothing for it to say, and the number that *is* selected
+            // already opens the slider.
+            if isOffPreset {
+                ticks
+                pinchedChip
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.45), lineWidth: 1))
+        // The whole capsule is the control. `highPriorityGesture` so the drag
+        // wins over the buttons inside it — a tap still gets through, because a
+        // `DragGesture` with a minimum distance does not fire on one.
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 6)
+                .onChanged { value in
+                    let start = dragStartZoom ?? zoom
+                    dragStartZoom = start
+                    zoom = CameraZoom.zoom(
+                        draggedBy: value.translation.width, from: start)
+                }
+                .onEnded { _ in dragStartZoom = nil })
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Five marks, the middle one taller. Purely the "you can drag this" sign;
+    /// they are not scaled to the range and deliberately do not claim to be.
+    private var ticks: some View {
+        HStack(spacing: 2.5) {
+            ForEach(0..<5, id: \.self) { i in
+                Capsule()
+                    .fill(OneDay.inkFaint.opacity(i == 2 ? 0.8 : 0.4))
+                    .frame(width: 1.5, height: i == 2 ? 11 : 7)
+            }
+        }
+        .padding(.horizontal, 5)
+        .accessibilityHidden(true)
+    }
+
+    /// One lens. Tapping the one you are already on opens the fine slider —
+    /// which is why this is a single button rather than a picker: the second
+    /// tap means something different from the first.
     private func chip(_ preset: CGFloat) -> some View {
         let selected = CameraZoom.isSame(zoom, preset)
         return Button {
-            zoom = preset
+            if selected {
+                showsSlider = true
+            } else {
+                zoom = preset
+            }
         } label: {
-            Text(CameraZoom.label(preset))
-                .font(.caption.weight(.heavy))
-                .monospacedDigit()
-                .lineLimit(1)
-                .foregroundStyle(selected ? Color.white : Color.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(minWidth: 44)
-                .background {
-                    Capsule().fill(selected ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.systemGray6)))
-                }
+            dotLabel(CameraZoom.label(preset), selected: selected)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Strings.zoomTo(CameraZoom.label(preset)))
+        .accessibilityLabel(
+            selected ? Strings.customZoom : Strings.zoomTo(CameraZoom.label(preset)))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// Reads "自定义" until the zoom is somewhere the chips don't name, and
-    /// then reads the number it actually is — so a pinch to 1.8x has
-    /// somewhere to show up, and tapping it opens the slider already there.
-    private var customChip: some View {
+    /// Where a pinch lands. Always drawn selected, because it only exists while
+    /// it is the current zoom, and tapping it opens the slider at that value.
+    private var pinchedChip: some View {
         Button {
             showsSlider = true
         } label: {
-            Text(isOffPreset ? CameraZoom.label(zoom) : Strings.customZoom)
-                .font(.caption.weight(.heavy))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .foregroundStyle(isOffPreset ? Color.white : Color.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(minWidth: 44)
-                .background {
-                    Capsule().fill(isOffPreset ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.systemGray6)))
-                }
+            dotLabel(CameraZoom.label(zoom), selected: true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.customZoom)
         .accessibilityValue(CameraZoom.label(zoom))
+    }
+
+    /// One number on the track. A pill rather than a circle: it lives inside a
+    /// capsule now, and a circle inside a capsule is a box inside a box.
+    ///
+    /// The selected one is the only filled thing in the control, which is what
+    /// makes the current lens readable at a glance while your eye is on the
+    /// picture rather than on this.
+    private func dotLabel(_ text: String, selected: Bool) -> some View {
+        Text(text)
+            .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            // "9.9x" needs the last of this at accessibility sizes; VoiceOver
+            // reads the full label either way.
+            .minimumScaleFactor(0.62)
+            .foregroundStyle(selected ? Color.white : OneDay.inkSoft)
+            .padding(.horizontal, 10)
+            .frame(minWidth: 34)
+            .frame(height: Self.pill)
+            .background {
+                if selected {
+                    Capsule().fill(tint)
+                }
+            }
+            .contentShape(Capsule())
     }
 
     private var sliderRow: some View {

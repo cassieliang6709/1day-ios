@@ -40,6 +40,23 @@ struct CameraZoom: Equatable {
     /// through a divide and a clamp.
     static let matchTolerance: CGFloat = 0.01
 
+    /// How far a finger travels along the zoom track to double the zoom.
+    static let pointsPerDoubling: CGFloat = 130
+
+    /// Where a drag along the zoom track lands, relative to where it started.
+    ///
+    /// Multiplicative, the same shape as the pinch on the picture: 1x→2x and
+    /// 4x→8x cost the same travel. A linear mapping over a 0.5–10 range spends
+    /// the first sixth of the capsule getting from 1x to 2x — the part people
+    /// actually use — and the rest in digital crop nobody asked for.
+    ///
+    /// Unclamped on purpose. `ClipRecorder.setZoom` is the only thing that
+    /// knows what this particular lens can reach, and it clamps; a second,
+    /// guessed clamp here is how a control ends up disagreeing with the camera.
+    static func zoom(draggedBy translation: CGFloat, from start: CGFloat) -> CGFloat {
+        start * pow(2, translation / pointsPerDoubling)
+    }
+
     init(base: CGFloat, minFactor: CGFloat, maxFactor: CGFloat) {
         // A zero base would divide every display value by nothing. Nothing
         // reports one, but it arrives from `virtualDeviceSwitchOverVideoZoomFactors`

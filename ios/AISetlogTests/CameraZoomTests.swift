@@ -149,3 +149,46 @@ final class CameraZoomTests: XCTestCase {
         XCTAssertEqual(broken.factor(forDisplay: 2), 2, accuracy: 0.0001)
     }
 }
+
+/// The drag along the zoom track, added in 1.3 when the row became a ticked
+/// capsule instead of four buttons.
+extension CameraZoomTests {
+    /// No movement is no change. Sounds trivial; it is the case that decides
+    /// whether a tap that wobbles six points re-lands you on the same lens or
+    /// somewhere near it.
+    func testAStationaryDragDoesNotMoveTheLens() {
+        XCTAssertEqual(CameraZoom.zoom(draggedBy: 0, from: 1), 1, accuracy: 0.0001)
+        XCTAssertEqual(CameraZoom.zoom(draggedBy: 0, from: 2.7), 2.7, accuracy: 0.0001)
+    }
+
+    /// The property the mapping exists for: the same travel is the same
+    /// *ratio*, wherever you started. A linear mapping would fail this, and
+    /// failing it is what makes a zoom control feel wrong at the long end.
+    func testTheSameTravelAlwaysDoublesOrHalves() {
+        let travel = CameraZoom.pointsPerDoubling
+        for start in [CGFloat(0.5), 1, 2, 4.3] {
+            XCTAssertEqual(
+                CameraZoom.zoom(draggedBy: travel, from: start), start * 2,
+                accuracy: 0.001,
+                "dragging one doubling from \(start) should double it")
+            XCTAssertEqual(
+                CameraZoom.zoom(draggedBy: -travel, from: start), start / 2,
+                accuracy: 0.001,
+                "dragging back should halve it")
+        }
+    }
+
+    func testDraggingRightZoomsInAndLeftZoomsOut() {
+        XCTAssertGreaterThan(CameraZoom.zoom(draggedBy: 40, from: 1), 1)
+        XCTAssertLessThan(CameraZoom.zoom(draggedBy: -40, from: 1), 1)
+    }
+
+    /// Deliberately unclamped — `ClipRecorder.setZoom` owns the clamp, because
+    /// it is the only thing that knows what this lens can reach. A second
+    /// guessed clamp in the control is how the UI ends up disagreeing with the
+    /// camera about where the zoom is.
+    func testTheMappingDoesNotClampAndLeavesThatToTheRecorder() {
+        let huge = CameraZoom.zoom(draggedBy: 2000, from: 1)
+        XCTAssertGreaterThan(huge, CameraZoom.interactiveCeiling)
+    }
+}

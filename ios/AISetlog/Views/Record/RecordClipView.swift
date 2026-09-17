@@ -46,8 +46,6 @@ struct RecordClipView: View {
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
-    @State private var showNotificationPrimer = false
-    @State private var dismissAfterPrimer = false
     /// Raised when the close button is pressed with a take still in review.
     ///
     /// The free-form camera has had this guard since `UnfiledClipGuard` —
@@ -163,15 +161,6 @@ struct RecordClipView: View {
         } message: {
             Text(Strings.keepClipFootnote)
         }
-        .sheet(
-            isPresented: $showNotificationPrimer,
-            onDismiss: {
-                if dismissAfterPrimer { dismiss() }
-                dismissAfterPrimer = false
-            }
-        ) {
-            NotificationPrimerView(challenges: store.challenges)
-        }
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = newValue
         }
@@ -266,17 +255,18 @@ struct RecordClipView: View {
 
     /// The whole control surface starts recording. The centered layout makes
     /// the primary camera action obvious and gives it a forgiving tap target.
+    ///
+    /// The 轻点拍摄 caption that used to sit under the ring is gone: a 66pt
+    /// brand-blue circle alone in a bar is not a control anybody needs a
+    /// sentence for, and the sentence was one of the lines making the picture
+    /// above it smaller. It is still the button's accessibility label.
     private var idleRecordingControl: some View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            CenteredCaptureControl(instruction: Strings.captureState(
-                recording: false, secondsLabel: clipSecondsText
-            )) {
-                recordButtonVisual
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            recordButtonVisual
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.captureState(
@@ -359,7 +349,7 @@ struct RecordClipView: View {
                         }
                     } else {
                         onSave(url, trimmedOverlayText)
-                        offerNotificationPrimer(dismissWhenFinished: true)
+                        dismiss()
                     }
                 } label: {
                     Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
@@ -393,11 +383,9 @@ struct RecordClipView: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
-        .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
-            ForEach(filingCandidates) { challenge in
-                Button(ChallengePresenter(challenge: challenge).displayTitle) {
-                    file(url, to: challenge)
-                }
+        .sheet(isPresented: $showSavePicker) {
+            ClipFilingSheet(candidates: filingCandidates) { chosen in
+                file(url, to: chosen)
             }
         }
         .confirmationDialog(
@@ -427,21 +415,39 @@ struct RecordClipView: View {
         ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
     }
 
-    /// Free-form: file the clip into a chosen plan's first open slot.
-    private func file(_ url: URL, to challenge: Challenge) {
-        // Unreachable through the sheet, which only lists stories with room in
-        // them — but filing into a full story used to mean overwriting a clip,
-        // so this refuses rather than trusting the caller.
-        guard let day = ClipFiling.targetDay(in: challenge) else {
+    /// Free-form: file the clip into each chosen plan's first open slot.
+    ///
+    /// Takes a list as of 1.3 — one take of an afternoon belongs in your own
+    /// story *and* in the room you shared it with, and the single-choice dialog
+    /// this replaced made that two takes. `ClipFileStore.storeClip` copies, so
+    /// the one temp URL can be filed once per story; the review is only cleared
+    /// after the loop, because clearing it calls `recorder.retake()` and that
+    /// is what invalidates `url`.
+    private func file(_ url: URL, to challenges: [Challenge]) {
+        var landed = 0
+        var lastTitle = ""
+
+        for challenge in challenges {
+            // Unreachable through the sheet, which only lists stories with room
+            // in them — but filing into a full story used to mean overwriting a
+            // clip, so this refuses rather than trusting the caller.
+            guard let day = ClipFiling.targetDay(in: challenge) else { continue }
+            store.saveClip(
+                from: url, day: day, challengeID: challenge.id,
+                overlayText: trimmedOverlayText)
+            landed += 1
+            lastTitle = ChallengePresenter(challenge: challenge).displayTitle
+        }
+
+        guard landed > 0 else {
             showToast(Strings.storyIsFull)
             return
         }
-        store.saveClip(from: url, day: day, challengeID: challenge.id, overlayText: trimmedOverlayText)
+
         recorder.retake()
         ringProgress = 0
         overlayText = ""
-        showToast(Strings.filedTo(ChallengePresenter(challenge: challenge).displayTitle))
-        offerNotificationPrimer(dismissWhenFinished: false)
+        showToast(landed == 1 ? Strings.filedTo(lastTitle) : Strings.filedToCount(landed))
     }
 
     /// Copy the clip somewhere permanent so it survives leaving this screen.
@@ -500,16 +506,6 @@ struct RecordClipView: View {
         }
     }
 
-    private func offerNotificationPrimer(dismissWhenFinished: Bool) {
-        guard !NotificationPreferences.primerSeen,
-              !NotificationPreferences.eveningEnabled
-        else {
-            if dismissWhenFinished { dismiss() }
-            return
-        }
-        dismissAfterPrimer = dismissWhenFinished
-        showNotificationPrimer = true
-    }
 
     private var unavailableView: some View {
         VStack(spacing: 18) {
@@ -568,7 +564,7 @@ struct RecordClipView: View {
                         recorder.acceptDemoClip(demo)
                     } else {
                         onSave(demo, trimmedOverlayText)
-                        offerNotificationPrimer(dismissWhenFinished: true)
+                        dismiss()
                     }
                 }
             }
@@ -690,8 +686,27 @@ struct RecordClipView: View {
             set: { recorder.setZoom($0) })
     }
 
+    /// Lens picker, then the shutter. Nothing else, and no panel behind it.
+    ///
+    /// This was a white rounded card holding a row of four wide capsules, a
+    /// 66pt shutter and the words 轻点拍摄 under it — about 150pt of furniture
+    /// under a 9:16 picture that is laid out `.fit`, so every point of it came
+    /// straight off the height of the preview. On a 6.3" phone the picture was
+    /// ~570pt tall inside a 378pt-wide screen: letterboxed by its own chrome.
+    ///
+    /// Gone, in the order they cost the most:
+    /// - the caption. The system camera does not tell you to tap the shutter,
+    ///   and this one is a 66pt brand-blue circle in the middle of the bar. It
+    ///   survives as the button's accessibility label, which is the one reader
+    ///   that genuinely needed the sentence.
+    /// - the card. A panel behind two controls that already read as controls.
+    /// - the capsules, now 36pt circles — see `ZoomControlRow`.
+    ///
+    /// `recordingControls` keeps its caption: mid-take, 轻点停止 is not
+    /// decoration, it is the only thing on screen that says the take can be cut
+    /// short, and the ring it sits under is counting rather than inviting.
     private var bottomControls: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             zoomControls
 
             Group {
@@ -703,9 +718,7 @@ struct RecordClipView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 28))
+        .padding(.top, 6)
     }
 }
 
