@@ -1140,6 +1140,18 @@ enum Strings {
     static var clipLengthRow: String { lang == .chinese ? "片段时长" : "Clip length" }
     static var orientationRow: String { lang == .chinese ? "画面方向" : "Frame" }
     static var inviteLabel: String { lang == .chinese ? "邀请" : "Invite" }
+    /// The one-time nudge when a room you own is still empty — see
+    /// `RoomShareNudge`. A room is created empty by design, and the gap between
+    /// making one and inviting someone is where rooms died: nothing said *now*.
+    static var sendTheCodeTitle: String {
+        lang == .chinese ? "把邀请码发出去" : "Send the code out"
+    }
+    static var sendTheCodeNow: String {
+        lang == .chinese ? "现在发" : "Send it now"
+    }
+    static var sendTheCodeLater: String {
+        lang == .chinese ? "待会儿" : "Later"
+    }
     static var stitchingMoment: String {
         lang == .chinese ? "正在拼接这个瞬间…" : "Stitching this moment…"
     }

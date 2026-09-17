@@ -30,6 +30,9 @@ struct StoryTimelineView: View {
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
+    /// The room whose code is being offered for sharing, once, right after it
+    /// was made. See `RoomShareNudge`.
+    @State private var nudgeShareCode: String?
     @State private var showRoomDemo = false
     /// The beat between the last moment landing and the film assembling.
     @State private var celebrate = false
@@ -228,12 +231,47 @@ struct StoryTimelineView: View {
             if challenge.isShared { await store.syncRoom(challengeID) }
         }
         .task(id: challengeID) {
+            offerShareIfRoomIsStillEmpty()
             guard challenge.isShared else { return }
             while !Task.isCancelled {
                 await store.syncRoom(challengeID)
                 do { try await Task.sleep(for: .seconds(10)) } catch { break }
             }
         }
+        .confirmationDialog(
+            Strings.sendTheCodeTitle,
+            isPresented: Binding(
+                get: { nudgeShareCode != nil },
+                set: { if !$0 { nudgeShareCode = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let code = nudgeShareCode {
+                // A `ShareLink` inside the dialog rather than a button that
+                // opens a second sheet: one tap from "yes" to the share sheet.
+                ShareLink(
+                    item: shareText(code: code, challenge: challenge),
+                    label: { Text(Strings.sendTheCodeNow) })
+            }
+            Button(Strings.sendTheCodeLater, role: .cancel) {}
+        }
+    }
+
+    /// Offer the code once, the first time you land on a room you own that
+    /// nobody has joined.
+    ///
+    /// Not on `onAppear`: this page is rebuilt on every navigation back to it,
+    /// and `RoomShareNudge` is what stops the offer returning — but reading the
+    /// member list before the first sync would call every room empty, so the
+    /// guard is "no members yet" *and* "never offered", and the flag is written
+    /// the moment it is asked rather than when it is answered.
+    private func offerShareIfRoomIsStillEmpty() {
+        guard let challenge, challenge.isShared, previewMedia == nil,
+              let code = challenge.roomCode,
+              store.members(for: challengeID).count <= 1,
+              RoomShareNudge.shouldOffer(code: code, isEmptyRoom: true)
+        else { return }
+        RoomShareNudge.markOffered(code: code)
+        nudgeShareCode = code
     }
 
     /// A header, and optionally the one sentence the section needs to be read
