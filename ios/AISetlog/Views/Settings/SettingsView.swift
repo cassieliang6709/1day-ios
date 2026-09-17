@@ -1,9 +1,8 @@
 import SwiftUI
-import UserNotifications
 
-/// App-level preferences: notifications, display and language, the account,
-/// and the small print. Anything with more than a couple of options is a row
-/// here and a page behind it — see `body`.
+/// App-level preferences: display and language, the account, and the small
+/// print. Anything with more than a couple of options is a row here and a page
+/// behind it — see `body`.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
@@ -25,38 +24,27 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
-    @AppStorage(NotificationPreferences.eveningEnabledKey)
-    private var eveningEnabled = false
-    @AppStorage(NotificationPreferences.sharedEnabledKey)
-    private var sharedEnabled = false
-    @AppStorage(NotificationPreferences.showFriendNamesKey)
-    private var showFriendNames = false
 
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
-    @State private var mutedRooms = NotificationPreferences.mutedRoomCodes
-
-    private var sharedChallenges: [Challenge] {
-        var seen: Set<String> = []
-        return store.challenges.filter { challenge in
-            guard let code = challenge.roomCode, seen.insert(code).inserted else {
-                return false
-            }
-            return true
-        }
-    }
-
-    /// Who you are, what you've made, then the switches.
+    /// Who you are, what you've made, then the two things worth changing.
     ///
-    /// This screen has been through two rewrites of its *structure* — nine
-    /// sections down to four — and both times it stayed a stock `Form`, which
-    /// made it the one page in the app rendered in system greys and system
-    /// blue. Coming here from the home screen felt like leaving the app.
+    /// This screen has been through three rewrites of its *structure* — nine
+    /// sections, then four, now two — and for the first two it stayed a stock
+    /// `Form`, which made it the one page in the app rendered in system greys
+    /// and system blue. Coming here from the home screen felt like leaving the
+    /// app.
     ///
     /// So: the app's own canvas and glass cards, and a header that answers
     /// "who am I here" before it offers anything to change. The three counts
     /// are the only new content, and they're the only reason to open this page
     /// when you don't want to change a setting.
+    ///
+    /// 通知 is gone as of 1.3, both rows of it. 晚间拍摄提醒 asked the person
+    /// to schedule a nudge about a story they were already looking at, and
+    /// 好友动态 was a push subscription for rooms most people never make. The
+    /// scheduler and the subscription service are still here and still guard on
+    /// their flags — with nothing left to set those flags, both stay off, which
+    /// is the behaviour we want and the reason the services didn't need
+    /// touching. See `ReminderService` and `SharedActivityNotificationService`.
     var body: some View {
         NavigationStack {
             ZStack {
@@ -66,7 +54,6 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         identityHeader
                         statsRow
-                        group(Strings.notifications, rows: notificationRows)
                         group(Strings.displayAndLanguage, rows: displayRows)
                         // Signed out there is nothing here but "sign in",
                         // which the header above already offers — one screen
@@ -89,17 +76,6 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.done) { dismiss() }
                 }
-            }
-            .task {
-                await refreshAuthorizationStatus()
-                mutedRooms = NotificationPreferences.mutedRoomCodes
-            }
-            // Granting permission happens in another app, and this sheet stays
-            // alive behind it — without re-reading on the way back, the page
-            // still says notifications are off after you just turned them on.
-            .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-                Task { await refreshAuthorizationStatus() }
             }
             // Outside the scroll content, as it was outside the Form: a sheet
             // presented from inside a row of an already-presented sheet takes
@@ -337,117 +313,6 @@ struct SettingsView: View {
         .padding(.top, 6)
     }
 
-    // MARK: - Notifications
-
-    /// Everything that can make this app interrupt you, under one heading. The
-    /// two switches stay here because they're what people come to change; the
-    /// room-by-room list is one tap down because it's as long as the number of
-    /// rooms you're in, and the "iPhone says no" notice only appears when it's
-    /// true of something you just asked for.
-    ///
-    /// The `footer` sentences the old `Section` carried are now each row's own
-    /// second line, where they sit next to the switch they explain instead of
-    /// in a paragraph under three unrelated ones.
-    @ViewBuilder
-    private var notificationRows: some View {
-        SettingsToggleRow(
-            symbol: "moon.stars.fill",
-            accent: .oneDayBrand,
-            title: Strings.eveningReminder,
-            caption: Strings.eveningReminderFooter,
-            isOn: Binding(get: { eveningEnabled }, set: setEveningEnabled))
-
-        if eveningEnabled {
-            rowDivider
-            // The icon is not decoration: every other row in this card has one,
-            // and a row without it reads as a different kind of thing — which
-            // this isn't, it's the setting belonging to the switch above it.
-            HStack(spacing: 11) {
-                SettingsIcon(symbol: "clock.fill", accent: .oneDayLavender)
-                DatePicker(
-                    Strings.reminderTime,
-                    selection: reminderTime,
-                    displayedComponents: .hourAndMinute)
-                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 8)
-
-            // What the switch and the time actually add up to. Without this the
-            // whole feature is invisible until it either fires or doesn't:
-            // there is nothing to remind about once every moment is filmed, and
-            // a time already past today waits for tomorrow — both correct, both
-            // indistinguishable from broken.
-            HStack(spacing: 11) {
-                SettingsIcon(symbol: "bell.badge.fill", accent: .oneDayMint)
-                Text(nextReminderText)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 13)
-            .padding(.bottom, 9)
-            .accessibilityIdentifier("next-reminder")
-        }
-
-        rowDivider
-        SettingsToggleRow(
-            symbol: "person.2.fill",
-            accent: .oneDayLavender,
-            title: Strings.friendActivity,
-            caption: Strings.friendActivityFooter,
-            isOn: Binding(get: { sharedEnabled }, set: setSharedEnabled))
-
-        if sharedEnabled {
-            rowDivider
-            SettingsToggleRow(
-                symbol: "tag.fill",
-                accent: .oneDayMint,
-                title: Strings.showFriendNames,
-                caption: nil,
-                isOn: $showFriendNames)
-
-            if !sharedChallenges.isEmpty {
-                rowDivider
-                SettingsLinkRow(
-                    symbol: "bell.badge.fill",
-                    accent: .oneDayLavender,
-                    title: Strings.sharedRooms,
-                    value: RoomNotificationsView.summary(
-                        rooms: sharedChallenges, muted: mutedRooms)
-                ) {
-                    RoomNotificationsView(rooms: sharedChallenges, mutedRooms: $mutedRooms)
-                }
-            }
-        }
-
-        // Not `&& (eveningEnabled || sharedEnabled)`, which is what it used to
-        // say and is the bug: with notifications refused in iOS Settings,
-        // `requestAuthorization` returns false, so the switch springs back to
-        // off, so neither flag is ever true, so the sentence explaining why the
-        // switch won't move never appeared. A dead toggle and no reason for it.
-        if authorizationStatus == .denied {
-            rowDivider
-            VStack(alignment: .leading, spacing: 7) {
-                Text(Strings.notificationPermissionDenied)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(Strings.openSettings) {
-                    guard let url = URL(string: UIApplication.openSettingsURLString)
-                    else { return }
-                    UIApplication.shared.open(url)
-                }
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(13)
-        }
-    }
-
     // MARK: - Display & language
 
     /// Three decisions you make once and forget. One line each, showing what
@@ -548,21 +413,22 @@ struct SettingsView: View {
         draftName = account.account?.displayName ?? ""
     }
 
-
-    private var aboutSection: some View {
-        Section {
-            Link(Strings.privacyPolicy, destination: Self.privacyPolicyURL)
-            LabeledContent(Strings.version, value: Self.versionString)
-        } header: {
-            Text(Strings.about)
-        }
-    }
-
     /// Baked into the binary, so changing it costs a release: it points at the
     /// `1day.` subdomain rather than the apex, leaving the apex free for a
     /// personal site without ever breaking this link. App Store Connect must
     /// carry the same address.
-    static let privacyPolicyURL = URL(string: "https://1day.liangyue.site/privacy")!
+    ///
+    /// Locale-suffixed as of 1.3. The site made English its default that
+    /// release — `/privacy` is the English page now and Chinese moved to
+    /// `/zh/privacy` — so a fixed `/privacy` handed every Chinese reader a
+    /// policy they can't read. This follows the language the app is actually
+    /// being used in, not the device's, because that is the setting one screen
+    /// above this link.
+    static var privacyPolicyURL: URL {
+        AppLanguage.effective == .chinese
+            ? URL(string: "https://1day.liangyue.site/zh/privacy")!
+            : URL(string: "https://1day.liangyue.site/privacy")!
+    }
 
     private static var versionString: String {
         let info = Bundle.main.infoDictionary
@@ -571,76 +437,6 @@ struct SettingsView: View {
         return "\(short) (\(build))"
     }
 
-    private var reminderTime: Binding<Date> {
-        Binding {
-            Calendar.current.date(
-                bySettingHour: NotificationPreferences.eveningHour,
-                minute: NotificationPreferences.eveningMinute,
-                second: 0,
-                of: .now) ?? .now
-        } set: { date in
-            let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-            NotificationPreferences.eveningHour = components.hour ?? 20
-            NotificationPreferences.eveningMinute = components.minute ?? 30
-            ReminderService.reconcile(for: store.challenges)
-        }
-    }
-
-    /// When the next evening reminder will actually fire, in words.
-    ///
-    /// Read straight off `ReminderService.plannedReminders` — the same pure
-    /// function the scheduler feeds from — so this line cannot claim a
-    /// reminder the system isn't holding.
-    private var nextReminderText: String {
-        guard authorizationStatus != .denied else { return Strings.reminderBlocked }
-        let next = ReminderService.plannedReminders(for: store.challenges)
-            .map(\.fireDate)
-            .filter { $0 > .now }
-            .min()
-        guard let next else { return Strings.reminderNothingToNudge }
-        return Strings.nextReminderAt(
-            next.formatted(
-                .dateTime.weekday(.abbreviated).hour().minute()
-                    .locale(Locale(identifier: appLanguage.resolved.localeCode))))
-    }
-
-    private func setEveningEnabled(_ enabled: Bool) {
-        guard enabled else {
-            eveningEnabled = false
-            ReminderService.reconcile(for: store.challenges)
-            return
-        }
-        Task {
-            let granted = await NotificationPermissionService.requestAuthorization()
-            eveningEnabled = granted
-            NotificationPreferences.primerSeen = true
-            await refreshAuthorizationStatus()
-            ReminderService.reconcile(for: store.challenges)
-        }
-    }
-
-    private func setSharedEnabled(_ enabled: Bool) {
-        guard enabled else {
-            sharedEnabled = false
-            SharedActivityNotificationService.removeSubscriptions()
-            return
-        }
-        Task {
-            let granted = await NotificationPermissionService.requestAuthorization()
-            sharedEnabled = granted
-            await refreshAuthorizationStatus()
-            if granted {
-                NotificationPermissionService.registerForRemoteNotificationsIfNeeded()
-            }
-            SharedActivityNotificationService.reconcileSubscriptions(
-                for: store.challenges)
-        }
-    }
-
-    private func refreshAuthorizationStatus() async {
-        authorizationStatus = await UNUserNotificationCenter.current()
-            .notificationSettings().authorizationStatus
-    }
 }
 
 // MARK: - Rows
