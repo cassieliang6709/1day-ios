@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · 和朋友一起怎么更显著 + 回看页四件事 —— 2026-09-16</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --plane:          #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --border:         rgba(11,11,11,0.10);
+    --now:            #eb6834;
+    --next:           #2a78d6;
+    --good:           #0ca30c;
+    --stop:           #c0392b;
+    /* app 自己的色板，取自 ios/AISetlog/Resources/Theme.swift */
+    --c-blue:    #1677ff;
+    --c-cyan:    #38b6ff;
+    --c-lav:     #b3a4ff;
+    --c-mint:    #4fd1a5;
+    --c-canvas:  #f5f8ff;
+    --c-ink:     #0f2e6b;
+    --c-inksoft: #4a6aa8;
+    --c-inkfaint:#8ea4cd;
+    --c-surface: #ffffff;
+    --c-hair:    rgba(15,46,107,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --plane: #0d0d0d;
+      --text-primary: #fff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --gridline: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --now: #d95926; --next: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 24px 80px;
+    background: var(--plane); color: var(--text-primary);
+    font: 15px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; }
+  header { margin-bottom: 30px; }
+  h1 { font-size: 27px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .thesis { font-size: 16px; color: var(--text-secondary); margin: 0; max-width: 64ch; }
+  .thesis b { color: var(--text-primary); font-weight: 700; }
+  .meta { font-size: 12.5px; color: var(--text-muted); margin-top: 10px; }
+  h2 {
+    font-size: 12.5px; font-weight: 800; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin: 46px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--gridline);
+  }
+  h3 { font-size: 16px; font-weight: 750; margin: 26px 0 10px; }
+  p { max-width: 70ch; }
+  code {
+    font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: rgba(11,11,11,0.05); padding: 1.5px 5px; border-radius: 4px;
+  }
+  @media (prefers-color-scheme: dark) { code { background: rgba(255,255,255,0.08); } }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .card + .card { margin-top: 12px; }
+
+  .verdict { display: grid; grid-template-columns: 74px 1fr; gap: 16px; align-items: start; }
+  .verdict + .verdict { margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--gridline); }
+  .tag {
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 4px 0; text-align: center; border-radius: 6px; color: #fff;
+  }
+  .tag.keep { background: var(--good); }
+  .tag.fix  { background: var(--next); }
+  .tag.ask  { background: var(--now); }
+  .tag.cut  { background: var(--stop); }
+  .verdict .t { font-weight: 700; margin-bottom: 4px; }
+  .verdict .d { color: var(--text-secondary); font-size: 14px; }
+  .verdict .d b { color: var(--text-primary); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
+  th { font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+  td.n { color: var(--text-muted); font-variant-numeric: tabular-nums; width: 28px; }
+  .rec { background: rgba(12,163,12,0.07); }
+
+  /* 手机框 */
+  .phones { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 8px; }
+  .ph-wrap { width: 268px; }
+  .phone {
+    width: 268px; height: 556px; border-radius: 38px; padding: 9px;
+    background: #0b0b0b; box-shadow: 0 12px 34px rgba(0,0,0,0.18); flex: none;
+  }
+  .screen {
+    width: 100%; height: 100%; border-radius: 30px; overflow: hidden; position: relative;
+    background: linear-gradient(170deg, var(--c-canvas), #eef4ff 58%, #f4f0ff);
+    color: var(--c-ink); font-size: 11px;
+  }
+  .cap { font-size: 12px; color: var(--text-muted); margin-top: 9px; line-height: 1.45; }
+  .cap b { color: var(--text-primary); font-weight: 700; display: block; font-size: 12.5px; }
+  .sbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px 3px; font-size: 9.5px; font-weight: 700; }
+  .island { width: 52px; height: 13px; border-radius: 8px; background: #0b0b0b; }
+  .body { padding: 6px 14px; height: calc(100% - 26px); overflow: hidden; }
+  .navrow { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; }
+  .bub { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.8); display: grid; place-items: center; font-size: 11px; box-shadow: 0 1px 4px rgba(15,46,107,0.12); }
+  .h1s { font-size: 19px; font-weight: 850; letter-spacing: -0.01em; margin: 2px 0 2px; }
+  .lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-inkfaint); margin: 10px 0 5px; }
+
+  /* app 组件 */
+  .glass { background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 15px; box-shadow: 0 3px 12px rgba(15,46,107,0.06); }
+  .row { display: flex; align-items: center; gap: 9px; padding: 9px 11px; }
+  .row + .row { border-top: 1px solid var(--c-hair); }
+  .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; flex: none; }
+  .ic.b { background: rgba(22,119,255,0.13); color: var(--c-blue); }
+  .ic.l { background: rgba(179,164,255,0.22); color: #7d6ba8; }
+  .ic.n { background: rgba(15,46,107,0.10); color: var(--c-ink); }
+  .rt { font-size: 11.5px; font-weight: 700; }
+  .val { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--c-inksoft); display: flex; align-items: center; gap: 4px; }
+  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 99px; background: rgba(15,46,107,0.05); }
+  .seg b { flex: 1; text-align: center; font-size: 9px; font-weight: 800; padding: 5px 0; border-radius: 99px; color: var(--c-inksoft); }
+  .seg b.on { background: var(--c-blue); color: #fff; }
+  .cta { border-radius: 99px; padding: 10px 0; text-align: center; font-size: 12px; font-weight: 800; color: #fff; background: linear-gradient(100deg, var(--c-blue), var(--c-cyan)); box-shadow: 0 5px 16px rgba(22,119,255,0.32); }
+
+  /* composer 专用 */
+  .gradcard { border-radius: 17px; padding: 10px 11px; background: linear-gradient(100deg, var(--c-blue), var(--c-cyan)); color: #fff; display: flex; gap: 9px; align-items: center; box-shadow: 0 6px 18px rgba(22,119,255,0.28); }
+  .gradcard .gi { width: 30px; height: 30px; border-radius: 10px; background: rgba(255,255,255,0.22); display: grid; place-items: center; font-size: 13px; flex: none; }
+  .gradcard .gt { font-size: 11.5px; font-weight: 850; }
+  .gradcard .gs { font-size: 9px; opacity: 0.9; }
+  .cocards { display: flex; gap: 7px; }
+  .cocard { flex: 1; border-radius: 16px; padding: 11px 9px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 850; background: var(--c-surface); border: 1px solid var(--c-hair); color: var(--c-inksoft); }
+  .cocard.on { background: linear-gradient(110deg, var(--c-blue), var(--c-cyan)); color: #fff; border-color: transparent; box-shadow: 0 5px 14px rgba(22,119,255,0.28); }
+  .cocard.lav.on { background: linear-gradient(110deg, #9b8cff, var(--c-lav)); box-shadow: 0 5px 14px rgba(155,140,255,0.3); }
+  .conote { font-size: 9px; font-weight: 700; color: var(--c-inksoft); margin-top: 6px; display: flex; gap: 4px; align-items: flex-start; }
+  .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .poster { position: relative; height: 92px; border-radius: 13px; padding: 7px; display: flex; align-items: flex-end; color: #fff; font-size: 9.5px; font-weight: 850; text-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+  .poster.p1 { background: linear-gradient(150deg, #3b5f9e, #7d6ba8); }
+  .poster.p2 { background: linear-gradient(150deg, #2f7f6a, #6fbf9a); }
+  .poster.p3 { background: linear-gradient(150deg, #9e5f7a, #d79aa8); }
+  .poster.p4 { background: linear-gradient(150deg, #8a6a3b, #d7b47a); }
+  .gear { position: absolute; top: 5px; right: 5px; width: 17px; height: 17px; border-radius: 50%; background: rgba(255,255,255,0.82); color: var(--c-ink); font-size: 8px; display: grid; place-items: center; text-shadow: none; }
+  .gear.hot { outline: 2px solid var(--now); outline-offset: 2px; }
+
+  /* 回看 */
+  .vfsmall { border-radius: 18px; overflow: hidden; position: relative; height: 248px; background: linear-gradient(150deg, #2a3f63, #4a6aa8 55%, #7d6ba8); }
+  .vfsmall.short { height: 196px; }
+  .vcap { position: absolute; left: 50%; transform: translateX(-50%); top: 42%; font-size: 12px; font-weight: 850; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,0.55); white-space: nowrap; }
+  .selbox { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); padding: 6px 12px; border: 1.4px dashed rgba(255,255,255,0.92); border-radius: 8px; }
+  .hdl { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .hdl.tl { left: -5px; top: -5px; } .hdl.tr { right: -5px; top: -5px; }
+  .hdl.bl { left: -5px; bottom: -5px; } .hdl.br { right: -5px; bottom: -5px; }
+  .duo { display: flex; gap: 9px; }
+  .duo .big { flex: 1; border-radius: 16px; padding: 11px 6px; text-align: center; background: var(--c-surface); border: 1px solid var(--c-hair); box-shadow: 0 3px 12px rgba(15,46,107,0.07); }
+  .duo .big .bi { font-size: 15px; }
+  .duo .big .bt { font-size: 10.5px; font-weight: 850; margin-top: 3px; }
+  .duo .big.pri { background: linear-gradient(110deg, var(--c-blue), var(--c-cyan)); color: #fff; border-color: transparent; box-shadow: 0 5px 15px rgba(22,119,255,0.3); }
+  .trio { display: flex; gap: 6px; }
+  .trio .p { flex: 1; border-radius: 99px; padding: 9px 0; text-align: center; font-size: 10px; font-weight: 850; background: var(--c-surface); border: 1px solid var(--c-hair); }
+  .trio .p.pri { background: linear-gradient(110deg, var(--c-blue), var(--c-cyan)); color: #fff; border-color: transparent; }
+  .flat { text-align: center; font-size: 10px; font-weight: 800; color: var(--c-inksoft); padding: 9px 0; }
+  .kb { position: absolute; left: 0; right: 0; bottom: 0; height: 168px; background: #d3d6dd; border-top: 1px solid rgba(0,0,0,0.12); padding: 7px 5px; }
+  .kbrow { display: flex; gap: 4px; margin-bottom: 5px; }
+  .kbrow span { flex: 1; height: 26px; border-radius: 5px; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+  .kbrow span.w { flex: 3; }
+  .field { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 14px; background: #fff; border: 1.5px solid rgba(22,119,255,0.35); font-size: 10.5px; }
+  .field .fx { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--c-blue); }
+
+  /* 调色板 */
+  .pal { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+  .pal .d { aspect-ratio: 1; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.75), 0 1px 4px rgba(0,0,0,0.25); }
+  .pal .d.sel { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2.5px var(--c-blue), 0 1px 4px rgba(0,0,0,0.25); }
+  .palrow { display: flex; gap: 7px; margin-top: 8px; }
+  .palrow .d { width: 22px; height: 22px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.8), 0 1px 4px rgba(0,0,0,0.25); }
+  .swatchtable td { vertical-align: middle; }
+  .sq { display: inline-block; width: 15px; height: 15px; border-radius: 4px; margin-right: 7px; vertical-align: -3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+
+  /* 单行 + 菜单 */
+  .onerow { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 16px; background: var(--c-surface); border: 1px solid var(--c-hair); box-shadow: 0 3px 12px rgba(15,46,107,0.06); }
+  .onerow .who { font-size: 11.5px; font-weight: 850; }
+  .onerow .hint { font-size: 9px; color: var(--c-inksoft); font-weight: 700; margin-top: 1px; }
+  .menu { border-radius: 14px; background: rgba(252,252,251,0.98); box-shadow: 0 10px 30px rgba(15,46,107,0.22); overflow: hidden; border: 1px solid var(--c-hair); }
+  .menu .mi { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 11px; font-weight: 750; }
+  .menu .mi + .mi { border-top: 1px solid var(--c-hair); }
+  .menu .mi .tick { margin-left: auto; color: var(--c-blue); font-weight: 900; }
+  .menu .mi .ms { font-size: 8.5px; color: var(--c-inksoft); font-weight: 700; }
+  .dim { position: absolute; inset: 0; background: rgba(11,18,32,0.14); }
+
+  /* 底部悬浮 */
+  .botbar { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; justify-content: center; }
+  .miniseg { display: inline-flex; gap: 3px; padding: 4px; border-radius: 99px; background: rgba(252,252,251,0.92); box-shadow: 0 6px 20px rgba(15,46,107,0.18); border: 1px solid var(--c-hair); }
+  .miniseg b { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 850; padding: 7px 13px; border-radius: 99px; color: var(--c-inksoft); }
+  .miniseg b.on { background: linear-gradient(110deg, var(--c-blue), var(--c-cyan)); color: #fff; }
+  .miniseg b.on.lav { background: linear-gradient(110deg, #9b8cff, var(--c-lav)); }
+  .chipbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 99px; background: rgba(252,252,251,0.94); box-shadow: 0 6px 20px rgba(15,46,107,0.18); border: 1px solid var(--c-hair); font-size: 11px; font-weight: 850; }
+  .abovebar { position: absolute; left: 14px; right: 14px; bottom: 58px; text-align: center; font-size: 9px; font-weight: 800; color: var(--c-inksoft); }
+  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; background: linear-gradient(to top, rgba(245,248,255,0.96), rgba(245,248,255,0)); }
+
+  /* 手势示意 */
+  .trash { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.5); display: grid; place-items: center; font-size: 13px; color: #fff; }
+  .guide { position: absolute; left: 50%; top: 8%; bottom: 8%; width: 1px; background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.85) 0 5px, transparent 5px 10px); }
+  .killx { position: absolute; left: -7px; top: -7px; width: 15px; height: 15px; border-radius: 50%; background: #fff; color: var(--c-ink); font-size: 9px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+
+  .open { border-left: 3px solid var(--now); padding-left: 13px; }
+  .open .q { font-weight: 750; margin-bottom: 3px; }
+  .open .why { font-size: 13.5px; color: var(--text-secondary); }
+  ul { max-width: 70ch; }
+  li { margin-bottom: 5px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 12px; max-width: 70ch; }
+  .fact { font-size: 13.5px; color: var(--text-secondary); max-width: 72ch; }
+  .fact b { color: var(--text-primary); }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>和朋友一起怎么更显著，加上回看页你不喜欢的四件事</h1>
+  <p class="thesis">两件事各自的答案都在源码里查过了。<b>和朋友一起没被删，它在海报右上角一个 13pt 的齿轮后面</b>——今天 <code>860dd06</code> 把创建页改成一屏四个 tab 时搬过去的。<b>字幕的放大、旋转、移动其实都已经做好了</b>，是昨天 <code>84334d2</code> 上的，只是除了直接上手捏之外没有任何地方告诉你能捏。所以下面一半是新设计，一半是把已经存在的东西露出来。</p>
+  <p class="meta">2026-09-16 · 分支 <code>fix/ux-round-after-1.2</code> · 源码 HEAD <code>84334d2</code> · 工作区里还停着一份两张卡版本的实现，没构建没提交</p>
+</header>
+
+<h2>你已经定的三件事</h2>
+<div class="card">
+  <div class="verdict">
+    <div class="tag fix">已定</div>
+    <div>
+      <div class="t">和朋友一起：一行一个按钮，点开再选，不要两张卡，也不换页</div>
+      <div class="d">下面第一部分按这个重画了。<b>剩一个小选择</b>：点开以后是弹原生菜单，还是那一行自己展开成两行。</div>
+    </div>
+  </div>
+  <div class="verdict">
+    <div class="tag fix">已定</div>
+    <div>
+      <div class="t">回看页：画面还是大的，收边，底下一排三个胶囊</div>
+      <div class="d">就是你发的那张图 —— 它是上一份 spec 里的<b>方案 B</b>。那张图画的是三个横胶囊，<b>但代码没按它做</b>：实现时把方案 A 的卡片列表融进来了，才变成你说丑的竖着三行。改回图上那样。</div>
+    </div>
+  </div>
+  <div class="verdict">
+    <div class="tag fix">已定</div>
+    <div>
+      <div class="t">字幕在大画面里改，不进小卡片；手势按常见 app 的习惯做</div>
+      <div class="d">选中态的虚线框 + 四角把手这个方案保留。我原来提的「在收边卡里改」作废。手势参照 Instagram Stories / 剪映 / CapCut 那一套，见第二部分第 4 条的对照表。</div>
+    </div>
+  </div>
+</div>
+
+<h2>第一部分 · 和朋友一起</h2>
+
+<h3>现在它在哪</h3>
+<p class="fact">创建页现在是一屏：标题、自己写题目的渐变卡、四个 tab、海报网格。<b>点海报本身就是提交</b>——直接建故事、进相机，默认自己拍（<code>StoryComposerView.createFromPoster</code>）。自己拍 / 和朋友一起这个选择被移进了一个设置半屏，进去的方法只有两个：点海报右上角的齿轮，或者走自己写题目那条路。源码注释自己写的是「一起拍唯一活着的地方」。</p>
+<p class="fact">这条路的另一头也一样窄：首页加入房间的唯一常驻入口是 header 上一个 36pt 无文字图标。<b>多人这条链路两头都看不见。</b></p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:10px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear hot">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>现状</b>橙圈那个 17pt 齿轮是「和朋友一起」目前唯一的入口。创建页上没有任何一个字提到房间或邀请码。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="position:relative">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:10px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+        <div class="fade"></div>
+        <div class="botbar">
+          <div class="miniseg"><b class="on">👤 自己拍</b><b>👥 一起拍</b></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>A1 · 底部迷你分段（推荐）</b>六个字，宽度约 150pt，钉在屏幕底部，海报从它下面滚过去。两个词一直都在，点一下就换，不用点两次。海报网格一点没被挤。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="position:relative">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:10px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，房间就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+        <div class="fade"></div>
+        <div class="abovebar">建好房间后给你 6 位邀请码</div>
+        <div class="botbar">
+          <div class="miniseg"><b>👤 自己拍</b><b class="on lav">👥 一起拍</b></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>A1 · 选到一起拍的样子</b>选中那半变成薰衣草渐变，上面多一行小字说邀请码。这行小字只在一起拍时出现——自己拍不需要解释。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="position:relative">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:10px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+        </div>
+        <div class="dim"></div>
+        <div style="position:absolute;left:52px;right:52px;bottom:56px">
+          <div class="menu">
+            <div class="mi"><span>👤</span><div>自己拍</div><span class="tick">✓</span></div>
+            <div class="mi"><span>👥</span><div>一起拍 · 需登录</div></div>
+          </div>
+        </div>
+        <div class="botbar">
+          <div class="chipbtn">👤 自己拍 ⌃</div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>A2 · 底部一个胶囊 + 菜单</b>你说的「一个按钮点开再选」，字最少（收起来四个字）。代价是要点两次，而且收起来的时候屏幕上没有「一起拍」这三个字——除了菜单里没人知道有这条路。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:10px"><b>一日</b><b>七日</b><b>按时间</b><b>自己写</b><b class="on" style="background:linear-gradient(110deg,#9b8cff,#b3a4ff)">一起拍</b></div>
+        <div class="lbl">选一张，房间就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>方案 B · 第五个 tab</b>不占任何额外高度，海报一行不少。但前四个 tab 回答「什么故事」，第五个回答「和谁」，五个挤在一排还会压到 9pt 以下；而且进了一起拍就看不到七日模板。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div class="rt" style="font-weight:850">搬家这一天</div><div class="val">1 / 7</div></div>
+        <div class="vfsmall short" style="margin-top:4px">
+          <div class="vcap">第一个箱子</div>
+        </div>
+        <div class="glass" style="margin-top:10px">
+          <div class="row"><div class="ic l">👥</div><div><div class="rt">邀请朋友一起拍</div><div style="font-size:9px;color:var(--c-inksoft)">把这个故事变成房间，你们各拍各的</div></div><div class="val">›</div></div>
+        </div>
+        <div class="lbl">今天还剩</div>
+        <div class="glass">
+          <div class="row"><div class="ic b">2</div><div class="rt">路上</div><div class="val">拍 ›</div></div>
+          <div class="row"><div class="ic b">3</div><div class="rt">新家第一眼</div><div class="val">拍 ›</div></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>方案 E · 建完再邀请</b>创建流程一个决定都不加。人想叫朋友通常是拍完第一段、觉得这天值得记的那一刻。但这不是 UI 活：本地故事升级成房间要新建云端记录、把拍好的片段补传、处理传一半失败。</p>
+  </div>
+</div>
+
+<h3>四个方案摊开比</h3>
+<table>
+  <thead><tr><th>方案</th><th>显著程度</th><th>代价</th><th>工时</th><th>我的判断</th></tr></thead>
+  <tbody>
+    <tr class="rec">
+      <td><b>A</b> 顶部一行 + 菜单<br><span style="color:var(--text-muted);font-weight:400">你定的</span></td>
+      <td>高。标题正下方，副标题里一直带着「和朋友一起」五个字</td>
+      <td>海报网格下移约 45pt（四张海报仍在一屏）；多一次点击才能切换</td>
+      <td>1.5 小时<br>（工作区那份的接线可复用，UI 换掉）</td>
+      <td><b>做这个</b>。不加步骤，和「点海报就建好」这条规矩不打架</td>
+    </tr>
+    <tr>
+      <td><b>A′</b> 顶部两张卡</td>
+      <td>最高，一眼两个选项都在</td>
+      <td>占 75pt，一屏从两行海报变成一行半</td>
+      <td>已写好，停在工作区</td>
+      <td>你否了。UI 那段作废，接线留用</td>
+    </tr>
+    <tr>
+      <td><b>B</b> 第五个 tab</td>
+      <td>中。在 tab 行里，但和其他四个长得一样，容易被当成又一批模板</td>
+      <td>两个维度混在一排；一起拍里看不到七日；五个 tab 字号要压到 9pt</td>
+      <td>2 小时</td>
+      <td>不推荐，理由是维度混淆</td>
+    </tr>
+    <tr>
+      <td><b>C</b> 首页就分叉</td>
+      <td>中高。首页空态卡和 header 各给一个「和朋友一起拍」入口，进创建页时预设好</td>
+      <td>首页再多一个按钮；进去以后改主意还得靠齿轮</td>
+      <td>1 小时</td>
+      <td>和 A 互补，不是替代。A 上线后再看要不要</td>
+    </tr>
+    <tr>
+      <td><b>E</b> 建完再邀请</td>
+      <td>换了个地方显著：创建时不问，故事页上一直有</td>
+      <td>要写「本地故事 → 房间」的升级路径，含已拍片段补传和失败重试。数据层的活</td>
+      <td>1 天以上</td>
+      <td>产品上最对，也最贵。A 做完再判断还缺不缺</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">A 和 E 不互斥：A 是创建时的选择，E 是事后的补救，先做 A 不会挡住以后做 E。</p>
+
+<h3>一个要你定的问题</h3>
+<div class="card">
+  <div class="open">
+    <div class="q">和朋友一起要登录 iCloud。这道墙放在哪？</div>
+    <div class="why">换成菜单以后这题基本自己解决了：<b>「需要登录」写在菜单里那一项的说明行上</b>（上面第二张图），人在选之前就知道，不用等点了海报才弹窗。<br>
+    剩下半个问题是取消登录之后怎么办 —— 现在是弹登录页、你点「先不了」、然后什么都没发生，和「取消登录邀请码丢了」是同一个病。这条归 UX 审计 4.2，单独修，不在这份 spec 里。</div>
+  </div>
+</div>
+
+<h2>第二部分 · 回看页四件事</h2>
+
+<h3>1 · 加字幕和重拍竖着排，太丑</h3>
+<p class="fact">现状是昨天收边改造的结果：视频缩成圆角卡片，底下一张玻璃卡里竖着三行——加字幕、聊天、重拍，每行是图标方块 + 标题 + 右侧值 + 箭头（<code>ClipPreviewView.momentRow</code>），再下面一条通栏的「全屏」胶囊。<b>三行长得完全一样，而这三件事的分量根本不一样</b>：加字幕是你几乎每次都做的，重拍是偶尔，聊天只在房间里出现。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div><div class="val" style="margin-left:auto">4 / 5</div></div>
+        <div class="vfsmall"><div class="vcap">第一个箱子</div></div>
+        <div class="glass" style="margin-top:11px">
+          <div class="row"><div class="ic b">💬</div><div class="rt">加字幕</div><div class="val">第一个箱子 ›</div></div>
+          <div class="row"><div class="ic l">💭</div><div class="rt">聊这个瞬间</div><div class="val">3 条 ›</div></div>
+          <div class="row"><div class="ic n">↺</div><div class="rt">重拍</div><div class="val">›</div></div>
+        </div>
+        <div class="flat" style="margin-top:10px;border:1px solid var(--c-hair);border-radius:99px;background:rgba(255,255,255,0.6)">⤢ 全屏</div>
+      </div>
+    </div></div>
+    <p class="cap"><b>现状</b>三行等重的列表，加上一条全屏。你说的丑就是这里：它长得像设置页，不像一个看片子的地方。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div><div class="val" style="margin-left:auto">4 / 5</div></div>
+        <div class="vfsmall"><div class="vcap">第一个箱子</div></div>
+        <div class="duo" style="margin-top:12px">
+          <div class="big pri"><div class="bi">✎</div><div class="bt">改字幕</div></div>
+          <div class="big"><div class="bi">↺</div><div class="bt">重拍</div></div>
+        </div>
+        <div class="glass" style="margin-top:9px">
+          <div class="row"><div class="ic l">💭</div><div class="rt">聊这个瞬间</div><div class="val">3 条 ›</div></div>
+        </div>
+        <div class="flat">⤢ 全屏看</div>
+      </div>
+    </div></div>
+    <p class="cap"><b>备选 · 两个方块（未选）</b>横着两个按钮，改字幕是主动作走渐变。但画面还是小卡片，聊天被挤到下面单独一行。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div><div class="val" style="margin-left:auto">4 / 5</div></div>
+        <div class="vfsmall"><div class="vcap">第一个箱子</div></div>
+        <div class="trio" style="margin-top:12px">
+          <div class="p pri">✎ 改字幕</div>
+          <div class="p">↺ 重拍</div>
+          <div class="p">💭 3</div>
+        </div>
+        <div class="flat" style="margin-top:8px">⤢ 全屏看</div>
+      </div>
+    </div></div>
+    <p class="cap"><b>备选 · 三个胶囊，画面不变大（未选）</b>一排全放下，最省高度。但画面还是那张小卡片，而你要的是画面本身变大。</p>
+  </div>
+</div>
+
+<h3>定稿：就是你发的那张图</h3>
+<p class="fact">画面缩进 13pt 圆角、四周暗底、顶上一个真的 ✕，底下一排三个胶囊。<b>上一份 spec 的方案 B 画的就是这个</b>，但实现时把方案 A 的卡片列表融了进来，所以你收到的是「小卡片 + 竖着三行」。改回图上那样，同时意味着<b>没有两个模式了</b>：这一屏就是回看，不再有「先卡片、点全屏才变大」的切换。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen" style="background:linear-gradient(170deg,#2b3a58,#43567f)">
+      <div class="sbar" style="color:#fff"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="padding:6px 10px">
+        <div class="navrow"><div class="bub" style="background:rgba(255,255,255,0.22);color:#fff">✕</div><div style="font-size:12px;font-weight:850;color:#fff">咖啡 · 2/7</div></div>
+        <div style="position:relative;border-radius:22px;height:352px;background:linear-gradient(150deg,#3f5680,#7d6ba8);overflow:hidden">
+          <div class="vcap" style="top:auto;bottom:26%">今天从这里开始</div>
+        </div>
+        <div class="palrow" style="justify-content:center;margin-top:11px">
+          <div class="d" style="background:#fff"></div>
+          <div class="d" style="background:#111"></div>
+          <div class="d" style="background:#1677ff"></div>
+          <div class="d" style="background:#38b6ff"></div>
+          <div class="d" style="background:#4fd1a5"></div>
+          <div class="d" style="background:#ffce73"></div>
+          <div class="d" style="background:#ff6b4a"></div>
+          <div class="d" style="background:#e8407a"></div>
+        </div>
+        <div class="trio" style="margin-top:11px">
+          <div class="p">✎ 加字幕</div>
+          <div class="p">↺ 重拍</div>
+          <div class="p pri">💭 聊天</div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>定稿</b>画面占掉整屏的六成半，字幕就在画面上改（下一条）。颜色那排只在已经有字幕时出现。三个胶囊按你的图：加字幕、重拍、聊天。</p>
+  </div>
+</div>
+
+<h3>2 · 改字幕不要跳全屏</h3>
+<p class="fact">你说对了，现在是强制跳的：<code>startEditingCaption()</code> 里第二行就是 <code>fullScreen = true</code>。当时这么写的理由是所见即所得——全屏才是导出尺寸，字幕摆在哪、多大，全屏下看到的最接近成片。</p>
+<p class="fact"><b>定稿是：不跳全屏，也不去小卡片里改，就在上面那张定稿画面上改。</b>因为定稿已经没有「小卡片」和「全屏」两个模式了——回看页本身就是一张大画面，字幕直接在它上面编辑。位置和大小按画面比例存（<code>CaptionSticker.x/y</code> 是 0–1 的分数，<code>scale</code> 是相对字号），所以画面上摆好，导出就是那个样子。</p>
+<p class="fact">下面左边那张「键盘顶起小卡片」是我原来提的方案，<b>你否了，作废</b>，留在这里只为说明差别。右边那张是定稿的编辑状态。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="position:relative;padding-bottom:0">
+        <div class="navrow"><div class="bub">✕</div><div class="val" style="margin-left:auto">4 / 5</div></div>
+        <div class="vfsmall short"><div class="vcap">第一个箱子</div></div>
+        <div class="field" style="margin-top:11px"><span>第一个箱子</span><span class="fx">完成</span></div>
+        <div class="pal" style="margin-top:10px">
+          <div class="d sel" style="background:#fff"></div>
+          <div class="d" style="background:#0f2e6b"></div>
+          <div class="d" style="background:#1677ff"></div>
+          <div class="d" style="background:#38b6ff"></div>
+          <div class="d" style="background:#4fd1a5"></div>
+          <div class="d" style="background:#b3a4ff"></div>
+          <div class="d" style="background:#ffce73"></div>
+          <div class="d" style="background:#ff9db3"></div>
+          <div class="d" style="background:#ff6b4a"></div>
+          <div class="d" style="background:#e8407a"></div>
+          <div class="d" style="background:#7b5cff"></div>
+          <div class="d" style="background:#111"></div>
+        </div>
+        <div class="kb">
+          <div class="kbrow"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="kbrow"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="kbrow"><span class="w"></span><span class="w"></span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>作废 · 键盘顶起小卡片</b>我原来提的：视频缩短给键盘让位，输入框贴在卡片下面。你不要这个。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar" style="color:#fff"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="position:absolute;inset:0;padding:0;height:auto">
+        <div style="position:absolute;inset:0;background:linear-gradient(150deg,#2a3f63,#4a6aa8 55%,#7d6ba8)"></div>
+        <div class="guide"></div>
+        <div class="selbox">
+          <span style="font-size:12px;font-weight:850;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,0.5)">第一个箱子</span>
+          <span class="killx">✕</span>
+          <span class="hdl tr"></span><span class="hdl bl"></span><span class="hdl br"></span>
+        </div>
+        <div style="position:absolute;left:14px;right:14px;bottom:76px">
+          <div style="font-size:9px;font-weight:800;color:rgba(255,255,255,0.85);text-align:center;margin-bottom:8px">拖动移位置 · 两指捏大小 · 两指转角度</div>
+          <div class="palrow">
+            <div class="d" style="background:#fff"></div>
+            <div class="d" style="background:#0f2e6b"></div>
+            <div class="d" style="background:#1677ff"></div>
+            <div class="d" style="background:#38b6ff"></div>
+            <div class="d" style="background:#4fd1a5"></div>
+            <div class="d" style="background:#b3a4ff"></div>
+            <div class="d" style="background:#ffce73"></div>
+            <div class="d" style="background:#ff6b4a"></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>定稿 · 选中字幕时的虚线框和四角把手</b>点一下字幕先选中（不直接进输入），出现虚线框、四个把手和一行手势说明；再点一下才编辑文字。左上角 ✕ 删除，右下角把手单指拖 = 同时缩放和旋转，移到中线出吸附虚线。</p>
+  </div>
+</div>
+
+<h3>3 · 字幕颜色不好看，要更多颜色</h3>
+<p class="fact">现在是六个：白、品牌蓝 <code>#1677FF</code>、青 <code>#38B6FF</code>、薰衣草 <code>#B3A4FF</code>、薄荷 <code>#4FD1A5</code>、深墨 <code>#0F2E6B</code>（<code>Theme.swift:187</code>）。<b>全是 app 自己的品牌色</b>——当时的想法是「视频上大多数颜色都读不清，读得清的就是这六个」。结果就是你说的：不像可以挑的颜色，像品牌色盘。</p>
+<p class="fact">建议换成 12 个，按用途分三组，都配同一套描边和投影保证在任何画面上都读得清：</p>
+<table class="swatchtable">
+  <thead><tr><th>组</th><th>颜色</th><th>为什么是这些</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>中性 2</td>
+      <td><span class="sq" style="background:#fff"></span>白 <span class="sq" style="background:#111;margin-left:10px"></span>黑</td>
+      <td>最常用的两个。现在只有白，没有黑——亮画面（雪、白墙、逆光）上白字永远糊</td>
+    </tr>
+    <tr>
+      <td>鲜色 6</td>
+      <td>
+        <span class="sq" style="background:#1677ff"></span><span class="sq" style="background:#38b6ff"></span><span class="sq" style="background:#4fd1a5"></span><span class="sq" style="background:#ffce73"></span><span class="sq" style="background:#ff6b4a"></span><span class="sq" style="background:#e8407a"></span>
+      </td>
+      <td>蓝、青、薄荷保留（已经在用），新增黄 <code>#FFCE73</code>、橙红 <code>#FF6B4A</code>、玫红 <code>#E8407A</code>。前两个 app 里已有（<code>oneDayButter</code>、<code>oneDayBlush</code> 附近），暖色现在完全缺席</td>
+    </tr>
+    <tr>
+      <td>柔色 4</td>
+      <td>
+        <span class="sq" style="background:#b3a4ff"></span><span class="sq" style="background:#7b5cff"></span><span class="sq" style="background:#ff9db3"></span><span class="sq" style="background:#0f2e6b"></span>
+      </td>
+      <td>薰衣草和深墨保留，加紫 <code>#7B5CFF</code> 和粉 <code>#FF9DB3</code>。两行六列刚好，不用滚</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">两个实现上的事实，决定了这件事便宜：颜色只在一处映射（<code>Theme.swift</code> 的 <code>Tint.uiColor</code>），预览和导出（<code>VideoStitcher</code> 第 816 行）读的是同一个值，所以加了就两边都对。存储是字符串，老版本读到新颜色会退回白色而不是丢掉整条字幕——朋友用旧版本看你的片子，字还在，只是白的。</p>
+
+<h3>4 · 放大缩小和调位置</h3>
+<div class="card">
+  <div class="verdict">
+    <div class="tag keep">已有</div>
+    <div>
+      <div class="t">三个都能做，昨天 <code>84334d2</code> 就上了</div>
+      <div class="d">拖动移位置（限制在画面 8% 到 92% 之间，免得拖出画外找不回来）、两指捏放大缩小（0.55 到 2.2 倍，下限是导出时还能看清的字号）、两指旋转（±35 度，再多就不像倾斜而像出错）。位置和大小都按画面比例存，所以导出和你摆的一样。</div>
+    </div>
+  </div>
+  <div class="verdict">
+    <div class="tag fix">要修</div>
+    <div>
+      <div class="t">但屏幕上没有任何地方说得出来</div>
+      <div class="d">字幕就是一段文字浮在画面上，点一下直接进输入框改字。<b>没有选中态、没有把手、没有提示</b>，所以除了自己瞎试没人会知道能捏能转。你问「有没有这个功能」本身就是证据。</div>
+    </div>
+  </div>
+</div>
+
+<h4 style="font-size:14.5px;font-weight:750;margin:22px 0 8px">按常见 app 的习惯补齐</h4>
+<p class="fact">对照 Instagram Stories、剪映、CapCut 这几个的贴纸交互，一套标准动作是八条。我们已经有三条，缺五条：</p>
+<table>
+  <thead><tr><th>动作</th><th>常见 app 怎么做</th><th>我们</th><th>工时</th></tr></thead>
+  <tbody>
+    <tr><td>单指拖动移位置</td><td>直接拖</td><td>已有</td><td>—</td></tr>
+    <tr><td>双指捏放大缩小</td><td>直接捏</td><td>已有（0.55–2.2 倍）</td><td>—</td></tr>
+    <tr><td>双指旋转</td><td>直接转</td><td>已有（±35°）</td><td>—</td></tr>
+    <tr><td>点一下选中，出虚线框 + 把手</td><td>三家都有，是「这东西能动」的唯一信号</td><td><b>要做</b></td><td>1.5 小时</td></tr>
+    <tr><td>右下角把手单指拖 = 同时缩放 + 旋转</td><td>Instagram / CapCut 都支持。单手拿手机时双指捏不动，这条是真需求</td><td><b>要做</b></td><td>1.5 小时</td></tr>
+    <tr><td>左上角 ✕ 删除</td><td>剪映用角上的 ✕；Instagram 是拖到底部垃圾桶。小画面里拖垃圾桶容易误触，建议用角上 ✕</td><td><b>要做</b></td><td>40 分钟</td></tr>
+    <tr><td>靠近中线时吸附 + 出辅助虚线 + 轻震动</td><td>三家都有。徒手摆正中间摆不准，这条决定成片是否显得随便</td><td><b>要做</b></td><td>1 小时</td></tr>
+    <tr><td>点画面空白处取消选中</td><td>标准</td><td><b>要做</b></td><td>20 分钟</td></tr>
+  </tbody>
+</table>
+<p class="note">五条加起来约 5 小时。第一次选中时在画面底部显示一次「拖动移位置 · 两指捏大小 · 两指转角度」，之后不再出现——常见 app 都是这个处理，提示只教一次。</p>
+
+<h2>处置一览</h2>
+<table>
+  <thead><tr><th class="n">#</th><th>事</th><th>判定</th><th>工时</th><th>卡在哪</th></tr></thead>
+  <tbody>
+    <tr><td class="n">1</td><td>和朋友一起：创建页顶部一行 + 点开选（方案 A）</td><td>差一个小确认</td><td>1.5 小时</td><td>原生菜单还是那一行自己展开。我推菜单</td></tr>
+    <tr><td class="n">2</td><td>回看页改成你那张图：大画面收边 + 一排三个胶囊</td><td>直接做</td><td>3 小时</td><td>不卡</td></tr>
+    <tr><td class="n">3</td><td>字幕就在大画面上改，不跳全屏也不进小卡片</td><td>直接做</td><td>1.5 小时</td><td>不卡（和 2 一起做，本来就是同一屏）</td></tr>
+    <tr><td class="n">4</td><td>字幕颜色从 6 个扩到 12 个，分三组</td><td>直接做</td><td>2 小时</td><td>不卡</td></tr>
+    <tr><td class="n">5</td><td>字幕手势补齐五条：选中态、单指把手、✕ 删除、中线吸附、点空白取消</td><td>直接做</td><td>5 小时</td><td>不卡</td></tr>
+    <tr><td class="n">6</td><td>首页也给「和朋友一起拍」入口（方案 C）</td><td>先不做</td><td>1 小时</td><td>等 1 上线看还缺不缺</td></tr>
+    <tr><td class="n">7</td><td>本地故事升级成房间（方案 E）</td><td>先不做</td><td>1 天以上</td><td>数据层的活，等 1 的反馈</td></tr>
+  </tbody>
+</table>
+<p class="note">2 到 5 不需要你回答任何问题，加起来约 11.5 小时，基本是一整天。1 只差「菜单还是展开」这一个字。工作区里停着的两张卡版本，UI 那段扔掉、接线（绑定和点海报建房间的分支）留用。</p>
+
+</main>
+</body>
+</html>
