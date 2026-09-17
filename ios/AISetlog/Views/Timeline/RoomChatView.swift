@@ -119,7 +119,7 @@ private struct RoomChatConversation: View {
                         if error == .fetch {
                             Button(text("重试", "Retry")) { Task { await session.refresh() } }
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.oneDayBlue)
+                                .foregroundStyle(Color.oneDayBrand)
                         }
                     }
                     .padding(12)
@@ -360,7 +360,7 @@ private struct RoomChatConversation: View {
                     get: { session.state?.draft ?? "" }, set: { session.setDraft($0) }), axis: .vertical)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                    .tint(Color.oneDayBlue)
+                    .tint(Color.oneDayBrand)
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
@@ -371,9 +371,9 @@ private struct RoomChatConversation: View {
                         cornerRadius: 20, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.oneDayBlue.opacity(0.3), lineWidth: 1.5)
+                            .strokeBorder(Color.oneDayBrand.opacity(0.3), lineWidth: 1.5)
                     }
-                    .oneDayGlow(.oneDayBlue, strength: 0.45)
+                    .oneDayGlow(.oneDayBrand, strength: 0.45)
                     .disabled(session.state == nil)
                 Button {
                     followsLatest = true
@@ -384,7 +384,7 @@ private struct RoomChatConversation: View {
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                         .background(OneDay.brandHorizontal, in: Circle())
-                        .oneDayGlow(.oneDayBlue, strength: 0.8)
+                        .oneDayGlow(.oneDayBrand, strength: 0.8)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(text("发送", "Send"))

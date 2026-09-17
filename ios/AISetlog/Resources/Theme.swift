@@ -24,8 +24,40 @@ extension UIColor {
             alpha: 1)
     }
 
-    /// #1677FF — the one blue everything leans on.
+    /// #1677FF — the blue the app was born in. Pinned, and still the default
+    /// accent: caption colours and anything that must stay this exact hue
+    /// reads this one rather than `oneDayBrand`.
     static let oneDayBlue = UIColor(hex: 0x1677FF)
+
+    /// The accent the app is currently wearing.
+    ///
+    /// Your avatar's colour, or the brand blue when you haven't picked one.
+    /// Computed rather than stored because it answers a preference, and a
+    /// `let` would freeze whichever colour was current at launch.
+    ///
+    /// Reads the same key the avatar reads, which is the whole point: people
+    /// asked for a warm app, and they had already been given a place to say
+    /// which colour is theirs. One choice, not two.
+    static var oneDayBrand: UIColor { Identity.myPickedUIColor() ?? oneDayBlue }
+
+    /// The lighter end of the brand gradient, derived from whatever the accent
+    /// is. Hue rotated a little and saturation eased off — the same
+    /// relationship #38B6FF has to #1677FF, applied to any of the seven.
+    static var oneDayBrandLight: UIColor {
+        let base = oneDayBrand
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard base.getHue(
+            &hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        else { return oneDayCyan }
+        return UIColor(
+            hue: (hue - 0.028 + 1).truncatingRemainder(dividingBy: 1),
+            saturation: saturation * 0.84,
+            brightness: min(brightness * 1.06, 1),
+            alpha: alpha)
+    }
     /// #38B6FF — the lighter half of the brand gradient.
     static let oneDayCyan = UIColor(hex: 0x38B6FF)
     /// #7FB4FF — tinted rails, inactive strokes, gradient midpoints.
@@ -69,6 +101,10 @@ extension UIColor {
 
 extension Color {
     static let oneDayBlue = Color(uiColor: .oneDayBlue)
+    /// Computed, not stored, for the same reason as the `UIColor` it wraps: a
+    /// `let` here would hand every view the accent as it was at launch.
+    static var oneDayBrand: Color { Color(uiColor: .oneDayBrand) }
+    static var oneDayBrandLight: Color { Color(uiColor: .oneDayBrandLight) }
     static let oneDayCyan = Color(uiColor: .oneDayCyan)
     static let oneDaySky = Color(uiColor: .oneDaySky)
     static let oneDayNavy = Color(uiColor: .oneDayNavy)
@@ -135,13 +171,17 @@ enum OneDay {
 
     // MARK: Gradients
 
-    static let brand = LinearGradient(
-        colors: [Color.oneDayBlue, Color.oneDayCyan],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
+    static var brand: LinearGradient {
+        LinearGradient(
+            colors: [Color.oneDayBrand, Color.oneDayBrandLight],
+            startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
-    static let brandHorizontal = LinearGradient(
-        colors: [Color.oneDayBlue, Color.oneDayCyan],
-        startPoint: .leading, endPoint: .trailing)
+    static var brandHorizontal: LinearGradient {
+        LinearGradient(
+            colors: [Color.oneDayBrand, Color.oneDayBrandLight],
+            startPoint: .leading, endPoint: .trailing)
+    }
 
     /// Behind a cover image, so white text stays legible over any footage.
     static let scrim = LinearGradient(
@@ -169,7 +209,7 @@ extension View {
     }
 
     /// Colored lift under a primary action, so the blue feels like it glows.
-    func oneDayGlow(_ color: Color = .oneDayBlue, strength: Double = 1) -> some View {
+    func oneDayGlow(_ color: Color = .oneDayBrand, strength: Double = 1) -> some View {
         shadow(color: color.opacity(0.28 * strength), radius: 18 * strength, y: 9 * strength)
     }
 }

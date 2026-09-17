@@ -142,7 +142,7 @@ struct StoryCoverSheet: View {
                                     RoundedRectangle(cornerRadius: 13, style: .continuous)
                                         .strokeBorder(
                                             liftingFrom == clip.day
-                                                ? Color.oneDayBlue : .white.opacity(0.25),
+                                                ? Color.oneDayBrand : .white.opacity(0.25),
                                             lineWidth: liftingFrom == clip.day ? 2.5 : 1)
                                 }
                         }
@@ -161,10 +161,10 @@ struct StoryCoverSheet: View {
             HStack(spacing: 11) {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .frame(width: 34, height: 34)
                     .background(
-                        Color.oneDayBlue.opacity(0.13),
+                        Color.oneDayBrand.opacity(0.13),
                         in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 Text(Strings.coverFromPhotos)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -207,7 +207,7 @@ struct StoryCoverSheet: View {
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .strokeBorder(
-                                        chosen ? Color.oneDayBlue : .white.opacity(0.3),
+                                        chosen ? Color.oneDayBrand : .white.opacity(0.3),
                                         lineWidth: chosen ? 2.5 : 1)
                             }
                     }

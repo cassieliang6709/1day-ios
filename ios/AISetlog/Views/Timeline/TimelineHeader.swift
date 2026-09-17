@@ -45,7 +45,7 @@ struct TimelineHeader: View {
                 if isSyncing {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(Color.oneDayBlue)
+                        .tint(Color.oneDayBrand)
                 }
             }
 
@@ -73,7 +73,7 @@ struct TimelineHeader: View {
                 Text(code)
                     .font(.system(size: 15, weight: .heavy, design: .monospaced))
                     .tracking(2)
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
 
                 Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 11, weight: .bold))
@@ -169,7 +169,7 @@ struct EditPlanSheet: View {
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
                                 .frame(width: 24, height: 24)
-                                .background(Color.oneDayBlue, in: Circle())
+                                .background(Color.oneDayBrand, in: Circle())
                             TextField(
                                 Strings.promptN(index + 1),
                                 text: Binding(

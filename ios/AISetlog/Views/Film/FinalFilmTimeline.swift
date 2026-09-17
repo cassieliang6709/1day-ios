@@ -66,7 +66,7 @@ struct FinalFilmTimeline: View {
             FilmAction(
                 icon: isSaving ? "arrow.down.circle" : "square.and.arrow.down",
                 label: isSaving ? Strings.saving : Strings.saveAction,
-                accent: .oneDayBlue,
+                accent: .oneDayBrand,
                 isBusy: isSaving,
                 action: onSave)
                 .disabled(previewMedia != nil)

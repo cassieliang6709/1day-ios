@@ -17,7 +17,7 @@ struct NotificationPrimerView: View {
 
             Image(systemName: "bell.badge.fill")
                 .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(Color.oneDayBlue.gradient)
+                .foregroundStyle(Color.oneDayBrand.gradient)
 
             VStack(spacing: 10) {
                 Text(Strings.notificationPrimerTitle)
@@ -49,7 +49,7 @@ struct NotificationPrimerView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
                 .disabled(requesting)

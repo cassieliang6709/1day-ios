@@ -195,13 +195,13 @@ struct TemplateCoverField: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18, weight: .bold))
                                 .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, Color.oneDayBlue)
+                                .foregroundStyle(.white, Color.oneDayBrand)
                                 .padding(5)
                         }
                     }
                 Text(preset.name.resolved())
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(selected ? Color.oneDayBlue : OneDay.inkSoft)
+                    .foregroundStyle(selected ? Color.oneDayBrand : OneDay.inkSoft)
                     .lineLimit(1)
             }
         }

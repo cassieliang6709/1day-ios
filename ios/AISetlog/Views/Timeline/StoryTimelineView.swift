@@ -339,7 +339,7 @@ struct StoryTimelineView: View {
                 ShareLink(item: shareText(code: code, challenge: challenge)) {
                     Label(Strings.inviteLabel, systemImage: "person.badge.plus")
                         .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 9)
                         .background(.regularMaterial, in: Capsule())

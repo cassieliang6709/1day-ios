@@ -310,7 +310,7 @@ struct OpenSlotRow: View {
             HStack(spacing: 12) {
                 Image(systemName: momentIcon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .frame(width: 34, height: 34)
                     .background(Color.oneDayMist.opacity(0.55), in: Circle())
 
@@ -324,7 +324,7 @@ struct OpenSlotRow: View {
 
                 Text(trailingLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 

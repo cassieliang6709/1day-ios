@@ -27,7 +27,7 @@ struct OneDayCanvas: View {
                 // being legible. Dark keeps the same shapes as a dim brand
                 // glow instead: decoration, never a spotlight.
                 ZStack {
-                    bloom(.oneDayMist, dark: .oneDayBlue,
+                    bloom(.oneDayMist, dark: .oneDayBrand,
                           size: 320, x: -140, y: -280, opacity: 0.9, darkOpacity: 0.16)
                     bloom(.oneDaySky, dark: .oneDayCyan,
                           size: 260, x: 170, y: -180, opacity: 0.28, darkOpacity: 0.10)

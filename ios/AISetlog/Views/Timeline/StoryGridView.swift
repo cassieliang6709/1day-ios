@@ -42,7 +42,7 @@ struct ViewModeToggle: View {
                         .background {
                             if isOn {
                                 Capsule()
-                                    .fill(Color.oneDayBlue)
+                                    .fill(Color.oneDayBrand)
                                     .matchedGeometryEffect(id: "viewmode", in: indicator)
                             }
                         }

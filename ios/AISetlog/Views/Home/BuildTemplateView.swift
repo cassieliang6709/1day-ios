@@ -67,7 +67,7 @@ struct BuildTemplateView: View {
                     } header: {
                         Text(Strings.templateCoverLabel)
                             .font(.caption.bold())
-                            .foregroundStyle(Color.oneDayBlue.opacity(0.62))
+                            .foregroundStyle(Color.oneDayBrand.opacity(0.62))
                             .kerning(1.2)
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
@@ -83,7 +83,7 @@ struct BuildTemplateView: View {
                         } header: {
                             Text(Strings.yourOrder(selected.count))
                                 .font(.caption.bold())
-                                .foregroundStyle(Color.oneDayBlue.opacity(0.62))
+                                .foregroundStyle(Color.oneDayBrand.opacity(0.62))
                                 .kerning(1.2)
                         }
                         .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
@@ -100,7 +100,7 @@ struct BuildTemplateView: View {
                     } header: {
                         Text(Strings.promptPool)
                             .font(.caption.bold())
-                            .foregroundStyle(Color.oneDayBlue.opacity(0.62))
+                            .foregroundStyle(Color.oneDayBrand.opacity(0.62))
                             .kerning(1.2)
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 20, trailing: 20))
@@ -153,9 +153,9 @@ struct BuildTemplateView: View {
         .background(OneDay.surface.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(Color.oneDayBlue.opacity(nameFocused ? 0.38 : 0.13), lineWidth: 1.5)
+                .strokeBorder(Color.oneDayBrand.opacity(nameFocused ? 0.38 : 0.13), lineWidth: 1.5)
         )
-        .shadow(color: Color.oneDayBlue.opacity(0.08), radius: 16, y: 8)
+        .shadow(color: Color.oneDayBrand.opacity(0.08), radius: 16, y: 8)
     }
 
     private func orderRow(index: Int) -> some View {
@@ -164,7 +164,7 @@ struct BuildTemplateView: View {
                 .font(.caption.bold())
                 .foregroundStyle(.white)
                 .frame(width: 22, height: 22)
-                .background(Color.oneDayBlue, in: Circle())
+                .background(Color.oneDayBrand, in: Circle())
             TextField(
                 Strings.promptN(index + 1),
                 text: Binding(
@@ -193,7 +193,7 @@ struct BuildTemplateView: View {
         .background(OneDay.surface.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.oneDayBlue.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.oneDayBrand.opacity(0.12), lineWidth: 1)
         )
     }
 
@@ -208,11 +208,11 @@ struct BuildTemplateView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
                 .background(
-                    isSelected ? Color.oneDayBlue : OneDay.surface.opacity(0.94),
+                    isSelected ? Color.oneDayBrand : OneDay.surface.opacity(0.94),
                     in: Capsule()
                 )
                 .overlay(
-                    Capsule().strokeBorder(Color.oneDayBlue.opacity(isSelected ? 0 : 0.2), lineWidth: 1.5)
+                    Capsule().strokeBorder(Color.oneDayBrand.opacity(isSelected ? 0 : 0.2), lineWidth: 1.5)
                 )
         }
         .buttonStyle(.plain)

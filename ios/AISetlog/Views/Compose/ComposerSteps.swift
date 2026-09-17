@@ -179,7 +179,7 @@ struct MoodStep: View {
             .background(
                 OneDay.brandHorizontal,
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .oneDayGlow(.oneDayBlue, strength: 0.7)
+            .oneDayGlow(.oneDayBrand, strength: 0.7)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.customPromptsTitle)
@@ -281,7 +281,7 @@ private struct PromptTemplateTile: View {
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(
-                    isSelected ? Color.oneDayBlue.opacity(0.65) : OneDay.hairline,
+                    isSelected ? Color.oneDayBrand.opacity(0.65) : OneDay.hairline,
                     lineWidth: isSelected ? 2 : 1)
         }
         .overlay(alignment: .topTrailing) {
@@ -289,7 +289,7 @@ private struct PromptTemplateTile: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 21, weight: .bold))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, Color.oneDayBlue)
+                    .foregroundStyle(.white, Color.oneDayBrand)
                     .padding(8)
             }
         }
@@ -361,9 +361,9 @@ struct SetupStep: View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: "clock.badge.checkmark")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
                 .frame(width: 42, height: 42)
-                .background(Color.oneDayBlue.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.oneDayBrand.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(Strings.timeOnlySetupTitle)
@@ -376,7 +376,7 @@ struct SetupStep: View {
             }
         }
         .padding(15)
-        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBlue)
+        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBrand)
     }
 
     private var heading: some View {
@@ -412,7 +412,7 @@ struct SetupStep: View {
                     TextField("", text: $title, prompt: Text(Strings.titlePrompt(oneDay: isOneDay)))
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
-                        .tint(Color.oneDayBlue)
+                        .tint(Color.oneDayBrand)
                         .focused($titleFocused)
                         .onChange(of: title) { _, _ in
                             if titleFocused { titleEdited = true }
@@ -436,7 +436,7 @@ struct SetupStep: View {
                         momentsExpanded ? Strings.hideMoments : Strings.reviewMoments,
                         systemImage: momentsExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                 }
                 .buttonStyle(.plain)
             }
@@ -458,7 +458,7 @@ struct SetupStep: View {
                             } label: {
                                 Label(Strings.addMoment, systemImage: "plus.circle.fill")
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.oneDayBlue)
+                                    .foregroundStyle(Color.oneDayBrand)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.vertical, 10)
                             }
@@ -494,7 +494,7 @@ struct SetupStep: View {
                     set: { if moments.indices.contains(index) { moments[index] = $0 } }))
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
 
             if moments.count > 2 {
                 Button {
@@ -524,7 +524,7 @@ struct SetupStep: View {
                     icon: "person.fill",
                     title: Strings.createByYourself,
                     caption: Strings.createByYourselfCaption,
-                    accent: .oneDayBlue,
+                    accent: .oneDayBrand,
                     isOn: !withFriends
                 ) { withFriends = false }
 

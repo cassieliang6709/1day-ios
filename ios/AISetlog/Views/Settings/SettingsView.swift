@@ -157,12 +157,11 @@ struct SettingsView: View {
     private var identityHeader: some View {
         VStack(alignment: .leading, spacing: 11) {
             identityRow
-            // Only once there's a name to attach it to: the colour is stored
-            // against your name, and an avatar with no name is the mascot,
-            // which has no tint to change.
-            if account.isSignedIn, account.account?.displayName.isEmpty == false {
-                tintPicker
-            }
+            // Shown signed out too. The colour is stored against your name, so
+            // it used to need one — but it is also the app's accent now, and
+            // gating it meant somebody who films alone and never signs in had
+            // no way to change the colour of anything.
+            tintPicker
         }
         .padding(.vertical, 4)
     }
@@ -178,9 +177,9 @@ struct SettingsView: View {
     private var tintPicker: some View {
         HStack(spacing: 9) {
             ForEach(Array(Identity.paletteUIColors.enumerated()), id: \.offset) { index, ui in
-                let chosen = index == Identity.tintIndex(for: account.account?.displayName)
+                let chosen = index == Identity.tintIndex(for: tintOwnerName)
                 Button {
-                    Identity.chooseTint(index, forName: account.account?.displayName)
+                    Identity.chooseTint(index, forName: tintOwnerName)
                     myTintIndex = index
                 } label: {
                     Circle()
@@ -204,6 +203,14 @@ struct SettingsView: View {
         .accessibilityIdentifier("avatar-tints")
     }
 
+    /// Whose colour this is. `"local"` for a device with no account on it —
+    /// the same stand-in `ChallengeStore.currentAuthor` uses, so a solo user is
+    /// a consistent person throughout the app rather than a special case here.
+    private var tintOwnerName: String {
+        let name = account.account?.displayName ?? ""
+        return name.isEmpty ? "local" : name
+    }
+
     private var identityRow: some View {
         HStack(spacing: 13) {
             AvatarDot(name: account.account?.displayName, size: 54)
@@ -216,7 +223,7 @@ struct SettingsView: View {
                     TextField(Strings.yourNamePlaceholder, text: $draftName)
                         .font(.system(size: 20, weight: .heavy, design: .rounded))
                         .foregroundStyle(OneDay.ink)
-                        .tint(Color.oneDayBlue)
+                        .tint(Color.oneDayBrand)
                         .focused($nameFocused)
                         .submitLabel(.done)
                         .onSubmit(commitName)
@@ -240,7 +247,7 @@ struct SettingsView: View {
                     // so getting back in meant starting one.
                     Button(Strings.signIn) { showSignIn = true }
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                 }
             }
 
@@ -295,7 +302,7 @@ struct SettingsView: View {
         HStack(spacing: 6) {
             Link(Strings.privacyPolicy, destination: Self.privacyPolicyURL)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
             Text("·")
             Text(Self.versionString)
         }
@@ -320,7 +327,7 @@ struct SettingsView: View {
     private var notificationRows: some View {
         SettingsToggleRow(
             symbol: "moon.stars.fill",
-            accent: .oneDayBlue,
+            accent: .oneDayBrand,
             title: Strings.eveningReminder,
             caption: Strings.eveningReminderFooter,
             isOn: Binding(get: { eveningEnabled }, set: setEveningEnabled))
@@ -404,7 +411,7 @@ struct SettingsView: View {
                     UIApplication.shared.open(url)
                 }
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(13)
@@ -440,7 +447,7 @@ struct SettingsView: View {
         rowDivider
         SettingsLinkRow(
             symbol: "globe",
-            accent: .oneDayBlue,
+            accent: .oneDayBrand,
             title: Strings.language,
             value: appLanguage.displayName
         ) {
@@ -494,7 +501,7 @@ struct SettingsView: View {
         } else {
             SettingsButtonRow(
                 symbol: "person.crop.circle.badge.plus",
-                accent: .oneDayBlue,
+                accent: .oneDayBrand,
                 title: Strings.signIn,
                 caption: nil
             ) { showSignIn = true }
@@ -650,7 +657,7 @@ private struct SettingsToggleRow: View {
             Spacer(minLength: 8)
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)

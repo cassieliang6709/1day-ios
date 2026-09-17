@@ -193,11 +193,11 @@ struct StoryRowCard: View {
                         filled: progress.filled,
                         total: max(progress.total, 1),
                         size: 5,
-                        tint: .oneDayBlue)
+                        tint: .oneDayBrand)
                     Text("\(progress.filled)/\(progress.total)")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                 }
             }
 

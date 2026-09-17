@@ -79,17 +79,17 @@ struct ReactionBar: View {
                     Text("\(count)")
                         .font(.system(size: 11.5, weight: .heavy, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(mine ? Color.oneDayBlue : OneDay.inkSoft)
+                        .foregroundStyle(mine ? Color.oneDayBrand : OneDay.inkSoft)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(
-                mine ? Color.oneDayBlue.opacity(0.13) : OneDay.surfaceSoft.opacity(0.9),
+                mine ? Color.oneDayBrand.opacity(0.13) : OneDay.surfaceSoft.opacity(0.9),
                 in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
-                    mine ? Color.oneDayBlue.opacity(0.45) : OneDay.hairline, lineWidth: 1)
+                    mine ? Color.oneDayBrand.opacity(0.45) : OneDay.hairline, lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -168,7 +168,7 @@ private struct AnyEmojiField: View {
             TextField(Strings.anyEmojiPlaceholder, text: $typed)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .accessibilityIdentifier("any-emoji")
@@ -287,7 +287,7 @@ struct CommentInputBar: View {
             Button(action: send) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 30))
-                    .foregroundStyle(canSend ? Color.oneDayBlue : Color.gray.opacity(0.4))
+                    .foregroundStyle(canSend ? Color.oneDayBrand : Color.gray.opacity(0.4))
             }
             .disabled(!canSend)
         }

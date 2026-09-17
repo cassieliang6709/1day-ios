@@ -264,7 +264,7 @@ struct PlansHomeView: View {
                     .lineLimit(1)
                     .fixedSize()
 
-                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBlue)
+                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBrand)
                     .layoutPriority(-1)
             }
         }

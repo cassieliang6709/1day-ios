@@ -275,7 +275,7 @@ private struct AdjustFilmSheet: View {
                     Text(Strings.hardCutsFooter)
                 }
             }
-            .tint(Color.oneDayBlue)
+            .tint(Color.oneDayBrand)
             .navigationTitle(Strings.adjust)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

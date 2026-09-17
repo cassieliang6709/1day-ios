@@ -41,7 +41,7 @@ struct JoinInviteSheet: View {
                     }
                     .font(.headline)
                 }
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
 
                 VStack(spacing: 14) {
                     ZStack {
@@ -55,7 +55,7 @@ struct JoinInviteSheet: View {
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [
-                                        Color.oneDayBlue,
+                                        Color.oneDayBrand,
                                         Color.oneDayCyan,
                                     ],
                                     startPoint: .topLeading,
@@ -112,7 +112,7 @@ struct JoinInviteSheet: View {
                         .background(
                             LinearGradient(
                                 colors: normalizedCode.count == 6
-                                    ? [Color.oneDayBlue, Color.oneDayCyan]
+                                    ? [Color.oneDayBrand, Color.oneDayCyan]
                                     : [Color.gray.opacity(0.28), Color.gray.opacity(0.22)],
                                 startPoint: .leading,
                                 endPoint: .trailing

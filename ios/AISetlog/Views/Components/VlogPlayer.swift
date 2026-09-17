@@ -153,7 +153,7 @@ struct VlogPlayer: View {
         Button { playback.toggle() } label: {
             Image(systemName: "play.fill")
                 .font(.system(size: 24))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
                 .frame(width: 62, height: 62)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))

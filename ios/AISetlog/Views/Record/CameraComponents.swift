@@ -304,9 +304,9 @@ struct CaptionEditor: View {
         HStack(spacing: 10) {
             Image(systemName: "textformat")
                 .font(.headline.bold())
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
                 .frame(width: 30, height: 30)
-                .background(Color.oneDayBlue.opacity(0.12), in: Circle())
+                .background(Color.oneDayBrand.opacity(0.12), in: Circle())
 
             TextField(
                 "",
@@ -338,6 +338,6 @@ struct CaptionEditor: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(.white.opacity(0.86), in: Capsule())
-        .overlay(Capsule().stroke(Color.oneDayBlue.opacity(0.16), lineWidth: 1))
+        .overlay(Capsule().stroke(Color.oneDayBrand.opacity(0.16), lineWidth: 1))
     }
 }

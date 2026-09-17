@@ -240,7 +240,7 @@ struct RecordClipView: View {
                 .stroke(.white.opacity(0.55), lineWidth: 4)
                 .frame(width: 66, height: 66)
             Circle()
-                .fill(Color.oneDayBlue)
+                .fill(Color.oneDayBrand)
                 .frame(width: 50, height: 50)
         }
     }

@@ -343,7 +343,7 @@ struct ClipPreviewView: View {
                                         .frame(width: 26, height: 26)
                                     if tint == sticker.tint {
                                         Circle()
-                                            .strokeBorder(Color.oneDayBlue, lineWidth: 2.5)
+                                            .strokeBorder(Color.oneDayBrand, lineWidth: 2.5)
                                             .frame(width: 33, height: 33)
                                     }
                                 }
@@ -418,7 +418,7 @@ struct ClipPreviewView: View {
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .strokeBorder(
                                     chosen
-                                        ? AnyShapeStyle(Color.oneDayBlue)
+                                        ? AnyShapeStyle(Color.oneDayBrand)
                                         : AnyShapeStyle(.white.opacity(0.2)),
                                     lineWidth: chosen ? 2.5 : 1)
                         }

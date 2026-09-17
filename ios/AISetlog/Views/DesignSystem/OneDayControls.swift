@@ -10,7 +10,7 @@ import SwiftUI
 /// One per screen, never two competing.
 struct PrimaryActionStyle: ButtonStyle {
     var tint: LinearGradient = OneDay.brandHorizontal
-    var glow: Color = .oneDayBlue
+    var glow: Color = .oneDayBrand
 
     func makeBody(configuration: Configuration) -> some View {
         Surface(configuration: configuration, tint: tint, glow: glow)
@@ -54,7 +54,7 @@ struct SoftActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 16, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.oneDayBlue)
+            .foregroundStyle(Color.oneDayBrand)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(OneDay.surface, in: Capsule())
@@ -102,7 +102,7 @@ struct IconBubble: View {
 struct OneDayChip: View {
     var icon: String?
     let text: String
-    var tint: Color = .oneDayBlue
+    var tint: Color = .oneDayBrand
     /// On a photo or video, the chip needs its own scrim to stay readable.
     var onDark = false
 
@@ -178,7 +178,7 @@ struct PillSelector<Value: Hashable>: View {
             .background {
                 if isOn {
                     Capsule()
-                        .fill(Color.oneDayBlue)
+                        .fill(Color.oneDayBrand)
                         .matchedGeometryEffect(id: "pill", in: pill)
                 }
             }
@@ -193,7 +193,7 @@ struct PillSelector<Value: Hashable>: View {
 struct OptionRow<Trailing: View>: View {
     let icon: String
     let title: String
-    var accent: Color = .oneDayBlue
+    var accent: Color = .oneDayBrand
     @ViewBuilder var trailing: Trailing
 
     var body: some View {

@@ -26,7 +26,7 @@ struct TemplateCard: View {
         .overlay {
             RoundedRectangle(cornerRadius: OneDay.Radius.hero, style: .continuous)
                 .strokeBorder(
-                    isActive ? Color.oneDayBlue.opacity(0.35) : OneDay.hairline,
+                    isActive ? Color.oneDayBrand.opacity(0.35) : OneDay.hairline,
                     lineWidth: isActive ? 1.5 : 1)
         }
         .oneDaySoftShadow(strength: isActive ? 1.4 : 0.6)
@@ -130,11 +130,11 @@ struct TemplateCover: View {
     let identityKey: String
 
     private static let palettes: [[Color]] = [
-        [.oneDaySky, .oneDayBlue],
-        [.oneDayLavender, .oneDayBlue],
+        [.oneDaySky, .oneDayBrand],
+        [.oneDayLavender, .oneDayBrand],
         [.oneDayMint, .oneDayCyan],
         [.oneDayButter, .oneDayBlush],
-        [.oneDayCyan, .oneDayBlue],
+        [.oneDayCyan, .oneDayBrand],
         [.oneDayBlush, .oneDayLavender],
     ]
 
@@ -232,7 +232,7 @@ struct CarouselDots: View {
         HStack(spacing: 6) {
             ForEach(0..<max(count, 1), id: \.self) { dot in
                 Capsule()
-                    .fill(dot == index ? Color.oneDayBlue : Color.oneDaySky.opacity(0.35))
+                    .fill(dot == index ? Color.oneDayBrand : Color.oneDaySky.opacity(0.35))
                     .frame(width: dot == index ? 18 : 6, height: 6)
             }
         }

@@ -15,7 +15,7 @@ struct TimelineRail: View {
     var isLast = false
     /// Filled nodes are moments that exist; hollow ones are still to come.
     var isFilled = true
-    var tint: Color = .oneDayBlue
+    var tint: Color = .oneDayBrand
     /// The next moment to film pulses gently — the one live thing on screen.
     var isNext = false
 
@@ -79,7 +79,7 @@ struct TimelineStamp: View {
                 Text(label)
                     .font(.system(size: 12.5, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(isEmphasized ? Color.oneDayBlue : OneDay.inkSoft)
+                    .foregroundStyle(isEmphasized ? Color.oneDayBrand : OneDay.inkSoft)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -142,7 +142,7 @@ struct TimelineClip: View {
     }
 
     private var tintForState: Color? {
-        if case .mine = state { return .oneDayBlue }
+        if case .mine = state { return .oneDayBrand }
         return nil
     }
 
@@ -185,10 +185,10 @@ struct TimelineClip: View {
             if let durationLabel {
                 Text(durationLabel)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color.oneDayBlue.opacity(0.12), in: Capsule())
+                    .background(Color.oneDayBrand.opacity(0.12), in: Capsule())
             }
         }
     }
@@ -243,7 +243,7 @@ struct TimelineClip: View {
                 VStack(spacing: 7) {
                     Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                         .symbolEffect(.pulse)
                     if showsMomentTitle {
                         Text(momentTitle)
@@ -253,7 +253,7 @@ struct TimelineClip: View {
                     }
                     Text(Strings.tapToFilm)
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                 }
                 .padding(.vertical, 22)
             }

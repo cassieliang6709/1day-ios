@@ -73,7 +73,7 @@ private struct AvatarOverflowDot: View {
     var body: some View {
         Text("+\(count)")
             .font(.system(size: size * 0.34, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.oneDayBlue)
+            .foregroundStyle(Color.oneDayBrand)
             .frame(width: size, height: size)
             .background(OneDay.surfaceSoft, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: size * 0.06))

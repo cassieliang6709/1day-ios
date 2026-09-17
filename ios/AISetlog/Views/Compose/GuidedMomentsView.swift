@@ -121,7 +121,7 @@ struct GuidedMomentsView: View {
                 TextField("", text: $storyName, prompt: Text(Strings.guidedNamePlaceholder))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                    .tint(Color.oneDayBlue)
+                    .tint(Color.oneDayBrand)
                     .accessibilityIdentifier("custom-story-name")
 
                 // Only once there are prompts to save: before that the empty
@@ -129,7 +129,7 @@ struct GuidedMomentsView: View {
                 if needsName, filledCount >= 2 {
                     Text(Strings.storyNameNeeded)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                         .padding(.top, 3)
                         .transition(.opacity)
                 }
@@ -146,7 +146,7 @@ struct GuidedMomentsView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                     Text(Strings.intentHeading)
                         .font(.system(size: 15.5, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
@@ -160,7 +160,7 @@ struct GuidedMomentsView: View {
                 TextField("", text: $intent, prompt: Text(Strings.intentPlaceholder))
                     .font(.system(size: 15.5, weight: .medium, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                    .tint(Color.oneDayBlue)
+                    .tint(Color.oneDayBrand)
                     .submitLabel(.go)
                     .onSubmit(generatePrompts)
                     .disabled(isSuggesting)
@@ -206,7 +206,7 @@ struct GuidedMomentsView: View {
                         Button(action: addBlankPrompt) {
                             Label(Strings.addAnotherPrompt, systemImage: "plus.circle.fill")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color.oneDayBlue)
+                                .foregroundStyle(Color.oneDayBrand)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 11)
                         }
@@ -223,7 +223,7 @@ struct GuidedMomentsView: View {
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(Color.oneDayBlue, in: Circle())
+                .background(Color.oneDayBrand, in: Circle())
 
             TextField(
                 "",
@@ -231,7 +231,7 @@ struct GuidedMomentsView: View {
                 prompt: Text(Strings.customPromptPlaceholder(index + 1)))
                 .font(.system(size: 15.5, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
                 .focused($focused, equals: index)
                 .submitLabel(index == answers.count - 1 ? .done : .next)
                 .onSubmit {
@@ -278,7 +278,7 @@ struct GuidedMomentsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .tint(Color.oneDayBlue)
+                .tint(Color.oneDayBrand)
                 .accessibilityIdentifier("save-to-template-library")
 
                 if savesToLibrary {
