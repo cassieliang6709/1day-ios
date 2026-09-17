@@ -14,7 +14,7 @@ struct ClipReaction: Codable, Identifiable, Equatable {
     /// What the picker offers before you've used anything else. Not a limit:
     /// `id` is `authorID|emoji`, so toggling and de-duping work for any emoji,
     /// and `ClipReactionRecents` remembers the ones you actually reach for.
-    static let palette = ["❤️", "🔥", "😂", "👏", "🥹", "✨"]
+    static let palette = ["🩵", "🥹", "😭", "🫶", "✨", "🐣"]
 }
 
 /// The emoji this person has used, most recent first.

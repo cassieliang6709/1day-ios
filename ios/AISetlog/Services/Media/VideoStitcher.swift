@@ -726,7 +726,11 @@ enum VideoStitcher {
 
     // MARK: - Overlays (device only)
 
-    private static func addTitleCard(
+    /// Internal rather than private so `FilmMarkPreviewTests` can draw the
+    /// real layers into a bitmap: the export path that normally shows them is
+    /// device-only (see the note at the top of this file), so a screenshot of
+    /// the actual thing is otherwise impossible to get on a Mac.
+    static func addTitleCard(
         _ card: TitleCard, to parentLayer: CALayer, renderSize: CGSize, duration: Double
     ) {
         let titleSize = renderSize.height * 0.05
@@ -760,6 +764,19 @@ enum VideoStitcher {
 
         // CA coordinates: origin bottom-left.
         let (title, titleTextSize) = textLayer(card.title, size: titleSize, weight: .heavy, alpha: 1)
+
+        // The mascot, above the title. The opening card was the story's name
+        // and its dates in white type on black — the one place every viewer
+        // looks at for a full second, and the only thing on it that said which
+        // app made this was nothing at all.
+        var layers: [CALayer] = [title]
+        if let mark = mascotLayer(
+            size: renderSize.height * 0.115,
+            centredIn: renderSize,
+            y: renderSize.height * 0.52 + titleTextSize.height * 1.9
+        ) {
+            layers.append(mark)
+        }
         title.frame = CGRect(
             x: 0, y: renderSize.height * 0.52,
             width: renderSize.width, height: titleTextSize.height * 1.2)
@@ -769,7 +786,8 @@ enum VideoStitcher {
             x: 0, y: renderSize.height * 0.52 - subTextSize.height * 1.6,
             width: renderSize.width, height: subTextSize.height * 1.2)
 
-        for layer in [title, subtitle] {
+        layers.append(subtitle)
+        for layer in layers {
             layer.opacity = 0
             let anim = CAKeyframeAnimation(keyPath: "opacity")
             anim.values = [0, 1, 1, 0]
@@ -1347,23 +1365,55 @@ enum VideoStitcher {
         parentLayer.addSublayer(pill)
     }
 
-    /// A tiny "made with 1Day" tag in the bottom-left corner, present for the
+    /// The mascot as a layer, or nil when the artwork can't be loaded — a film
+    /// without a mark on it still has to export.
+    private static func mascotLayer(
+        size: CGFloat, centredIn renderSize: CGSize, y: CGFloat
+    ) -> CALayer? {
+        guard let image = UIImage(named: "OneDayMascot")?.cgImage else { return nil }
+        let layer = CALayer()
+        layer.contents = image
+        layer.contentsGravity = .resizeAspect
+        layer.frame = CGRect(
+            x: (renderSize.width - size) / 2, y: y, width: size, height: size)
+        return layer
+    }
+
+    /// A tiny mascot and "1Day" in the bottom-left corner, present for the
     /// whole film — every shared vlog quietly advertises where it came from.
-    private static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
+    static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
         let fontSize = max(renderSize.height * 0.016, 11)
-        let attributed = NSAttributedString(string: "made with 1Day", attributes: [
-            .font: roundedFont(size: fontSize, weight: .semibold),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.55),
+        let attributed = NSAttributedString(string: "1Day", attributes: [
+            .font: roundedFont(size: fontSize, weight: .heavy),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.62),
             .kern: fontSize * 0.04,
         ])
         let textSize = attributed.size()
+        let left = renderSize.width * 0.045
+        let bottom = renderSize.height * 0.028
+        // CA coordinates: origin bottom-left.
+        //
+        // "made with 1Day" in 55% white was three words of small print. The
+        // mark people recognise is the face, so the face goes first and the
+        // name shrinks to one word beside it — same corner, same restraint,
+        // and now legible as a logo at a glance on a phone.
+        if let mascot = UIImage(named: "OneDayMascot")?.cgImage {
+            let glyph = fontSize * 1.7
+            let layer = CALayer()
+            layer.contents = mascot
+            layer.contentsGravity = .resizeAspect
+            layer.opacity = 0.82
+            layer.frame = CGRect(
+                x: left, y: bottom - (glyph - textSize.height) / 2,
+                width: glyph, height: glyph)
+            parentLayer.addSublayer(layer)
+        }
         let layer = CATextLayer()
         layer.string = attributed
         layer.contentsScale = 2
-        // CA coordinates: origin bottom-left.
         layer.frame = CGRect(
-            x: renderSize.width * 0.045,
-            y: renderSize.height * 0.028,
+            x: left + fontSize * 2.1,
+            y: bottom,
             width: textSize.width, height: textSize.height)
         parentLayer.addSublayer(layer)
     }

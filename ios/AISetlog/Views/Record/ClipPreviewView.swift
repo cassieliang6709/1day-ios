@@ -255,15 +255,10 @@ struct ClipPreviewView: View {
     private var bottomControls: some View {
         VStack(spacing: 9) {
             byline
-            if isShared {
-                ReactionBar(reactions: reactions, myID: myID) { emoji in
-                    if let challengeID {
-                        store.toggleReaction(
-                            emoji, day: day, challengeID: challengeID,
-                            targetAuthorID: targetAuthorID ?? myID)
-                    }
-                }
-            }
+            // The reaction strip used to be here, between the byline and the
+            // buttons. It lives in the moment's chat now — the other place
+            // people say something about a take — so this screen is the
+            // picture and three things you can do to it.
             if isMine, hasCaption {
                 tintRows
                 plateRow
@@ -929,7 +924,10 @@ struct ClipPreviewView: View {
                 // better than an arrow that does nothing four times out of
                 // five. The room chat opened from the story timeline is where
                 // they're links.
-                RoomChatView(challengeID: challengeID, moment: day)
+                RoomChatView(
+                    challengeID: challengeID,
+                    moment: day,
+                    reactionTarget: .init(day: day, authorID: targetAuthorID ?? myID))
             }
         }
         .presentationDetents([.large])

@@ -13,6 +13,19 @@ struct RoomChatView: View {
     /// supply this because only the host knows how to get to a moment from
     /// where it put the chat.
     var onOpenMoment: ((Int) -> Void)?
+    /// Whose clip, on which day, the reaction row at the top belongs to.
+    ///
+    /// Reactions used to be a row of their own on the review screen, under the
+    /// picture — a floating strip of emoji that was the first thing you saw
+    /// after your own face. They belong with the other thing people say about
+    /// a moment, which is the thread. Nil when the chat was opened from the
+    /// story rather than from one clip: there is no single take to react to.
+    var reactionTarget: ReactionTarget?
+
+    struct ReactionTarget: Equatable {
+        let day: Int
+        let authorID: String
+    }
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
@@ -29,16 +42,36 @@ struct RoomChatView: View {
         return ChallengePresenter(challenge: challenge).title(forSlot: day)
     }
 
+    /// The moment's reactions, above the thread.
+    @ViewBuilder
+    private func reactionRow(_ target: ReactionTarget, myID: String) -> some View {
+        let interactions = store.interactions(
+            for: challengeID, day: target.day, targetAuthorID: target.authorID)
+        ReactionBar(reactions: interactions.reactions, myID: myID) { emoji in
+            store.toggleReaction(
+                emoji, day: target.day, challengeID: challengeID,
+                targetAuthorID: target.authorID)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+    }
+
     var body: some View {
         if let code = store.challenge(challengeID)?.roomCode, let me = account.account {
-            RoomChatConversation(
-                scope: .init(accountID: me.id, roomCode: code),
-                authorName: me.displayName,
-                moment: moment,
-                source: sessionSource,
-                momentTitle: momentTitle,
-                onOpenMoment: onOpenMoment)
-                .id("\(sessionSource.identity):\(me.id):\(code)")
+            VStack(spacing: 0) {
+                if let target = reactionTarget {
+                    reactionRow(target, myID: me.id)
+                }
+                RoomChatConversation(
+                    scope: .init(accountID: me.id, roomCode: code),
+                    authorName: me.displayName,
+                    moment: moment,
+                    source: sessionSource,
+                    momentTitle: momentTitle,
+                    onOpenMoment: onOpenMoment)
+                    .id("\(sessionSource.identity):\(me.id):\(code)")
+            }
         } else {
             VStack(spacing: 20) {
                 Text(language.resolved == .chinese ? "登录并加入房间后才能聊天。" : "Sign in and join the room to chat.")
