@@ -26,6 +26,10 @@ struct PlansHomeView: View {
     @State private var showRoomDemo = false
     @State private var joinCode = ""
     @State private var joining = false
+    /// Bumped to abandon the current join — by the cancel button or the
+    /// timeout. The in-flight call checks it before doing anything with its
+    /// result, so a late success can't navigate somewhere the person left.
+    @State private var joinAttempt = 0
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
     /// The story a long press is proposing to delete, held until it's confirmed.
@@ -195,10 +199,24 @@ struct PlansHomeView: View {
         .scrollIndicators(.hidden)
         .overlay {
             if joining {
-                ProgressView(Strings.joining)
-                    .controlSize(.large)
-                    .padding(24)
-                    .glassSurface()
+                VStack(spacing: 14) {
+                    ProgressView(Strings.joining)
+                        .controlSize(.large)
+                    // A full-screen spinner with no way out and no ceiling is
+                    // indistinguishable from a frozen app: a bad code or no
+                    // signal left the person holding a phone that spun until
+                    // they force-quit it. Cancelling does not stop the network
+                    // call — it stops *waiting* for it, which is the part they
+                    // are stuck in.
+                    Button(Strings.cancel) {
+                        joinAttempt += 1
+                        joining = false
+                    }
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBrand)
+                }
+                .padding(24)
+                .glassSurface()
             }
         }
     }
@@ -529,14 +547,30 @@ struct PlansHomeView: View {
         guard code.count >= 6 else { return }
         let run = {
             joining = true
+            let attempt = joinAttempt
             Task {
-                defer { joining = false }
+                defer { if attempt == joinAttempt { joining = false } }
                 do {
                     let challenge = try await store.joinRoom(code: code)
+                    // Abandoned while it was in flight — cancelled, or timed
+                    // out. Navigating now would drop somebody into a room they
+                    // had already walked away from.
+                    guard attempt == joinAttempt else { return }
                     path = [challenge.id]
                 } catch {
+                    guard attempt == joinAttempt else { return }
                     errorText = error.localizedDescription
                 }
+            }
+            // The ceiling. 20s is well past a healthy join on a slow
+            // connection and well short of the minute it takes to decide an
+            // app is broken.
+            Task {
+                try? await Task.sleep(for: .seconds(20))
+                guard attempt == joinAttempt, joining else { return }
+                joinAttempt += 1
+                joining = false
+                errorText = Strings.joinTimedOut
             }
         }
         if account.isSignedIn { run() } else { afterSignIn = run }

@@ -9,8 +9,12 @@ struct JoinInviteSheet: View {
     let onJoin: () -> Void
 
     @FocusState private var codeFocused: Bool
+    /// Shown when 粘贴 found nothing to paste. See `Strings.noCodeOnClipboard`.
+    @State private var pasteFailed = false
 
     private var normalizedCode: String { InviteCode.normalize(code) }
+
+
 
     var body: some View {
         ZStack {
@@ -34,14 +38,30 @@ struct JoinInviteSheet: View {
                         .frame(width: 42, height: 5)
                     Spacer()
                     Button(Strings.paste) {
+                        // The `else` is the fix. Without it this button did
+                        // nothing on an empty or codeless clipboard — same
+                        // screen, same empty slots, no way to tell whether the
+                        // tap registered, the clipboard was empty, or the
+                        // message you copied just wasn't the right one.
                         if let pasted = UIPasteboard.general.string,
                            let found = InviteCode.extract(from: pasted) {
                             code = found
+                            pasteFailed = false
+                        } else {
+                            pasteFailed = true
                         }
                     }
                     .font(.headline)
                 }
                 .foregroundStyle(Color.oneDayBrand)
+
+                if pasteFailed {
+                    Text(Strings.noCodeOnClipboard)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .transition(.opacity)
+                        .accessibilityIdentifier("paste-failed")
+                }
 
                 VStack(spacing: 14) {
                     ZStack {

@@ -344,6 +344,12 @@ enum Strings {
     }
     static var history: String { lang == .chinese ? "历史" : "HISTORY" }
     static var joining: String { lang == .chinese ? "加入中…" : "Joining…" }
+    /// The join took too long to be waited out. Not "失败" — we genuinely do
+    /// not know whether the room exists, only that this attempt gave up, and
+    /// the honest thing to offer is another go rather than a verdict.
+    static var joinTimedOut: String {
+        lang == .chinese ? "一直没连上，再试一次？" : "Still no answer — try again?"
+    }
     /// Shown while a poster tap is opening a shared room. The solo path is
     /// instant and needs nothing; this one is a network round trip, and without
     /// it the poster rack just sits there looking like the tap missed.
@@ -1166,6 +1172,12 @@ enum Strings {
         lang == .chinese ? "显示与语言" : "Display & Language"
     }
     static var inviteCodeLabel: String { lang == .chinese ? "邀请码" : "Invite code" }
+    /// Tapping 粘贴 with no code on the clipboard used to do nothing at all —
+    /// same screen, same empty slots, no way to tell whether the button worked,
+    /// the clipboard was empty, or the message you copied wasn't the right one.
+    static var noCodeOnClipboard: String {
+        lang == .chinese ? "剪贴板里没有邀请码" : "No invite code on the clipboard"
+    }
     static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static func previewTheFilm(_ count: Int) -> String {
         lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) \(momentWord(count))"
