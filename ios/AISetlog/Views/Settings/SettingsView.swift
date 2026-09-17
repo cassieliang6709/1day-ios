@@ -19,6 +19,10 @@ struct SettingsView: View {
     @State private var draftName = ""
     @FocusState private var nameFocused: Bool
 
+    /// Written by the picker below, read by every `AvatarDot` — held here too
+    /// so this screen repaints its own header the moment a dot is tapped.
+    @AppStorage(Identity.myTintKey) private var myTintIndex = -1
+
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
     /// Read, not written, here: the row shows which look is on and the page
@@ -154,6 +158,56 @@ struct SettingsView: View {
     // MARK: - Who you are
 
     private var identityHeader: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            identityRow
+            // Only once there's a name to attach it to: the colour is stored
+            // against your name, and an avatar with no name is the mascot,
+            // which has no tint to change.
+            if account.isSignedIn, account.account?.displayName.isEmpty == false {
+                tintPicker
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// Seven dots. Tap one and it's yours — including the one somebody else in
+    /// the room already has.
+    ///
+    /// The colour used to be a hash of your name, with no way to change it,
+    /// which is fine until the name you actually go by hands you the green.
+    /// Uniqueness inside a room was the reason for the hash, and it is not
+    /// worth overriding the person's own choice: every avatar in the app has
+    /// the name next to it or under it.
+    private var tintPicker: some View {
+        HStack(spacing: 9) {
+            ForEach(Array(Identity.paletteUIColors.enumerated()), id: \.offset) { index, ui in
+                let chosen = index == Identity.tintIndex(for: account.account?.displayName)
+                Button {
+                    Identity.chooseTint(index, forName: account.account?.displayName)
+                    myTintIndex = index
+                } label: {
+                    Circle()
+                        .fill(Color(uiColor: ui).gradient)
+                        .frame(height: 26)
+                        .frame(maxWidth: .infinity)
+                        .overlay {
+                            if chosen {
+                                Circle()
+                                    .strokeBorder(OneDay.ink, lineWidth: 2.5)
+                                    .frame(width: 33, height: 33)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Strings.avatarColourN(index + 1))
+                .accessibilityAddTraits(chosen ? .isSelected : [])
+            }
+        }
+        .accessibilityIdentifier("avatar-tints")
+    }
+
+    private var identityRow: some View {
         HStack(spacing: 13) {
             AvatarDot(name: account.account?.displayName, size: 54)
 
@@ -195,7 +249,6 @@ struct SettingsView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
     }
 
     /// Three numbers the app can actually count.
