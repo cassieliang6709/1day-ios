@@ -14,9 +14,13 @@ struct PlansHomeView: View {
     /// What to lead with and what to list under it, as one decision. See
     /// `HomeStories`.
     let stories: HomeStories
+    /// Switch the shell to its 新建 tab. The composer used to be a
+    /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
+    /// every in-page CTA that used to raise the cover asks the shell instead.
+    /// One composer, one place it can be.
+    let onCompose: () -> Void
 
     @State private var path: [UUID] = []
-    @State private var showComposer = false
     @State private var showJoin = false
     @State private var showSettings = false
     @State private var showRoomDemo = false
@@ -47,9 +51,6 @@ struct PlansHomeView: View {
             .navigationDestination(for: UUID.self) { id in
                 StoryTimelineView(challengeID: id)
             }
-        }
-        .fullScreenCover(isPresented: $showComposer) {
-            StoryComposerView { id in path.append(id) }
         }
         .fullScreenCover(item: $recordChallenge) { challenge in
             recorder(for: challenge)
@@ -202,8 +203,14 @@ struct PlansHomeView: View {
     /// opening 1day already has, and it was crowding out the two they didn't.
     ///
     /// Nothing up here is allowed to outshine "continue today's story" in the
-    /// card below, so all three controls are the same 36pt and the create
-    /// button earns its emphasis from the brand gradient alone.
+    /// card below.
+    ///
+    /// Two controls now, not three. The brand-gradient `plus` that used to end
+    /// this row is the shell's middle tab as of 1.3 — a wordless 36pt circle in
+    /// the top-right corner was the app's second-most-used action in the one
+    /// spot a thumb on a 6.9" phone cannot reach, and it is the only entry
+    /// point that moved: 加入 stays here because joining a room is somebody
+    /// else's invitation arriving, not a thing you set out to do.
     private var header: some View {
         HStack(spacing: 11) {
             Button { showSettings = true } label: {
@@ -238,7 +245,14 @@ struct PlansHomeView: View {
                         .font(.system(size: 13, weight: .bold))
                     Text(Strings.joinShort)
                         .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .lineLimit(1)
                 }
+                // 加入 is two glyphs and Join is four, so the capsule that fits
+                // in Chinese is narrower than the English word and the label
+                // wrapped to "Joi / n". Fixing the label's width makes the
+                // greeting column absorb the squeeze instead — it already
+                // shrinks by design, and the dateline drops its pips first.
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(OneDay.ink)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 8)
@@ -249,23 +263,6 @@ struct PlansHomeView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.enterInviteCode)
             .accessibilityIdentifier("home-join-room")
-
-            Button {
-                showComposer = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(OneDay.brandHorizontal, in: Circle())
-                    .oneDaySoftShadow(strength: 0.6)
-            }
-            .buttonStyle(.plain)
-            // Visually 36pt so it sits level with the bubble beside it, but
-            // the tap target still clears Apple's 44pt floor.
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
-            .accessibilityLabel(Strings.newStory)
         }
         .padding(.horizontal, 20)
     }
@@ -333,7 +330,7 @@ struct PlansHomeView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
 
-                Button(Strings.startTodayCTA) { showComposer = true }
+                Button(Strings.startTodayCTA) { onCompose() }
                     .buttonStyle(.primaryAction)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -359,7 +356,7 @@ struct PlansHomeView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button(Strings.startTodaysStory) { showComposer = true }
+            Button(Strings.startTodaysStory) { onCompose() }
                 .buttonStyle(.primaryAction)
                 .padding(.top, 4)
 
@@ -497,12 +494,17 @@ struct PlansHomeView: View {
             let challenge = store.createQuickStart()
             path = [challenge.id]
         case .newStory:
-            showComposer = true
+            onCompose()
         case .join:
             joinCode = ""
             showJoin = true
         case .record(let id):
             recordChallenge = store.challenge(id)
+        case .openStory(let id):
+            // Replaces rather than appends: the composer is not a screen you
+            // go "back" to, and it is no longer on this stack to go back to.
+            guard store.challenge(id) != nil else { return }
+            path = [id]
         }
     }
 
