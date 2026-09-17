@@ -179,10 +179,6 @@ struct StoryTimelineView: View {
                 TimelineHeader(
                     challenge: challenge,
                     cast: cast,
-                    progress: RoomProgress(
-                        momentCount: challenge.cards.count,
-                        clips: clips,
-                        myID: myID),
                     viewMode: $viewMode,
                     showsViewModeToggle: false,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""))

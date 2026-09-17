@@ -1116,9 +1116,6 @@ enum Strings {
     }
     /// Beside the room's own count, so "3/5" can mean the day and this can
     /// mean me. Only shown when the two differ.
-    static func yourTakes(_ count: Int) -> String {
-        lang == .chinese ? "你 \(count) 个" : "you · \(count)"
-    }
     static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
 
     // MARK: Moments (composer)
@@ -1253,20 +1250,6 @@ enum Strings {
     /// moments that are still yours to take.
     static func momentsFilmed(_ filmed: Int, total: Int) -> String {
         lang == .chinese ? "拍了 \(filmed)/\(total) 个瞬间" : "\(filmed) of \(total) filmed"
-    }
-    /// The single line under a story's title: when it is, how long each take
-    /// runs, and how far the day has got.
-    ///
-    /// These three facts used to be three lines — a subtitle with the date, a
-    /// row of chips with the clip length, and a labelled progress bar with the
-    /// count — which is a third of a phone screen spent on "9月17日, 2秒,
-    /// 0/7" before the story itself got a pixel. One line, interpuncts, and
-    /// the bar below keeps the shape but loses its caption.
-    static func storyMeta(when: String, clipLength: String, filmed: Int, total: Int) -> String {
-        if lang == .chinese {
-            return "\(when) · 每段\(clipLength) · \(filmed)/\(total) 个瞬间"
-        }
-        return "\(when) · \(clipLength) each · \(filmed)/\(total) moments"
     }
     static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
     /// The way into the film, on the one card the page allows itself — and

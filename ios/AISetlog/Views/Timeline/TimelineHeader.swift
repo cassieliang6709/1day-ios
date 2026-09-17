@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// The top of the timeline: what this story is, who's in it, and how far the
-/// day has got. Small on purpose — the line below it is the content.
+/// The top of the timeline: what this story is and who's in it.
+///
+/// It no longer says how far the day has got. That was a `RoomProgress` the
+/// header only used to print `0/3` beside two other numbers, and the bar
+/// underneath says it better; the parameter went with the line.
 struct TimelineHeader: View {
     let challenge: Challenge
     /// Who's in the room. Nil for a solo story, which has nobody to name.
     let cast: RoomCast?
-    /// Everyone's, not just mine. See `RoomProgress`.
-    let progress: RoomProgress
     @Binding var viewMode: StoryViewMode
     var showsViewModeToggle = true
     var isSyncing = false
@@ -15,7 +16,6 @@ struct TimelineHeader: View {
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var didCopyCode = false
 
-    private var schedule: StorySchedule { StorySchedule(challenge) }
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
     var body: some View {
@@ -30,28 +30,40 @@ struct TimelineHeader: View {
                 inviteCode(code)
             }
 
-            stats
+            if showsViewModeToggle {
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    ViewModeToggle(mode: $viewMode)
+                }
+            }
         }
     }
 
+    /// Just the title.
+    ///
+    /// Under it there used to be a subtitle with the date, a row of three chips
+    /// with the clip length and the film's runtime, and a captioned progress
+    /// bar with the count — three stacked lines holding one short number each,
+    /// about a third of the screen spent on `9月17日`, `2秒`, `0/3` before the
+    /// story itself got a pixel. 1.3 merged them into one line, and then deleted
+    /// that line too: none of the three is why you opened the story, and the
+    /// thin bar below already answers the only one you might want at a glance.
+    ///
+    /// The numbers are not lost — they live in the bar's accessibility label
+    /// (`StoryProgressBar`), the clip length is on the camera as 每段 2 秒 where
+    /// it is about to matter, and the runtime is on the film screen.
     private var title: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Text(presenter.displayTitle)
-                    .font(.system(size: 29, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .lineLimit(2)
+        HStack(spacing: 8) {
+            Text(presenter.displayTitle)
+                .font(.system(size: 29, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .lineLimit(2)
 
-                if isSyncing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(Color.oneDayBrand)
-                }
+            if isSyncing {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Color.oneDayBrand)
             }
-
-            Text(challenge.isShared ? Strings.everyonesMoments : schedule.spanLabel)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
         }
     }
 
@@ -99,41 +111,6 @@ struct TimelineHeader: View {
         }
     }
 
-    private var stats: some View {
-        HStack(spacing: 8) {
-            // No "3/7" chip here any more — the progress bar under the header
-            // is that number, and printing it twice on one screen is how the
-            // page ended up with nothing to look at first.
-
-            // Only where it adds something. In a solo story it would repeat
-            // the progress bar above, and in a room where I'm the only one who
-            // has filmed anything it would too.
-            if challenge.isShared, progress.hasOthers {
-                OneDayChip(
-                    icon: "person.fill",
-                    text: Strings.yourTakes(progress.mine),
-                    tint: .oneDaySky)
-            }
-
-            OneDayChip(
-                icon: "clock",
-                text: challenge.resolvedClipLength.secondsLabel,
-                tint: .oneDayLavender)
-
-            if progress.filled > 0 {
-                OneDayChip(
-                    icon: "film",
-                    text: schedule.filmDuration(clipCount: progress.clipCount),
-                    tint: .oneDayMint)
-            }
-
-            Spacer(minLength: 8)
-
-            if showsViewModeToggle {
-                ViewModeToggle(mode: $viewMode)
-            }
-        }
-    }
 }
 
 /// Renaming a story and its moment prompts. A plain form on purpose — this is
