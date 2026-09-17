@@ -97,6 +97,23 @@ extension UIColor {
     static let oneDayEmerald = UIColor(hex: 0x0E8A5F)
     /// #6E4FE0 — 5.4:1 on white.
     static let oneDayGrape = UIColor(hex: 0x6E4FE0)
+    /// #1678B1 — 4.8:1. Replaces `oneDayCyan` in the identity palette: that
+    /// one is 2.26:1 against white, so the initial drawn on it was a smudge
+    /// and so was every button label once the accent followed it.
+    static let oneDaySteel = UIColor(hex: 0x1678B1)
+    /// #107C84 — 5.0:1. Between the blue and the green, so a room of four
+    /// people doesn't read as three blues.
+    static let oneDayPeacock = UIColor(hex: 0x107C84)
+    /// #4B7F10 — 4.8:1. The yellow end of green.
+    static let oneDayMoss = UIColor(hex: 0x4B7F10)
+    /// #8A710F — 4.7:1. Warm without being orange.
+    static let oneDayMustard = UIColor(hex: 0x8A710F)
+    /// #C34B18 — 4.8:1. `oneDayCoral` at 3.96:1 was just under the line.
+    static let oneDayEmber = UIColor(hex: 0xC34B18)
+    /// #DA1B4E — 4.9:1. The loudest of the twelve.
+    static let oneDayRose = UIColor(hex: 0xDA1B4E)
+    /// #5A6C8C — 5.3:1. Near-neutral, for somebody who doesn't want a colour.
+    static let oneDayGraphite = UIColor(hex: 0x5A6C8C)
 }
 
 extension Color {
@@ -119,6 +136,13 @@ extension Color {
     static let oneDayAmber = Color(uiColor: .oneDayAmber)
     static let oneDayEmerald = Color(uiColor: .oneDayEmerald)
     static let oneDayGrape = Color(uiColor: .oneDayGrape)
+    static let oneDaySteel = Color(uiColor: .oneDaySteel)
+    static let oneDayPeacock = Color(uiColor: .oneDayPeacock)
+    static let oneDayMoss = Color(uiColor: .oneDayMoss)
+    static let oneDayMustard = Color(uiColor: .oneDayMustard)
+    static let oneDayEmber = Color(uiColor: .oneDayEmber)
+    static let oneDayRose = Color(uiColor: .oneDayRose)
+    static let oneDayGraphite = Color(uiColor: .oneDayGraphite)
 }
 
 /// Semantic tokens. Prefer these over the raw palette in view code: `OneDay.ink`

@@ -5,16 +5,27 @@ import UIKit
 /// old free-choice "sticker pack". `MemberChip` (ChallengeBoardView) shares
 /// this same palette so a person's color matches everywhere in the app.
 enum Identity {
-    /// Seven hues, deliberately spread across the wheel. The old palette was six
-    /// blues (`oneDaySky`, `systemTeal`, `systemBlue` among them), so two people
-    /// in one room read as the same person at a glance — and the light end of it
-    /// could not hold the white initial `AvatarDot` draws on top. Every entry
-    /// here clears 4:1 against white.
+    /// Twelve hues, spread across the wheel, in the order the picker draws them.
+    ///
+    /// This is also the app's accent palette (`UIColor.oneDayBrand`), so every
+    /// entry has to carry white text twice over: the initial `AvatarDot` draws
+    /// on it, and the label on a filled button. The bar is 4:1 and these were
+    /// picked by measuring, not by eye — which is how two of the previous seven
+    /// turned out to be under it. `oneDayCyan` was **2.26:1**, and the comment
+    /// here used to claim all seven cleared 4:1; `oneDayCoral` was 3.96:1.
+    /// Both are replaced (`oneDaySteel`, `oneDayEmber`) rather than kept at a
+    /// size where nobody can read their own initial.
     ///
     /// `oneDayMint` is not a candidate: it rings "this is you" in `AvatarStack`.
+    ///
+    /// Growing the list from seven to twelve moves everybody's *derived*
+    /// colour, because that is `sum % count`. Unavoidable when the palette
+    /// changes size, and only affects people who never picked one — a pick is
+    /// stored by name and survives.
     static let paletteUIColors: [UIColor] = [
-        .oneDayNavy, .oneDayBlue, .oneDayCyan,
-        .oneDayCoral, .oneDayAmber, .oneDayEmerald, .oneDayGrape,
+        .oneDayNavy, .oneDayBlue, .oneDaySteel, .oneDayPeacock,
+        .oneDayEmerald, .oneDayMoss, .oneDayMustard, .oneDayAmber,
+        .oneDayEmber, .oneDayRose, .oneDayGraphite, .oneDayGrape,
     ]
 
     /// Which of the seven you picked for yourself, and the name it was picked
@@ -78,6 +89,8 @@ enum Identity {
     /// choice — which is allowed. Telling people apart in a room was never
     /// only the colour's job; the name is under every avatar.
     static func derivedIndex(for name: String?) -> Int {
+        // 1 is the brand blue's slot: a nameless avatar draws the mascot, and
+        // anything else reading this wants the app's own colour.
         guard let name, !name.isEmpty else { return 1 }
         let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return sum % paletteUIColors.count

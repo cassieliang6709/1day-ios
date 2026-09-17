@@ -175,8 +175,27 @@ struct SettingsView: View {
     /// worth overriding the person's own choice: every avatar in the app has
     /// the name next to it or under it.
     private var tintPicker: some View {
-        HStack(spacing: 9) {
-            ForEach(Array(Identity.paletteUIColors.enumerated()), id: \.offset) { index, ui in
+        VStack(spacing: 8) {
+            ForEach(Array(tintRows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 8) { tintDots(row) }
+            }
+        }
+        .accessibilityIdentifier("avatar-tints")
+    }
+
+    /// Six per row. Twelve in one row is a 24pt dot with 3pt between them —
+    /// the row that used to hold seven was already at its limit.
+    private var tintRows: [[Int]] {
+        let all = Array(Identity.paletteUIColors.indices)
+        return stride(from: 0, to: all.count, by: 6).map {
+            Array(all[$0..<min($0 + 6, all.count)])
+        }
+    }
+
+    @ViewBuilder
+    private func tintDots(_ indices: [Int]) -> some View {
+        ForEach(indices, id: \.self) { index in
+            let ui = Identity.paletteUIColors[index]
                 let chosen = index == Identity.tintIndex(for: tintOwnerName)
                 Button {
                     Identity.chooseTint(index, forName: tintOwnerName)
@@ -195,12 +214,10 @@ struct SettingsView: View {
                         }
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.avatarColourN(index + 1))
-                .accessibilityAddTraits(chosen ? .isSelected : [])
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.avatarColourN(index + 1))
+            .accessibilityAddTraits(chosen ? .isSelected : [])
         }
-        .accessibilityIdentifier("avatar-tints")
     }
 
     /// Whose colour this is. `"local"` for a device with no account on it —
