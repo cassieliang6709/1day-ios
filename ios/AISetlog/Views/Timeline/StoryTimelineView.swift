@@ -425,8 +425,9 @@ struct StoryTimelineView: View {
             }
 
         case .preview(let day, let targetAuthorID):
-            // The tapped clip opens, and the rest of the story is a swipe away
-            // either side of it.
+            // The tapped clip, on its own. The swipe that used to reach the
+            // rest of the story from here is gone — see `ClipDeckReview`; the
+            // timeline on the page behind is how you get to the next moment.
             let deck = ClipDeck(
                 clips: store.recordedClips(for: challengeID),
                 momentCount: challenge?.cards.count ?? 0,

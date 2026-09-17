@@ -1,30 +1,33 @@
 import SwiftUI
 
-/// The whole story, one clip per page, swiped left and right.
+/// One clip, full screen. The tapped one.
 ///
-/// Tapping a tile used to open that clip and nothing else: to see the next
-/// moment you closed the screen, found the next tile, and opened it again.
-/// Three taps and two dissolves to move from 2pm to 3pm in your own day.
-/// The clips are already a sequence — that's what a story is — so they get the
-/// gesture a sequence gets.
+/// It was a paged `TabView` — the whole story, one clip per page, swiped left
+/// and right — and it is not any more: taken out in 1.3 rather than improved.
 ///
-/// The order comes from `ClipDeck` rather than from this view, because the
-/// story page lays the same clips out as tiles and the two have to agree: if
-/// each sorted its own way, tapping the third tile would open the fifth page.
+/// The gesture was invisible. A black full-bleed pager has no peeking edge and
+/// no arrows, so the only people who found the other takes were the ones who
+/// swiped by accident; the fix on the table was a page-dot row, which is a
+/// signal for a gesture nobody was looking for in the first place. The story
+/// page now lays the same clips out as a timeline you scroll, so "see the next
+/// moment" already has an answer that is on screen and labelled. Two ways to
+/// walk the same sequence, one of them hidden, is one too many.
+///
+/// `ClipDeck` stays: the story page and this screen have to agree on which
+/// clip is which, and the deck is where that ordering lives.
 struct ClipDeckReview: View {
     let deck: ClipDeck
     var challengeID: UUID?
     var momentCount = 0
     var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
-    /// Which day to start on — whichever tile was tapped.
+    /// Which clip to show — whichever one was tapped. Named `startIndex` from
+    /// when it was the first page of a pager; it is now the only one.
     let startIndex: Int
     /// Re-record a day. Takes the day rather than closing over one, because by
     /// the time it fires you may have swiped three moments away from where you
     /// came in.
     let onReRecord: (Int) -> Void
-
-    @State private var index: Int
 
     init(
         deck: ClipDeck,
@@ -42,33 +45,23 @@ struct ClipDeckReview: View {
         self.showsPrompt = showsPrompt
         self.startIndex = startIndex
         self.onReRecord = onReRecord
-        _index = State(initialValue: startIndex)
     }
 
-    /// The pages whose players exist. Three people filming five moments is
-    /// fifteen clips, and fifteen looping `AVPlayer`s is not something to ask a
-    /// phone to hold at once — so a page that isn't next to you is black.
-    private var live: Set<Int> { deck.liveIndices(around: index) }
-
     var body: some View {
-        TabView(selection: $index) {
-            ForEach(Array(deck.clips.enumerated()), id: \.element.id) { position, clip in
-                page(clip, isLive: live.contains(position))
-                    .tag(position)
+        Group {
+            if let clip = deck.clips.indices.contains(startIndex)
+                ? deck.clips[startIndex] : nil {
+                // Always live: one clip, one player. The pager needed a
+                // three-page window to keep fifteen looping `AVPlayer`s off the
+                // phone at once (three people, five moments); with the swipe
+                // gone that budget went too, and `ClipDeck.liveIndices` with it.
+                page(clip, isLive: true)
+            } else {
+                Color.black
             }
         }
-        // Page dots, not `.never`. A black full-bleed pager with no dots, no
-        // peeking edge and no arrows is indistinguishable from a single clip:
-        // the only people who found out a story's other takes were behind a
-        // swipe were the ones who swiped by accident. `.always` keeps them on
-        // a one-clip story too, which is honest — one dot says "one".
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .interactive))
         .ignoresSafeArea()
         .background(Color.black.ignoresSafeArea())
-        // Again out here: a page's own preference doesn't reach the window
-        // through the paging container, so without this the clock sits on the
-        // video and the close button gets pushed 20 points down the frame.
         .statusBarHidden()
     }
 

@@ -129,25 +129,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertNil(d.index(ofDay: 1, authorID: "someone-who-didnt"))
     }
 
-    // MARK: Which players stay alive
-
-    func testOnlyThePageYoureOnAndItsNeighboursAreLive() {
-        let d = deck((1...5).map { clip(day: $0, author: me) })
-        XCTAssertEqual(d.liveIndices(around: 2), [1, 2, 3])
-    }
-
-    func testTheWindowClampsAtBothEnds() {
-        let d = deck((1...5).map { clip(day: $0, author: me) })
-        XCTAssertEqual(d.liveIndices(around: 0), [0, 1])
-        XCTAssertEqual(d.liveIndices(around: 4), [3, 4])
-    }
-
-    func testNothingIsLiveOffTheEnd() {
-        let d = deck([clip(day: 1, author: me)])
-        XCTAssertEqual(d.liveIndices(around: 7), [])
-        XCTAssertEqual(deck([]).liveIndices(around: 0), [])
-    }
-
     // MARK: The chip over the video
 
     func testTheChipNamesTheMomentAndDoesNotNameMe() {

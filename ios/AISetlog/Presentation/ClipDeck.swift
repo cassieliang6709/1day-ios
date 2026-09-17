@@ -86,16 +86,6 @@ struct ClipDeck {
         }
     }
 
-    /// The pages whose players should exist: the one you're looking at and its
-    /// two neighbours.
-    ///
-    /// Three people filming five moments is fifteen clips, and fifteen looping
-    /// `AVPlayer`s is not something to ask a phone to hold at once.
-    func liveIndices(around index: Int) -> Set<Int> {
-        guard clips.indices.contains(index) else { return [] }
-        return Set((index - 1)...(index + 1)).filter { clips.indices.contains($0) }
-    }
-
     /// What the chip over the video says.
     struct Position: Equatable {
         /// 1-based slot in the story.
