@@ -1,16 +1,26 @@
 import SwiftUI
 
-/// Making a story: one screen, one decision.
+/// Making a story: pick a poster, then one page of settings.
 ///
-/// It was two screens and eight controls — 1/2 选拍法 with a style pill, a
-/// mode pill and a poster grid, then 2/2 设置故事 with a name, a moment list, a
-/// company picker and two capture rows — and seven of the eight already had
-/// the right default. Now the rack of posters *is* the form: tapping one
-/// creates the story with those defaults and goes straight to filming, and the
-/// gear on a poster's corner opens everything the second screen used to ask,
-/// for the person who actually wants to change something.
+/// The 1.2 shape was "the poster is the submit button" — a tap created the
+/// story with defaults and went straight to filming, and the settings were
+/// optional behind a gear on the poster's corner. It was fast, and it was
+/// wrong about one thing: 谁一起拍 was in there. The obvious gesture answered
+/// it 自己来 without asking, and answering it any other way meant noticing a
+/// 26pt icon. That is not a default, it is a decision being made for you.
+///
+/// So the poster opens the page now, and the page's own button creates the
+/// story. Every decision on one page, made once, before anything exists. The
+/// page is a sheet rather than a push because the rack behind it is the thing
+/// you came from and a sheet keeps it there.
 struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
+    /// How to leave. Nil means "I was presented, dismiss me" — the sheet path.
+    /// `RootShellView` passes a closure instead, because as the 新建 tab this
+    /// view has no presentation to dismiss and `dismiss()` is a no-op: without
+    /// this the ✕ did nothing and creating a story left the composer on screen
+    /// behind the story it had just made.
+    var onClose: (() -> Void)? = nil
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
@@ -35,7 +45,8 @@ struct StoryComposerView: View {
     @State private var moments: [String] = []
     @State private var isCustomPromptStory = false
     @State private var showGuided = false
-    /// The old step 2, now a sheet behind a poster's gear.
+    /// The settings page. Raised by a poster tap — there is no other way to it
+    /// and no way past it.
     @State private var showSetup = false
     @State private var creating = false
     @State private var errorText: String?
@@ -76,12 +87,34 @@ struct StoryComposerView: View {
                     customTemplates: store.customTemplates,
                     rack: $rack,
                     onBuildOwn: beginCustomPromptFlow,
-                    onChoose: createFromPoster,
-                    onSettings: openSettings,
+                    onChoose: openSettings,
                     onEdit: { editingTemplate = $0 },
                     onDelete: deleteTemplate,
                     coverURL: { store.coverURL(for: $0) })
             }
+
+            // Only for the poster-tap route into a shared room. The settings
+            // sheet has its own inline spinner and its own error line above the
+            // button; out here on the rack there was neither, so a slow room
+            // creation looked like a tap that missed and a failed one looked
+            // like nothing at all.
+            if creating, !showSetup, withFriends {
+                Color.black.opacity(0.18).ignoresSafeArea()
+                ProgressView(Strings.creatingRoom)
+                    .controlSize(.large)
+                    .padding(22)
+                    .glassSurface(radius: OneDay.Radius.card)
+            }
+        }
+        .alert(
+            Strings.couldNotCreateRoom,
+            isPresented: Binding(
+                get: { errorText != nil && !showSetup },
+                set: { if !$0 { errorText = nil } })
+        ) {
+            Button(Strings.ok) { errorText = nil }
+        } message: {
+            Text(errorText ?? "")
         }
         .sheet(isPresented: $showSetup) { setupSheet }
         .sheet(isPresented: $showSignIn) {
@@ -121,12 +154,12 @@ struct StoryComposerView: View {
 
     // MARK: - Chrome
 
-    /// Just the way out. There is no progress counter because there is no
-    /// second step — `StepDots` reading `1/2` was itself telling people to
-    /// expect another screen to fill in.
+    /// Just the way out. There is no progress counter and no back chevron
+    /// because there is one screen: the settings arrive as a sheet over it, and
+    /// a sheet already has its own ✕.
     private var topBar: some View {
         HStack(spacing: 12) {
-            IconBubble(systemName: "xmark") { dismiss() }
+            IconBubble(systemName: "xmark") { leave() }
             Spacer()
             Color.clear.frame(width: 38, height: 38)
         }
@@ -137,8 +170,8 @@ struct StoryComposerView: View {
 
     // MARK: - The settings sheet
 
-    /// Everything the second screen used to ask, now optional: reached from a
-    /// poster's gear, and the only place 一起拍 lives.
+    /// The one page: name, 谁一起拍, clip length, frame, and the moment list.
+    /// Its button is what creates the story.
     private var setupSheet: some View {
         VStack(spacing: 0) {
             // No title of its own: `SetupStep` already leads with 设置, and two
@@ -217,6 +250,15 @@ struct StoryComposerView: View {
 
     // MARK: - Actions
 
+    /// Leaving, whichever way this view got on screen. See `onClose`.
+    private func leave() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+
     private func start() {
         let name = title.trimmingCharacters(in: .whitespaces)
         // `dismiss()` isn't instant, so a second tap inside the closing
@@ -237,7 +279,7 @@ struct StoryComposerView: View {
             // Closing the sheet first: dismissing the composer out from under
             // an open sheet leaves the sheet animating over the story page.
             showSetup = false
-            dismiss()
+            leave()
             onCreate(challenge.id)
         }
     }
@@ -256,7 +298,7 @@ struct StoryComposerView: View {
                     templateName: selected?.identityKey,
                     momentTitles: resolvedMoments)
                 showSetup = false
-                dismiss()
+                leave()
                 onCreate(challenge.id)
             } catch {
                 errorText = error.localizedDescription
@@ -276,42 +318,18 @@ struct StoryComposerView: View {
         showGuided = true
     }
 
-    /// The gear on a poster's corner: adopt that poster, then open the
-    /// settings sheet instead of creating anything. This is the whole of the
-    /// old second screen, for the person who wants to rename the story, edit
-    /// its moments, or invite someone before they start.
+    /// Tapping a poster: adopt that script, then open the settings page.
+    ///
+    /// This is the whole flow as of 1.3. It used to create the story on the spot
+    /// and the settings were optional, behind a gear — which meant the fast path
+    /// answered 谁一起拍 as 自己来 without asking, and answering it any other way
+    /// required noticing a 26pt icon in a poster's corner. Now the tap opens the
+    /// page and the page's own button is what creates the story, so every
+    /// decision is made once, in one place, before anything exists.
     private func openSettings(_ template: ChallengeTemplate) {
         adopt(template)
         errorText = nil
         showSetup = true
-    }
-
-    /// Tapping a poster creates the story and leaves for the camera.
-    ///
-    /// The poster *is* the submit button. Every other control on this screen
-    /// had a correct default, so asking for confirmation was asking the user
-    /// to re-affirm a choice they had just made — and the previous shape made
-    /// it worse than that: `1/2 选拍法` and 下一步 only ever applied to the
-    /// poster that happened to be selected by default, so tapping any other
-    /// one skipped both. One rule now, and it is the fast one.
-    private func createFromPoster(_ template: ChallengeTemplate) {
-        guard !creating else { return }
-        adopt(template)
-        // `adopt` has just synced `title` and `moments` to this poster — or
-        // kept a name the user typed in the settings sheet, which is the one
-        // case where they told us what to call it. An empty name can't reach
-        // `store.create`, so the poster's own name is the floor.
-        let typed = title.trimmingCharacters(in: .whitespaces)
-        creating = true
-        let challenge = store.create(
-            title: typed.isEmpty ? template.displayName : typed,
-            mode: selection.mode,
-            clipLength: clipLength,
-            orientation: orientation,
-            templateName: template.identityKey,
-            momentTitles: resolvedMoments)
-        dismiss()
-        onCreate(challenge.id)
     }
 
     /// Makes `template` the story's script, without deciding what happens next.

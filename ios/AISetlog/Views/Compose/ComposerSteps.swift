@@ -24,14 +24,26 @@ enum TemplateRack: Hashable {
     case custom
 }
 
-/// The whole composer: one question, one row of filters, one rack of posters.
-/// Tapping a poster creates the story. The gear on its corner is the way to
-/// rename it, edit its moments or invite someone first.
+/// The composer's first screen: one question, one row of filters, one rack of
+/// posters. Tapping a poster opens its settings, and the settings page is where
+/// the story gets made.
 ///
-/// This used to be step 1 of 2, with a 下一步 button, a `1/2` counter, and a
-/// selected poster that rose to the top and expanded — which made "selected"
-/// and "submitted" two different things, so every poster except the default
-/// needed two taps and the default needed one.
+/// Three shapes, for the record, because the current one looks like the first:
+///
+/// 1. **1/2 选拍法 → 2/2 设置故事.** A 下一步 button that only ever applied to
+///    whichever poster happened to be selected by default, so tapping any other
+///    one skipped the second screen entirely.
+/// 2. **The poster is the submit button.** Tapping created the story with
+///    defaults and left for the camera; the gear on a poster's corner was the
+///    only way to the settings. Fast, but 和朋友一起 lived behind a 26pt gear —
+///    the most consequential choice in the app, hidden in a corner, while the
+///    obvious gesture silently chose 自己来.
+/// 3. **Now:** a poster opens the settings page. One page, every decision on
+///    it — who you're filming with included — and the button at the bottom both
+///    creates the story and starts it.
+///
+/// So there is no gear any more (the poster *is* the gear) and no "选一张，就
+/// 建好了" (it no longer does).
 struct MoodStep: View {
     /// Built-ins only. The user's own sets live on the 自己写 rack, so the two
     /// lists are passed apart rather than concatenated.
@@ -40,9 +52,9 @@ struct MoodStep: View {
     let customTemplates: [ChallengeTemplate]
     @Binding var rack: TemplateRack
     let onBuildOwn: () -> Void
-    /// A poster tap is the submission: this creates the story and leaves.
+    /// A poster tap adopts that script and opens the settings page. It used to
+    /// create the story outright; see this type's note.
     let onChoose: (ChallengeTemplate) -> Void
-    let onSettings: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
     /// Where a template's own cover picture lives, asked of the store rather
@@ -88,16 +100,13 @@ struct MoodStep: View {
                     .padding(.horizontal, 20)
                     .accessibilityIdentifier("composer-rack")
 
-                // "选一张，就建好了" is a promise about the posters below it —
-                // on an empty rack there is nothing for it to be about.
-                if !shown.isEmpty {
-                    SectionLabel(text: Strings.pickOneCreatesIt)
-                        .padding(.horizontal, 20)
-                }
-
                 grid
             }
-            .padding(.bottom, 16)
+            // Clears the floating capsule. This screen was a `fullScreenCover`
+            // until 1.3, with nothing under it to get out of the way of; as the
+            // 新建 tab the last row of posters scrolled under 计划/新建/拍摄 and
+            // stopped there.
+            .padding(.bottom, OneDay.tabBarClearance + 16)
             .animation(OneDay.Motion.soft, value: rack)
         }
         .scrollIndicators(.hidden)
@@ -125,7 +134,6 @@ struct MoodStep: View {
                         isSelected: false,
                         coverURL: coverURL(template),
                         onSelect: { onChoose(template) },
-                        onSettings: { onSettings(template) },
                         onEdit: template.isCustom ? { onEdit(template) } : nil,
                         onDelete: template.isCustom ? { onDelete(template) } : nil)
                 }
@@ -198,7 +206,6 @@ private struct PromptTemplateTile: View {
     let isSelected: Bool
     var coverURL: URL?
     let onSelect: () -> Void
-    var onSettings: (() -> Void)? = nil
     var subtitle: Subtitle = .prompts
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
@@ -234,20 +241,6 @@ private struct PromptTemplateTile: View {
                             role: .destructive, action: onDelete)
                     }
                 }
-
-            if let onSettings {
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(OneDay.ink)
-                        .padding(8)
-                        .background(.thinMaterial, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(7)
-                .accessibilityLabel(Strings.storySettingsTitle)
-                .accessibilityIdentifier("poster-settings")
-            }
         }
     }
 
