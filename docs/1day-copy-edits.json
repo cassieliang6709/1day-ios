@@ -1,17 +1,8 @@
 {
   "saved": "2026-09-17",
-  "note": "从编辑页读回来的改动。页面本身只把改动留在内存里，所以每次她说一声我就存一份到这儿。",
+  "note": "从编辑页读回来的改动。页面只把改动留在内存和 URL hash 里，所以她说一声我就存一份到这儿。",
   "edits": [
-    {
-      "key": "deleteStoryWarning",
-      "zh": "连 \\(clipCount) 段一起删，删完没了。",
-      "en": "这个故事会从这台设备上删掉，找不回来。",
-      "warning": "en 这一栏里现在是中文，看起来是粘错格子了 —— 等她确认要不要改回英文"
-    },
-    {
-      "key": "deleteStoryWarningEmpty",
-      "zh": "删了就没了。",
-      "en": "This story will be deleted from this device. This can’t be undone."
-    }
+    { "key": "deleteStoryWarning",      "zh": "连 \\(clipCount) 段一起删，删完没了。" },
+    { "key": "deleteStoryWarningEmpty", "zh": "删了就没了。" }
   ]
 }
