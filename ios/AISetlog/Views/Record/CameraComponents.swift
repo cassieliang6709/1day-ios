@@ -254,6 +254,129 @@ struct MomentStampOverlay: View {
     }
 }
 
+/// The lens picker: 0.5x / 1x / 2x, and a way past them.
+///
+/// Every value here is a display value (see `CameraZoom`), never a
+/// `videoZoomFactor`. Which presets arrive is the recorder's decision — a
+/// front camera has no ultra-wide, so it sends two chips instead of three.
+///
+/// It sits in the control bar under the picture rather than on top of it, the
+/// way the system camera does: the bottom of the frame is already spoken for
+/// by the moment's name and the story's progress bars, and both of those are
+/// promises about the export that a row of chips must not cover.
+struct ZoomControlRow: View {
+    let presets: [CGFloat]
+    let capabilities: CameraZoom
+    let tint: Color
+    /// Writes go straight to the lens — the setter is `ClipRecorder.setZoom`,
+    /// which clamps, so this row never has to check a value before sending it.
+    @Binding var zoom: CGFloat
+    /// Whether the fine slider has replaced the chips.
+    @Binding var showsSlider: Bool
+
+    /// Whether the zoom is somewhere the chips don't name — after a pinch, or
+    /// after the slider.
+    private var isOffPreset: Bool {
+        !presets.contains { CameraZoom.isSame($0, zoom) }
+    }
+
+    var body: some View {
+        Group {
+            if showsSlider {
+                sliderRow
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(presets, id: \.self) { chip($0) }
+                    customChip
+                }
+            }
+        }
+        // Four capsules of two or three characters each have to fit the width
+        // of the narrowest phone this app runs on, and at accessibility sizes
+        // they stop fitting. Capped here rather than left to shrink the
+        // picture above it or slide off the screen; VoiceOver reads the
+        // accessibility labels at full size regardless of the drawn text.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    private func chip(_ preset: CGFloat) -> some View {
+        let selected = CameraZoom.isSame(zoom, preset)
+        return Button {
+            zoom = preset
+        } label: {
+            Text(CameraZoom.label(preset))
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(selected ? Color.white : Color.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(minWidth: 44)
+                .background {
+                    Capsule().fill(selected ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.systemGray6)))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.zoomTo(CameraZoom.label(preset)))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// Reads "自定义" until the zoom is somewhere the chips don't name, and
+    /// then reads the number it actually is — so a pinch to 1.8x has
+    /// somewhere to show up, and tapping it opens the slider already there.
+    private var customChip: some View {
+        Button {
+            showsSlider = true
+        } label: {
+            Text(isOffPreset ? CameraZoom.label(zoom) : Strings.customZoom)
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(isOffPreset ? Color.white : Color.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(minWidth: 44)
+                .background {
+                    Capsule().fill(isOffPreset ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.systemGray6)))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.customZoom)
+        .accessibilityValue(CameraZoom.label(zoom))
+    }
+
+    private var sliderRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                showsSlider = false
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(.primary)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color(.systemGray6)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.closeCustomZoom)
+
+            Slider(value: $zoom, in: capabilities.minDisplay...capabilities.maxDisplay)
+                .tint(tint)
+                .accessibilityLabel(Strings.zoomSlider)
+                .accessibilityValue(CameraZoom.label(zoom))
+
+            Text(CameraZoom.label(zoom))
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+                // Room for the widest label the ceiling allows, so the slider
+                // doesn't shuffle sideways as the number grows a digit.
+                .frame(minWidth: 44, alignment: .trailing)
+        }
+    }
+}
+
 /// On-video center caption editor: the text sits exactly where it will be
 /// burned into the exported film, so what you type is what ships.
 struct CaptionOverlayEditor: View {

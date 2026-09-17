@@ -649,6 +649,15 @@ enum Strings {
     static var switchOrientation: String { lang == .chinese ? "切换画幅" : "Switch frame" }
     static var flipCamera: String { lang == .chinese ? "切换前后摄像头" : "Flip camera" }
 
+    // The zoom values themselves ("0.5x") are formatted by `CameraZoom.label`
+    // and are the same in both languages, so they are not copy.
+    static var customZoom: String { lang == .chinese ? "自定义" : "Custom" }
+    static var closeCustomZoom: String { lang == .chinese ? "收起自定义倍数" : "Close custom zoom" }
+    static func zoomTo(_ value: String) -> String {
+        lang == .chinese ? "缩放 \(value)" : "Zoom \(value)"
+    }
+    static var zoomSlider: String { lang == .chinese ? "缩放倍数" : "Zoom level" }
+
     /// The frame a clip was filmed in, named the way the picker names it — so
     /// "no landscape plan yet" and the row that would have created one agree.
     ///

@@ -34,12 +34,44 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private(set) var clipURL: URL?
     private(set) var recordedAt: Date?
 
-    /// Finds a camera for a position. On a device that's the front/back
-    /// wide-angle camera; the iOS 17+ Simulator has no built-in camera, but it
-    /// can hand you the host Mac's camera as an external device instead.
+    /// What the current lens can reach, and where it is pointed now — both in
+    /// display values (0.5, 1, 2), never in `videoZoomFactor`. See `CameraZoom`.
+    private(set) var zoomCapabilities: CameraZoom = .unavailable
+    private(set) var zoom: CGFloat = 1
+
+    /// The chips to draw. One entry means this camera has no zoom worth
+    /// offering, and the UI draws nothing.
+    var zoomPresets: [CGFloat] { zoomCapabilities.presets() }
+
+    /// Lens preference for the back camera, widest reach first.
+    ///
+    /// A *virtual* device is what makes 0.5x exist at all: it spans the
+    /// ultra-wide, wide and telephoto lenses and hands over between them as
+    /// the zoom factor crosses their switch-over points, so the session sees
+    /// one input and the person gets three lenses. Asking for
+    /// `.builtInWideAngleCamera` — which is what this used to do — gets one
+    /// lens and a hard floor of 1x no matter what the phone has in it.
+    private static let backCameraTypes: [AVCaptureDevice.DeviceType] = [
+        .builtInTripleCamera,
+        .builtInDualWideCamera,
+        .builtInDualCamera,
+        .builtInWideAngleCamera,
+    ]
+
+    /// The front camera is a single lens on every phone — no ultra-wide to
+    /// reach for, so nothing virtual to ask for either.
+    private static let frontCameraTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+
+    /// Finds a camera for a position: the widest-reaching virtual device the
+    /// phone has, falling back through to a single wide-angle lens. The iOS 17+
+    /// Simulator has no built-in camera, but it can hand you the host Mac's
+    /// camera as an external device instead.
     private func camera(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        if let builtIn = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
-            return builtIn
+        let preferred = position == .front ? Self.frontCameraTypes : Self.backCameraTypes
+        for type in preferred {
+            if let device = AVCaptureDevice.default(type, for: .video, position: position) {
+                return device
+            }
         }
         let discovery = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.builtInWideAngleCamera, .external],
@@ -106,7 +138,57 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             return
         }
         applyOrientation()
+        refreshZoom()
         state = .ready
+    }
+
+    // MARK: - Zoom
+
+    /// Point the lens at a display zoom value — 0.5, 1, 2, or anything in
+    /// between and above that this camera can reach.
+    ///
+    /// Clamped here rather than by the caller, so a pinch can hand over a raw
+    /// running product and a slider can hand over its own bounds without
+    /// either of them knowing what lenses are behind the preview.
+    func setZoom(_ display: CGFloat) {
+        guard let device = videoInput?.device else { return }
+        let clamped = zoomCapabilities.clampedDisplay(display)
+        zoom = clamped
+
+        let factor = zoomCapabilities.factor(forDisplay: clamped)
+        // Same queue as session setup and teardown: `lockForConfiguration`
+        // blocks, and a pinch runs it on every gesture frame.
+        Self.sessionQueue.async {
+            do {
+                try device.lockForConfiguration()
+            } catch {
+                return
+            }
+            // The device's own limits, not the UI's: `CameraZoom` caps the
+            // interactive range well below the hardware's, and setting a
+            // factor outside the real range raises.
+            device.videoZoomFactor = min(
+                max(factor, device.minAvailableVideoZoomFactor),
+                device.maxAvailableVideoZoomFactor)
+            device.unlockForConfiguration()
+        }
+    }
+
+    /// Re-reads the lens's zoom range and parks at 1x. Called on every input
+    /// change, because a different lens is a different range.
+    ///
+    /// 1x rather than keeping the number: the front camera's range has no
+    /// 0.5x in it, so carrying a display value across a flip would either
+    /// clamp to a picture the chips no longer describe or leave a 10x crop on
+    /// a lens with no optical reach to hide it.
+    private func refreshZoom() {
+        guard let device = videoInput?.device else {
+            zoomCapabilities = .unavailable
+            zoom = 1
+            return
+        }
+        zoomCapabilities = CameraZoom(device: device)
+        setZoom(1)
     }
 
     // MARK: - Orientation
@@ -214,6 +296,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         // discarded and the connection falls back to 0° — which records a
         // portrait clip sideways.
         applyOrientation()
+        refreshZoom()
     }
 
     func startRecording(seconds: Double) {

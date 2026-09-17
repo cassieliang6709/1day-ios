@@ -56,6 +56,12 @@ struct RecordClipView: View {
     /// seconds, tapped X out of habit, and `teardown()` deleted the temp file
     /// on the way out with nothing on screen to say it had happened.
     @State private var askBeforeDiscarding = false
+    /// Whether the fine zoom row has replaced the preset chips. The chips
+    /// cover 0.5x / 1x / 2x; this covers everything between and above them.
+    @State private var showsZoomSlider = false
+    /// A pinch reports a running multiple of where it began, so where it began
+    /// has to be remembered for the length of the gesture. nil = not pinching.
+    @State private var pinchStartZoom: CGFloat?
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -225,6 +231,19 @@ struct RecordClipView: View {
                 .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
                 .padding(12)
             }
+            // Pinch the picture itself, which is where the hand already is.
+            // The chips are the quick answer; this is the whole range, and it
+            // stays live while recording — zooming mid-take is the point of
+            // having it on the preview rather than in a setting.
+            .gesture(
+                MagnifyGesture(minimumScaleDelta: 0.01)
+                    .onChanged { value in
+                        let start = pinchStartZoom ?? recorder.zoom
+                        pinchStartZoom = start
+                        recorder.setZoom(start * value.magnification)
+                    }
+                    .onEnded { _ in pinchStartZoom = nil }
+            )
             .layoutPriority(1)
 
             bottomControls
@@ -645,12 +664,42 @@ struct RecordClipView: View {
         }
     }
 
+    // MARK: - Zoom
+
+    /// Drawn in both `.live` and `.recording`: zooming mid-take is allowed by
+    /// the capture pipeline and is half of why anybody wants 2x.
+    @ViewBuilder
+    private var zoomControls: some View {
+        let presets = recorder.zoomPresets
+        // One preset means one lens with nothing to reach for — the front
+        // camera on an older phone, or the Simulator's borrowed webcam. A
+        // single dead chip would be worse than no row at all.
+        if presets.count > 1 {
+            ZoomControlRow(
+                presets: presets,
+                capabilities: recorder.zoomCapabilities,
+                tint: myTint,
+                zoom: zoomBinding,
+                showsSlider: $showsZoomSlider)
+        }
+    }
+
+    private var zoomBinding: Binding<CGFloat> {
+        Binding(
+            get: { recorder.zoom },
+            set: { recorder.setZoom($0) })
+    }
+
     private var bottomControls: some View {
-        Group {
-            if recorder.state == .recording {
-                recordingControls
-            } else {
-                idleRecordingControl
+        VStack(spacing: 8) {
+            zoomControls
+
+            Group {
+                if recorder.state == .recording {
+                    recordingControls
+                } else {
+                    idleRecordingControl
+                }
             }
         }
         .frame(maxWidth: .infinity)
