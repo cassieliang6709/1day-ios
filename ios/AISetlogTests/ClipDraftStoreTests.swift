@@ -141,9 +141,112 @@ final class ClipDraftStoreTests: XCTestCase {
         try Data(repeating: 7, count: bytes).write(to: url)
         return url
     }
+
+    // MARK: - Filing one clip into several stories
+
+    /// The premise `ClipFilingSheet` is built on: one take can go into more
+    /// than one story.
+    ///
+    /// Filing used to be a single-choice dialog, so this was never exercised —
+    /// and it is only safe because `DiskClipFileStore.storeClip` *copies*. If
+    /// it ever moved the file instead, the first story would get the clip and
+    /// every story after it would silently get nothing: `saveClip` reports
+    /// failure by doing nothing at all, so the batch loop in
+    /// `RecordClipView.file(_:to:)` would count successes it didn't have.
+    ///
+    /// Asserts the three things that would break: every story ends up holding
+    /// a clip, each in its own first open slot, and the source survives.
+    func testOneClipFilesIntoSeveralStoriesAndLeavesTheSourceAlone() throws {
+        let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fileStore = DiskClipFileStore()
+        let store = ChallengeStore(
+            repository: UserDefaultsChallengeRepository(
+                defaults: defaults, fileStore: fileStore),
+            fileStore: fileStore,
+            coverStore: NoCoverStore())
+
+        let targets = ["Mine", "The room", "Third"].map {
+            store.create(
+                title: $0,
+                mode: .oneDay,
+                clipLength: .tiny,
+                orientation: .portrait,
+                templateName: nil,
+                momentTitles: ["one", "two"])
+        }
+        defer { targets.forEach { fileStore.deleteClips(challengeID: $0.id) } }
+
+        let source = try makeTempClip(named: "shared.mov", bytes: 256)
+
+        for challenge in targets {
+            let day = try XCTUnwrap(
+                ClipFiling.targetDay(in: try XCTUnwrap(store.challenge(challenge.id))),
+                "every fresh story has an open slot")
+            store.saveClip(from: source, day: day, challengeID: challenge.id)
+        }
+
+        for challenge in targets {
+            let saved = try XCTUnwrap(store.challenge(challenge.id))
+            let filled = saved.cards.filter { $0.clipFileName != nil }
+            XCTAssertEqual(
+                filled.count, 1,
+                "\(saved.title) should hold exactly the one clip it was filed")
+            XCTAssertEqual(filled.first?.day, 1, "it lands in the first open slot")
+        }
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: source.path),
+            "filing copies; the take is still there to file again")
+    }
+
+    /// The sheet only ever offers stories with room in them, and the batch loop
+    /// skips any that filled up in between. A story with every slot taken must
+    /// not be a candidate — filing into one used to overwrite whatever was in
+    /// whichever day the story happened to be on.
+    func testAFullStoryIsNotOfferedAsSomewhereToFileTo() throws {
+        let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fileStore = DiskClipFileStore()
+        let store = ChallengeStore(
+            repository: UserDefaultsChallengeRepository(
+                defaults: defaults, fileStore: fileStore),
+            fileStore: fileStore,
+            coverStore: NoCoverStore())
+
+        let challenge = store.create(
+            title: "One slot only",
+            mode: .oneDay,
+            clipLength: .tiny,
+            orientation: .portrait,
+            templateName: nil,
+            momentTitles: ["only"])
+        defer { fileStore.deleteClips(challengeID: challenge.id) }
+
+        let source = try makeTempClip(named: "fills-it.mov", bytes: 128)
+        store.saveClip(from: source, day: 1, challengeID: challenge.id)
+
+        let full = try XCTUnwrap(store.challenge(challenge.id))
+        XCTAssertNil(ClipFiling.targetDay(in: full))
+        XCTAssertTrue(
+            ClipFiling.candidates(in: [full], orientation: .portrait).isEmpty,
+            "a full story is not somewhere a clip can go")
+    }
 }
 
 // MARK: - Doubles
+
+/// The batch-filing tests build a real `ChallengeStore`, which needs one of
+/// these; nothing they assert touches a template cover.
+private final class NoCoverStore: TemplateCoverStore {
+    func storeCover(_ imageData: Data, ownerID: UUID) -> String? { nil }
+    func coverURL(fileName: String) -> URL? { nil }
+    func deleteCover(fileName: String) {}
+}
 
 private final class InMemoryDraftRepository: ClipDraftRepository {
     private var stored: [ClipDraft] = []
