@@ -25,6 +25,8 @@ struct StoryTimelineView: View {
     @State private var sheet: TimelineSheet?
     @State private var showFilm = false
     @State private var showEditPlan = false
+    /// Changing the picture that stands for this story — see `StoryCoverSheet`.
+    @State private var showCoverPicker = false
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
@@ -93,6 +95,24 @@ struct StoryTimelineView: View {
             if let challenge {
                 EditPlanSheet(challenge: challenge) { title, moments in
                     store.updatePlan(challengeID, title: title, momentTitles: moments)
+                }
+            }
+        }
+        .sheet(isPresented: $showCoverPicker) {
+            if let challenge {
+                // Newest first: the frame somebody wants for a cover is almost
+                // always the one they just filmed.
+                let clips = store.recordedClips(for: challengeID).sorted {
+                    ($0.recordedAt ?? .distantPast, $0.day)
+                        > ($1.recordedAt ?? .distantPast, $1.day)
+                }
+                StoryCoverSheet(
+                    challenge: challenge,
+                    clips: clips,
+                    currentCoverURL: store.storyCoverURL(
+                        for: challenge, latestClipURL: clips.first?.url)
+                ) { choice in
+                    store.setStoryCover(choice, for: challengeID)
                 }
             }
         }
@@ -351,6 +371,12 @@ struct StoryTimelineView: View {
 
                 if !challenge.isTimeOnly {
                     Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
+                }
+
+                // Next to 编辑计划 because it is the same kind of thing: what
+                // this story *is*, rather than what to do in it.
+                Button(Strings.storyCoverTitle, systemImage: "photo") {
+                    showCoverPicker = true
                 }
 
                 Button(

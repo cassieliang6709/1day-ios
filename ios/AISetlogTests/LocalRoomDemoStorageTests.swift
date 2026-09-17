@@ -28,7 +28,7 @@ final class LocalRoomDemoStorageTests: XCTestCase {
         storage.close()
         storage.saveChallenges([Challenge(id: UUID(), title: "Late", startDate: .now, cards: [])])
         XCTAssertTrue(storage.loadChallenges().isEmpty)
-        XCTAssertNil(storage.storeCover(Data([1, 2, 3]), templateID: UUID()))
+        XCTAssertNil(storage.storeCover(Data([1, 2, 3]), ownerID: UUID()))
         XCTAssertNil(storage.storeClip(from: URL(fileURLWithPath: "/missing.mov"), day: 1, challengeID: UUID()))
         storage.close()
         XCTAssertFalse(FileManager.default.fileExists(atPath: storage.root.path))
@@ -43,7 +43,7 @@ final class LocalRoomDemoStorageTests: XCTestCase {
                 XCTAssertTrue(url.standardizedFileURL.path.hasPrefix(storage.root.standardizedFileURL.path + "/"))
             }
         }
-        let cover = try XCTUnwrap(storage.storeCover(Data([1, 2, 3]), templateID: UUID()))
+        let cover = try XCTUnwrap(storage.storeCover(Data([1, 2, 3]), ownerID: UUID()))
         XCTAssertNotNil(storage.coverURL(fileName: cover))
         storage.deleteCover(fileName: cover)
         XCTAssertNil(storage.coverURL(fileName: cover))

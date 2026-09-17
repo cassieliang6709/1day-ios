@@ -503,7 +503,8 @@ struct PlansHomeView: View {
     /// per row (progress, cover, refresh token) tripled that for nothing.
     private struct CardState {
         let progress: RoomProgress
-        /// The most recent clip in the story, from anyone. A room where only my
+        /// What the card shows: the cover this story was given, and failing
+        /// that the most recent clip in it, from anyone. A room where only my
         /// friends have filmed used to fall back to the template art, so the
         /// card looked untouched while it was three moments in.
         let coverURL: URL?
@@ -524,7 +525,7 @@ struct PlansHomeView: View {
                 momentCount: challenge.cards.count,
                 clips: clips,
                 myID: account.account?.id ?? RoomProgress.soloAuthorID),
-            coverURL: latest?.url,
+            coverURL: store.storyCoverURL(for: challenge, latestClipURL: latest?.url),
             refreshToken: latest?.recordedAt)
     }
 

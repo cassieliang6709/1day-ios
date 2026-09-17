@@ -272,9 +272,9 @@ private final class MemoryTemplateCoverStore: TemplateCoverStore {
     private(set) var deleted: [String] = []
     var failsWrites = false
 
-    func storeCover(_ imageData: Data, templateID: UUID) -> String? {
+    func storeCover(_ imageData: Data, ownerID: UUID) -> String? {
         guard !failsWrites else { return nil }
-        let fileName = "\(templateID.uuidString)-\(written.count).coverimg"
+        let fileName = "\(ownerID.uuidString)-\(written.count).coverimg"
         written[fileName] = imageData
         return fileName
     }

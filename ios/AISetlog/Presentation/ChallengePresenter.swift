@@ -23,7 +23,10 @@ struct ChallengePresenter {
     /// built-in poster when known, otherwise the closest poster its own
     /// moments can earn, and only then the universal custom-story cover.
     var coverAssetName: String {
-        builtInTemplate?.coverAssetName
+        // A preset the person picked for this story wins: it is the only one
+        // of these four that somebody chose on purpose.
+        challenge.presetCoverAssetName
+            ?? builtInTemplate?.coverAssetName
             ?? TemplateCoverMatcher.assetName(
                 forMomentKeys: challenge.momentTitles ?? [], name: challenge.title)
             ?? TemplateCoverMatcher.fallbackAssetName

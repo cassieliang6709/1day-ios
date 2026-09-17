@@ -57,7 +57,10 @@ enum TemplateCoverChoice: Equatable {
     }
 }
 
-private struct TemplateCoverPreset: Identifiable {
+/// The bundled cover library. Not private: a story's own cover picker
+/// (`StoryCoverSheet`) offers the same six, and two lists of scenes that have
+/// to stay in step is one list too many.
+struct TemplateCoverPreset: Identifiable {
     let assetName: String
     let name: LocalizedText
     var id: String { assetName }
