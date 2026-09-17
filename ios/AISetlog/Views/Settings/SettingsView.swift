@@ -32,6 +32,7 @@ struct SettingsView: View {
     @AppStorage(NotificationPreferences.showFriendNamesKey)
     private var showFriendNames = false
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var mutedRooms = NotificationPreferences.mutedRoomCodes
 
@@ -92,6 +93,13 @@ struct SettingsView: View {
             .task {
                 await refreshAuthorizationStatus()
                 mutedRooms = NotificationPreferences.mutedRoomCodes
+            }
+            // Granting permission happens in another app, and this sheet stays
+            // alive behind it — without re-reading on the way back, the page
+            // still says notifications are off after you just turned them on.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await refreshAuthorizationStatus() }
             }
             // Outside the scroll content, as it was outside the Form: a sheet
             // presented from inside a row of an already-presented sheet takes
@@ -415,7 +423,12 @@ struct SettingsView: View {
             }
         }
 
-        if authorizationStatus == .denied && (eveningEnabled || sharedEnabled) {
+        // Not `&& (eveningEnabled || sharedEnabled)`, which is what it used to
+        // say and is the bug: with notifications refused in iOS Settings,
+        // `requestAuthorization` returns false, so the switch springs back to
+        // off, so neither flag is ever true, so the sentence explaining why the
+        // switch won't move never appeared. A dead toggle and no reason for it.
+        if authorizationStatus == .denied {
             rowDivider
             VStack(alignment: .leading, spacing: 7) {
                 Text(Strings.notificationPermissionDenied)
