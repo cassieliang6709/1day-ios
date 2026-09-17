@@ -152,7 +152,6 @@ final class LocalizationTests: XCTestCase {
             inBothLanguages { Strings.followPrompts },
             inBothLanguages { Strings.recordByTime },
             inBothLanguages { Strings.coverFromClips },
-            inBothLanguages { Strings.timeOnlyCaptionNote },
             inBothLanguages { Strings.previewTheFilm(7) },
             inBothLanguages { Strings.headerDateProgress(1, 7) },
         ]

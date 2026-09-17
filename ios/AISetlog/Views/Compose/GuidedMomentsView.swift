@@ -72,7 +72,6 @@ struct GuidedMomentsView: View {
                         promptEditor
                         libraryButton
                         keepItCard
-                        footnote
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 28)
@@ -104,10 +103,6 @@ struct GuidedMomentsView: View {
             Text(Strings.guidedHeading)
                 .font(.system(size: 24, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-            Text(Strings.guidedSubtitle)
-                .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 8)
     }
@@ -151,11 +146,6 @@ struct GuidedMomentsView: View {
                         .font(.system(size: 15.5, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
                 }
-
-                Text(Strings.intentSubtitle)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
 
                 TextField("", text: $intent, prompt: Text(Strings.intentPlaceholder))
                     .font(.system(size: 15.5, weight: .medium, design: .rounded))
@@ -306,16 +296,6 @@ struct GuidedMomentsView: View {
             .filter { !$0.isEmpty }
     }
 
-    private var footnote: some View {
-        HStack(alignment: .top, spacing: 10) {
-            OneDayBuddy(size: 30)
-            Text(Strings.guidedFootnote(filled: filledCount, needsName: needsName))
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 4)
-    }
 
     private func binding(_ index: Int) -> Binding<String> {
         Binding(

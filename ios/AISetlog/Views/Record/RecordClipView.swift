@@ -546,7 +546,12 @@ struct RecordClipView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(myTint)
             }
+            // Same gate as the home screen's demo button, for the same
+            // reason: the Simulator has no camera, so this is the only way to
+            // get footage into a story on a Mac — and it does not belong on the
+            // screen the rest of the time. See `DemoEntries`.
             #if DEBUG
+            if DemoEntries.areEnabled {
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
             Button(Strings.useDemoClip(localizedMomentTitle)) {
                 Task {
@@ -570,6 +575,7 @@ struct RecordClipView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(myTint)
+            }
             #endif
             Spacer()
         }

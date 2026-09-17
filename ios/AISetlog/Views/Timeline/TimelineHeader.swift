@@ -147,8 +147,6 @@ struct EditPlanSheet: View {
                     }
                 } header: {
                     Text(Strings.captureTitles)
-                } footer: {
-                    Text(Strings.editPlanFootnote(shared: challenge.isShared))
                 }
             }
             .navigationTitle(Strings.editPlan)

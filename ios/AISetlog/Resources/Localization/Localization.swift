@@ -169,11 +169,6 @@ enum Strings {
     static var settings: String { lang == .chinese ? "设置" : "Settings" }
     static var language: String { lang == .chinese ? "语言" : "Language" }
     static var systemLanguage: String { lang == .chinese ? "跟随系统" : "System" }
-    static var languageFootnote: String {
-        lang == .chinese
-            ? "“跟随系统”会使用设备语言。模板、拍摄提示和菜单会立即切换。"
-            : "“System” follows your device language. Templates, prompts, and menus switch instantly."
-    }
 
     static var notifications: String { lang == .chinese ? "通知" : "Notifications" }
     static var eveningReminder: String {
@@ -657,7 +652,6 @@ enum Strings {
     /// is one too many, and of the two this is the one that is literally a list
     /// of settings.
     static var meTitle: String { lang == .chinese ? "设置" : "Settings" }
-    static var tapToRename: String { lang == .chinese ? "点这里改名字" : "Tap to rename" }
     static var signedInWithApple: String {
         lang == .chinese ? "已用 Apple ID 登录" : "Signed in with Apple"
     }
@@ -684,13 +678,6 @@ enum Strings {
     /// Never "美颜" and never "beauty". Both words presume something is wrong
     /// with the face in the picture; the phone's camera is what was unkind.
     static var lookTitle: String { lang == .chinese ? "柔和一点" : "A gentler look" }
-    /// The promise, said out loud on the screen where it matters: the file is
-    /// never touched, so this is always undoable.
-    static var lookFootnote: String {
-        lang == .chinese
-            ? "只改回看和成片。原片一直在，随时能关。"
-            : "Changes playback and the film only. The recording is untouched."
-    }
     /// The three dials. Named for what the camera got wrong, not for the Core
     /// Image filter underneath — nobody films thinking "my white point is off".
     static var lookExposure: String { lang == .chinese ? "亮度" : "Exposure" }
@@ -702,11 +689,6 @@ enum Strings {
         lang == .chinese ? "按住看原片" : "Hold to see the original"
     }
     static var lookRemember: String { lang == .chinese ? "以后都这样看" : "Keep this from now on" }
-    static var lookRememberFootnote: String {
-        lang == .chinese
-            ? "关掉的话，下次打开 app 就回到原样 —— 这次调的只算这次。"
-            : "With this off, the app opens on “As shot” next time — today's choice is just for today."
-    }
 
     // MARK: Final reel
 
@@ -758,16 +740,6 @@ enum Strings {
     static var editPlan: String { lang == .chinese ? "编辑计划" : "Edit plan" }
     static var planTitle: String { lang == .chinese ? "计划名称" : "Plan name" }
     static var captureTitles: String { lang == .chinese ? "拍摄标题" : "Capture titles" }
-    static func editPlanFootnote(shared: Bool) -> String {
-        if lang == .chinese {
-            return shared
-                ? "修改会保存到这台设备，不会更改朋友设备上的标题。"
-                : "已经拍摄的视频不会被删除，只会更新之后显示的标题。"
-        }
-        return shared
-            ? "Changes stay on this device and do not rename titles on your friends’ devices."
-            : "Existing clips stay in place; only their displayed titles change."
-    }
 
     // MARK: Build template
 
@@ -1069,11 +1041,6 @@ enum Strings {
             ? "说一句今天要干嘛，题目我来出"
             : "Say what today is for — I'll write the prompts"
     }
-    static var timeOnlyCaptionNote: String {
-        lang == .chinese
-            ? "字幕由你自己在每段片子上填写，1Day 只负责保留拍摄时间。"
-            : "You write the captions on each clip; 1Day just keeps the time."
-    }
     static var timeOnlySetupTitle: String {
         lang == .chinese ? "只记录时间" : "Time only"
     }
@@ -1093,26 +1060,12 @@ enum Strings {
     static var next: String { lang == .chinese ? "下一步" : "Next" }
     static var back: String { lang == .chinese ? "返回" : "Back" }
     static var whoIsFilming: String { lang == .chinese ? "谁来拍" : "Who's filming" }
-    static var soloSetupSubtitle: String {
-        lang == .chinese ? "几个小设置，今天就开始。" : "A few details, then today begins."
-    }
     static var createByYourself: String { lang == .chinese ? "自己来" : "By yourself" }
     static var createByYourselfCaption: String {
         lang == .chinese ? "只在这台设备上" : "Stays on this device"
     }
     static var createWithFriendsCaption: String {
         lang == .chinese ? "分享邀请码一起拍" : "Share a code, film together"
-    }
-    static var createRoomSubtitle: String {
-        lang == .chinese ? "一起完成今天的故事。" : "Build today's story together."
-    }
-    /// Shown before the room exists, so it has to say the room is empty. The
-    /// composer used to show faces here instead, which read as "these people
-    /// are already in" — nobody is, until an invite code gets used.
-    static var roomExplainer: String {
-        lang == .chinese
-            ? "创建后房间里先只有你。把邀请码发出去，进来的人各自拍各自的瞬间，1Day 缝成一部影片。"
-            : "At first the room is just you. Share the invite code — whoever joins films their own moments, and 1Day stitches them into one film."
     }
     /// Beside the room's own count, so "3/5" can mean the day and this can
     /// mean me. Only shown when the two differ.
@@ -1135,36 +1088,8 @@ enum Strings {
     static var guidedHeading: String {
         lang == .chinese ? "想拍什么，由你来写" : "Write what you might want to film"
     }
-    static var guidedSubtitle: String {
-        lang == .chinese
-            ? "先写两个可能遇见的画面就够了。今天真正开始以后，随时还能增加或修改。"
-            : "Start with two scenes you might encounter. Add or change them anytime once the day begins."
-    }
     static var guidedNamePlaceholder: String {
         lang == .chinese ? "给这一天起个名字…" : "Name this day…"
-    }
-    /// Says what "就用这些" is still waiting for. A grey button whose reason
-    /// lives off-screen is a dead end, and the name field scrolls away first.
-    static func guidedFootnote(filled: Int, needsName: Bool) -> String {
-        let enoughPrompts = filled >= 2
-        switch (enoughPrompts, needsName) {
-        case (false, true):
-            return lang == .chinese
-                ? "还差故事名字，和至少 2 个题目。"
-                : "Still needs a name and at least 2 prompts."
-        case (true, true):
-            return lang == .chinese
-                ? "题目够了。上面给这一天起个名字，就能保存。"
-                : "Prompts are ready. Name the day up top and you can save."
-        case (false, false):
-            return lang == .chinese
-                ? "已经写了 \(filled) 个，至少要 2 个。"
-                : "\(filled) written; 2 is the minimum."
-        case (true, false):
-            return lang == .chinese
-                ? "已经写了 \(filled) 个。2–7 个都可以，空白项不会加入故事。"
-                : "\(filled) written. Use 2–7 prompts; blank rows won't be added to the story."
-        }
     }
     /// Shown on the name card itself, where the fix is.
     static var storyNameNeeded: String {
@@ -1174,11 +1099,6 @@ enum Strings {
 
     static var intentHeading: String {
         lang == .chinese ? "说说今天要干嘛" : "What's today for?"
-    }
-    static var intentSubtitle: String {
-        lang == .chinese
-            ? "一句话就行。生成标题和题目，只填空白，不覆盖已有内容；每项都能改，也可以直接手写。"
-            : "One sentence suggests a title and prompts. Only blanks are filled; existing text stays. Edit anything, or write your own."
     }
     static var intentPlaceholder: String {
         lang == .chinese ? "比如：今天要搬家" : "For example: moving house today"
@@ -1227,11 +1147,6 @@ enum Strings {
     static var systemAppearance: String { lang == .chinese ? "跟随系统" : "System" }
     static var lightAppearance: String { lang == .chinese ? "浅色" : "Light" }
     static var darkAppearance: String { lang == .chinese ? "深色" : "Dark" }
-    static var appearanceFootnote: String {
-        lang == .chinese
-            ? "只影响 1Day，不改变系统设置。"
-            : "Applies to 1Day only — your system setting is untouched."
-    }
     /// One heading over the three "what the app looks and reads like" rows.
     /// Each is a choice you make once, so they get one line apiece and the
     /// options live one screen down.
@@ -1384,11 +1299,6 @@ enum Strings {
     static var yourNamePlaceholder: String {
         lang == .chinese ? "朋友看到的名字" : "What friends see"
     }
-    static var yourNameFootnote: String {
-        lang == .chinese
-            ? "共享房间里，你的片段会挂在这个名字下。改名只影响以后拍的。"
-            : "This is the name on your clips in a shared room. Renaming affects clips from here on."
-    }
     /// Apple only hands over a name on the very first sign-in. Without one,
     /// somebody has to be called something in a room full of friends.
     static var defaultMemberName: String { lang == .chinese ? "朋友" : "Friend" }
@@ -1410,11 +1320,6 @@ enum Strings {
     }
     static var deleteAccountConfirm: String {
         lang == .chinese ? "永久删除" : "Delete permanently"
-    }
-    static var deleteAccountFootnote: String {
-        lang == .chinese
-            ? "退出登录只是登出，故事仍留在设备上。删除账号会清空一切。"
-            : "Signing out just signs you out; your stories stay on this device. Deleting removes everything."
     }
     static var deletingAccount: String { lang == .chinese ? "正在删除…" : "Deleting…" }
     /// Said out loud, because the alternative — a spinner that ends and a

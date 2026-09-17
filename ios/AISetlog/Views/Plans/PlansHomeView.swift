@@ -153,16 +153,21 @@ struct PlansHomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
 
+                // Off unless something asked for it — see `DemoEntries`. It
+                // was an always-on button on the first screen of every Debug
+                // build, which is where 1.3's 冗余内容清理 found it.
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                Button {
-                    showRoomDemo = true
-                } label: {
-                    Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
-                          systemImage: "person.3.sequence")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                if DemoEntries.areEnabled {
+                    Button {
+                        showRoomDemo = true
+                    } label: {
+                        Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
+                              systemImage: "person.3.sequence")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .accessibilityIdentifier("home-room-demo")
                 }
-                .accessibilityIdentifier("home-room-demo")
                 #endif
 
                 switch stories.hero {

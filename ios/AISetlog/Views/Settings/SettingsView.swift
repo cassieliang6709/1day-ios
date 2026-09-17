@@ -229,10 +229,6 @@ struct SettingsView: View {
                         .submitLabel(.done)
                         .onSubmit(commitName)
                         .accessibilityIdentifier("your-name")
-                    Text(nameFocused ? Strings.yourNameFootnote : Strings.tapToRename)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.inkFaint)
-                        .lineLimit(2)
                 }
                 .onChange(of: nameFocused) { _, focused in
                     if !focused { commitName() }
@@ -336,7 +332,6 @@ struct SettingsView: View {
         ) {
             SettingsOptionPage(
                 title: Strings.appearance,
-                footnote: Strings.appearanceFootnote,
                 selection: $appAppearance)
         }
         rowDivider
@@ -348,7 +343,6 @@ struct SettingsView: View {
         ) {
             SettingsOptionPage(
                 title: Strings.language,
-                footnote: Strings.languageFootnote,
                 selection: $appLanguage)
         }
     }
@@ -389,7 +383,7 @@ struct SettingsView: View {
                 symbol: "trash.fill",
                 accent: .red,
                 title: Strings.deleteAccount,
-                caption: Strings.deleteAccountFootnote,
+                caption: nil,
                 isDestructive: true,
                 isDisabled: isDeleting
             ) { showDeleteConfirmation = true }

@@ -140,13 +140,6 @@ struct MoodStep: View {
             }
             .padding(.horizontal, 20)
 
-            if rack == .byTime {
-                Label(Strings.timeOnlyCaptionNote, systemImage: "clock")
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkFaint)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 20)
-            }
         }
     }
 
@@ -336,7 +329,6 @@ struct SetupStep: View {
                     momentsCard
                 }
                 companyPicker
-                if withFriends { roomExplainer }
                 setupCard
                 // Failures live in the footer next to the button that caused
                 // them — at the end of this scroll they were below the fold,
@@ -377,9 +369,6 @@ struct SetupStep: View {
             Text(withFriends ? Strings.withFriends : Strings.composerSetupStep)
                 .font(.system(size: 30, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-            Text(withFriends ? Strings.createRoomSubtitle : Strings.soloSetupSubtitle)
-                .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
         }
         .padding(.top, 4)
     }
@@ -537,18 +526,6 @@ struct SetupStep: View {
         }
     }
 
-    private var roomExplainer: some View {
-        HStack(alignment: .top, spacing: 11) {
-            OneDayBuddy(size: 34)
-            Text(Strings.roomExplainer)
-                .font(.system(size: 13.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .glassSurface(radius: OneDay.Radius.card, tint: .oneDayLavender)
-        .transition(.scale(scale: 0.96).combined(with: .opacity))
-    }
 
     private var setupCard: some View {
         GlassCard(padding: 16) {
