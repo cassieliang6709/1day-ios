@@ -1,3 +1,8 @@
 {
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [
+    { "source": "/en", "destination": "/", "permanent": true },
+    { "source": "/en/privacy", "destination": "/privacy", "permanent": true },
+    { "source": "/en/updates", "destination": "/updates", "permanent": true }
+  ]
 }
