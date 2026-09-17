@@ -2,6 +2,52 @@ import SwiftUI
 import AVKit
 import Photos
 
+/// What a finished stitch turns into on screen.
+///
+/// Exists because the bug it replaces was an *absence*: `render()` had three
+/// paths that returned without setting either `exportURL` or `errorMessage`,
+/// and each one left the view on `GeneratingFilm` with nothing on the way — a
+/// spinner that could not finish. Nothing about a bare `return` says that, so
+/// the rule is a type now: every case either shows a film or says why not, and
+/// `.superseded` is the single case allowed to show nothing, because by
+/// definition another render is already running.
+enum FilmRenderOutcome: Equatable {
+    /// Show the film.
+    case film
+    /// Show `failure(_:)`. The stitch produced nothing usable.
+    case failed
+    /// Show `failure(_:)` with the demo's own wording: the stitch worked, but
+    /// the session that owned the media closed underneath it.
+    case sessionEnded
+    /// Show nothing and keep waiting — `renderRevision` moved, so the render
+    /// that replaced this one owns the screen.
+    case superseded
+
+    /// - Parameters:
+    ///   - stitchFailed: the stitcher threw.
+    ///   - superseded: `requested != renderRevision` — a newer render started.
+    ///   - scopeRejected: the room-preview media scope refused the output, which
+    ///     it does whenever it has closed.
+    ///   - scopeClosed: the scope is closed. Only consulted when the stitch
+    ///     failed, to choose the honest wording.
+    static func of(
+        stitchFailed: Bool,
+        superseded: Bool,
+        scopeRejected: Bool,
+        scopeClosed: Bool
+    ) -> FilmRenderOutcome {
+        // First, because it is the only reason silence is correct.
+        if superseded { return .superseded }
+        if stitchFailed { return scopeClosed ? .sessionEnded : .failed }
+        if scopeRejected { return .sessionEnded }
+        return .film
+    }
+
+    /// The invariant the bug broke. Anything that isn't `.superseded` has to
+    /// put something on screen.
+    var showsSomething: Bool { self != .superseded }
+}
+
 /// Screens 5 and 6 — the film being made, then the film.
 ///
 /// One view, two phases, because they're one moment for the user: you finish
@@ -174,17 +220,47 @@ struct FilmView: View {
             // shared room it stops at your own takes.
             options.lookAuthorID = challenge.isShared ? (account.account?.id ?? "local") : nil
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
-            // A newer render started while this one was working.
-            guard !Task.isCancelled, requested == renderRevision else {
-                try? FileManager.default.removeItem(at: url)
-                return
-            }
-            if let previewMedia, !previewMedia.accept(url) { return }
-            withAnimation(OneDay.Motion.soft) { exportURL = url }
+            // The scope refuses — and deletes — anything handed to it after it
+            // closes, which is what 退出演示 does. Asked before the outcome is
+            // computed so the answer is part of the decision rather than an
+            // early return around it.
+            let rejected = previewMedia.map { !$0.accept(url) } ?? false
+            apply(
+                FilmRenderOutcome.of(
+                    stitchFailed: false,
+                    superseded: requested != renderRevision,
+                    scopeRejected: rejected,
+                    scopeClosed: previewMedia?.isClosed == true),
+                url: url,
+                reason: nil)
         } catch {
-            guard !Task.isCancelled, previewMedia?.isClosed != true, requested == renderRevision else { return }
             print("[stitch] failed: \(error)")
-            errorMessage = error.localizedDescription
+            apply(
+                FilmRenderOutcome.of(
+                    stitchFailed: true,
+                    superseded: requested != renderRevision,
+                    scopeRejected: false,
+                    scopeClosed: previewMedia?.isClosed == true),
+                url: nil,
+                reason: error.localizedDescription)
+        }
+    }
+
+    /// Puts the outcome on screen. The one place `exportURL` and `errorMessage`
+    /// are written after a render, so "always one or the other" is checkable by
+    /// reading a single function instead of three `return`s.
+    private func apply(_ outcome: FilmRenderOutcome, url: URL?, reason: String?) {
+        switch outcome {
+        case .superseded:
+            // Another render owns the screen and will land its own result.
+            if let url { try? FileManager.default.removeItem(at: url) }
+        case .film:
+            guard let url else { errorMessage = Strings.stitchFailed; return }
+            withAnimation(OneDay.Motion.soft) { exportURL = url }
+        case .sessionEnded:
+            errorMessage = Strings.filmSessionEnded
+        case .failed:
+            errorMessage = reason ?? Strings.stitchFailed
         }
     }
 
