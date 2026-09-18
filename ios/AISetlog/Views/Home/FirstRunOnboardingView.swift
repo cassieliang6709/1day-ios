@@ -100,7 +100,7 @@ struct FirstRunOnboardingView: View {
         HStack(alignment: .firstTextBaseline, spacing: 9) {
             Text("3")
                 .font(.system(size: 31, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
             Text(Strings.firstRunThreeMoments)
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
@@ -110,7 +110,7 @@ struct FirstRunOnboardingView: View {
                 .padding(.horizontal, 2)
             Text("1")
                 .font(.system(size: 31, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
             Text(Strings.firstRunOneFilm)
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)

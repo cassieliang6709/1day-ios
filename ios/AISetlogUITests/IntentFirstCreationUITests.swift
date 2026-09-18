@@ -5,9 +5,12 @@ final class IntentFirstCreationUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
-        let create = app.buttons["New story"]
-        XCTAssertTrue(create.waitForExistence(timeout: 15))
-        create.tap()
+        // The composer is the left tab as of 1.3, not a plus in the corner.
+        let plan = app.buttons["Plan"]
+        XCTAssertTrue(plan.waitForExistence(timeout: 15), "Plan tab missing")
+        plan.tap()
+        // Above the racks, so it is the first thing on the screen after the
+        // question itself — no rack to switch to first.
         let own = app.buttons["Write your own prompts"]
         XCTAssertTrue(own.waitForExistence(timeout: 15))
         own.tap()

@@ -254,6 +254,229 @@ struct MomentStampOverlay: View {
     }
 }
 
+/// The lens picker: 0.5x / 1x / 2x, and a way past them.
+///
+/// Every value here is a display value (see `CameraZoom`), never a
+/// `videoZoomFactor`. Which presets arrive is the recorder's decision — a
+/// front camera has no ultra-wide, so it sends two chips instead of three.
+///
+/// It floats over the picture, above the burn-in block.
+///
+/// The bottom of the frame is spoken for by the moment's name and the story's
+/// progress bars, and both of those are promises about the export — a control
+/// must not cover them. That ruled out a floating picker for one round; what
+/// makes it work is sitting *above* that block rather than over it, which is
+/// what `RecordClipView.zoomControls` positions it to do. The reward is the
+/// whole control bar's height going back to the viewfinder: the picture is the
+/// screen, which is the Apple lesson that matters here.
+///
+/// On glass over video rather than on the app canvas, so the styling is dark
+/// and self-contained — an `inkSoft` number is invisible over a night shot.
+///
+/// One ticked capsule as of 1.3, replacing four 64×34 chips and a word-width
+/// 「自定义」 — 260pt of chrome under a picture that wanted the room.
+///
+/// The ticks are not decoration. The row had a horizontal drag before this and
+/// nothing said so, so nobody used it: a row of discrete buttons reads as
+/// buttons, and a person who wants 1.4x pinches the picture instead. Marks
+/// between the numbers is how the system camera says "this is continuous", and
+/// it is the cheapest possible signal — no label, no hint, no onboarding.
+///
+/// Three ways to the same value, in the order they cost: tap a number to jump;
+/// drag anywhere along the capsule for anything in between; tap the number you
+/// are already on for the fine slider. There is no separate 「自定义」 button —
+/// off-preset, the pinched value takes its own slot, already selected, so 1.8x
+/// has somewhere to show up and somewhere to be adjusted from.
+struct ZoomControlRow: View {
+    let presets: [CGFloat]
+    let capabilities: CameraZoom
+    let tint: Color
+    /// Writes go straight to the lens — the setter is `ClipRecorder.setZoom`,
+    /// which clamps, so this row never has to check a value before sending it.
+    @Binding var zoom: CGFloat
+    /// Whether the fine slider has replaced the chips.
+    @Binding var showsSlider: Bool
+
+    /// The zoom the current drag began at. Held for the length of the gesture
+    /// so the mapping is relative to where your finger went down rather than
+    /// to wherever the lens happens to be mid-drag.
+    @State private var dragStartZoom: CGFloat?
+
+    /// Whether the zoom is somewhere the chips don't name — after a pinch, or
+    /// after the slider.
+    private var isOffPreset: Bool {
+        !presets.contains { CameraZoom.isSame($0, zoom) }
+    }
+
+    /// The height of one number on the track, and therefore of the control.
+    /// Apple's lens picker is about this; the previous 36pt circles plus their
+    /// own row padding were the thing eating the picture's height.
+    private static let pill: CGFloat = 30
+
+    var body: some View {
+        Group {
+            if showsSlider {
+                sliderRow
+            } else {
+                track
+            }
+        }
+        // The row has to fit the width of the narrowest phone this app runs on,
+        // and at accessibility sizes the numbers stop fitting their circles.
+        // Capped here rather than left to shrink the picture above it or slide
+        // off the screen; VoiceOver reads the accessibility labels at full size
+        // regardless of the drawn text.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    /// The capsule: numbers with tick marks between them, and a drag across
+    /// the whole thing.
+    private var track: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(presets.enumerated()), id: \.element) { index, preset in
+                if index > 0 { ticks }
+                chip(preset)
+            }
+            // Only when the zoom is somewhere the presets don't name. On-preset
+            // there is nothing for it to say, and the number that *is* selected
+            // already opens the slider.
+            if isOffPreset {
+                ticks
+                pinchedChip
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        // Its own dark glass, not `.regularMaterial`: the material picks up the
+        // system appearance and turns near-white in light mode, which over a
+        // bright frame is a white bar on a white picture.
+        .background(.black.opacity(0.28), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+        // The whole capsule is the control. `highPriorityGesture` so the drag
+        // wins over the buttons inside it — a tap still gets through, because a
+        // `DragGesture` with a minimum distance does not fire on one.
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 6)
+                .onChanged { value in
+                    let start = dragStartZoom ?? zoom
+                    dragStartZoom = start
+                    zoom = CameraZoom.zoom(
+                        draggedBy: value.translation.width, from: start)
+                }
+                .onEnded { _ in dragStartZoom = nil })
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Five marks, the middle one taller. Purely the "you can drag this" sign;
+    /// they are not scaled to the range and deliberately do not claim to be.
+    private var ticks: some View {
+        HStack(spacing: 2.5) {
+            ForEach(0..<5, id: \.self) { i in
+                Capsule()
+                    .fill(Color.white.opacity(i == 2 ? 0.85 : 0.45))
+                    .frame(width: 1.5, height: i == 2 ? 11 : 7)
+            }
+        }
+        .padding(.horizontal, 5)
+        .accessibilityHidden(true)
+    }
+
+    /// One lens. Tapping the one you are already on opens the fine slider —
+    /// which is why this is a single button rather than a picker: the second
+    /// tap means something different from the first.
+    private func chip(_ preset: CGFloat) -> some View {
+        let selected = CameraZoom.isSame(zoom, preset)
+        return Button {
+            if selected {
+                showsSlider = true
+            } else {
+                zoom = preset
+            }
+        } label: {
+            dotLabel(CameraZoom.label(preset), selected: selected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            selected ? Strings.customZoom : Strings.zoomTo(CameraZoom.label(preset)))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// Where a pinch lands. Always drawn selected, because it only exists while
+    /// it is the current zoom, and tapping it opens the slider at that value.
+    private var pinchedChip: some View {
+        Button {
+            showsSlider = true
+        } label: {
+            dotLabel(CameraZoom.label(zoom), selected: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.customZoom)
+        .accessibilityValue(CameraZoom.label(zoom))
+    }
+
+    /// One number on the track. A pill rather than a circle: it lives inside a
+    /// capsule now, and a circle inside a capsule is a box inside a box.
+    ///
+    /// The selected one is the only filled thing in the control, which is what
+    /// makes the current lens readable at a glance while your eye is on the
+    /// picture rather than on this.
+    private func dotLabel(_ text: String, selected: Bool) -> some View {
+        Text(text)
+            .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            // "9.9x" needs the last of this at accessibility sizes; VoiceOver
+            // reads the full label either way.
+            .minimumScaleFactor(0.62)
+            // White at 82% rather than `inkSoft`: this sits on video now, and
+            // a blue-grey number over a dark frame cannot be read at all.
+            .foregroundStyle(selected ? Color.white : Color.white.opacity(0.82))
+            .shadow(color: .black.opacity(selected ? 0 : 0.35), radius: 3)
+            .padding(.horizontal, 10)
+            .frame(minWidth: 34)
+            .frame(height: Self.pill)
+            .background {
+                if selected {
+                    Capsule().fill(tint)
+                } else {
+                    Capsule().fill(.black.opacity(0.28))
+                }
+            }
+            .contentShape(Capsule())
+    }
+
+    private var sliderRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                showsSlider = false
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(.black.opacity(0.35)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.closeCustomZoom)
+
+            Slider(value: $zoom, in: capabilities.minDisplay...capabilities.maxDisplay)
+                .tint(tint)
+                .accessibilityLabel(Strings.zoomSlider)
+                .accessibilityValue(CameraZoom.label(zoom))
+
+            Text(CameraZoom.label(zoom))
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(.white)
+                // Room for the widest label the ceiling allows, so the slider
+                // doesn't shuffle sideways as the number grows a digit.
+                .frame(minWidth: 44, alignment: .trailing)
+        }
+    }
+}
+
 /// On-video center caption editor: the text sits exactly where it will be
 /// burned into the exported film, so what you type is what ships.
 struct CaptionOverlayEditor: View {
@@ -304,9 +527,9 @@ struct CaptionEditor: View {
         HStack(spacing: 10) {
             Image(systemName: "textformat")
                 .font(.headline.bold())
-                .foregroundStyle(Color.oneDayBlue)
+                .foregroundStyle(Color.oneDayBrand)
                 .frame(width: 30, height: 30)
-                .background(Color.oneDayBlue.opacity(0.12), in: Circle())
+                .background(Color.oneDayBrand.opacity(0.12), in: Circle())
 
             TextField(
                 "",
@@ -338,6 +561,6 @@ struct CaptionEditor: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(.white.opacity(0.86), in: Capsule())
-        .overlay(Capsule().stroke(Color.oneDayBlue.opacity(0.16), lineWidth: 1))
+        .overlay(Capsule().stroke(Color.oneDayBrand.opacity(0.16), lineWidth: 1))
     }
 }

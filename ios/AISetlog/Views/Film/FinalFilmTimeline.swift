@@ -12,6 +12,10 @@ struct FinalFilmTimeline: View {
     let filmURL: URL
     let isSaving: Bool
     let saveMessage: String?
+    /// Set when the message is a permission refusal, so the line can carry the
+    /// way out of it. Nil for "saved" and for an ordinary failure, neither of
+    /// which iOS Settings can do anything about.
+    var onOpenSettings: (() -> Void)?
     let onSave: () -> Void
     let onAdjust: () -> Void
 
@@ -66,7 +70,7 @@ struct FinalFilmTimeline: View {
             FilmAction(
                 icon: isSaving ? "arrow.down.circle" : "square.and.arrow.down",
                 label: isSaving ? Strings.saving : Strings.saveAction,
-                accent: .oneDayBlue,
+                accent: .oneDayBrand,
                 isBusy: isSaving,
                 action: onSave)
                 .disabled(previewMedia != nil)
@@ -88,12 +92,25 @@ struct FinalFilmTimeline: View {
         }
         .overlay(alignment: .bottom) {
             if let saveMessage {
-                Text(saveMessage)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .padding(.top, 6)
-                    .offset(y: 22)
-                    .transition(.opacity)
+                VStack(spacing: 4) {
+                    Text(saveMessage)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .multilineTextAlignment(.center)
+                    // "需要相册权限才能保存视频。" used to be the whole of it:
+                    // a sentence about a switch in another app, with no way to
+                    // reach the switch. The camera's refusal already had this
+                    // door; the photo library's didn't.
+                    if let onOpenSettings {
+                        Button(Strings.openSystemSettings, action: onOpenSettings)
+                            .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.oneDayBrand)
+                            .accessibilityIdentifier("film-open-settings")
+                    }
+                }
+                .padding(.top, 6)
+                .offset(y: 22)
+                .transition(.opacity)
             }
         }
         .animation(OneDay.Motion.soft, value: saveMessage)

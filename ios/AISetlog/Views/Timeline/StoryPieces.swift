@@ -24,39 +24,35 @@ struct StoryProgressBar: View {
         return min(Double(filmed) / Double(total), 1)
     }
 
+    /// Just the bar.
+    ///
+    /// It used to carry its own caption — `拍了 0/7 个瞬间` on the left, `这一天
+    /// 拍满了` on the right — which made it the third line in a row to print the
+    /// same three numbers. As of 1.3 it is the *only* progress display on this
+    /// page: the header's date/length/count line is gone entirely, and "the day
+    /// is full" was already said louder by the `FilmReadyCard` that appears
+    /// directly underneath at exactly that moment. What's left is the thing a
+    /// bar is good at: the shape of the progress, read without reading.
+    ///
+    /// The numbers stay in the accessibility label, because the shape is the
+    /// one thing VoiceOver can't relay.
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Text(Strings.momentsFilmed(filmed, total: total))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .lineLimit(1)
-
-                Spacer(minLength: 4)
-
-                if total > 0, filmed >= total {
-                    Text(Strings.dayIsFull)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayMint)
-                        .lineLimit(1)
-                }
+        // A `GeometryReader` rather than a fraction of `maxWidth`: the fill
+        // has to be a real width so the capsule keeps its round ends at 1/7
+        // of the way through a day.
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(OneDay.surfaceSoft.opacity(0.8))
+                Capsule()
+                    .fill(OneDay.brandHorizontal)
+                    .frame(width: max(proxy.size.width * fraction, fraction > 0 ? 8 : 0))
             }
-
-            // A `GeometryReader` rather than a fraction of `maxWidth`: the fill
-            // has to be a real width so the capsule keeps its round ends at 1/7
-            // of the way through a day.
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(OneDay.surfaceSoft.opacity(0.8))
-                    Capsule()
-                        .fill(OneDay.brandHorizontal)
-                        .frame(width: max(proxy.size.width * fraction, fraction > 0 ? 8 : 0))
-                }
-            }
-            .frame(height: 7)
-            .animation(OneDay.Motion.soft, value: fraction)
         }
-        .accessibilityElement(children: .combine)
+        .frame(height: 7)
+        .animation(OneDay.Motion.soft, value: fraction)
+        .accessibilityElement()
+        .accessibilityLabel(Strings.momentsFilmed(filmed, total: total))
+        .accessibilityValue(total > 0 && filmed >= total ? Strings.dayIsFull : "")
     }
 }
 
@@ -310,7 +306,7 @@ struct OpenSlotRow: View {
             HStack(spacing: 12) {
                 Image(systemName: momentIcon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .frame(width: 34, height: 34)
                     .background(Color.oneDayMist.opacity(0.55), in: Circle())
 
@@ -324,7 +320,7 @@ struct OpenSlotRow: View {
 
                 Text(trailingLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBlue)
+                    .foregroundStyle(Color.oneDayBrand)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 

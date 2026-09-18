@@ -24,8 +24,40 @@ extension UIColor {
             alpha: 1)
     }
 
-    /// #1677FF — the one blue everything leans on.
+    /// #1677FF — the blue the app was born in. Pinned, and still the default
+    /// accent: caption colours and anything that must stay this exact hue
+    /// reads this one rather than `oneDayBrand`.
     static let oneDayBlue = UIColor(hex: 0x1677FF)
+
+    /// The accent the app is currently wearing.
+    ///
+    /// Your avatar's colour, or the brand blue when you haven't picked one.
+    /// Computed rather than stored because it answers a preference, and a
+    /// `let` would freeze whichever colour was current at launch.
+    ///
+    /// Reads the same key the avatar reads, which is the whole point: people
+    /// asked for a warm app, and they had already been given a place to say
+    /// which colour is theirs. One choice, not two.
+    static var oneDayBrand: UIColor { Identity.myPickedUIColor() ?? oneDayBlue }
+
+    /// The lighter end of the brand gradient, derived from whatever the accent
+    /// is. Hue rotated a little and saturation eased off — the same
+    /// relationship #38B6FF has to #1677FF, applied to any of the seven.
+    static var oneDayBrandLight: UIColor {
+        let base = oneDayBrand
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard base.getHue(
+            &hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        else { return oneDayCyan }
+        return UIColor(
+            hue: (hue - 0.028 + 1).truncatingRemainder(dividingBy: 1),
+            saturation: saturation * 0.84,
+            brightness: min(brightness * 1.06, 1),
+            alpha: alpha)
+    }
     /// #38B6FF — the lighter half of the brand gradient.
     static let oneDayCyan = UIColor(hex: 0x38B6FF)
     /// #7FB4FF — tinted rails, inactive strokes, gradient midpoints.
@@ -65,10 +97,31 @@ extension UIColor {
     static let oneDayEmerald = UIColor(hex: 0x0E8A5F)
     /// #6E4FE0 — 5.4:1 on white.
     static let oneDayGrape = UIColor(hex: 0x6E4FE0)
+    /// #1678B1 — 4.8:1. Replaces `oneDayCyan` in the identity palette: that
+    /// one is 2.26:1 against white, so the initial drawn on it was a smudge
+    /// and so was every button label once the accent followed it.
+    static let oneDaySteel = UIColor(hex: 0x1678B1)
+    /// #107C84 — 5.0:1. Between the blue and the green, so a room of four
+    /// people doesn't read as three blues.
+    static let oneDayPeacock = UIColor(hex: 0x107C84)
+    /// #4B7F10 — 4.8:1. The yellow end of green.
+    static let oneDayMoss = UIColor(hex: 0x4B7F10)
+    /// #8A710F — 4.7:1. Warm without being orange.
+    static let oneDayMustard = UIColor(hex: 0x8A710F)
+    /// #C34B18 — 4.8:1. `oneDayCoral` at 3.96:1 was just under the line.
+    static let oneDayEmber = UIColor(hex: 0xC34B18)
+    /// #DA1B4E — 4.9:1. The loudest of the twelve.
+    static let oneDayRose = UIColor(hex: 0xDA1B4E)
+    /// #5A6C8C — 5.3:1. Near-neutral, for somebody who doesn't want a colour.
+    static let oneDayGraphite = UIColor(hex: 0x5A6C8C)
 }
 
 extension Color {
     static let oneDayBlue = Color(uiColor: .oneDayBlue)
+    /// Computed, not stored, for the same reason as the `UIColor` it wraps: a
+    /// `let` here would hand every view the accent as it was at launch.
+    static var oneDayBrand: Color { Color(uiColor: .oneDayBrand) }
+    static var oneDayBrandLight: Color { Color(uiColor: .oneDayBrandLight) }
     static let oneDayCyan = Color(uiColor: .oneDayCyan)
     static let oneDaySky = Color(uiColor: .oneDaySky)
     static let oneDayNavy = Color(uiColor: .oneDayNavy)
@@ -83,6 +136,13 @@ extension Color {
     static let oneDayAmber = Color(uiColor: .oneDayAmber)
     static let oneDayEmerald = Color(uiColor: .oneDayEmerald)
     static let oneDayGrape = Color(uiColor: .oneDayGrape)
+    static let oneDaySteel = Color(uiColor: .oneDaySteel)
+    static let oneDayPeacock = Color(uiColor: .oneDayPeacock)
+    static let oneDayMoss = Color(uiColor: .oneDayMoss)
+    static let oneDayMustard = Color(uiColor: .oneDayMustard)
+    static let oneDayEmber = Color(uiColor: .oneDayEmber)
+    static let oneDayRose = Color(uiColor: .oneDayRose)
+    static let oneDayGraphite = Color(uiColor: .oneDayGraphite)
 }
 
 /// Semantic tokens. Prefer these over the raw palette in view code: `OneDay.ink`
@@ -135,13 +195,17 @@ enum OneDay {
 
     // MARK: Gradients
 
-    static let brand = LinearGradient(
-        colors: [Color.oneDayBlue, Color.oneDayCyan],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
+    static var brand: LinearGradient {
+        LinearGradient(
+            colors: [Color.oneDayBrand, Color.oneDayBrandLight],
+            startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
-    static let brandHorizontal = LinearGradient(
-        colors: [Color.oneDayBlue, Color.oneDayCyan],
-        startPoint: .leading, endPoint: .trailing)
+    static var brandHorizontal: LinearGradient {
+        LinearGradient(
+            colors: [Color.oneDayBrand, Color.oneDayBrandLight],
+            startPoint: .leading, endPoint: .trailing)
+    }
 
     /// Behind a cover image, so white text stays legible over any footage.
     static let scrim = LinearGradient(
@@ -169,7 +233,62 @@ extension View {
     }
 
     /// Colored lift under a primary action, so the blue feels like it glows.
-    func oneDayGlow(_ color: Color = .oneDayBlue, strength: Double = 1) -> some View {
+    func oneDayGlow(_ color: Color = .oneDayBrand, strength: Double = 1) -> some View {
         shadow(color: color.opacity(0.28 * strength), radius: 18 * strength, y: 9 * strength)
     }
+}
+
+// MARK: - Caption tints
+
+extension CaptionSticker.Tint {
+    /// Deliberately fixed hexes rather than the themed tokens above.
+    ///
+    /// A caption gets burned into an exported file. Resolving its colour
+    /// through `UIColor.themed` would mean the same story exports with dark
+    /// ink on a light-mode phone and pale blue on a dark-mode one — the
+    /// device's appearance setting deciding what somebody's film looks like
+    /// forever. These twelve are pinned values.
+    var uiColor: UIColor {
+        switch self {
+        case .white: .white
+        // Not `.black`: a pure black caption on video reads as a hole, and
+        // clips to nothing on the darker end of an HDR frame.
+        case .black: UIColor(hex: 0x111111)
+        case .blue: UIColor(hex: 0x1677FF)
+        case .cyan: UIColor(hex: 0x38B6FF)
+        case .mint: UIColor(hex: 0x4FD1A5)
+        case .butter: UIColor(hex: 0xFFCE73)
+        case .coral: UIColor(hex: 0xFF6B4A)
+        case .rose: UIColor(hex: 0xE8407A)
+        case .lavender: UIColor(hex: 0xB3A4FF)
+        case .violet: UIColor(hex: 0x7B5CFF)
+        case .blush: UIColor(hex: 0xFF9DB3)
+        case .ink: UIColor(hex: 0x0F2E6B)
+        }
+    }
+
+    var color: Color { Color(uiColor: uiColor) }
+}
+
+// MARK: - Caption plates
+
+extension CaptionSticker {
+    /// The colour of the bar behind the words, or `nil` for the two styles that
+    /// have no bar.
+    ///
+    /// One function for the screen and the exporter, because they have to
+    /// agree: the review screen is the only place a caption's look is chosen,
+    /// and the film is the only place it matters.
+    var plateUIColor: UIColor? {
+        guard let plate = style.plate else { return nil }
+        // No cleverness here on purpose. An illegible pair — white words on the
+        // white bar, black words on the black one — is prevented at the moment
+        // it is picked (`CaptionSticker.legible…`), which is the only place a
+        // correction can be *seen*. Doing it here instead meant tapping 白底
+        // and getting a black bar, with the white square still lit.
+        let base: UIColor = plate.isWhite ? .white : UIColor(hex: 0x111111)
+        return base.withAlphaComponent(plate.opacity)
+    }
+
+    var plateColor: Color? { plateUIColor.map(Color.init(uiColor:)) }
 }

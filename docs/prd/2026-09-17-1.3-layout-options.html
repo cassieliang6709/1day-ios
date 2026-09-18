@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.3 排版方案 — 拍摄区 / 瞬间列表</title>
+<style>
+  :root{
+    --brand:#1677FF; --cyan:#38B6FF; --sky:#7FB4FF;
+    --ink:#0F2E6B; --ink-soft:#5B7099; --ink-faint:#93A6C6;
+    --canvas:#F5F8FF; --surface:#fff; --mist:#DCEBFF;
+    --lavender:#B3A4FF; --mint:#5FD6B4;
+    --hairline:rgba(22,119,255,.10);
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:#EEF3FB;color:var(--ink);line-height:1.75;padding:32px 24px 80px}
+  .wrap{max-width:1180px;margin:0 auto}
+
+  h1{font-size:23px;font-weight:800;letter-spacing:-.01em}
+  .sub{color:var(--ink-soft);font-size:14px;margin-top:6px}
+  .rule{height:2px;background:var(--brand);width:52px;margin:14px 0 30px}
+
+  h2{font-size:18px;font-weight:800;margin:44px 0 4px}
+  .h2note{color:var(--ink-soft);font-size:13.5px;margin-bottom:22px;max-width:74ch}
+
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .opt{width:310px}
+  .optname{font-size:14.5px;font-weight:800;margin-bottom:2px}
+  .optname b{color:var(--brand)}
+  .optwhy{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;min-height:56px}
+  .optwhy .warn{color:#B5610A}
+
+  /* phone */
+  .phone{width:310px;height:640px;border-radius:40px;background:var(--canvas);
+         position:relative;overflow:hidden;box-shadow:0 10px 34px rgba(15,46,107,.16);
+         border:1px solid var(--hairline)}
+  .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);
+         width:86px;height:22px;background:#0b1220;border-radius:14px;z-index:9}
+
+  /* ---- camera shell ---- */
+  .topbar{display:flex;align-items:center;gap:8px;padding:40px 14px 0}
+  .tb{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);
+      box-shadow:0 2px 8px rgba(15,46,107,.08);display:grid;place-items:center;
+      font-size:13px;color:var(--ink);flex:0 0 auto}
+  .tbmid{flex:1;text-align:center}
+  .wordmark{font-weight:800;font-size:14px;letter-spacing:-.02em}
+  .slot{font-size:10.5px;color:var(--ink-soft)}
+
+  .view{margin:8px 12px 0;border-radius:22px;position:relative;overflow:hidden;
+        background:linear-gradient(170deg,#c9d9ef,#aabfdc 55%,#93aacd);
+        border:2px solid var(--brand)}
+  .view .ph{position:absolute;inset:0;display:grid;place-items:center;
+            color:rgba(255,255,255,.62);font-size:11.5px;letter-spacing:.04em}
+  .stamp{position:absolute;right:11px;top:10px;text-align:right;color:#fff;
+         text-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .stamp .d{font-size:9.5px;font-weight:800}
+  .stamp .t{font-size:15px;font-weight:900;letter-spacing:-.02em}
+  .burnin{position:absolute;left:0;right:0;bottom:9px;text-align:center}
+  .bars{display:flex;gap:3px;justify-content:center;margin-bottom:6px}
+  .bars i{width:16px;height:3px;border-radius:2px;background:rgba(255,255,255,.45)}
+  .bars i.on{background:#fff}
+  .mpill{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;
+         background:rgba(0,0,0,.34);padding:3px 10px;border-radius:99px}
+  .secpill{position:absolute;left:11px;top:10px;font-size:9.5px;font-weight:800;
+           color:var(--ink);background:rgba(255,255,255,.9);padding:3px 8px;border-radius:99px}
+
+  /* zoom variants */
+  .zdots{display:flex;gap:7px;justify-content:center}
+  .zdot{width:32px;height:32px;border-radius:50%;background:#EDF1F7;display:grid;
+        place-items:center;font-size:11px;font-weight:800;color:var(--ink);
+        font-variant-numeric:tabular-nums}
+  .zdot.on{background:var(--brand);color:#fff}
+
+  .ztrack{display:flex;align-items:center;justify-content:center;gap:0;
+          background:rgba(255,255,255,.88);border-radius:99px;padding:5px 8px;
+          box-shadow:0 2px 10px rgba(15,46,107,.08)}
+  .ztrack span{font-size:11px;font-weight:800;color:var(--ink-soft);
+               padding:4px 11px;border-radius:99px;font-variant-numeric:tabular-nums}
+  .ztrack span.on{background:var(--brand);color:#fff}
+  .ztrack .ticks{display:flex;gap:2px;align-items:center;padding:0 4px}
+  .ztrack .ticks i{width:1.5px;height:7px;background:var(--ink-faint);border-radius:1px;opacity:.5}
+  .ztrack .ticks i.tall{height:11px;opacity:.9}
+
+  .zarc{position:relative;height:40px;display:grid;place-items:center}
+  .zarc .curve{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:0}
+  .zarc .val{font-size:11.5px;font-weight:900;color:#fff;background:var(--brand);
+             width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
+             font-variant-numeric:tabular-nums;z-index:2;box-shadow:0 2px 10px rgba(22,119,255,.4)}
+  .zarc .side{font-size:10.5px;font-weight:800;color:var(--ink-soft);width:34px;text-align:center}
+
+  .shutter{display:grid;place-items:center;padding:10px 0 0}
+  .sh{width:60px;height:60px;border-radius:50%;border:4px solid rgba(15,46,107,.22);
+      display:grid;place-items:center}
+  .sh i{width:44px;height:44px;border-radius:50%;background:var(--brand);display:block}
+  .shrow{display:flex;align-items:center;justify-content:center;gap:26px;padding:10px 0 0}
+  .shside{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);
+          display:grid;place-items:center;font-size:12px;color:var(--ink);
+          box-shadow:0 2px 8px rgba(15,46,107,.08)}
+
+  /* ---- tab bar ---- */
+  .tabs{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+        display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.82);
+        backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.7);
+        border-radius:99px;padding:5px;box-shadow:0 6px 20px rgba(15,46,107,.14);z-index:8}
+  .tab{display:flex;align-items:center;gap:5px;padding:8px 13px;border-radius:99px;
+       font-size:12.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+  .tab.on{background:linear-gradient(90deg,var(--brand),var(--cyan));color:#fff}
+  .tab.mid{font-size:13.5px;font-weight:800;padding:9px 17px}
+  .tab .ic{font-size:11px}
+
+  /* ---- moment list ---- */
+  .page{padding:40px 16px 0}
+  .ttl{font-size:23px;font-weight:900;letter-spacing:-.02em}
+  .bar{height:6px;border-radius:99px;background:var(--mist);margin:11px 0 0;overflow:hidden}
+  .bar i{display:block;height:100%;width:33%;border-radius:99px;
+         background:linear-gradient(90deg,var(--brand),var(--cyan))}
+  .sect{font-size:11px;font-weight:800;color:var(--ink-faint);letter-spacing:.06em;margin:22px 0 9px}
+
+  /* A: vertical rail */
+  .rail{position:relative;padding-left:26px}
+  .rail:before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;
+               background:var(--mist);border-radius:2px}
+  .rail .prog{position:absolute;left:8px;top:6px;height:34px;width:2px;
+              background:var(--brand);border-radius:2px}
+  .node{position:relative;padding:9px 0}
+  .node .dot{position:absolute;left:-22px;top:15px;width:11px;height:11px;border-radius:50%;
+             background:var(--surface);border:2px solid var(--mist)}
+  .node.done .dot{background:var(--brand);border-color:var(--brand)}
+  .node.now .dot{border-color:var(--brand);box-shadow:0 0 0 3px rgba(22,119,255,.16)}
+  .node .nm{font-size:15px;font-weight:700}
+  .node.done .nm{color:var(--ink-soft)}
+  .node .go{float:right;font-size:12px;font-weight:800;color:var(--brand)}
+  .node .thumb{width:100%;height:56px;border-radius:12px;margin-top:7px;
+               background:linear-gradient(150deg,#c9d9ef,#9fb5d4)}
+
+  /* B: horizontal filmstrip */
+  .strip{display:flex;gap:9px;overflow:hidden;padding:2px 0 0}
+  .cell{flex:0 0 78px}
+  .cellbox{height:104px;border-radius:14px;background:var(--mist);position:relative;
+           display:grid;place-items:center;font-size:10.5px;color:var(--ink-faint)}
+  .cellbox.filled{background:linear-gradient(150deg,#c9d9ef,#9fb5d4)}
+  .cellbox.next{border:2px dashed var(--brand);background:rgba(22,119,255,.06);color:var(--brand);font-weight:800}
+  .celllb{font-size:11px;font-weight:700;margin-top:6px;text-align:center;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stripbar{display:flex;gap:4px;margin:14px 0 0}
+  .stripbar i{flex:1;height:4px;border-radius:99px;background:var(--mist)}
+  .stripbar i.on{background:var(--brand)}
+  .bigcta{margin-top:16px;background:linear-gradient(90deg,var(--brand),var(--cyan));
+          color:#fff;font-weight:800;font-size:14.5px;text-align:center;
+          padding:14px;border-radius:18px}
+
+  /* C: clock arc */
+  .clock{display:flex;align-items:center;gap:12px;padding:10px 0}
+  .hour{font-size:11px;font-weight:800;color:var(--ink-faint);width:38px;
+        font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .cline{flex:1;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:16px;
+         background:var(--surface);box-shadow:0 1px 5px rgba(15,46,107,.05)}
+  .cline.empty{background:transparent;box-shadow:none;border:1px dashed var(--hairline)}
+  .cthumb{width:38px;height:38px;border-radius:11px;flex:0 0 auto;
+          background:linear-gradient(150deg,#c9d9ef,#9fb5d4)}
+  .cthumb.ghost{background:var(--mist)}
+  .cnm{font-size:14px;font-weight:700;flex:1}
+  .cline.empty .cnm{color:var(--ink-soft)}
+  .cgo{font-size:12px;font-weight:800;color:var(--brand)}
+
+  .foot{margin-top:56px;padding-top:22px;border-top:1px solid var(--hairline);
+        font-size:13px;color:var(--ink-soft);max-width:80ch}
+  .foot b{color:var(--ink)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+       background:rgba(22,119,255,.07);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>1.3 排版方案</h1>
+<div class="sub">拍摄区 3 版、瞬间列表 3 版。灰蓝占位块是取景画面（模拟器没摄像头，渲染不出来）。底部 tab 已按新配置画：计划 / 我的 / 拍摄。</div>
+<div class="rule"></div>
+
+<h2>一、拍摄区</h2>
+<div class="h2note">
+  现在的问题：取景画面下面压着一块白色圆角卡片，里面是四个宽胶囊（0.5x / 1x / 2x / 自定义）+ 快门 + 「轻点拍摄」四个字，约 150pt。画面是 9:16 <code>.fit</code>，所以这块占掉的高度直接从画面上扣。三版都去掉了白卡片和那四个字，区别在变焦控件怎么放、以及能不能直接拖。
+</div>
+
+<div class="row">
+
+  <div class="opt">
+    <div class="optname">A · <b>圆点一排</b>（最小改动）</div>
+    <div class="optwhy">三个 36pt 圆点贴在快门上方，整排可横向拖动做无级变焦，点当前那个展开滑杆。<br>画面最高，但「能拖」这件事没有视觉暗示。</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar">
+        <div class="tb">▢</div>
+        <div class="tbmid"><div class="wordmark">1day</div><div class="slot">晨光</div></div>
+        <div class="tb">⟲</div>
+      </div>
+      <div class="view" style="height:396px">
+        <div class="ph">取景画面</div>
+        <div class="secpill">每段 2 秒</div>
+        <div class="stamp"><div class="d">2026年9月17日</div><div class="t">19:42</div></div>
+        <div class="burnin">
+          <div class="bars"><i class="on"></i><i></i><i></i></div>
+          <div class="mpill">晨光</div>
+        </div>
+      </div>
+      <div style="padding:12px 0 0">
+        <div class="zdots"><div class="zdot">0.5</div><div class="zdot on">1x</div><div class="zdot">2</div></div>
+      </div>
+      <div class="shutter"><div class="sh"><i></i></div></div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid"><span class="ic">◉</span>我的</div>
+        <div class="tab on"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="opt">
+    <div class="optname">B · <b>刻度条</b>（推荐）</div>
+    <div class="optwhy">倍数做成一条带刻度的胶囊轨道，当前值高亮。刻度本身就是「这里能拖」的信号 —— 这是原生相机的做法。<br>比 A 高 6pt，换来可拖动一眼看得出。</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar">
+        <div class="tb">▢</div>
+        <div class="tbmid"><div class="wordmark">1day</div><div class="slot">晨光</div></div>
+        <div class="tb">⟲</div>
+      </div>
+      <div class="view" style="height:390px">
+        <div class="ph">取景画面</div>
+        <div class="secpill">每段 2 秒</div>
+        <div class="stamp"><div class="d">2026年9月17日</div><div class="t">19:42</div></div>
+        <div class="burnin">
+          <div class="bars"><i class="on"></i><i></i><i></i></div>
+          <div class="mpill">晨光</div>
+        </div>
+      </div>
+      <div style="padding:12px 14px 0">
+        <div class="ztrack">
+          <span>0.5</span>
+          <span class="ticks"><i></i><i></i><i class="tall"></i><i></i><i></i></span>
+          <span class="on">1x</span>
+          <span class="ticks"><i></i><i></i><i class="tall"></i><i></i><i></i></span>
+          <span>2</span>
+        </div>
+      </div>
+      <div class="shutter"><div class="sh"><i></i></div></div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid"><span class="ic">◉</span>我的</div>
+        <div class="tab on"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="opt">
+    <div class="optname">C · <b>压在画面上</b>（画面最大）</div>
+    <div class="optwhy">变焦浮在画面内、快门左右放翻转和画幅，画面吃满整个宽度。<br><span class="warn">要确认：画面底部烧的是题目名和进度条，浮层压上去会遮。只有把它放在烧字上方才成立。</span></div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar">
+        <div class="tb">▢</div>
+        <div class="tbmid"><div class="wordmark">1day</div><div class="slot">晨光</div></div>
+        <div class="tb">⟲</div>
+      </div>
+      <div class="view" style="height:452px">
+        <div class="ph">取景画面</div>
+        <div class="secpill">每段 2 秒</div>
+        <div class="stamp"><div class="d">2026年9月17日</div><div class="t">19:42</div></div>
+        <div style="position:absolute;left:0;right:0;bottom:64px" class="zarc">
+          <div class="curve">
+            <div class="side">0.5</div>
+            <div class="val">1x</div>
+            <div class="side">2</div>
+          </div>
+        </div>
+        <div class="burnin">
+          <div class="bars"><i class="on"></i><i></i><i></i></div>
+          <div class="mpill">晨光</div>
+        </div>
+      </div>
+      <div class="shrow">
+        <div class="shside">▢</div>
+        <div class="sh"><i></i></div>
+        <div class="shside">⟲</div>
+      </div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid"><span class="ic">◉</span>我的</div>
+        <div class="tab on"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>二、瞬间列表</h2>
+<div class="h2note">
+  标题下面那行（<code>9月17日 · 每段 2 秒 · 0/3 个瞬间</code>）已按你的决定整行删掉，只剩细进度条。三版的区别是列表本身怎么表达「一天的顺序」。编号文字（第一个瞬间 / 第二个瞬间）三版都没有 —— 顺序交给图形。
+</div>
+
+<div class="row">
+
+  <div class="opt">
+    <div class="optname">A · <b>竖向时间轴</b></div>
+    <div class="optwhy">一条竖线串起所有瞬间，拍过的节点实心、当前的带光圈。拍过的直接挂缩略图。<br>顺序最清楚，滚动最自然，改动最小。</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="page">
+        <div class="ttl">我的一天</div>
+        <div class="bar"><i></i></div>
+        <div class="sect">今天</div>
+        <div class="rail">
+          <div class="prog"></div>
+          <div class="node done">
+            <div class="dot"></div>
+            <div class="nm">晨光</div>
+            <div class="thumb"></div>
+          </div>
+          <div class="node now">
+            <div class="dot"></div>
+            <div class="go">开拍 ›</div>
+            <div class="nm">在路上</div>
+          </div>
+          <div class="node">
+            <div class="dot"></div>
+            <div class="go">开拍 ›</div>
+            <div class="nm">傍晚的光</div>
+          </div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid on"><span class="ic">◉</span>我的</div>
+        <div class="tab"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="opt">
+    <div class="optname">B · <b>横向胶片</b></div>
+    <div class="optwhy">一天就是一条胶片，横向滑。空格子是虚线，下一个要拍的高亮，底下一个 CTA。<br>一屏看完整天，但瞬间多了要滑，题目长了会截断。</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="page">
+        <div class="ttl">我的一天</div>
+        <div class="bar"><i></i></div>
+        <div class="sect">今天</div>
+        <div class="strip">
+          <div class="cell"><div class="cellbox filled"></div><div class="celllb">晨光</div></div>
+          <div class="cell"><div class="cellbox next">开拍</div><div class="celllb">在路上</div></div>
+          <div class="cell"><div class="cellbox">＋</div><div class="celllb">傍晚的光</div></div>
+        </div>
+        <div class="stripbar"><i class="on"></i><i></i><i></i></div>
+        <div class="bigcta">拍「在路上」</div>
+      </div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid on"><span class="ic">◉</span>我的</div>
+        <div class="tab"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="opt">
+    <div class="optname">C · <b>按时间排</b></div>
+    <div class="optwhy">左边是真实时间，拍过的显示拍摄时刻，没拍的留空。<br>最像日记，但只有「按时间」的故事才有真时间；普通故事左边这一列没得填。</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="page">
+        <div class="ttl">我的一天</div>
+        <div class="bar"><i></i></div>
+        <div class="sect">今天</div>
+        <div class="clock">
+          <div class="hour">9:15</div>
+          <div class="cline"><div class="cthumb"></div><div class="cnm">晨光</div></div>
+        </div>
+        <div class="clock">
+          <div class="hour">—</div>
+          <div class="cline empty"><div class="cthumb ghost"></div><div class="cnm">在路上</div><div class="cgo">开拍 ›</div></div>
+        </div>
+        <div class="clock">
+          <div class="hour">—</div>
+          <div class="cline empty"><div class="cthumb ghost"></div><div class="cnm">傍晚的光</div><div class="cgo">开拍 ›</div></div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab"><span class="ic">▤</span>计划</div>
+        <div class="tab mid on"><span class="ic">◉</span>我的</div>
+        <div class="tab"><span class="ic">◎</span>拍摄</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <b>已定：拍摄区 <u>C</u> + 瞬间列表 <u>A</u>，另外 <u>B</u> 用于「按时间」那种没有主题的故事。</b>
+  第一轮选的是 B + A；看到实现之后改成了 C —— 变焦浮层放在烧字上方就不会遮到对成片的承诺，那是 C 唯一的阻碍，位置对了就成立。B 没有被丢掉：它在没有名字的格子上比竖向轨道好，因为「按时间」的故事只有时间可写。
+  <br><br>
+  <b>原始建议（留档）：拍摄区 B + 瞬间列表 A。</b>
+  拍摄区 B 只比 A 多 6pt，但刻度让「能拖」自己说出来，不用教；C 的浮层会压到烧进成片的题目和进度条，那两个是对成片的承诺，遮了就不老实。瞬间列表 A 的竖线在瞬间数量变化时不会散架，B 在七日故事上要横滑七格，C 的左列在非「按时间」故事里没有数据可填。
+  <br><br>
+  告诉我两个字母就行（比如「B + A」）。想混搭或哪版改一改也直接说。
+</div>
+
+</div>
+</body>
+</html>

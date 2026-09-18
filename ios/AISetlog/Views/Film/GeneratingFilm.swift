@@ -65,7 +65,7 @@ struct GeneratingFilm: View {
     /// The mascot plus a bar — the one place in the app a progress bar earns
     /// its keep, because something genuinely is filling up.
     private var progressCard: some View {
-        GlassCard(padding: 16, tint: .oneDayBlue) {
+        GlassCard(padding: 16, tint: .oneDayBrand) {
             HStack(spacing: 14) {
                 OneDayBuddy(size: 46, isWorking: true)
 
@@ -101,7 +101,7 @@ struct GeneratingFilm: View {
                         ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 17))
                         .foregroundStyle(index < mergedCount
-                            ? Color.oneDayBlue : Color.oneDaySky.opacity(0.45))
+                            ? Color.oneDayBrand : Color.oneDaySky.opacity(0.45))
                         .contentTransition(.symbolEffect(.replace))
 
                     Text(schedule.railLabel(forSlot: clip.day, recordedAt: clip.recordedAt) ?? "")

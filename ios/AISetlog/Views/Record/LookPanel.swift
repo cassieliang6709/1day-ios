@@ -50,10 +50,6 @@ struct LookPanel: View {
                 Text(Strings.lookTitle)
                     .font(.system(size: 17, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
-                Text(Strings.lookFootnote)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.65))
-                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             // Only offered once there is something to undo, and it resets all
@@ -162,10 +158,6 @@ struct LookPanel: View {
                     .foregroundStyle(.white)
             }
             .tint(Color.oneDaySky)
-            Text(Strings.lookRememberFootnote)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

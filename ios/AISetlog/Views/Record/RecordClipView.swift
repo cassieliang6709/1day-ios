@@ -16,7 +16,11 @@ struct RecordClipView: View {
     /// about this story rather than decoration. 0 = no story behind this take
     /// (free-form), and then no indicator is drawn at all.
     var momentCount = 0
-    var clipLength: Challenge.ClipLength = .tiny
+    /// The story's length is where this take starts, not where it's stuck: the
+    /// timer chip switches it for this recording only. `@State` so the chip can
+    /// write to it — the value the caller passes seeds the camera the first
+    /// time it opens for a slot and is never written back to the challenge.
+    @State var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
     /// clip is filed into a chosen plan instead of a fixed day slot.
@@ -42,8 +46,6 @@ struct RecordClipView: View {
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
-    @State private var showNotificationPrimer = false
-    @State private var dismissAfterPrimer = false
     /// Raised when the close button is pressed with a take still in review.
     ///
     /// The free-form camera has had this guard since `UnfiledClipGuard` —
@@ -52,6 +54,12 @@ struct RecordClipView: View {
     /// seconds, tapped X out of habit, and `teardown()` deleted the temp file
     /// on the way out with nothing on screen to say it had happened.
     @State private var askBeforeDiscarding = false
+    /// Whether the fine zoom row has replaced the preset chips. The chips
+    /// cover 0.5x / 1x / 2x; this covers everything between and above them.
+    @State private var showsZoomSlider = false
+    /// A pinch reports a running multiple of where it began, so where it began
+    /// has to be remembered for the length of the gesture. nil = not pinching.
+    @State private var pinchStartZoom: CGFloat?
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -153,15 +161,6 @@ struct RecordClipView: View {
         } message: {
             Text(Strings.keepClipFootnote)
         }
-        .sheet(
-            isPresented: $showNotificationPrimer,
-            onDismiss: {
-                if dismissAfterPrimer { dismiss() }
-                dismissAfterPrimer = false
-            }
-        ) {
-            NotificationPrimerView(challenges: store.challenges)
-        }
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = newValue
         }
@@ -200,14 +199,61 @@ struct RecordClipView: View {
             ) {
                 CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
             }
+            .overlay(alignment: .topLeading) {
+                Button {
+                    guard recorder.state != .recording, recorder.clipURL == nil else { return }
+                    clipLength = switch clipLength {
+                    case .tiny: .story
+                    case .story: .scene
+                    case .scene: .tiny
+                    }
+                } label: {
+                    Label("每段 \(clipSecondsText)", systemImage: "timer")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.regularMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(recorder.state == .recording || recorder.clipURL != nil)
+                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
+                .padding(12)
+            }
+            // Pinch the picture itself, which is where the hand already is.
+            // The chips are the quick answer; this is the whole range, and it
+            // stays live while recording — zooming mid-take is the point of
+            // having it on the preview rather than in a setting.
+            .gesture(
+                MagnifyGesture(minimumScaleDelta: 0.01)
+                    .onChanged { value in
+                        let start = pinchStartZoom ?? recorder.zoom
+                        pinchStartZoom = start
+                        recorder.setZoom(start * value.magnification)
+                    }
+                    .onEnded { _ in pinchStartZoom = nil }
+            )
+            // Over the picture, above the burn-in. The moment's name and the
+            // progress bars sit in the bottom ~56pt of the frame and are
+            // promises about the export, so the offset is what keeps this
+            // legal — see `ZoomControlRow`.
+            .overlay(alignment: .bottom) {
+                zoomControls
+                    .padding(.bottom, Self.burnInHeight)
+            }
             .layoutPriority(1)
 
-            bottomControls
+            shutterRow
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
     }
+
+    /// How much of the frame's bottom edge the burn-in block occupies:
+    /// `progressBars` over `momentPill`, plus the overlay's own edge inset.
+    /// The zoom control clears it rather than covering it.
+    private static let burnInHeight: CGFloat = 72
 
     private var recordButtonVisual: some View {
         ZStack {
@@ -215,24 +261,25 @@ struct RecordClipView: View {
                 .stroke(.white.opacity(0.55), lineWidth: 4)
                 .frame(width: 66, height: 66)
             Circle()
-                .fill(Color.oneDayBlue)
+                .fill(Color.oneDayBrand)
                 .frame(width: 50, height: 50)
         }
     }
 
     /// The whole control surface starts recording. The centered layout makes
     /// the primary camera action obvious and gives it a forgiving tap target.
+    ///
+    /// The 轻点拍摄 caption that used to sit under the ring is gone: a 66pt
+    /// brand-blue circle alone in a bar is not a control anybody needs a
+    /// sentence for, and the sentence was one of the lines making the picture
+    /// above it smaller. It is still the button's accessibility label.
     private var idleRecordingControl: some View {
         Button {
             recorder.startRecording(seconds: clipSeconds)
         } label: {
-            CenteredCaptureControl(instruction: Strings.captureState(
-                recording: false, secondsLabel: clipSecondsText
-            )) {
-                recordButtonVisual
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            recordButtonVisual
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.captureState(
@@ -315,7 +362,7 @@ struct RecordClipView: View {
                         }
                     } else {
                         onSave(url, trimmedOverlayText)
-                        offerNotificationPrimer(dismissWhenFinished: true)
+                        dismiss()
                     }
                 } label: {
                     Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
@@ -349,11 +396,9 @@ struct RecordClipView: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
-        .confirmationDialog(Strings.fileThisClipTo, isPresented: $showSavePicker, titleVisibility: .visible) {
-            ForEach(filingCandidates) { challenge in
-                Button(ChallengePresenter(challenge: challenge).displayTitle) {
-                    file(url, to: challenge)
-                }
+        .sheet(isPresented: $showSavePicker) {
+            ClipFilingSheet(candidates: filingCandidates) { chosen in
+                file(url, to: chosen)
             }
         }
         .confirmationDialog(
@@ -383,21 +428,39 @@ struct RecordClipView: View {
         ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
     }
 
-    /// Free-form: file the clip into a chosen plan's first open slot.
-    private func file(_ url: URL, to challenge: Challenge) {
-        // Unreachable through the sheet, which only lists stories with room in
-        // them — but filing into a full story used to mean overwriting a clip,
-        // so this refuses rather than trusting the caller.
-        guard let day = ClipFiling.targetDay(in: challenge) else {
+    /// Free-form: file the clip into each chosen plan's first open slot.
+    ///
+    /// Takes a list as of 1.3 — one take of an afternoon belongs in your own
+    /// story *and* in the room you shared it with, and the single-choice dialog
+    /// this replaced made that two takes. `ClipFileStore.storeClip` copies, so
+    /// the one temp URL can be filed once per story; the review is only cleared
+    /// after the loop, because clearing it calls `recorder.retake()` and that
+    /// is what invalidates `url`.
+    private func file(_ url: URL, to challenges: [Challenge]) {
+        var landed = 0
+        var lastTitle = ""
+
+        for challenge in challenges {
+            // Unreachable through the sheet, which only lists stories with room
+            // in them — but filing into a full story used to mean overwriting a
+            // clip, so this refuses rather than trusting the caller.
+            guard let day = ClipFiling.targetDay(in: challenge) else { continue }
+            store.saveClip(
+                from: url, day: day, challengeID: challenge.id,
+                overlayText: trimmedOverlayText)
+            landed += 1
+            lastTitle = ChallengePresenter(challenge: challenge).displayTitle
+        }
+
+        guard landed > 0 else {
             showToast(Strings.storyIsFull)
             return
         }
-        store.saveClip(from: url, day: day, challengeID: challenge.id, overlayText: trimmedOverlayText)
+
         recorder.retake()
         ringProgress = 0
         overlayText = ""
-        showToast(Strings.filedTo(ChallengePresenter(challenge: challenge).displayTitle))
-        offerNotificationPrimer(dismissWhenFinished: false)
+        showToast(landed == 1 ? Strings.filedTo(lastTitle) : Strings.filedToCount(landed))
     }
 
     /// Copy the clip somewhere permanent so it survives leaving this screen.
@@ -456,16 +519,6 @@ struct RecordClipView: View {
         }
     }
 
-    private func offerNotificationPrimer(dismissWhenFinished: Bool) {
-        guard !NotificationPreferences.primerSeen,
-              !NotificationPreferences.eveningEnabled
-        else {
-            if dismissWhenFinished { dismiss() }
-            return
-        }
-        dismissAfterPrimer = dismissWhenFinished
-        showNotificationPrimer = true
-    }
 
     private var unavailableView: some View {
         VStack(spacing: 18) {
@@ -506,7 +559,12 @@ struct RecordClipView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(myTint)
             }
+            // Same gate as the home screen's demo button, for the same
+            // reason: the Simulator has no camera, so this is the only way to
+            // get footage into a story on a Mac — and it does not belong on the
+            // screen the rest of the time. See `DemoEntries`.
             #if DEBUG
+            if DemoEntries.areEnabled {
             CaptionEditor(text: $overlayText, isFocused: $overlayTextFocused)
             Button(Strings.useDemoClip(localizedMomentTitle)) {
                 Task {
@@ -524,12 +582,13 @@ struct RecordClipView: View {
                         recorder.acceptDemoClip(demo)
                     } else {
                         onSave(demo, trimmedOverlayText)
-                        offerNotificationPrimer(dismissWhenFinished: true)
+                        dismiss()
                     }
                 }
             }
             .buttonStyle(.borderedProminent)
             .tint(myTint)
+            }
             #endif
             Spacer()
         }
@@ -555,37 +614,25 @@ struct RecordClipView: View {
         .padding(.bottom, 18)
     }
 
+    /// The wordmark, the moment's name, and — outside the free-form tab — the
+    /// way out. Nothing you press mid-shoot.
+    ///
+    /// 画幅 and 翻转 used to flank the wordmark up here, which put the two
+    /// controls you reach for while filming at the far end of the phone from
+    /// your thumb. They are beside the shutter now; see `shutterRow`. What is
+    /// left is the two things you read rather than press, so the row shrank
+    /// from 44pt to the height of its own text.
     private var topBar: some View {
         HStack {
             if isFreeform {
-                // No cover to dismiss in the tab — the left slot carries the
-                // orientation toggle instead.
-                Button {
-                    // Cycles rather than toggles now that there are three
-                    // frames. The glyph is the current one, so which way round
-                    // the cycle runs doesn't have to be learned.
-                    freeformOrientation = switch freeformOrientation {
-                    case .portrait: .landscape
-                    case .landscape: .square
-                    case .square: .portrait
-                    }
-                } label: {
-                    Image(systemName: SetupStep.orientationIcon(freeformOrientation))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.black.opacity(0.78))
-                        .frame(width: 44, height: 44)
-                        .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.switchOrientation)
-                .disabled(recorder.state == .recording || recorder.clipURL != nil)
-                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+                // No cover to dismiss in the tab, and nothing else needs the
+                // left slot now that the frame toggle moved down.
+                Color.clear.frame(width: 38, height: 1)
             } else {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .bold))
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: 17, weight: .bold))
+                        .frame(width: 38, height: 38)
                         .background(.white.opacity(0.92), in: Circle())
                         .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
                 }
@@ -606,32 +653,115 @@ struct RecordClipView: View {
 
             Spacer(minLength: 8)
 
-            Button { recorder.flipCamera() } label: {
-                Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.92), in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Strings.flipCamera)
-            .disabled(recorder.state != .ready || recorder.clipURL != nil)
-            .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+            Color.clear.frame(width: 38, height: 1)
         }
     }
 
-    private var bottomControls: some View {
-        Group {
-            if recorder.state == .recording {
-                recordingControls
+    // MARK: - Zoom
+
+    /// Drawn in both `.live` and `.recording`: zooming mid-take is allowed by
+    /// the capture pipeline and is half of why anybody wants 2x.
+    @ViewBuilder
+    private var zoomControls: some View {
+        let presets = recorder.zoomPresets
+        // One preset means one lens with nothing to reach for — the front
+        // camera on an older phone, or the Simulator's borrowed webcam. A
+        // single dead chip would be worse than no row at all.
+        if presets.count > 1 {
+            ZoomControlRow(
+                presets: presets,
+                capabilities: recorder.zoomCapabilities,
+                tint: myTint,
+                zoom: zoomBinding,
+                showsSlider: $showsZoomSlider)
+        }
+    }
+
+    private var zoomBinding: Binding<CGFloat> {
+        Binding(
+            get: { recorder.zoom },
+            set: { recorder.setZoom($0) })
+    }
+
+    /// Just the shutter, with the frame and flip controls either side of it.
+    ///
+    /// Three shapes in two rounds. It was a white rounded card holding four
+    /// wide zoom capsules, a 66pt shutter and the words 轻点拍摄 — about 150pt
+    /// of furniture under a 9:16 picture laid out `.fit`, so every point came
+    /// straight off the viewfinder. Then the card and the caption went and the
+    /// zoom became a ticked track, still under the picture. Now the zoom is
+    /// over the picture (above the burn-in) and this row is one control tall.
+    ///
+    /// The two 34pt circles are 画幅 and 翻转, moved down from the top bar.
+    /// They were up there flanking the wordmark, which put the two things you
+    /// reach for mid-shoot at the far end of the phone from your thumb; beside
+    /// the shutter they are where the hand already is. The top bar keeps the
+    /// wordmark and the moment's name — the two things you read rather than
+    /// press.
+    ///
+    /// `recordingControls` keeps its caption: mid-take, 轻点停止 is not
+    /// decoration, it is the only thing on screen that says the take can be cut
+    /// short, and the ring it sits under is counting rather than inviting.
+    private var shutterRow: some View {
+        HStack(spacing: 0) {
+            if isFreeform {
+                orientationButton
+                    .frame(maxWidth: .infinity)
             } else {
-                idleRecordingControl
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
             }
+
+            Group {
+                if recorder.state == .recording {
+                    recordingControls
+                } else {
+                    idleRecordingControl
+                }
+            }
+
+            flipButton
+                .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 28))
+        .padding(.top, 8)
+    }
+
+    private var orientationButton: some View {
+        Button {
+            // Cycles rather than toggles now that there are three frames. The
+            // glyph is the current one, so which way round the cycle runs
+            // doesn't have to be learned.
+            freeformOrientation = switch freeformOrientation {
+            case .portrait: .landscape
+            case .landscape: .square
+            case .square: .portrait
+            }
+        } label: {
+            Image(systemName: SetupStep.orientationIcon(freeformOrientation))
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.black.opacity(0.78))
+                .frame(width: 38, height: 38)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.switchOrientation)
+        .disabled(recorder.state == .recording || recorder.clipURL != nil)
+        .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+    }
+
+    private var flipButton: some View {
+        Button { recorder.flipCamera() } label: {
+            Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
+                .font(.system(size: 17, weight: .bold))
+                .frame(width: 38, height: 38)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.flipCamera)
+        .disabled(recorder.state != .ready || recorder.clipURL != nil)
+        .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
     }
 }
 

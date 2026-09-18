@@ -10,7 +10,7 @@ import SwiftUI
 ///
 /// New code should use `OneDay` directly.
 enum BoardTheme {
-    static let primary = Color.oneDayBlue
+    static let primary = Color.oneDayBrand
     static let accent = Color.oneDayCyan
     static let deep = Color.oneDayNavy
     static let tint = Color.oneDaySky

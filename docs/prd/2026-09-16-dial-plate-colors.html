@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · 拨号盘 / 字幕底 / 颜色 —— 2026-09-16 晚</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:#fcfcfb; --plane:#f9f9f7;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --gridline:#e1e0d9; --border:rgba(11,11,11,0.10);
+    --now:#eb6834; --next:#2a78d6; --good:#0ca30c; --stop:#c0392b;
+    --c-blue:#1677ff; --c-cyan:#38b6ff; --c-lav:#b3a4ff; --c-mint:#4fd1a5;
+    --c-canvas:#f5f8ff; --c-ink:#0f2e6b; --c-inksoft:#4a6aa8; --c-inkfaint:#8ea4cd;
+    --c-surface:#ffffff; --c-hair:rgba(15,46,107,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --plane:#0d0d0d;
+      --text-primary:#fff; --text-secondary:#c3c2b7; --text-muted:#898781;
+      --gridline:#2c2c2a; --border:rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:38px 24px 80px; background:var(--plane); color:var(--text-primary);
+    font:15px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  main { max-width:1040px; margin:0 auto; }
+  h1 { font-size:26px; font-weight:800; margin:0 0 8px; }
+  .lead { font-size:16px; color:var(--text-secondary); margin:0; max-width:56ch; }
+  .lead b { color:var(--text-primary); }
+  .meta { font-size:12.5px; color:var(--text-muted); margin-top:9px; }
+  h2 {
+    font-size:12.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--text-muted); margin:44px 0 14px; padding-bottom:8px;
+    border-bottom:1px solid var(--gridline);
+  }
+  h3 { font-size:16.5px; font-weight:750; margin:24px 0 8px; }
+  p { max-width:60ch; }
+  .big { font-size:17px; font-weight:700; max-width:52ch; }
+  code {
+    font:12.5px/1.4 ui-monospace,Menlo,monospace; background:rgba(11,11,11,0.05);
+    padding:1.5px 5px; border-radius:4px;
+  }
+  @media (prefers-color-scheme: dark) { code { background:rgba(255,255,255,0.08); } }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:10px; border-bottom:1px solid var(--gridline); vertical-align:top; }
+  th { font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted); }
+  .rec { background:rgba(12,163,12,0.07); }
+  .card { background:var(--surface-1); border:1px solid var(--border); border-radius:14px; padding:16px 18px; }
+
+  /* 手机 */
+  .phones { display:flex; flex-wrap:wrap; gap:24px; margin-top:6px; }
+  .ph-wrap { width:262px; }
+  .phone { width:262px; height:540px; border-radius:38px; padding:9px; background:#0b0b0b; box-shadow:0 12px 30px rgba(0,0,0,.18); }
+  .screen {
+    width:100%; height:100%; border-radius:30px; overflow:hidden; position:relative;
+    background:linear-gradient(170deg,var(--c-canvas),#eef4ff 58%,#f4f0ff);
+    color:var(--c-ink); font-size:11px;
+  }
+  .cap { font-size:12.5px; color:var(--text-muted); margin-top:9px; line-height:1.5; }
+  .cap b { display:block; color:var(--text-primary); font-size:13px; font-weight:750; }
+  .sbar { display:flex; justify-content:space-between; align-items:center; padding:8px 15px 3px; font-size:9.5px; font-weight:700; }
+  .island { width:50px; height:13px; border-radius:8px; background:#0b0b0b; }
+  .body { padding:6px 14px; height:calc(100% - 26px); position:relative; }
+  .navrow { display:flex; align-items:center; gap:8px; padding:2px 0 6px; }
+  .bub { width:23px; height:23px; border-radius:50%; background:rgba(255,255,255,.85); display:grid; place-items:center; font-size:10px; box-shadow:0 1px 4px rgba(15,46,107,.12); }
+  .h1s { font-size:18px; font-weight:850; margin:2px 0; }
+  .lbl { font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--c-inkfaint); margin:9px 0 5px; }
+  .gradcard { border-radius:16px; padding:9px 10px; background:linear-gradient(100deg,var(--c-blue),var(--c-cyan)); color:#fff; display:flex; gap:8px; align-items:center; box-shadow:0 5px 15px rgba(22,119,255,.26); }
+  .gradcard .gi { width:27px; height:27px; border-radius:9px; background:rgba(255,255,255,.22); display:grid; place-items:center; font-size:12px; flex:none; }
+  .gradcard .gt { font-size:11px; font-weight:850; }
+  .gradcard .gs { font-size:8.5px; opacity:.9; }
+  .seg { display:flex; gap:2px; padding:3px; border-radius:99px; background:rgba(15,46,107,.05); }
+  .seg b { flex:1; text-align:center; font-size:9px; font-weight:800; padding:5px 0; border-radius:99px; color:var(--c-inksoft); }
+  .seg b.on { background:var(--c-blue); color:#fff; }
+  .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .poster { position:relative; height:88px; border-radius:13px; padding:7px; display:flex; align-items:flex-end; color:#fff; font-size:9.5px; font-weight:850; text-shadow:0 1px 4px rgba(0,0,0,.45); }
+  .poster.p1 { background:linear-gradient(150deg,#3b5f9e,#7d6ba8); }
+  .poster.p2 { background:linear-gradient(150deg,#2f7f6a,#6fbf9a); }
+  .poster.p3 { background:linear-gradient(150deg,#9e5f7a,#d79aa8); }
+  .poster.p4 { background:linear-gradient(150deg,#8a6a3b,#d7b47a); }
+  .gear { position:absolute; top:5px; right:5px; width:16px; height:16px; border-radius:50%; background:rgba(255,255,255,.82); color:var(--c-ink); font-size:8px; display:grid; place-items:center; text-shadow:none; }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:78px; background:linear-gradient(to top,rgba(245,248,255,.97),rgba(245,248,255,0)); }
+
+  /* 拨号盘 */
+  .dialwrap { position:absolute; left:10px; right:10px; bottom:12px; display:flex; justify-content:center; }
+  .dial {
+    display:flex; align-items:flex-start; gap:26px; padding:9px 22px 7px; border-radius:99px;
+    background:rgba(252,252,251,.94); box-shadow:0 6px 20px rgba(15,46,107,.18);
+    border:1px solid var(--c-hair);
+  }
+  .dial b { font-size:11.5px; font-weight:800; color:var(--c-inkfaint); text-align:center; }
+  .dial b.on { color:var(--c-ink); font-size:12.5px; font-weight:900; }
+  .dial b span { display:block; width:5px; height:5px; border-radius:50%; margin:3px auto 0; background:transparent; }
+  .dial b.on span { background:var(--c-blue); }
+  .dial b.on.lav span { background:#9b8cff; }
+  .dialnote { position:absolute; left:10px; right:10px; bottom:58px; text-align:center; font-size:9px; font-weight:800; color:var(--c-inksoft); }
+
+  /* 邀请屏 */
+  .codebox { border-radius:18px; padding:16px 12px; text-align:center; background:var(--c-surface); border:1px solid var(--c-hair); box-shadow:0 4px 14px rgba(15,46,107,.07); }
+  .codebox .k { font-size:27px; font-weight:900; letter-spacing:.14em; color:var(--c-ink); font-variant-numeric:tabular-nums; }
+  .codebox .t { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--c-inkfaint); margin-bottom:5px; }
+  .cta { border-radius:99px; padding:11px 0; text-align:center; font-size:12px; font-weight:850; color:#fff; background:linear-gradient(100deg,var(--c-blue),var(--c-cyan)); box-shadow:0 5px 16px rgba(22,119,255,.3); }
+  .ghost { border-radius:99px; padding:10px 0; text-align:center; font-size:11.5px; font-weight:800; color:var(--c-ink); background:var(--c-surface); border:1px solid var(--c-hair); }
+  .rowline { display:flex; align-items:center; gap:9px; padding:10px 11px; border-radius:14px; background:var(--c-surface); border:1px solid var(--c-hair); font-size:11px; font-weight:700; }
+  .rowline .v { margin-left:auto; color:var(--c-inksoft); font-weight:700; font-size:10.5px; }
+
+  /* 流程 */
+  .flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px; font-weight:700; }
+  .flow .n { padding:7px 12px; border-radius:10px; background:var(--surface-1); border:1px solid var(--border); }
+  .flow .n.blue { background:rgba(22,119,255,.1); border-color:rgba(22,119,255,.3); }
+  .flow .n.lav { background:rgba(155,140,255,.13); border-color:rgba(155,140,255,.35); }
+  .flow .a { color:var(--text-muted); }
+
+  /* 字幕底 */
+  .plates { display:flex; flex-wrap:wrap; gap:18px; margin-top:10px; }
+  .plate { width:238px; }
+  .vid { position:relative; height:150px; border-radius:16px; overflow:hidden; display:grid; place-items:center; }
+  .vid.dark { background:linear-gradient(150deg,#2a3f63,#4a6aa8 55%,#7d6ba8); }
+  .vid.bright { background:linear-gradient(160deg,#f2efe6,#dfe8f5 60%,#eef1f6); }
+  .t-none { font-size:15px; font-weight:900; color:#fff; text-shadow:0 0 3px rgba(0,0,0,.9),0 1px 5px rgba(0,0,0,.7); }
+  .t-soft { font-size:15px; font-weight:900; color:#fff; background:rgba(0,0,0,.45); padding:5px 11px; border-radius:11px; }
+  .t-black { font-size:15px; font-weight:900; color:#fff; background:#000; padding:5px 11px; border-radius:5px; }
+  .t-white { font-size:15px; font-weight:900; color:#111; background:#fff; padding:5px 11px; border-radius:5px; }
+  .pn { font-size:13px; font-weight:750; margin-top:8px; }
+  .pd { font-size:12.5px; color:var(--text-muted); }
+
+  /* 颜色 */
+  .pal { display:grid; grid-template-columns:repeat(6,1fr); gap:9px; max-width:300px; }
+  .pal .d { aspect-ratio:1; border-radius:50%; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.8),0 1px 4px rgba(0,0,0,.22); }
+  .pal .d.sel { box-shadow:inset 0 0 0 2px #fff,0 0 0 2.5px var(--c-blue),0 1px 4px rgba(0,0,0,.22); }
+  .palsm { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+  .palsm .d { aspect-ratio:1; border-radius:50%; box-shadow:inset 0 0 0 1.2px rgba(255,255,255,.8),0 1px 3px rgba(0,0,0,.25); }
+
+  /* 聊天 */
+  .bubthem { max-width:78%; background:#fff; color:var(--c-ink); border-radius:14px 14px 14px 4px; padding:7px 10px; font-size:10.5px; border:1px solid var(--c-hair); position:relative; margin-bottom:14px; }
+  .bubme { margin-left:auto; max-width:78%; background:linear-gradient(120deg,var(--c-blue),var(--c-cyan)); color:#fff; border-radius:14px 14px 4px 14px; padding:7px 10px; font-size:10.5px; margin-bottom:14px; }
+  .react { position:absolute; bottom:-11px; left:9px; background:#fff; border:1px solid var(--c-hair); border-radius:99px; padding:1px 6px; font-size:9px; box-shadow:0 1px 4px rgba(15,46,107,.12); }
+  .composer { display:flex; align-items:center; gap:7px; padding:8px; border-radius:18px; background:#fff; border:1.5px solid rgba(22,119,255,.28); font-size:10.5px; color:var(--c-inkfaint); }
+  .send { width:26px; height:26px; border-radius:50%; background:linear-gradient(120deg,var(--c-blue),var(--c-cyan)); color:#fff; display:grid; place-items:center; font-size:11px; margin-left:auto; }
+
+  .pick { border-left:3px solid var(--now); padding-left:13px; margin-top:14px; }
+  .pick .q { font-weight:800; }
+  ul { max-width:60ch; } li { margin-bottom:4px; }
+  .note { font-size:13px; color:var(--text-muted); max-width:62ch; margin-top:10px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>拨号盘、字幕底、颜色</h1>
+<p class="lead">四件事画出来了：<b>怎么选自己拍还是一起拍</b>、<b>字幕的四种底</b>、<b>十二个颜色</b>、<b>emoji 搬到哪里去</b>。每张图下面写清楚点了会发生什么。</p>
+<p class="meta">2026-09-16 晚 · 上一份是 <code>2026-09-16-friends-entry-and-clip-review.html</code></p>
+
+<h2>一 · 拨号盘</h2>
+
+<p class="big">两个词并排放在屏幕最下面，像相机切「照片 / 视频」那样。划一下换，点一下也换。</p>
+<p>亮的那个词下面有一个小圆点。这是相机的老规矩，不是两个一样的按钮。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:9px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，就建好了</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+        <div class="fade"></div>
+        <div class="dialwrap">
+          <div class="dial">
+            <b class="on">自己拍<span></span></b>
+            <b>一起拍<span></span></b>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>现在是「自己拍」</b>点任何一张海报 → 直接进相机开拍。不问你别的。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">✕</div></div>
+        <div class="h1s">今天会是什么故事？</div>
+        <div class="gradcard" style="margin-top:8px">
+          <div class="gi">✦</div>
+          <div><div class="gt">自己写题目</div><div class="gs">说说今天要干什么，题目我来写</div></div>
+        </div>
+        <div class="seg" style="margin-top:9px"><b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b></div>
+        <div class="lbl">选一张，先建房间</div>
+        <div class="pgrid">
+          <div class="poster p1">搬家这一天<div class="gear">⚙</div></div>
+          <div class="poster p2">普通的周三<div class="gear">⚙</div></div>
+          <div class="poster p3">和她见面<div class="gear">⚙</div></div>
+          <div class="poster p4">一个人出门<div class="gear">⚙</div></div>
+        </div>
+        <div class="fade"></div>
+        <div class="dialnote">下一步会给你 6 位邀请码</div>
+        <div class="dialwrap">
+          <div class="dial">
+            <b>自己拍<span></span></b>
+            <b class="on lav">一起拍<span></span></b>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>划到「一起拍」</b>小圆点跟着过去，海报上面那行字从「就建好了」变成「先建房间」。多一行小字告诉你下一步是什么。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div style="font-size:11.5px;font-weight:850">房间建好了</div></div>
+        <div class="h1s" style="font-size:16px">把码发给朋友</div>
+        <div class="codebox" style="margin-top:10px">
+          <div class="t">邀请码</div>
+          <div class="k">K7M2Q9</div>
+        </div>
+        <div class="cta" style="margin-top:10px">分享给朋友</div>
+        <div class="lbl">这个房间</div>
+        <div class="rowline" style="margin-bottom:7px">搬家这一天<span class="v">改名 ›</span></div>
+        <div class="rowline" style="margin-bottom:7px">7 个瞬间<span class="v">改 ›</span></div>
+        <div class="rowline">每段 2 秒<span class="v">改 ›</span></div>
+        <div class="dialwrap"><div style="width:100%"><div class="ghost">先自己拍第一个</div></div></div>
+      </div>
+    </div></div>
+    <p class="cap"><b>只有「一起拍」才会看到这一屏</b>因为房间不把码发出去就没人进来。顺手也能改名、改瞬间数、改秒数 —— 就是你说的那个设置项，不用找齿轮。</p>
+  </div>
+</div>
+
+<h3>两条路一眼看清</h3>
+<div class="card">
+  <p class="flow" style="margin:0 0 10px">
+    <span class="n blue">自己拍</span><span class="a">→</span>
+    <span class="n">点海报</span><span class="a">→</span>
+    <span class="n">相机</span>
+    <span style="color:var(--good);font-weight:800;margin-left:8px">1 步</span>
+  </p>
+  <p class="flow" style="margin:0">
+    <span class="n lav">一起拍</span><span class="a">→</span>
+    <span class="n">点海报</span><span class="a">→</span>
+    <span class="n">邀请码这一屏</span><span class="a">→</span>
+    <span class="n">相机</span>
+    <span style="color:var(--text-muted);font-weight:800;margin-left:8px">2 步</span>
+  </p>
+</div>
+<p class="note">这就是为什么它们不再像「两个一模一样的模式」：一个一步到相机，一个中间有一屏，而那一屏是真的有事要干（发码）。相机里不用再放任何开关。</p>
+
+<h2>二 · 字幕的四种底</h2>
+<p class="big">同一句字幕，四种底。左边两个是深画面，右边两个是亮画面 —— 亮画面是现在最糊的情况。</p>
+
+<div class="plates">
+  <div class="plate">
+    <div class="vid dark"><span class="t-none">今天从这里开始</span></div>
+    <div class="pn">1 · 无底（现在的默认）</div>
+    <div class="pd">白字加黑描边。深画面清楚，亮画面糊。</div>
+  </div>
+  <div class="plate">
+    <div class="vid dark"><span class="t-soft">今天从这里开始</span></div>
+    <div class="pn">2 · 半透明黑</div>
+    <div class="pd">已经有了，藏在「格式」按钮里。什么画面都读得清，还能看见后面。</div>
+  </div>
+  <div class="plate">
+    <div class="vid bright"><span class="t-black">今天从这里开始</span></div>
+    <div class="pn">3 · 纯黑块（你说的）</div>
+    <div class="pd">最狠也最清楚。像字幕条，遮得住后面。</div>
+  </div>
+  <div class="plate">
+    <div class="vid bright"><span class="t-white">今天从这里开始</span></div>
+    <div class="pn">4 · 白底黑字</div>
+    <div class="pd">亮画面上最好看，不像贴了一条黑胶布。</div>
+  </div>
+</div>
+<p class="note">现在「格式」按钮点一下换一种，看不到有哪些。改成四个小方块直接摆出来，点哪个是哪个。</p>
+
+<h2>三 · 十二个颜色</h2>
+<p class="big">两行六个，全在屏幕上，不用滑。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen" style="background:linear-gradient(170deg,#2b3a58,#43567f)">
+      <div class="sbar" style="color:#fff"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body" style="padding:6px 12px">
+        <div class="navrow"><div class="bub" style="background:rgba(255,255,255,.22);color:#fff">✕</div><div style="font-size:11.5px;font-weight:850;color:#fff">咖啡 · 2/7</div></div>
+        <div style="position:relative;border-radius:20px;height:270px;background:linear-gradient(150deg,#3f5680,#7d6ba8);overflow:hidden;display:grid;place-items:center">
+          <span class="t-soft" style="font-size:13px">今天从这里开始</span>
+        </div>
+        <div style="margin-top:11px">
+          <div class="palsm">
+            <div class="d" style="background:#fff"></div>
+            <div class="d" style="background:#111"></div>
+            <div class="d" style="background:#1677ff"></div>
+            <div class="d" style="background:#38b6ff"></div>
+            <div class="d" style="background:#4fd1a5"></div>
+            <div class="d" style="background:#ffce73"></div>
+          </div>
+          <div class="palsm" style="margin-top:6px">
+            <div class="d" style="background:#ff6b4a"></div>
+            <div class="d" style="background:#e8407a"></div>
+            <div class="d" style="background:#b3a4ff"></div>
+            <div class="d" style="background:#7b5cff"></div>
+            <div class="d" style="background:#ff9db3"></div>
+            <div class="d" style="background:#0f2e6b"></div>
+          </div>
+        </div>
+        <div class="dialwrap" style="bottom:10px">
+          <div style="width:100%;display:flex;gap:6px">
+            <div class="ghost" style="flex:1">✎ 加字幕</div>
+            <div class="ghost" style="flex:1">↺ 重拍</div>
+            <div class="cta" style="flex:1;padding:10px 0">💬 聊天</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>回看页的全貌</b>颜色两行摆开，只在已经有字幕的时候出现。下面三个按钮横着 —— 就是你要的那个排法。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div style="padding-top:6px">
+      <h3 style="margin-top:0">十二个是怎么挑的</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td style="width:92px">
+              <div class="palsm" style="grid-template-columns:repeat(2,18px);gap:5px">
+                <div class="d" style="background:#fff"></div><div class="d" style="background:#111"></div>
+              </div>
+            </td>
+            <td><b>白 + 黑</b><br><span style="color:var(--text-secondary)">现在只有白。雪地、白墙、逆光上白字永远糊，缺的就是黑。</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="palsm" style="grid-template-columns:repeat(3,18px);gap:5px">
+                <div class="d" style="background:#1677ff"></div><div class="d" style="background:#38b6ff"></div><div class="d" style="background:#4fd1a5"></div>
+                <div class="d" style="background:#ffce73"></div><div class="d" style="background:#ff6b4a"></div><div class="d" style="background:#e8407a"></div>
+              </div>
+            </td>
+            <td><b>六个亮色</b><br><span style="color:var(--text-secondary)">前三个已经有了。新加黄、橙红、玫红 —— 现在一个暖色都没有。</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="palsm" style="grid-template-columns:repeat(2,18px);gap:5px">
+                <div class="d" style="background:#b3a4ff"></div><div class="d" style="background:#7b5cff"></div>
+                <div class="d" style="background:#ff9db3"></div><div class="d" style="background:#0f2e6b"></div>
+              </div>
+            </td>
+            <td><b>四个柔色</b><br><span style="color:var(--text-secondary)">薰衣草和深蓝保留，加紫和粉。</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">好消息：颜色在代码里只写一处，预览和导出读的是同一个值。加颜色两边一起对，不会一个地方漏。</p>
+    </div>
+  </div>
+</div>
+
+<h2>四 · Emoji 搬到聊天里</h2>
+<p class="big">回看页不放那一排表情了。改成在聊天里长按一条消息加表情。</p>
+
+<div class="phones">
+  <div class="ph-wrap">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>100%</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div style="font-size:11.5px;font-weight:850">咖啡 · 2/7</div></div>
+        <div style="margin-top:8px">
+          <div class="bubthem">这个角度好可爱<div class="react">😂 2</div></div>
+          <div class="bubme">我拍了八遍</div>
+          <div class="bubthem">笑死<div class="react">❤️ 1</div></div>
+        </div>
+        <div class="dialwrap" style="bottom:12px">
+          <div style="width:100%" class="composer"><span>说点什么…</span><div class="send">↑</div></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap"><b>表情挂在消息下面</b>和微信、iMessage 一样的规矩。功能没删，只是不在回看页占地方了。</p>
+  </div>
+
+  <div class="ph-wrap">
+    <div style="padding-top:6px">
+      <h3 style="margin-top:0">为什么不直接删</h3>
+      <p>已经有人拍的片子里存着表情，成片里也会飘出来（<code>DayClip.emoji</code>）。直接删 UI，老片子的表情还在数据里，但你再也看不到、也改不了 —— 那是最难查的一类问题。</p>
+      <p>搬进聊天就没这个问题：看得见、删得掉、跟着消息走。</p>
+      <p class="note">要是你就是想彻底删干净（连成片里飘的表情一起去掉），也行，20 分钟，但要一起删掉数据里的字段，老房间同步过来的表情会被忽略。</p>
+    </div>
+  </div>
+</div>
+
+<h2>要你点头的</h2>
+<table>
+  <thead><tr><th>#</th><th>事</th><th>我建议</th><th>工时</th></tr></thead>
+  <tbody>
+    <tr class="rec"><td>1</td><td>拨号盘 + 一起拍才有的邀请屏</td><td>照上面的图做</td><td>4 小时</td></tr>
+    <tr class="rec"><td>2</td><td>四种字幕底，摆出来选</td><td>照上面的图做</td><td>2.5 小时</td></tr>
+    <tr class="rec"><td>3</td><td>颜色 6 个 → 12 个</td><td>照上面的图做</td><td>2 小时</td></tr>
+    <tr class="rec"><td>4</td><td>三个按钮横着 + 画面变大</td><td>上一份 spec 已经定了</td><td>3 小时</td></tr>
+    <tr><td>5</td><td>Emoji 搬进聊天</td><td>搬，不删</td><td>2 小时</td></tr>
+    <tr><td>6</td><td>拍完以后改的字幕同步给朋友</td><td>这是 bug，要修</td><td>2 小时</td></tr>
+  </tbody>
+</table>
+
+<div class="pick">
+  <p class="q" style="margin-bottom:4px">第 6 条要说一下</p>
+  <p style="margin:0">你问「两个人都能加字幕吗」— 能，各加自己那半，成片里各自在自己画面下面。<b>但拍完以后再改的字幕只留在你手机上，朋友看不到。</b>代码注释里自己写着「local only for now」。这不是设计，是漏的。</p>
+</div>
+
+<p class="note">1 到 4 加起来 11.5 小时。5 和 6 各 2 小时。你说做哪些，我就开始。</p>
+
+</main>
+</body>
+</html>

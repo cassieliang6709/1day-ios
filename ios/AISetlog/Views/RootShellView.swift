@@ -1,18 +1,25 @@
 import SwiftUI
 
-/// The app's two surfaces — your plans and the free-form camera — swapped by
-/// a floating capsule instead of a tab bar. The plans surface stays mounted so
-/// switching never loses its navigation stack.
+/// The app's three surfaces — your plans, making a new one, and the free-form
+/// camera — swapped by a floating capsule instead of a tab bar. The plans
+/// surface stays mounted so switching never loses its navigation stack.
 ///
-/// There is no third tab and no primary button down here: the one action that
-/// matters lives inside today's `StoryCard`, where it has the context to say
-/// what it will actually do.
+/// 新建 became the middle tab in 1.3. It used to be a 36pt wordless `plus` in
+/// the corner of the plans header, which made the app's second-most-used action
+/// the smallest target on its first screen — and put it in the one place a
+/// thumb holding a phone cannot reach. The composer is a full screen either
+/// way; as a tab it is also somewhere you can back out of by tapping 计划,
+/// rather than hunting for an ✕.
 enum HomeLaunchAction: Equatable {
     /// First-run path: make the three-moment personal story immediately.
     case quickStart
     case newStory
     case join
     case record(UUID)
+    /// Push a story's timeline onto the plans stack. What the composer asks for
+    /// once it has made something: the composer lives in the shell now, and the
+    /// navigation stack it needs to push onto belongs to `PlansHomeView`.
+    case openStory(UUID)
 }
 
 struct RootShellView: View {
@@ -20,7 +27,7 @@ struct RootShellView: View {
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
-    enum Surface: Hashable { case plans, camera }
+    enum Surface: Hashable { case plans, compose, camera }
     @State private var surface: Surface = .plans
 
     /// The camera surface reports through this whether it's still holding a
@@ -44,9 +51,26 @@ struct RootShellView: View {
             PlansHomeView(
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $launchAction,
-                stories: stories)
+                stories: stories,
+                onCompose: { surface = .compose })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
+
+            // Not kept mounted behind the others the way plans is: it holds a
+            // half-filled form, and coming back to 新建 after wandering off
+            // should offer a fresh one rather than the poster rack scrolled to
+            // wherever it was left. There is no navigation stack to lose here.
+            if surface == .compose {
+                StoryComposerView(
+                    onCreate: { id in
+                        // Back to plans, with the new story's timeline pushed:
+                        // the composer's whole job is done and the thing you
+                        // just made is what you want to look at.
+                        surface = .plans
+                        launchAction = .openStory(id)
+                    },
+                    onClose: { surface = .plans })
+            }
 
             // Mounted only while active so the capture session stops on leave.
             // That unmount is also what used to destroy unfiled clips, so the
@@ -54,29 +78,34 @@ struct RootShellView: View {
             if surface == .camera {
                 CameraTabView(
                     unfiledGuard: unfiledGuard,
-                    onStartStory: {
-                        launchAction = .newStory
-                        surface = .plans
-                    })
+                    onStartStory: { surface = .compose })
             }
 
-            // One explicit action instead of a second navigation world.
-            if surface == .plans {
-                Button {
-                    guardedSurface.wrappedValue = .camera
-                } label: {
-                    Label(Strings.surfaceCamera, systemImage: "camera.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 13)
-                        .background(OneDay.ink, in: Capsule())
-                        .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 18)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            // 计划 · 我的 · 拍摄, in that order, with 我的 in the middle and
+            // emphasised — see `FloatingTabBar.emphasisedIndex`. The middle
+            // slot is the one a thumb reaches without moving the phone, so it
+            // holds the screen the app opens on rather than an action.
+            FloatingTabBar(
+                items: [
+                    .init(
+                        tab: Surface.compose,
+                        label: Strings.surfaceCompose,
+                        icon: "sparkles.rectangle.stack",
+                        activeIcon: "sparkles.rectangle.stack.fill"),
+                    .init(
+                        tab: Surface.plans,
+                        label: Strings.surfacePlans,
+                        icon: "rectangle.stack",
+                        activeIcon: "rectangle.stack.fill"),
+                    .init(
+                        tab: Surface.camera,
+                        label: Strings.surfaceCamera,
+                        icon: "camera",
+                        activeIcon: "camera.fill"),
+                ],
+                selection: guardedSurface,
+                emphasisedIndex: 1)
+                .padding(.bottom, 6)
         }
         .confirmationDialog(
             Strings.keepClipQuestion,

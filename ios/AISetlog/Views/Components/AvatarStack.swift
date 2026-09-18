@@ -13,6 +13,12 @@ struct AvatarDot: View {
     /// Draws a bright ring around the dot — used for "this is you".
     var isYou = false
 
+    /// Bound, not read: picking your own colour in Settings has to repaint
+    /// every avatar of you on the screen behind it — the header, your clips'
+    /// bylines, your dot in the roster. `Identity` reads the same key, so
+    /// observing it here is what makes all of them update at once.
+    @AppStorage(Identity.myTintKey) private var myTintIndex = -1
+
     private var tint: Color { Identity.tint(for: name) }
     private var hasName: Bool { name?.isEmpty == false }
 
@@ -67,7 +73,7 @@ private struct AvatarOverflowDot: View {
     var body: some View {
         Text("+\(count)")
             .font(.system(size: size * 0.34, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.oneDayBlue)
+            .foregroundStyle(Color.oneDayBrand)
             .frame(width: size, height: size)
             .background(OneDay.surfaceSoft, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: size * 0.06))

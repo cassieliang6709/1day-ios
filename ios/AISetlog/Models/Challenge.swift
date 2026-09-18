@@ -83,6 +83,19 @@ struct Challenge: Codable, Identifiable {
     /// before they've filmed anything. nil in rooms saved before this existed.
     var ownerID: String? = nil
 
+    /// A cover the person chose for *this story*: a picture out of their photo
+    /// library, or a frame lifted from one of its own clips.
+    ///
+    /// Until now a story could not have a cover at all. The card showed the
+    /// newest clip in it, and before anything was filmed, the template's
+    /// painted poster — both automatic, neither choosable. nil keeps exactly
+    /// that behaviour, which is what every story saved before this has.
+    var coverFileName: String? = nil
+    /// A cover the person chose out of the bundled library, by asset name.
+    /// Separate from `coverFileName` so picking a bundled one doesn't have to
+    /// copy an image the app already ships.
+    var presetCoverAssetName: String? = nil
+
     var isShared: Bool { roomCode != nil }
     var resolvedMode: Mode { mode ?? .sevenDay }
     var resolvedClipLength: ClipLength { clipLength ?? .tiny }

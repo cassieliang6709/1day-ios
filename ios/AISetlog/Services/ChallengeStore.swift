@@ -107,10 +107,67 @@ final class ChallengeStore {
         guard let imageData else { return template }
         var filed = template
         // A failed write leaves the old cover in place rather than blanking it.
-        if let stored = coverStore.storeCover(imageData, templateID: template.id) {
+        if let stored = coverStore.storeCover(imageData, ownerID: template.id) {
             filed.coverFileName = stored
         }
         return filed
+    }
+
+    // MARK: - A story's own cover
+
+    /// What the cover sheet came back with.
+    ///
+    /// `keepFilming` is not "no change": it is the choice to go back to the
+    /// automatic cover — the newest clip in the story, and the template's
+    /// poster before anything is filmed. That was the only behaviour there
+    /// used to be, so it has to stay reachable.
+    enum StoryCoverChoice: Equatable {
+        case preset(String)
+        case picked(Data)
+        case keepFilming
+    }
+
+    func setStoryCover(_ choice: StoryCoverChoice, for id: UUID) {
+        guard let index = challenges.firstIndex(where: { $0.id == id }) else { return }
+        let previous = challenges[index].coverFileName
+
+        switch choice {
+        case .preset(let assetName):
+            challenges[index].presetCoverAssetName = assetName
+            challenges[index].coverFileName = nil
+        case .picked(let data):
+            // Filed before the story that names it is saved, so a story never
+            // points at a file that isn't there — same order as templates.
+            guard let stored = coverStore.storeCover(data, ownerID: id) else { return }
+            challenges[index].coverFileName = stored
+            challenges[index].presetCoverAssetName = nil
+        case .keepFilming:
+            challenges[index].coverFileName = nil
+            challenges[index].presetCoverAssetName = nil
+        }
+
+        // The old picture goes with the choice that replaced it. Deleting after
+        // the swap rather than before: a failed write above returns early and
+        // the story keeps the cover it had.
+        if let previous, previous != challenges[index].coverFileName {
+            coverStore.deleteCover(fileName: previous)
+        }
+    }
+
+    /// The picture this story's card should show, or nil to fall back to art.
+    ///
+    /// Chosen beats automatic: a cover somebody picked outranks the newest
+    /// clip, which outranks the poster. `latestClipURL` is handed in because
+    /// which clip is newest is the caller's question — rooms count everybody's.
+    func storyCoverURL(for challenge: Challenge, latestClipURL: URL?) -> URL? {
+        if let own = challenge.coverFileName,
+           let url = coverStore.coverURL(fileName: own) {
+            return url
+        }
+        // A bundled preset is artwork, not a file: the card draws it by name
+        // (`ChallengePresenter.coverAssetName`), so there is no URL to give.
+        if challenge.presetCoverAssetName != nil { return nil }
+        return latestClipURL
     }
 
     func updatePlan(_ id: UUID, title: String, momentTitles: [String]) {
@@ -445,8 +502,13 @@ final class ChallengeStore {
         return fileStore.clipURL(fileName: name, challengeID: challengeID)
     }
 
-    /// Edit a clip's center caption after the fact (from the preview). Local
-    /// only for now — room sync of caption edits rides the next clip upload.
+    /// Edit a clip's center caption after the fact (from the preview).
+    ///
+    /// Pushed to the room as well, not just saved locally. It used to say
+    /// "room sync of caption edits rides the next clip upload", which in
+    /// practice meant never: most captions are written *after* the take, so a
+    /// friend saw the words you typed at record time and nothing you changed
+    /// afterwards — including a caption you deleted.
     func updateOverlayText(_ text: String?, day: Int, challengeID: UUID) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
@@ -454,6 +516,7 @@ final class ChallengeStore {
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let words = trimmed?.isEmpty == true ? nil : trimmed
         challenges[ci].cards[idx].overlayText = words
+        pushCaptionToRoom(words, day: day, challengeIndex: ci)
         // Clearing the words clears where they were. Otherwise a caption
         // deleted and typed again would reappear wherever the last one was
         // dragged to, which reads as the app remembering something you threw
@@ -470,6 +533,21 @@ final class ChallengeStore {
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
         else { return }
         challenges[ci].cards[idx].captionSticker = sticker
+    }
+
+    /// Sends an edited caption to the room, when there is one to send to.
+    ///
+    /// Words only. Where the caption sits is `CaptionSticker`, which rides the
+    /// clip record's own field and is rewritten by the next upload — moving
+    /// that to its own round trip is a bigger change than this, and a friend
+    /// reading the wrong *position* is a much smaller wrong than a friend
+    /// reading words you deleted.
+    private func pushCaptionToRoom(_ words: String?, day: Int, challengeIndex ci: Int) {
+        guard let code = challenges[ci].roomCode, let me = account?.account else { return }
+        Task { @MainActor in
+            await roomSync.updateClipCaption(
+                code: code, day: day, authorID: me.id, overlayText: words)
+        }
     }
 
     // MARK: - Reactions & comments (local-first)

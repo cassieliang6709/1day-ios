@@ -67,4 +67,30 @@ struct RoomProgress: Equatable {
         guard total > 0 else { return 1 }
         return (1...total).first { !filledDays.contains($0) } ?? total
     }
+
+    /// The slot the home card's button should open.
+    ///
+    /// Today's, when today is still empty. In a seven-day story the slots *are*
+    /// days, and `nextOpenMoment` — the earliest empty one — sent somebody who
+    /// missed Tuesday straight back to Tuesday on Thursday. The day you can
+    /// still film is today; a missed day is caught up from the story page,
+    /// where all of them are listed.
+    ///
+    /// - Parameter today: which slot is today, or `nil` for a one-day story
+    ///   where every slot is today and "earliest empty" is the right answer.
+    func slotToOffer(today: Int?) -> Int {
+        guard total > 0 else { return 1 }
+        guard let today else { return nextOpenMoment }
+        let clamped = min(max(today, 1), total)
+        // Only when it's still empty: a button that re-films the moment you
+        // already have today is a button that does nothing new.
+        return filledDays.contains(clamped) ? nextOpenMoment : clamped
+    }
+
+    /// Whether the slot on offer is today's, so the label can say
+    /// "catch up day 2" instead of implying it is today's.
+    func offeringToday(today: Int?) -> Bool {
+        guard let today, total > 0 else { return true }
+        return slotToOffer(today: today) == min(max(today, 1), total)
+    }
 }

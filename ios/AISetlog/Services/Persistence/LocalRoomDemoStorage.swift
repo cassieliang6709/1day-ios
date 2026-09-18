@@ -60,9 +60,9 @@ final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore, TemplateCo
         // Deliberately never touches production legacy files.
     }
 
-    func storeCover(_ imageData: Data, templateID: UUID) -> String? {
+    func storeCover(_ imageData: Data, ownerID: UUID) -> String? {
         guard !isClosed else { return nil }
-        let name = "\(templateID)-\(UUID()).coverimg"
+        let name = "\(ownerID)-\(UUID()).coverimg"
         let url = root.appendingPathComponent(safeComponent(name))
         do {
             try imageData.write(to: url, options: .atomic)

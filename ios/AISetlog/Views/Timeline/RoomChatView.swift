@@ -5,17 +5,73 @@ import SwiftUI
 struct RoomChatView: View {
     let challengeID: UUID
     var moment: Int? = nil
+    /// What to do when somebody taps a message's "about moment N" quote.
+    ///
+    /// Nil means the quote is text rather than a link — which is what it was
+    /// everywhere until now: `RoomChatMessage.moment` was written on send and
+    /// then printed as a grey caption nobody could act on. The host has to
+    /// supply this because only the host knows how to get to a moment from
+    /// where it put the chat.
+    var onOpenMoment: ((Int) -> Void)?
+    /// Whose clip, on which day, the reaction row at the top belongs to.
+    ///
+    /// Reactions used to be a row of their own on the review screen, under the
+    /// picture — a floating strip of emoji that was the first thing you saw
+    /// after your own face. They belong with the other thing people say about
+    /// a moment, which is the thread. Nil when the chat was opened from the
+    /// story rather than from one clip: there is no single take to react to.
+    var reactionTarget: ReactionTarget?
+
+    struct ReactionTarget: Equatable {
+        let day: Int
+        let authorID: String
+    }
+
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @Environment(\.roomChatSessionSource) private var sessionSource
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppLanguage.storageKey) private var language: AppLanguage = .system
 
+    /// The moment's own prompt, so a quote can say 「第 2 个瞬间 · 咖啡」 rather
+    /// than just a number. Nil for a record-by-time story, which has no prompts.
+    private func momentTitle(_ day: Int) -> String? {
+        guard let challenge = store.challenge(challengeID), !challenge.isTimeOnly else {
+            return nil
+        }
+        return ChallengePresenter(challenge: challenge).title(forSlot: day)
+    }
+
+    /// The moment's reactions, above the thread.
+    @ViewBuilder
+    private func reactionRow(_ target: ReactionTarget, myID: String) -> some View {
+        let interactions = store.interactions(
+            for: challengeID, day: target.day, targetAuthorID: target.authorID)
+        ReactionBar(reactions: interactions.reactions, myID: myID) { emoji in
+            store.toggleReaction(
+                emoji, day: target.day, challengeID: challengeID,
+                targetAuthorID: target.authorID)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+    }
+
     var body: some View {
         if let code = store.challenge(challengeID)?.roomCode, let me = account.account {
-            RoomChatConversation(scope: .init(accountID: me.id, roomCode: code),
-                                 authorName: me.displayName, moment: moment, source: sessionSource)
-                .id("\(sessionSource.identity):\(me.id):\(code)")
+            VStack(spacing: 0) {
+                if let target = reactionTarget {
+                    reactionRow(target, myID: me.id)
+                }
+                RoomChatConversation(
+                    scope: .init(accountID: me.id, roomCode: code),
+                    authorName: me.displayName,
+                    moment: moment,
+                    source: sessionSource,
+                    momentTitle: momentTitle,
+                    onOpenMoment: onOpenMoment)
+                    .id("\(sessionSource.identity):\(me.id):\(code)")
+            }
         } else {
             VStack(spacing: 20) {
                 Text(language.resolved == .chinese ? "登录并加入房间后才能聊天。" : "Sign in and join the room to chat.")
@@ -48,11 +104,30 @@ private struct RoomChatConversation: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLanguage.storageKey) private var language: AppLanguage = .system
 
-    init(scope: RoomChatScope, authorName: String, moment: Int?, source: RoomChatSessionSource) {
+    private let momentTitle: (Int) -> String?
+    private let onOpenMoment: ((Int) -> Void)?
+
+    init(
+        scope: RoomChatScope,
+        authorName: String,
+        moment: Int?,
+        source: RoomChatSessionSource,
+        momentTitle: @escaping (Int) -> String?,
+        onOpenMoment: ((Int) -> Void)?
+    ) {
         self.authorName = authorName
         self.preview = source.preview
+        self.momentTitle = momentTitle
+        self.onOpenMoment = onOpenMoment
         _moment = State(initialValue: moment)
         _session = StateObject(wrappedValue: source.makeSession(scope: scope))
+    }
+
+    /// 「第 2 个瞬间 · 咖啡」, or just the number for a story without prompts.
+    private func momentLabel(_ day: Int) -> String {
+        let numbered = text("第 \(day) 个瞬间", "Moment \(day)")
+        guard let title = momentTitle(day), !title.isEmpty else { return numbered }
+        return "\(numbered) · \(MomentCatalog.localize(title))"
     }
 
     private func text(_ zh: String, _ en: String) -> String { language.resolved == .chinese ? zh : en }
@@ -63,23 +138,35 @@ private struct RoomChatConversation: View {
             VStack(spacing: 0) {
                 if preview != nil {
                     Text(text("本地演示 · 不会发送给朋友", "Local demo · Nothing is sent to friends"))
-                        .font(.caption).foregroundStyle(.secondary).padding(10)
-                        .frame(maxWidth: .infinity).background(Color.blue.opacity(0.08))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .padding(10)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.oneDayLavender.opacity(0.14))
                 }
                 if let error = session.error {
                     HStack {
-                        Text(errorText(error)).font(.footnote)
+                        Text(errorText(error))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
                         if error == .fetch {
                             Button(text("重试", "Retry")) { Task { await session.refresh() } }
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.oneDayBrand)
                         }
-                    }.padding(12).frame(maxWidth: .infinity).background(Color.orange.opacity(0.12))
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.oneDayAmber.opacity(0.16))
                 }
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             if entries.isEmpty {
                                 Text(text("在这里聊聊你们的故事", "Talk about your story here"))
-                                    .foregroundStyle(.secondary).padding(.top, 48)
+                                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
+                                    .foregroundStyle(OneDay.inkSoft)
+                                    .padding(.top, 48)
                             }
                             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                                 bubble(entry, namesAuthor: namesAuthor(at: index)).id(entry.id)
@@ -96,7 +183,12 @@ private struct RoomChatConversation: View {
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            // The app's own canvas. This screen was the only one still on
+            // `systemGroupedBackground` with `secondarySystemGroupedBackground`
+            // bubbles and a `systemGray6` field — system greys on a system
+            // grey, which is why the one input on the page was the hardest
+            // thing on it to find.
+            .background(OneDayCanvas(seed: 4))
             .navigationTitle(preview == nil ? text("房间聊天", "Room chat") : text("聊天演示", "Chat demo"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -167,25 +259,46 @@ private struct RoomChatConversation: View {
             if mine { Spacer(minLength: 40) }
             VStack(alignment: mine ? .trailing : .leading, spacing: 5) {
                 if namesAuthor {
-                    Text(entry.message.authorName).font(.caption).foregroundStyle(.secondary)
+                    Text(entry.message.authorName)
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.inkFaint)
                 }
-                if let context = entry.message.moment {
-                    Text(text("来自第 \(context) 个瞬间", "From moment \(context)"))
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-                Text(entry.message.text)
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .foregroundStyle(mine ? Color.white : Color.primary)
-                    .background(mine ? Color.oneDayBlue : Color(.secondarySystemGroupedBackground),
-                                in: RoundedRectangle(cornerRadius: 16))
-                    .contextMenu {
-                        if mine && entry.delivery == .sent {
-                            Button(text("删除消息", "Delete message"), role: .destructive) {
-                                deletionCandidate = entry.id
-                            }.disabled(session.deletingIDs.contains(entry.id))
-                        }
+                VStack(alignment: .leading, spacing: 7) {
+                    if let context = entry.message.moment {
+                        quote(context, mine: mine)
                     }
+                    Text(entry.message.text)
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .textSelection(.enabled)
+                }
+                // The tail corner is the one nearest its owner, so a run of
+                // messages reads as coming from one side.
+                .padding(.horizontal, 13)
+                .padding(.vertical, 10)
+                .foregroundStyle(mine ? Color.white : OneDay.ink)
+                .background {
+                    let shape = UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: 17,
+                            bottomLeading: mine ? 17 : 5,
+                            bottomTrailing: mine ? 5 : 17,
+                            topTrailing: 17),
+                        style: .continuous)
+                    if mine {
+                        shape.fill(OneDay.brandHorizontal)
+                    } else {
+                        shape.fill(OneDay.surface)
+                            .overlay { shape.strokeBorder(OneDay.hairline, lineWidth: 1) }
+                    }
+                }
+                .oneDaySoftShadow(strength: mine ? 0 : 0.5)
+                .contextMenu {
+                    if mine && entry.delivery == .sent {
+                        Button(text("删除消息", "Delete message"), role: .destructive) {
+                            deletionCandidate = entry.id
+                        }.disabled(session.deletingIDs.contains(entry.id))
+                    }
+                }
                 HStack(spacing: 8) {
                     Text(entry.message.createdAt, format: .dateTime.month().day().hour().minute())
                     if mine {
@@ -199,43 +312,130 @@ private struct RoomChatConversation: View {
                             }.padding(.vertical, 8)
                         }
                     }
-                }.font(.caption2).foregroundStyle(.secondary)
+                }
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(OneDay.inkFaint)
             }
             if !mine { Spacer(minLength: 40) }
         }
     }
 
+    /// What this message is about, inside the bubble it belongs to.
+    ///
+    /// `RoomChatMessage.moment` has been written on every message sent from a
+    /// moment since chat shipped, and printed above the bubble as a grey
+    /// `caption2` line reading 「来自第 2 个瞬间」 — a number with no name, no
+    /// visual tie to the bubble, and nothing to tap. As a rule inside the
+    /// bubble with the moment's own prompt on it, it says which moment and
+    /// gets you there.
+    @ViewBuilder
+    private func quote(_ day: Int, mine: Bool) -> some View {
+        let rule = mine ? Color.white.opacity(0.55) : Color.oneDayLavender
+        let ink = mine ? Color.white.opacity(0.9) : OneDay.inkSoft
+        let label = HStack(spacing: 5) {
+            Text(momentLabel(day))
+                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+            if onOpenMoment != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .black))
+                    .foregroundStyle(ink)
+            }
+        }
+        .padding(.leading, 7)
+        .overlay(alignment: .leading) {
+            Capsule().fill(rule).frame(width: 2.5)
+        }
+
+        if let onOpenMoment {
+            Button { onOpenMoment(day) } label: { label }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("chat-moment-quote")
+        } else {
+            label
+        }
+    }
+
     private var composer: some View {
         VStack(spacing: 8) {
+            // What the next message will be tagged with. Worth a tinted band
+            // rather than a grey caption: it changes what gets *stored* on the
+            // message, and the only clue it was on used to be one line of
+            // `caption` type above the field.
             if let context = moment {
-                HStack {
-                    Text(text("聊聊第 \(context) 个瞬间", "About moment \(context)"))
-                    Spacer()
-                    Button(text("取消引用", "Remove context")) { moment = nil }
-                }.font(.caption)
+                HStack(spacing: 6) {
+                    Text(text("在说：\(momentLabel(context))", "About: \(momentLabel(context))"))
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayNavy)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Button {
+                        moment = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(OneDay.inkSoft)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(text("取消引用", "Remove context"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.oneDayLavender.opacity(0.16), in: RoundedRectangle(
+                    cornerRadius: 11, style: .continuous))
+                .overlay(alignment: .leading) {
+                    Capsule().fill(Color.oneDayLavender).frame(width: 2.5).padding(.vertical, 5)
+                }
             }
             HStack(alignment: .bottom, spacing: 10) {
                 TextField(text("发消息…", "Message…"), text: Binding(
                     get: { session.state?.draft ?? "" }, set: { session.setDraft($0) }), axis: .vertical)
-                    .lineLimit(1...5).padding(12).background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 18))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .tint(Color.oneDayBrand)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    // White with a brand-coloured edge and a faint glow. It is
+                    // the only place on this screen you can type, so it is the
+                    // one thing that should be impossible to miss.
+                    .background(OneDay.surface, in: RoundedRectangle(
+                        cornerRadius: 20, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.oneDayBrand.opacity(0.3), lineWidth: 1.5)
+                    }
+                    .oneDayGlow(.oneDayBrand, strength: 0.45)
                     .disabled(session.state == nil)
                 Button {
                     followsLatest = true
                     Task { await session.send(authorName: authorName, moment: moment) }
                 } label: {
-                    Image(systemName: "arrow.up.circle.fill").font(.system(size: 36))
-                        .frame(minWidth: 44, minHeight: 44)
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(OneDay.brandHorizontal, in: Circle())
+                        .oneDayGlow(.oneDayBrand, strength: 0.8)
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel(text("发送", "Send"))
                 .disabled(session.state?.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false ||
                           (session.state?.draft.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0) > RoomChatState.maximumMessageLength)
             }
             if let count = session.state?.draft.count, count > 1_800 {
                 Text("\(count) / \(RoomChatState.maximumMessageLength)")
-                    .font(.caption).foregroundStyle(count > RoomChatState.maximumMessageLength ? Color.red : Color.secondary)
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        count > RoomChatState.maximumMessageLength
+                            ? Color.red : OneDay.inkFaint)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-        }.padding(12).background(.regularMaterial)
+        }
+        .padding(12)
+        .background(.regularMaterial)
     }
 
     private func errorText(_ error: RoomChatSession.Failure) -> String {

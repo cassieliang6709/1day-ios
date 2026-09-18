@@ -726,7 +726,11 @@ enum VideoStitcher {
 
     // MARK: - Overlays (device only)
 
-    private static func addTitleCard(
+    /// Internal rather than private so `FilmMarkPreviewTests` can draw the
+    /// real layers into a bitmap: the export path that normally shows them is
+    /// device-only (see the note at the top of this file), so a screenshot of
+    /// the actual thing is otherwise impossible to get on a Mac.
+    static func addTitleCard(
         _ card: TitleCard, to parentLayer: CALayer, renderSize: CGSize, duration: Double
     ) {
         let titleSize = renderSize.height * 0.05
@@ -760,6 +764,19 @@ enum VideoStitcher {
 
         // CA coordinates: origin bottom-left.
         let (title, titleTextSize) = textLayer(card.title, size: titleSize, weight: .heavy, alpha: 1)
+
+        // The mascot, above the title. The opening card was the story's name
+        // and its dates in white type on black — the one place every viewer
+        // looks at for a full second, and the only thing on it that said which
+        // app made this was nothing at all.
+        var layers: [CALayer] = [title]
+        if let mark = mascotLayer(
+            size: renderSize.height * 0.115,
+            centredIn: renderSize,
+            y: renderSize.height * 0.52 + titleTextSize.height * 1.9
+        ) {
+            layers.append(mark)
+        }
         title.frame = CGRect(
             x: 0, y: renderSize.height * 0.52,
             width: renderSize.width, height: titleTextSize.height * 1.2)
@@ -769,7 +786,8 @@ enum VideoStitcher {
             x: 0, y: renderSize.height * 0.52 - subTextSize.height * 1.6,
             width: renderSize.width, height: subTextSize.height * 1.2)
 
-        for layer in [title, subtitle] {
+        layers.append(subtitle)
+        for layer in layers {
             layer.opacity = 0
             let anim = CAKeyframeAnimation(keyPath: "opacity")
             anim.values = [0, 1, 1, 0]
@@ -806,22 +824,32 @@ enum VideoStitcher {
     ) -> CALayer {
         let minEdge = min(frame.width, frame.height)
         let maxWidth = frame.width * 0.76
-        let banded = sticker.style == .band
-        var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        // The bar behind the words, described once in `CaptionSticker.Style`
+        // and read here and on the review screen. Four styles have one shape
+        // each; two have none.
+        let plate = sticker.style.plate
+        let banded = plate != nil
+        // `scale` is what the pinch gesture committed. It goes in here rather
+        // than as a layer transform so the shrink-to-fit loop below sees the
+        // real size: scaling the layer afterwards would push a caption
+        // somebody enlarged straight back out past `maxWidth`.
+        var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062) * sticker.scale
         let weight: UIFont.Weight = sticker.style == .headline ? .heavy : .bold
+        let ink = sticker.tint.uiColor
         var attributed = NSAttributedString()
         repeat {
             attributed = NSAttributedString(string: text, attributes: [
                 .font: roundedFont(size: fontSize, weight: weight),
-                .foregroundColor: UIColor.white,
+                .foregroundColor: ink,
             ])
-            if attributed.size().width + (banded ? fontSize * 1.6 : 0) <= maxWidth { break }
+            let plateWidth = (plate?.padH ?? 0) * 2 * fontSize
+            if attributed.size().width + plateWidth <= maxWidth { break }
             fontSize *= 0.92
         } while fontSize > 10
 
         let textSize = attributed.size()
-        let padH = banded ? fontSize * 0.8 : 0
-        let padV = banded ? fontSize * 0.42 : 0
+        let padH = (plate?.padH ?? 0) * fontSize
+        let padV = (plate?.padV ?? 0) * fontSize
         let box = CGSize(
             width: min(textSize.width, maxWidth) + padH * 2,
             height: textSize.height + padV * 2)
@@ -837,9 +865,22 @@ enum VideoStitcher {
         container.frame = CGRect(
             x: x, y: renderSize.height - yFromTop - box.height / 2,
             width: box.width, height: box.height)
-        if banded {
-            container.backgroundColor = UIColor.black.withAlphaComponent(0.45).cgColor
-            container.cornerRadius = box.height * 0.34
+        if let plate, let fill = sticker.plateUIColor {
+            container.backgroundColor = fill.cgColor
+            container.cornerRadius = box.height * plate.radius
+        }
+        if sticker.angle != 0 {
+            // Around the container's own middle, which is already where the
+            // sticker's fractions placed it — the default anchor point — so
+            // turning the words doesn't also move them.
+            //
+            // Negated: this layer tree counts y from the bottom (see the
+            // `renderSize.height -` above), so a positive z-rotation here
+            // turns anticlockwise, while SwiftUI's `.rotationEffect` on the
+            // review screen turns clockwise. Same number, opposite sign, so
+            // the export matches what was placed.
+            container.transform = CATransform3DMakeRotation(
+                -sticker.angle * .pi / 180, 0, 0, 1)
         }
 
         let layer = CATextLayer()
@@ -1324,23 +1365,55 @@ enum VideoStitcher {
         parentLayer.addSublayer(pill)
     }
 
-    /// A tiny "made with 1Day" tag in the bottom-left corner, present for the
+    /// The mascot as a layer, or nil when the artwork can't be loaded — a film
+    /// without a mark on it still has to export.
+    private static func mascotLayer(
+        size: CGFloat, centredIn renderSize: CGSize, y: CGFloat
+    ) -> CALayer? {
+        guard let image = UIImage(named: "OneDayMascot")?.cgImage else { return nil }
+        let layer = CALayer()
+        layer.contents = image
+        layer.contentsGravity = .resizeAspect
+        layer.frame = CGRect(
+            x: (renderSize.width - size) / 2, y: y, width: size, height: size)
+        return layer
+    }
+
+    /// A tiny mascot and "1Day" in the bottom-left corner, present for the
     /// whole film — every shared vlog quietly advertises where it came from.
-    private static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
+    static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
         let fontSize = max(renderSize.height * 0.016, 11)
-        let attributed = NSAttributedString(string: "made with 1Day", attributes: [
-            .font: roundedFont(size: fontSize, weight: .semibold),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.55),
+        let attributed = NSAttributedString(string: "1Day", attributes: [
+            .font: roundedFont(size: fontSize, weight: .heavy),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.62),
             .kern: fontSize * 0.04,
         ])
         let textSize = attributed.size()
+        let left = renderSize.width * 0.045
+        let bottom = renderSize.height * 0.028
+        // CA coordinates: origin bottom-left.
+        //
+        // "made with 1Day" in 55% white was three words of small print. The
+        // mark people recognise is the face, so the face goes first and the
+        // name shrinks to one word beside it — same corner, same restraint,
+        // and now legible as a logo at a glance on a phone.
+        if let mascot = UIImage(named: "OneDayMascot")?.cgImage {
+            let glyph = fontSize * 1.7
+            let layer = CALayer()
+            layer.contents = mascot
+            layer.contentsGravity = .resizeAspect
+            layer.opacity = 0.82
+            layer.frame = CGRect(
+                x: left, y: bottom - (glyph - textSize.height) / 2,
+                width: glyph, height: glyph)
+            parentLayer.addSublayer(layer)
+        }
         let layer = CATextLayer()
         layer.string = attributed
         layer.contentsScale = 2
-        // CA coordinates: origin bottom-left.
         layer.frame = CGRect(
-            x: renderSize.width * 0.045,
-            y: renderSize.height * 0.028,
+            x: left + fontSize * 2.1,
+            y: bottom,
             width: textSize.width, height: textSize.height)
         parentLayer.addSublayer(layer)
     }

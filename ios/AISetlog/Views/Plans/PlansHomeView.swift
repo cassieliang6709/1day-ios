@@ -14,14 +14,22 @@ struct PlansHomeView: View {
     /// What to lead with and what to list under it, as one decision. See
     /// `HomeStories`.
     let stories: HomeStories
+    /// Switch the shell to its 新建 tab. The composer used to be a
+    /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
+    /// every in-page CTA that used to raise the cover asks the shell instead.
+    /// One composer, one place it can be.
+    let onCompose: () -> Void
 
     @State private var path: [UUID] = []
-    @State private var showComposer = false
     @State private var showJoin = false
     @State private var showSettings = false
     @State private var showRoomDemo = false
     @State private var joinCode = ""
     @State private var joining = false
+    /// Bumped to abandon the current join — by the cancel button or the
+    /// timeout. The in-flight call checks it before doing anything with its
+    /// result, so a late success can't navigate somewhere the person left.
+    @State private var joinAttempt = 0
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
     /// The story a long press is proposing to delete, held until it's confirmed.
@@ -47,9 +55,6 @@ struct PlansHomeView: View {
             .navigationDestination(for: UUID.self) { id in
                 StoryTimelineView(challengeID: id)
             }
-        }
-        .fullScreenCover(isPresented: $showComposer) {
-            StoryComposerView { id in path.append(id) }
         }
         .fullScreenCover(item: $recordChallenge) { challenge in
             recorder(for: challenge)
@@ -112,6 +117,17 @@ struct PlansHomeView: View {
         )) {
             SignInView { afterSignIn?() }
                 .presentationDetents([.medium])
+                // Cancelling sign-in used to drop the six digits with the
+                // pending action: the sheet closed, `afterSignIn` was cleared,
+                // and reopening 加入 started from an empty field. The code the
+                // friend sent is the one thing here the app can't reproduce,
+                // so cancelling puts the sheet back with it still typed.
+                .onDisappear {
+                    guard afterSignIn == nil, !joinCode.isEmpty,
+                          !account.isSignedIn
+                    else { return }
+                    showJoin = true
+                }
         }
         .alert(Strings.couldntJoin, isPresented: Binding(
             get: { errorText != nil }, set: { if !$0 { errorText = nil } }
@@ -141,16 +157,21 @@ struct PlansHomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
 
+                // Off unless something asked for it — see `DemoEntries`. It
+                // was an always-on button on the first screen of every Debug
+                // build, which is where 1.3's 冗余内容清理 found it.
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                Button {
-                    showRoomDemo = true
-                } label: {
-                    Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
-                          systemImage: "person.3.sequence")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                if DemoEntries.areEnabled {
+                    Button {
+                        showRoomDemo = true
+                    } label: {
+                        Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
+                              systemImage: "person.3.sequence")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .accessibilityIdentifier("home-room-demo")
                 }
-                .accessibilityIdentifier("home-room-demo")
                 #endif
 
                 switch stories.hero {
@@ -178,10 +199,24 @@ struct PlansHomeView: View {
         .scrollIndicators(.hidden)
         .overlay {
             if joining {
-                ProgressView(Strings.joining)
-                    .controlSize(.large)
-                    .padding(24)
-                    .glassSurface()
+                VStack(spacing: 14) {
+                    ProgressView(Strings.joining)
+                        .controlSize(.large)
+                    // A full-screen spinner with no way out and no ceiling is
+                    // indistinguishable from a frozen app: a bad code or no
+                    // signal left the person holding a phone that spun until
+                    // they force-quit it. Cancelling does not stop the network
+                    // call — it stops *waiting* for it, which is the part they
+                    // are stuck in.
+                    Button(Strings.cancel) {
+                        joinAttempt += 1
+                        joining = false
+                    }
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBrand)
+                }
+                .padding(24)
+                .glassSurface()
             }
         }
     }
@@ -191,8 +226,14 @@ struct PlansHomeView: View {
     /// opening 1day already has, and it was crowding out the two they didn't.
     ///
     /// Nothing up here is allowed to outshine "continue today's story" in the
-    /// card below, so all three controls are the same 36pt and the create
-    /// button earns its emphasis from the brand gradient alone.
+    /// card below.
+    ///
+    /// Two controls now, not three. The brand-gradient `plus` that used to end
+    /// this row is the shell's middle tab as of 1.3 — a wordless 36pt circle in
+    /// the top-right corner was the app's second-most-used action in the one
+    /// spot a thumb on a 6.9" phone cannot reach, and it is the only entry
+    /// point that moved: 加入 stays here because joining a room is somebody
+    /// else's invitation arriving, not a thing you set out to do.
     private var header: some View {
         HStack(spacing: 11) {
             Button { showSettings = true } label: {
@@ -215,28 +256,36 @@ struct PlansHomeView: View {
 
             Spacer(minLength: 6)
 
-            IconBubble(systemName: "person.2.badge.plus", size: 36) {
+            // A 36pt wordless icon was the only permanent way into a room
+            // after onboarding, wedged between the settings avatar and 新建.
+            // Now it says what it is.
+            Button {
                 joinCode = ""
                 showJoin = true
-            }
-            .accessibilityLabel(Strings.enterInviteCode)
-
-            Button {
-                showComposer = true
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(OneDay.brandHorizontal, in: Circle())
-                    .oneDaySoftShadow(strength: 0.6)
+                HStack(spacing: 5) {
+                    Image(systemName: "person.2.badge.plus")
+                        .font(.system(size: 13, weight: .bold))
+                    Text(Strings.joinShort)
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .lineLimit(1)
+                }
+                // 加入 is two glyphs and Join is four, so the capsule that fits
+                // in Chinese is narrower than the English word and the label
+                // wrapped to "Joi / n". Fixing the label's width makes the
+                // greeting column absorb the squeeze instead — it already
+                // shrinks by design, and the dateline drops its pips first.
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(OneDay.ink)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(OneDay.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+                .oneDaySoftShadow(strength: 0.5)
             }
             .buttonStyle(.plain)
-            // Visually 36pt so it sits level with the bubble beside it, but
-            // the tap target still clears Apple's 44pt floor.
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
-            .accessibilityLabel(Strings.newStory)
+            .accessibilityLabel(Strings.enterInviteCode)
+            .accessibilityIdentifier("home-join-room")
         }
         .padding(.horizontal, 20)
     }
@@ -264,7 +313,7 @@ struct PlansHomeView: View {
                     .lineLimit(1)
                     .fixedSize()
 
-                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBlue)
+                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBrand)
                     .layoutPriority(-1)
             }
         }
@@ -304,7 +353,7 @@ struct PlansHomeView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
 
-                Button(Strings.startTodayCTA) { showComposer = true }
+                Button(Strings.startTodayCTA) { onCompose() }
                     .buttonStyle(.primaryAction)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -330,9 +379,20 @@ struct PlansHomeView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button(Strings.startTodaysStory) { showComposer = true }
+            Button(Strings.startTodaysStory) { onCompose() }
                 .buttonStyle(.primaryAction)
                 .padding(.top, 4)
+
+            // The empty state used to offer one door. Somebody whose first
+            // contact with 1Day is a friend's six-digit code had to find the
+            // icon in the header instead.
+            Button(Strings.haveInviteCode) {
+                joinCode = ""
+                showJoin = true
+            }
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.oneDayBrand)
+            .accessibilityIdentifier("empty-join-room")
         }
         .padding(26)
         .glassSurface(radius: OneDay.Radius.hero)
@@ -433,10 +493,12 @@ struct PlansHomeView: View {
            card.clipFileName == nil {
             return card.day
         }
-        // The first moment *nobody* has filmed. Defaulting to one a friend
-        // already covered, while an untouched one waits further down, is how a
-        // room ends up with three takes of breakfast and no evening.
-        return cardState(for: challenge).progress.nextOpenMoment
+        // Today's, when today is still empty — see `RoomProgress.slotToOffer`.
+        // Otherwise the first moment *nobody* has filmed: defaulting to one a
+        // friend already covered, while an untouched one waits further down, is
+        // how a room ends up with three takes of breakfast and no evening.
+        return cardState(for: challenge).progress.slotToOffer(
+            today: challenge.isOneDay ? nil : challenge.currentDay)
     }
 
     // MARK: - Routing
@@ -455,12 +517,17 @@ struct PlansHomeView: View {
             let challenge = store.createQuickStart()
             path = [challenge.id]
         case .newStory:
-            showComposer = true
+            onCompose()
         case .join:
             joinCode = ""
             showJoin = true
         case .record(let id):
             recordChallenge = store.challenge(id)
+        case .openStory(let id):
+            // Replaces rather than appends: the composer is not a screen you
+            // go "back" to, and it is no longer on this stack to go back to.
+            guard store.challenge(id) != nil else { return }
+            path = [id]
         }
     }
 
@@ -480,14 +547,30 @@ struct PlansHomeView: View {
         guard code.count >= 6 else { return }
         let run = {
             joining = true
+            let attempt = joinAttempt
             Task {
-                defer { joining = false }
+                defer { if attempt == joinAttempt { joining = false } }
                 do {
                     let challenge = try await store.joinRoom(code: code)
+                    // Abandoned while it was in flight — cancelled, or timed
+                    // out. Navigating now would drop somebody into a room they
+                    // had already walked away from.
+                    guard attempt == joinAttempt else { return }
                     path = [challenge.id]
                 } catch {
+                    guard attempt == joinAttempt else { return }
                     errorText = error.localizedDescription
                 }
+            }
+            // The ceiling. 20s is well past a healthy join on a slow
+            // connection and well short of the minute it takes to decide an
+            // app is broken.
+            Task {
+                try? await Task.sleep(for: .seconds(20))
+                guard attempt == joinAttempt, joining else { return }
+                joinAttempt += 1
+                joining = false
+                errorText = Strings.joinTimedOut
             }
         }
         if account.isSignedIn { run() } else { afterSignIn = run }
@@ -503,7 +586,8 @@ struct PlansHomeView: View {
     /// per row (progress, cover, refresh token) tripled that for nothing.
     private struct CardState {
         let progress: RoomProgress
-        /// The most recent clip in the story, from anyone. A room where only my
+        /// What the card shows: the cover this story was given, and failing
+        /// that the most recent clip in it, from anyone. A room where only my
         /// friends have filmed used to fall back to the template art, so the
         /// card looked untouched while it was three moments in.
         let coverURL: URL?
@@ -524,7 +608,7 @@ struct PlansHomeView: View {
                 momentCount: challenge.cards.count,
                 clips: clips,
                 myID: account.account?.id ?? RoomProgress.soloAuthorID),
-            coverURL: latest?.url,
+            coverURL: store.storyCoverURL(for: challenge, latestClipURL: latest?.url),
             refreshToken: latest?.recordedAt)
     }
 

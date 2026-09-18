@@ -1,0 +1,8 @@
+{
+  "saved": "2026-09-17",
+  "note": "从编辑页读回来的改动。页面只把改动留在内存和 URL hash 里，所以她说一声我就存一份到这儿。",
+  "edits": [
+    { "key": "deleteStoryWarning",      "zh": "连 \\(clipCount) 段一起删，删完没了。" },
+    { "key": "deleteStoryWarningEmpty", "zh": "删了就没了。" }
+  ]
+}

@@ -27,8 +27,13 @@ struct StoryCard: View {
     private var openMoment: String {
         challenge.isTimeOnly
             ? Strings.timeOnlyMoment
-            : presenter.title(forSlot: progress.nextOpenMoment)
+            : presenter.title(forSlot: offeredSlot)
     }
+
+    /// Which slot the button opens — today's in a multi-day story, see
+    /// `RoomProgress.slotToOffer`.
+    private var todaySlot: Int? { challenge.isOneDay ? nil : challenge.currentDay }
+    private var offeredSlot: Int { progress.slotToOffer(today: todaySlot) }
 
     /// The film is watchable, and there's nothing left for me to add.
     ///
@@ -172,6 +177,10 @@ struct StoryRowCard: View {
     var memberNames: [String] = []
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
+    /// Same rule as the hero card: the row names today's moment, and says
+    /// which day when today's is filmed and an earlier one isn't.
+    private var todaySlot: Int? { challenge.isOneDay ? nil : challenge.currentDay }
+    private var offeredSlot: Int { progress.slotToOffer(today: todaySlot) }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -193,11 +202,11 @@ struct StoryRowCard: View {
                         filled: progress.filled,
                         total: max(progress.total, 1),
                         size: 5,
-                        tint: .oneDayBlue)
+                        tint: .oneDayBrand)
                     Text("\(progress.filled)/\(progress.total)")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color.oneDayBlue)
+                        .foregroundStyle(Color.oneDayBrand)
                 }
             }
 
@@ -234,8 +243,13 @@ struct StoryRowCard: View {
             return Strings.filmReadySubtitle(
                 duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }
-        return challenge.isTimeOnly
-            ? Strings.timeOnlyMoment
-            : Strings.openMomentLabel(presenter.title(forSlot: progress.nextOpenMoment))
+        if challenge.isTimeOnly { return Strings.timeOnlyMoment }
+        let moment = presenter.title(forSlot: offeredSlot)
+        // Says which day when it isn't today's. A seven-day story where
+        // Tuesday was missed now offers Tuesday explicitly rather than
+        // pretending it is what today is for.
+        return progress.offeringToday(today: todaySlot)
+            ? Strings.openMomentLabel(moment)
+            : Strings.catchUpDayLabel(day: offeredSlot, moment: moment)
     }
 }

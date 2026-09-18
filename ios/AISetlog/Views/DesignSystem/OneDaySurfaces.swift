@@ -27,7 +27,7 @@ struct OneDayCanvas: View {
                 // being legible. Dark keeps the same shapes as a dim brand
                 // glow instead: decoration, never a spotlight.
                 ZStack {
-                    bloom(.oneDayMist, dark: .oneDayBlue,
+                    bloom(.oneDayMist, dark: .oneDayBrand,
                           size: 320, x: -140, y: -280, opacity: 0.9, darkOpacity: 0.16)
                     bloom(.oneDaySky, dark: .oneDayCyan,
                           size: 260, x: 170, y: -180, opacity: 0.28, darkOpacity: 0.10)
@@ -154,63 +154,33 @@ struct OneDayLogoMark: View {
     }
 }
 
-/// The mascot: a soft blue blob with two dot eyes. Shows up wherever the app
-/// is doing something on the user's behalf (stitching, waiting on a friend).
+/// The mascot: the drawn artwork, in the same ringed circle it wears as an
+/// avatar. Shows up wherever the app is doing something on the user's behalf
+/// (stitching, waiting on a friend) or has nothing to show yet.
+///
+/// It used to draw its own face — a rounded rectangle, two white dots and a
+/// stroked arc. That reads as a placeholder for a mascot rather than as one,
+/// and at the sizes this is used at (68–78pt on an otherwise empty screen) it
+/// is the only thing on the page. `AvatarDot` with no name already renders the
+/// real artwork, and it is the face the user knows from the top left of the
+/// home screen, so the two places the app shows itself now agree.
 struct OneDayBuddy: View {
     var size: CGFloat = 44
-    /// Eyes close and the body squashes gently while something is in progress.
+    /// Breathes gently while something is in progress.
     var isWorking = false
 
     @State private var breathe = false
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.42, style: .continuous)
-                .fill(OneDay.brand)
-                .frame(width: size, height: size * (breathe ? 0.94 : 1))
-
-            HStack(spacing: size * 0.2) {
-                eye
-                eye
-            }
-            .offset(y: -size * 0.06)
-
-            smile
-        }
-        .frame(width: size, height: size)
-        .onAppear {
-            guard isWorking else { return }
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+        AvatarDot(name: nil, size: size)
+            .scaleEffect(breathe ? 0.94 : 1)
+            .animation(
+                .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+                value: breathe)
+            .onAppear {
+                guard isWorking else { return }
                 breathe = true
             }
-        }
-    }
-
-    /// The bottom quarter of a circle, stroked — a curve that reads as a smile.
-    ///
-    /// It was a `Capsule` of the same width and a sixteenth of the height,
-    /// under a comment calling it a little smile. A capsule that wide and that
-    /// flat is a straight line, so the face it drew was expressionless: the
-    /// brand mark on the first screen of the app looked mildly annoyed.
-    ///
-    /// `trim` starts at 3 o'clock and runs clockwise, so 0.125–0.375 is the arc
-    /// from the lower right to the lower left — the mouth, and nothing above it.
-    private var smile: some View {
-        Circle()
-            .trim(from: 0.125, to: 0.375)
-            .stroke(
-                .white.opacity(0.95),
-                style: StrokeStyle(lineWidth: size * 0.055, lineCap: .round))
-            .frame(width: size * 0.34, height: size * 0.34)
-            // Positioned by the arc's own middle rather than its box, which is
-            // the full circle and mostly empty.
-            .offset(y: size * 0.07)
-    }
-
-    private var eye: some View {
-        Circle()
-            .fill(.white)
-            .frame(width: size * 0.135, height: size * 0.135)
     }
 }
 

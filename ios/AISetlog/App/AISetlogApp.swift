@@ -9,6 +9,10 @@ struct AISetlogApp: App {
     @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    /// The accent the whole app wears, which is whichever colour you picked for
+    /// your avatar. Bound so `.tint` below is handed the new one the moment it
+    /// changes.
+    @AppStorage(Identity.myTintKey) private var myTintIndex = -1
 
     init() {
         let account = AccountStore()
@@ -42,7 +46,12 @@ struct AISetlogApp: App {
                 .environment(account)
                 .environment(drafts)
                 .environment(promptMetrics)
-                .tint(Color.oneDayBlue)
+                // `.tint` is enough on its own: it is an environment value, so
+                // changing it invalidates the whole subtree and every screen
+                // re-reads `Color.oneDayBrand`. An `.id(myTintIndex)` here also
+                // worked, and rebuilt the tree so hard that it closed the
+                // Settings sheet you were picking the colour in.
+                .tint(Color.oneDayBrand)
                 .preferredColorScheme(appAppearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }

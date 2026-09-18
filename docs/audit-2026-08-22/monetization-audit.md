@@ -10,20 +10,55 @@ The recommended launch model is freemium plus a non-consumable one-time unlock. 
 
 ## Recommended offer
 
+Decided 2026-09-17: the free tier is metered by **concurrent** shared rooms, not
+rooms per week. A weekly quota resets, so it throttles the most active hosts
+without ever becoming revenue. A concurrent cap does the thing the quota was
+actually meant to do — push people to finish a room before opening the next one
+— and it is not a purchase prompt.
+
 ### Free
 
+- Unlimited solo stories.
+- Two concurrent shared rooms. Finishing or archiving one frees the slot; a
+  room whose day (or week) has ended archives itself and releases its slot, so
+  an abandoned room never permanently occupies one.
+- Joining someone else's room is unlimited and free, permanently. Invited
+  contributors are the only acquisition channel; they must never hit a wall.
 - Create and preview the first complete film.
-- Join a friend's room and contribute clips for free.
 - Export with a short, tasteful 1Day end card.
 
 ### 1Day Plus — one-time purchase
 
-- Launch price: CNY 18 for early adopters.
-- Regular price: CNY 28.
+- Launch price: CNY 18 / USD 4.99 for early adopters.
+- Regular price: CNY 28 / USD 6.99.
+- Set the CN and US storefronts by hand. Apple's automatic conversion from
+  CNY 28 lands near USD 3.99, which underprices the US store for a
+  one-time unlock in this category.
 - Clean HD exports without the 1Day end card.
+- Unlimited concurrent shared rooms.
+- Cast one clip to several rooms at once.
 - Unlimited stories and custom prompts.
-- Host shared rooms; invited contributors remain free.
 - Restore purchases.
+
+Starting low is safe: a non-consumable's price can be raised later and existing
+buyers keep what they paid. Keep the product identifier stable and never reuse
+it.
+
+### What not to build in v1
+
+- **Per-room consumable purchase.** It makes the user hesitate every time they
+  want to invite friends, and it stacks a quota ledger, consumable IAP, and
+  multi-device sync — the three most failure-prone pieces at once.
+- **Subscription.** No recurring paid value exists yet. See below.
+
+### Cost note
+
+Rooms use the CloudKit **public** database and video travels as a `CKAsset`
+(`ios/AISetlog/Services/Cloud/CloudKitService.swift`). Public-database storage
+and transfer are billed to the developer, not to the participant's iCloud
+quota. So capping shared rooms has a real cost basis — but the cost scales with
+video volume, and room count is only a rough proxy for it. Treat the cap as
+cost control and completion pressure, not as the revenue mechanism.
 
 ### Later, only after retention is proven
 

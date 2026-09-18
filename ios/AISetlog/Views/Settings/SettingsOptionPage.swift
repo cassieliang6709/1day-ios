@@ -11,13 +11,15 @@ extension AppAppearance: SettingsOption {}
 
 /// One choice, one screen. Settings used to lay every option of every picker
 /// out on the front page, which cost most of a medium-detent sheet to show
-/// three things nobody changes twice. The row above now says which one is
-/// picked; the list and the sentence explaining it live here, where you read
-/// the sentence at the moment you're choosing.
+/// three things nobody changes twice. The row above says which one is picked.
+///
+/// The explaining sentence under the list is gone as of 1.3 — 外观 said "只影响
+/// 1Day，不改变系统设置" and 语言 said what 跟随系统 follows, both of which the
+/// option names already say. Three options with names is not a thing that
+/// needs a paragraph.
 struct SettingsOptionPage<Option: SettingsOption>: View
 where Option.AllCases: RandomAccessCollection {
     let title: String
-    let footnote: String
     @Binding var selection: Option
 
     var body: some View {
@@ -33,8 +35,6 @@ where Option.AllCases: RandomAccessCollection {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
-            } footer: {
-                Text(footnote)
             }
         }
         .navigationTitle(title)

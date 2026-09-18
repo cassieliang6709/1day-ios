@@ -21,7 +21,7 @@ struct SignInView: View {
 
             Image(systemName: "person.2.circle.fill")
                 .font(.system(size: 52))
-                .foregroundStyle(Color.oneDayBlue.gradient)
+                .foregroundStyle(Color.oneDayBrand.gradient)
 
             VStack(spacing: 8) {
                 Text(Strings.recordTogether)

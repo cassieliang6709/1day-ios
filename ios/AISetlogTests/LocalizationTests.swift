@@ -151,10 +151,8 @@ final class LocalizationTests: XCTestCase {
         let pairs = [
             inBothLanguages { Strings.followPrompts },
             inBothLanguages { Strings.recordByTime },
-            inBothLanguages { Strings.pickPromptSet },
-            inBothLanguages { Strings.timeOnlyCardBody },
-            inBothLanguages { Strings.timeOnlyCaptionNote },
-            inBothLanguages { Strings.promptCountLabel(7) },
+            inBothLanguages { Strings.coverFromClips },
+            inBothLanguages { Strings.previewTheFilm(7) },
             inBothLanguages { Strings.headerDateProgress(1, 7) },
         ]
 
@@ -183,13 +181,16 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(Strings.momentsShort(7), "7 个瞬间")
     }
 
+    /// 原来用的 promptCountLabel 和 createFirstStory 已经删了 —— 界面上
+    /// 没有任何地方用它们。换成两条真的在用的，测的还是同一件事：数字要
+    /// 带得出来，强制语言要生效。
     func testPromptCountAndProgressCarryTheirNumbers() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
-        XCTAssertEqual(Strings.promptCountLabel(7), "7 个题目")
+        XCTAssertEqual(Strings.previewTheFilm(7), "预览 · 7 个瞬间")
         XCTAssertEqual(Strings.headerDateProgress(1, 7), "今天 1/7")
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
-        XCTAssertEqual(Strings.promptCountLabel(7), "7 prompts")
+        XCTAssertEqual(Strings.previewTheFilm(7), "Preview · 7 moments")
         XCTAssertEqual(Strings.headerDateProgress(1, 7), "Today 1/7")
     }
 
@@ -202,13 +203,15 @@ final class LocalizationTests: XCTestCase {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertTrue(date.formatted(style.locale(AppLanguage.effective.locale)).contains("月"))
         XCTAssertEqual(Strings.notificationPrimerTitle, "留住今天的瞬间？")
-        XCTAssertEqual(Strings.createFirstStory, "创建我的第一个故事")
+        XCTAssertEqual(Strings.startTodaysStory, "开始今天的故事")
         XCTAssertEqual(Strings.unitName(oneDay: true), "个瞬间")
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertTrue(date.formatted(style.locale(AppLanguage.effective.locale)).contains("Jan"))
         XCTAssertEqual(Strings.notificationPrimerTitle, "Keep today’s moment?")
-        XCTAssertEqual(Strings.createFirstStory, "Create my first story")
+        // Typewriter apostrophe, matching the string as shipped. Most of the
+        // English copy uses one; a handful use the curly ’ instead.
+        XCTAssertEqual(Strings.startTodaysStory, "Start today's story")
         XCTAssertEqual(Strings.surfaceCamera, "Camera")
     }
 

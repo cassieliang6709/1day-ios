@@ -35,6 +35,11 @@ final class RoomSyncIsolationTests: XCTestCase {
                 XCTAssertEqual(day, 2); XCTAssertEqual(file, url)
                 calls.append("upload")
             },
+            updateClipCaption: { code, day, author, caption in
+                XCTAssertEqual([code, author, caption ?? ""], ["ROOM", "me", "edited"])
+                XCTAssertEqual(day, 2)
+                calls.append("caption")
+            },
             setReaction: { code, day, author, name, target, emoji, on in
                 XCTAssertEqual([code, author, name, target, emoji], ["ROOM", "me", "Me", "friend", "♥"])
                 XCTAssertEqual(day, 2); XCTAssertFalse(on)
@@ -52,10 +57,16 @@ final class RoomSyncIsolationTests: XCTestCase {
         XCTAssertNotNil(interactions)
         let uploaded = await service.uploadClip(code: "ROOM", day: 2, authorID: "me", authorName: "Me", fileURL: url, overlayText: "mine")
         XCTAssertTrue(uploaded)
+        // Editing a caption after the take goes to the room too — it used to
+        // stop at this device.
+        await service.updateClipCaption(
+            code: "ROOM", day: 2, authorID: "me", overlayText: "edited")
         await service.setReaction(code: "ROOM", day: 2, authorID: "me", authorName: "Me", targetAuthorID: "friend", emoji: "♥", on: false)
         await service.postComment(code: "ROOM", day: 2, id: "id", text: "hello", authorID: "me", authorName: "Me", targetAuthorID: "friend")
         await service.deleteComment(id: "id")
-        XCTAssertEqual(calls, ["fetch:ROOM", "interactions:ROOM", "upload", "reaction", "comment", "delete"])
+        XCTAssertEqual(
+            calls,
+            ["fetch:ROOM", "interactions:ROOM", "upload", "caption", "reaction", "comment", "delete"])
         XCTAssertNil(service.lastError["ROOM"])
         XCTAssertTrue(service.syncing.isEmpty)
     }
