@@ -9,7 +9,7 @@ seven-day stories, with film assembly entirely on-device.
 
 **Theme → Moments → Together → Film**
 
-[Website](https://1day.liangyue.site) · [English website](https://1day.liangyue.site/en) · [App Store](https://apps.apple.com/cn/app/1-day/id6794565199?uo=4) · [App release notes](https://1day.liangyue.site/en/updates)
+[Website](https://1day.liangyue.site) · [中文官网](https://1day.liangyue.site/zh) · [App Store](https://apps.apple.com/us/app/1-day/id6794565199) · [App release notes](https://1day.liangyue.site/updates)
 
 <p align="center">
   <img src="landing-page/public/assets/app-theme-en.png" width="230" alt="Choose a theme in the real 1Day app">
