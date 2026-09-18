@@ -194,23 +194,48 @@ struct StoryTimelineView: View {
                 // as a card of rows, then 拍过的 as a contact sheet — which cut
                 // the day in half and re-sorted each half by state, so a moment
                 // that is second in the plan and filmed sat below one that is
-                // fifth and empty. See `MomentTimeline`.
-                MomentTimeline(
-                    challenge: challenge,
-                    clips: clips,
-                    members: members,
-                    myID: myID,
-                    agenda: agenda,
-                    // A moment in a story only you filmed is one clip, so it
-                    // opens as a page in the day and you swipe on. In a shared
-                    // room it is still the whole moment with everyone stacked
-                    // in it, which isn't a page — that's what `.moment` is for.
-                    onPlay: { day in
-                        sheet = challenge.isShared
-                            ? .moment(day: day)
-                            : .preview(day: day, authorID: nil)
-                    },
-                    onFilm: { day in sheet = .record(day: day) })
+                // fifth and empty.
+                //
+                // Two shapes, chosen by whether the moments have names. A rail
+                // gives each name its own line and keeps seven readable; a
+                // 按时间 story has no names — its slots are 「第 N 个瞬间」,
+                // the numbering 1.3 deleted — so a vertical list of them is a
+                // list of nothing, one per line. That story gets a strip of
+                // frames labelled with the times instead, which is the only
+                // real fact it has and the reason somebody picked 按时间.
+                // See `MomentTimeline` and `MomentFilmstrip`.
+                //
+                // A moment in a story only you filmed is one clip, so it opens
+                // as a page in the day. In a shared room it is the whole moment
+                // with everyone stacked in it, which isn't a page — that's what
+                // `.moment` is for.
+                if challenge.isTimeOnly {
+                    MomentFilmstrip(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        agenda: agenda,
+                        onPlay: { day in
+                            sheet = challenge.isShared
+                                ? .moment(day: day)
+                                : .preview(day: day, authorID: nil)
+                        },
+                        onFilm: { day in sheet = .record(day: day) })
+                } else {
+                    MomentTimeline(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        agenda: agenda,
+                        onPlay: { day in
+                            sheet = challenge.isShared
+                                ? .moment(day: day)
+                                : .preview(day: day, authorID: nil)
+                        },
+                        onFilm: { day in sheet = .record(day: day) })
+                }
 
             }
             .padding(.horizontal, 20)

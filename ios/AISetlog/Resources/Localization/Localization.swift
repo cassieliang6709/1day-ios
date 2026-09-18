@@ -650,6 +650,18 @@ enum Strings {
     /// The review screen's card of things you can do to one moment, and the
     /// button that gives the clip the whole display when you want it.
     static var thisMoment: String { lang == .chinese ? "这个瞬间" : "This moment" }
+    /// The filmstrip's button, for a story with no prompts. It cannot name what
+    /// to film — that is the whole point of 按时间 — so it names the act.
+    static var captureThisMoment: String {
+        lang == .chinese ? "拍下这一刻" : "Capture this moment"
+    }
+    /// The filmstrip's button on a story that does have prompts: says which one
+    /// it is about to open.
+    static func filmNamedMoment(_ title: String) -> String {
+        lang == .chinese ? "拍「\(title)」" : "Film \(title)"
+    }
+    /// A slot in the filmstrip with nothing in it yet and no name to give it.
+    static var notYetFilmed: String { lang == .chinese ? "还没拍" : "Not yet" }
     static var addReaction: String { lang == .chinese ? "加个表情" : "Add a reaction" }
     /// The settings screen, which leads with who you are rather than with a
     /// list of switches.
