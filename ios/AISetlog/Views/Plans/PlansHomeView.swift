@@ -407,8 +407,12 @@ struct PlansHomeView: View {
     /// grows.
     private var timelineSection: some View {
         LazyVStack(alignment: .leading, spacing: 18) {
-            SectionLabel(text: stories.sectionTitle)
-                .padding(.horizontal, 20)
+            // Nil when nothing in the list has been filmed — the rows still
+            // show, the heading doesn't. See `HomeStories.sectionTitle`.
+            if let title = stories.sectionTitle {
+                SectionLabel(text: title)
+                    .padding(.horizontal, 20)
+            }
 
             ForEach(timeline.days) { day in
                 VStack(alignment: .leading, spacing: 9) {

@@ -193,6 +193,48 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertFalse(home.showsSection)
     }
 
+    // MARK: - The heading only appears once something has been filmed
+
+    /// Two stories, neither filmed. The list still has a row — the heading
+    /// doesn't. Product call 2026-09-18: 「你的故事」 comes off the screen when
+    /// there's no footage under it.
+    func testTheHeadingIsHiddenWhenNothingInTheListIsFilmed() {
+        let now = september(1)
+        let today = story("今天建的", on: now)
+        let yesterday = story("昨天建的", on: august(31))
+
+        let home = home([today, yesterday], now: now)
+
+        XCTAssertTrue(home.showsSection, "the row still has to be reachable")
+        XCTAssertNil(home.sectionTitle)
+    }
+
+    /// One clip anywhere in the list brings the heading back. The hero is
+    /// excluded from the list, so the clip has to be on a row to count.
+    func testOneFilmedRowBringsTheHeadingBack() {
+        let now = september(1)
+        let today = story("今天建的", on: now)
+        let yesterday = story("昨天拍过", on: august(31), recorded: 1)
+
+        let home = home([today, yesterday], now: now)
+
+        XCTAssertEqual(home.sectionTitle, Strings.yourStories)
+    }
+
+    /// Footage on the hero alone doesn't count: the heading labels the list,
+    /// and the hero isn't in it.
+    func testFilmingOnlyTheHeroLeavesTheHeadingHidden() {
+        let now = september(1)
+        let today = story("今天拍过", on: now, recorded: 1, filmedAt: now)
+        let yesterday = story("昨天建的", on: august(31))
+
+        let home = home([today, yesterday], now: now)
+
+        XCTAssertEqual(home.hero.challenge?.id, today.id)
+        XCTAssertEqual(home.timeline.days.flatMap { $0.stories }.map(\.id), [yesterday.id])
+        XCTAssertNil(home.sectionTitle)
+    }
+
     // MARK: - A story with no moments at all
 
     /// `isComplete` is `recorded == cards.count`, which is vacuously true when

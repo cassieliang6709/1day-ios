@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · 「按时间的故事」C 还是 D —— 2026-09-18</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:#fcfcfb; --plane:#f9f9f7;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --gridline:#e1e0d9; --border:rgba(11,11,11,0.10);
+    --now:#eb6834; --next:#2a78d6; --good:#0ca30c; --stop:#c0392b;
+    /* app 色板：ios/AISetlog/Resources/Theme.swift */
+    --c-blue:#1677ff; --c-cyan:#38b6ff; --c-lav:#b3a4ff; --c-mint:#4fd1a5;
+    --c-canvas:#f5f8ff; --c-ink:#0f2e6b; --c-inksoft:#4a6aa8; --c-inkfaint:#8ea4cd;
+    --c-surface:#fff; --c-hair:rgba(15,46,107,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --plane:#0d0d0d; --text-primary:#fff;
+      --text-secondary:#c3c2b7; --text-muted:#898781;
+      --gridline:#2c2c2a; --border:rgba(255,255,255,0.10);
+      --now:#d95926; --next:#3987e5;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:40px 24px 80px;background:var(--plane);color:var(--text-primary);
+    font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1120px;margin:0 auto}
+  h1{font-size:27px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}
+  .thesis{font-size:16px;color:var(--text-secondary);margin:0;max-width:66ch}
+  .thesis b{color:var(--text-primary);font-weight:700}
+  .meta{font-size:12.5px;color:var(--text-muted);margin-top:10px}
+  h2{font-size:12.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--text-muted);margin:46px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--gridline)}
+  h3{font-size:16px;font-weight:750;margin:26px 0 10px}
+  p{max-width:70ch}
+  code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:rgba(11,11,11,.05);padding:1.5px 5px;border-radius:4px}
+  @media (prefers-color-scheme:dark){code{background:rgba(255,255,255,.08)}}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--gridline);vertical-align:top}
+  th{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+  td.n{color:var(--text-muted);width:88px;white-space:nowrap;font-weight:700;font-size:12.5px}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 8px;border-radius:6px;color:#fff}
+  .tag.now{background:var(--now)} .tag.d{background:var(--next)}
+  .tag.c{background:#7d5bc6} .tag.cut{background:var(--stop)} .tag.keep{background:var(--good)}
+
+  .phones{display:flex;flex-wrap:wrap;gap:26px;margin-top:10px}
+  .ph{width:272px}
+  .phone{width:272px;height:610px;border-radius:38px;padding:9px;background:#0b0b0b;
+    box-shadow:0 12px 34px rgba(0,0,0,.18);flex:none}
+  .screen{width:100%;height:100%;border-radius:30px;overflow:hidden;position:relative;
+    background:linear-gradient(170deg,var(--c-canvas),#eef4ff 58%,#f4f0ff);color:var(--c-ink);font-size:11px}
+  .cap{font-size:12px;color:var(--text-muted);margin-top:9px;line-height:1.5}
+  .cap b{color:var(--text-primary);font-weight:700;display:block;font-size:12.5px;margin-bottom:2px}
+  .sbar{display:flex;justify-content:space-between;align-items:center;padding:8px 15px 3px;font-size:9.5px;font-weight:700}
+  .island{width:52px;height:13px;border-radius:8px;background:#0b0b0b}
+  .body{padding:4px 14px;height:calc(100% - 26px);overflow:hidden}
+  .navrow{display:flex;align-items:center;gap:8px;padding:2px 0 6px}
+  .bub{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.85);display:grid;
+    place-items:center;font-size:11px;box-shadow:0 1px 4px rgba(15,46,107,.12)}
+  .h1s{font-size:19px;font-weight:850;letter-spacing:-.01em}
+  .subs{font-size:10px;color:var(--c-inksoft)}
+  .prog{height:3px;border-radius:99px;background:rgba(15,46,107,.08);margin:8px 0 12px;overflow:hidden}
+  .prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c-blue),var(--c-cyan))}
+  .lbl{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--c-inkfaint);margin:10px 0 6px}
+
+  /* 胶片带（现状） */
+  .strip{display:flex;gap:7px;overflow:hidden;padding-bottom:4px}
+  .cell{flex:none;width:74px}
+  .cellimg{height:96px;border-radius:11px;overflow:hidden;position:relative}
+  .shot1{background:linear-gradient(150deg,#8fd3a8,#5bb98a)}
+  .shot2{background:linear-gradient(150deg,#f2c98a,#e8a95f)}
+  .shot3{background:linear-gradient(150deg,#9db8ec,#6d8fd6)}
+  .empty{border:1.5px dashed rgba(15,46,107,.22);background:rgba(255,255,255,.4);
+    display:grid;place-items:center;font-size:9px;color:var(--c-inkfaint);font-weight:700}
+  .celllbl{font-size:9px;font-weight:700;color:var(--c-inksoft);margin-top:4px;text-align:center}
+  .celllbl.blank{color:transparent}
+
+  /* 竖轨 */
+  .rail{position:relative;padding-left:22px}
+  .rail::before{content:"";position:absolute;left:5.5px;top:6px;bottom:14px;width:2px;
+    border-radius:99px;background:rgba(15,46,107,.10)}
+  .rail::after{content:"";position:absolute;left:5.5px;top:6px;height:30%;width:2px;
+    border-radius:99px;background:linear-gradient(180deg,var(--c-blue),var(--c-cyan))}
+  .node{position:relative;margin-bottom:9px}
+  .dot{position:absolute;left:-22px;top:3px;width:13px;height:13px;border-radius:50%;
+    background:var(--c-surface);border:2.5px solid rgba(15,46,107,.18);z-index:2}
+  .dot.done{background:var(--c-blue);border-color:var(--c-blue)}
+  .dot.next{border-color:var(--c-blue);box-shadow:0 0 0 3.5px rgba(22,119,255,.16)}
+  .nrow{display:flex;align-items:baseline;gap:6px}
+  .nname{font-size:12.5px;font-weight:800}
+  .nname.soft{color:var(--c-inksoft);font-weight:700}
+  .ntime{margin-left:auto;font-size:9.5px;font-weight:700;color:var(--c-inkfaint)}
+  .still{height:52px;border-radius:10px;margin-top:5px}
+  .open{margin-top:4px;font-size:10px;font-weight:800;color:var(--c-blue)}
+  .openbox{margin-top:4px;border:1.5px dashed rgba(22,119,255,.3);border-radius:10px;
+    padding:7px 9px;font-size:10px;font-weight:800;color:var(--c-blue);background:rgba(22,119,255,.05)}
+
+  /* 卷（C） */
+  .rollend{margin-top:4px;border:1.5px dashed rgba(22,119,255,.35);border-radius:12px;
+    padding:11px 9px;text-align:center;font-size:11px;font-weight:800;color:var(--c-blue);
+    background:rgba(22,119,255,.06)}
+  .cta{border-radius:99px;padding:11px 0;text-align:center;font-size:12px;font-weight:800;color:#fff;
+    background:linear-gradient(100deg,var(--c-blue),var(--c-cyan));box-shadow:0 5px 16px rgba(22,119,255,.3);margin-top:10px}
+  .ghost{border-radius:99px;padding:10px 0;text-align:center;font-size:11.5px;font-weight:800;
+    color:var(--c-inksoft);background:rgba(15,46,107,.05);margin-top:7px}
+
+  /* 新建页 tab */
+  .seg{display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(15,46,107,.05)}
+  .seg b{flex:1;text-align:center;font-size:9.5px;font-weight:800;padding:6px 0;border-radius:99px;color:var(--c-inksoft)}
+  .seg b.on{background:var(--c-blue);color:#fff}
+  .seg b.gone{color:var(--stop);text-decoration:line-through;opacity:.65}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .tile{border-radius:12px;overflow:hidden;background:var(--c-surface);border:1px solid var(--c-hair)}
+  .tcov{height:52px}
+  .tmeta{padding:6px 8px}
+  .tnm{font-size:10.5px;font-weight:800}
+  .tsub{font-size:8.5px;color:var(--c-inksoft);margin-top:1px}
+  .ring{outline:2px solid var(--c-blue);outline-offset:1px;border-radius:12px}
+
+  .openq{border-left:3px solid var(--now);padding-left:13px;margin-top:14px}
+  .openq .q{font-weight:750;margin-bottom:3px}
+  .openq .why{font-size:13.5px;color:var(--text-secondary)}
+  .note{font-size:13px;color:var(--text-muted);margin-top:12px;max-width:70ch}
+  ul{max-width:70ch} li{margin-bottom:5px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>「按时间的故事」：C 还是 D</h1>
+<p class="thesis">
+  今天的「和我过一天」有 <b>7 个固定的、没有名字的格子</b> —— 和「完美的一天」一样多。
+  所以它既不是计划（格子没说要拍什么）也不是记录（拍不了第 8 段）。
+  <b>D 让它诚实地变成计划，C 让它诚实地变成记录。</b>
+  下面把同一个故事（早上拍了起床、上午拍了路上，其余没拍）在三种形态下画出来。
+</p>
+<p class="meta">
+  2026-09-18 · 基线 <code>96fdf11</code> · 手机图是<b>按代码画的</b>，不是截图 ——
+  <code>MomentFilmstrip.swift</code> / <code>MomentTimeline.swift</code> / <code>ChallengeStore.cardCount</code>
+</p>
+
+<h2>故事页</h2>
+
+<div class="phones">
+
+  <!-- 现状 -->
+  <div class="ph">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div class="bub" style="margin-left:auto">⋯</div></div>
+        <div class="h1s">和我过一天</div>
+        <div class="prog"><i style="width:28%"></i></div>
+
+        <div class="lbl">今天</div>
+        <div class="strip">
+          <div class="cell"><div class="cellimg shot1"></div><div class="celllbl">07:40</div></div>
+          <div class="cell"><div class="cellimg shot2"></div><div class="celllbl">10:12</div></div>
+          <div class="cell"><div class="cellimg empty">拍这个</div><div class="celllbl blank">—</div></div>
+          <div class="cell"><div class="cellimg empty">拍这个</div><div class="celllbl blank">—</div></div>
+          <div class="cell"><div class="cellimg empty">拍这个</div><div class="celllbl blank">—</div></div>
+        </div>
+        <div style="font-size:9px;color:var(--c-inkfaint);margin-top:6px">← 还有 2 个格子在右边，要横滑</div>
+
+        <div class="cta" style="margin-top:14px">拍下一段</div>
+        <div class="ghost">看成片</div>
+      </div>
+    </div></div>
+    <div class="cap"><b>现状 · 横向胶片带</b>
+      7 个格子里 5 个是空的虚线框，都写「拍这个」，彼此无法区分。
+      拍过的标时间，没拍的那行标签是空字符串（<code>Text(isFilmed ? label : " ")</code>）。
+      两个格子在屏幕外，要横滑才知道还剩几个。</div>
+  </div>
+
+  <!-- D -->
+  <div class="ph">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div class="bub" style="margin-left:auto">⋯</div></div>
+        <div class="h1s">和我过一天</div>
+        <div class="prog"><i style="width:28%"></i></div>
+
+        <div class="rail" style="margin-top:10px">
+          <div class="node"><div class="dot done"></div>
+            <div class="nrow"><span class="nname soft">早上</span><span class="ntime">07:40</span></div>
+            <div class="still shot1"></div></div>
+          <div class="node"><div class="dot done"></div>
+            <div class="nrow"><span class="nname soft">上午</span><span class="ntime">10:12</span></div>
+            <div class="still shot2"></div></div>
+          <div class="node"><div class="dot next"></div>
+            <div class="nrow"><span class="nname">中午</span></div>
+            <div class="openbox">开拍</div></div>
+          <div class="node"><div class="dot"></div>
+            <div class="nrow"><span class="nname">下午</span></div></div>
+          <div class="node"><div class="dot"></div>
+            <div class="nrow"><span class="nname">傍晚</span></div></div>
+          <div class="node"><div class="dot"></div>
+            <div class="nrow"><span class="nname">晚上</span></div></div>
+          <div class="node"><div class="dot"></div>
+            <div class="nrow"><span class="nname">睡前</span></div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="cap"><b>D · 和所有故事同一条竖轨</b>
+      7 个格子配 7 个时段名。没拍的格子现在互相区分得开（「中午」不是「下午」），
+      一屏看完不用横滑，圈起来的那个是建议下一个拍的。
+      <b>这不是新写的组件</b> —— <code>MomentTimeline</code> 里给无名格子准备的
+      <code>title</code>/<code>icon</code> fallback 一直存在，只是从来没被调用过。</div>
+  </div>
+
+  <!-- C -->
+  <div class="ph">
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>
+      <div class="body">
+        <div class="navrow"><div class="bub">‹</div><div class="bub" style="margin-left:auto">⋯</div></div>
+        <div class="h1s">和我过一天</div>
+        <div class="subs">拍了 2 段</div>
+
+        <div class="rail" style="margin-top:12px">
+          <div class="node"><div class="dot done"></div>
+            <div class="nrow"><span class="nname soft">起床</span><span class="ntime">07:40</span></div>
+            <div class="still shot1"></div></div>
+          <div class="node"><div class="dot done"></div>
+            <div class="nrow"><span class="nname soft">在路上</span><span class="ntime">10:12</span></div>
+            <div class="still shot2"></div></div>
+          <div class="node"><div class="dot next"></div>
+            <div class="rollend">＋ 再拍一段</div></div>
+        </div>
+
+        <div class="cta" style="margin-top:14px">今天到这儿 · 出片</div>
+      </div>
+    </div></div>
+    <div class="cap"><b>C · 一卷，拍一段长一格</b>
+      没有空格子、没有 N/7、没有进度条 —— 因为没有「总数」这个概念。
+      字幕是你自己写的（「起床」「在路上」），不是模板给的。
+      末尾永远是「再拍一段」。<b>出片变成一个你按的按钮</b>，不再由第 7 格填满触发。</div>
+  </div>
+</div>
+
+<h2>新建页：只有 D 会动</h2>
+
+<div class="phones">
+  <div class="ph">
+    <div class="phone" style="height:330px"><div class="screen">
+      <div class="body" style="padding-top:12px">
+        <div class="h1s" style="font-size:16px">今天会是什么故事？</div>
+        <div class="seg" style="margin-top:10px">
+          <b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="tcov shot1"></div><div class="tmeta">
+            <div class="tnm">完美的一天</div><div class="tsub">起床 · 咖啡…</div></div></div>
+          <div class="tile"><div class="tcov shot2"></div><div class="tmeta">
+            <div class="tnm">慢慢重启</div><div class="tsub">一团糟的开始…</div></div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="cap"><b>现状</b>4 个 tab。「按时间」那一格里只有一张海报。</div>
+  </div>
+
+  <div class="ph">
+    <div class="phone" style="height:330px"><div class="screen">
+      <div class="body" style="padding-top:12px">
+        <div class="h1s" style="font-size:16px">今天会是什么故事？</div>
+        <div class="seg" style="margin-top:10px">
+          <b class="on">一日</b><b>七日</b><b>自己写</b>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="tcov shot1"></div><div class="tmeta">
+            <div class="tnm">完美的一天</div><div class="tsub">起床 · 咖啡…</div></div></div>
+          <div class="tile ring"><div class="tcov shot3"></div><div class="tmeta">
+            <div class="tnm">和我过一天</div><div class="tsub">早上 · 上午 · 中午…</div></div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="cap"><b>D</b>3 个 tab。「和我过一天」变成「一日」里的一张普通海报，
+      副标题第一次能写出它会问什么。</div>
+  </div>
+
+  <div class="ph">
+    <div class="phone" style="height:330px"><div class="screen">
+      <div class="body" style="padding-top:12px">
+        <div class="h1s" style="font-size:16px">今天会是什么故事？</div>
+        <div class="seg" style="margin-top:10px">
+          <b class="on">一日</b><b>七日</b><b>按时间</b><b>自己写</b>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="tcov shot1"></div><div class="tmeta">
+            <div class="tnm">完美的一天</div><div class="tsub">起床 · 咖啡…</div></div></div>
+          <div class="tile"><div class="tcov shot2"></div><div class="tmeta">
+            <div class="tnm">慢慢重启</div><div class="tsub">一团糟的开始…</div></div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="cap"><b>C</b>不变，还是 4 个 tab。C 改的是那种故事<b>内部</b>怎么运作，
+      不改它怎么被选中。</div>
+  </div>
+</div>
+
+<h2>两条路的代价</h2>
+
+<div class="card">
+<table>
+  <thead><tr><th></th><th><span class="tag d">D</span> 变成有名字的计划</th><th><span class="tag c">C</span> 变成会长的一卷</th></tr></thead>
+  <tbody>
+    <tr><td class="n">改动性质</td>
+      <td><b>删代码。</b><code>isTimeOnly</code> 永远为 false，七处分支变死代码</td>
+      <td><b>改数据模型。</b>格子从固定变成追加</td></tr>
+    <tr><td class="n">能删掉</td>
+      <td><code>MomentFilmstrip.swift</code>、<code>StoryTimelineView</code> 的 if/else、
+          <code>MomentTimeline</code> 和 <code>StoryGridView</code> 里的 fallback、
+          三处 <code>showsPrompt</code>、<code>ComposerSelection.Style.timeOnly</code>、
+          <code>Challenge.isTimeOnly</code></td>
+      <td>只能删 <code>MomentFilmstrip</code>（如果连它一起换）</td></tr>
+    <tr><td class="n">数据迁移</td>
+      <td><b>不需要</b> —— 前提是名字正好 7 个。老故事的 7 个无名格子原地获得名字，
+          片段不动、顺序不动、存储格式不动</td>
+      <td><b>需要</b>。<code>cardCount</code>、<code>saveClip</code> 的追加、
+          拼接器对格子数的假设都要改</td></tr>
+    <tr><td class="n">出片触发</td>
+      <td>不变（第 7 格填满 → <code>isComplete</code> → 自动出片）</td>
+      <td><b>断了。</b>会长的故事永远不完成，得换成明确的「今天到这儿」动作</td></tr>
+    <tr><td class="n">成片字幕</td>
+      <td><b>会变。</b>现在那 7 格给拼接器的 label 是 <code>nil</code>
+          （<code>ChallengeStore:695/719</code>），片子上没有段落字；D 之后会有</td>
+      <td>不变（还是你自己写的字幕）</td></tr>
+    <tr><td class="n">丢掉什么</td>
+      <td>「不按顺序、发生什么拍什么」。第 3 格就是中午，中午拍两件事只有一个格子</td>
+      <td>没丢东西，这是它的卖点</td></tr>
+    <tr><td class="n">工时</td><td>约半天，含测试</td><td>两到三天，含迁移和出片链改造</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="note">
+  一句话分辨：<b>D 是把一个假装成记录的计划承认为计划；C 是把它真的做成记录。</b>
+  今天的行为两边都不是 —— 它承诺「发生什么拍什么」，然后给你 7 个数好的空盒子。
+</p>
+
+<h2>如果选 D，要定两件事</h2>
+
+<div class="openq">
+  <div class="q">① 哪 7 个时段名</div>
+  <div class="why">
+    必须是 <b>7 个</b> —— 老故事就是 7 个格子，数量对上才不用迁移。
+    我的提案：<code>早上 · 上午 · 中午 · 下午 · 傍晚 · 晚上 · 睡前</code>。
+    词随你改，个数不能改。
+  </div>
+</div>
+
+<div class="openq">
+  <div class="q">② 成片上要不要出现这些时段字</div>
+  <div class="why">
+    今天「和我过一天」导出的片子是干净的，没有段落字幕，因为那 7 格传给拼接器的 label 是
+    <code>nil</code>。D 之后它们有名字了，默认就会印上去。
+    不想要的话我可以让这一张模板继续传 <code>nil</code> —— 多留一个分支，但只留一个，
+    而且是「要不要显示」这种表现层的分支，不是「这是另一种故事」那种结构分支。
+  </div>
+</div>
+
+</main>
+</body>
+</html>
