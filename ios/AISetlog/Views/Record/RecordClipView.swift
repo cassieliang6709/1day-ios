@@ -233,14 +233,27 @@ struct RecordClipView: View {
                     }
                     .onEnded { _ in pinchStartZoom = nil }
             )
+            // Over the picture, above the burn-in. The moment's name and the
+            // progress bars sit in the bottom ~56pt of the frame and are
+            // promises about the export, so the offset is what keeps this
+            // legal — see `ZoomControlRow`.
+            .overlay(alignment: .bottom) {
+                zoomControls
+                    .padding(.bottom, Self.burnInHeight)
+            }
             .layoutPriority(1)
 
-            bottomControls
+            shutterRow
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
     }
+
+    /// How much of the frame's bottom edge the burn-in block occupies:
+    /// `progressBars` over `momentPill`, plus the overlay's own edge inset.
+    /// The zoom control clears it rather than covering it.
+    private static let burnInHeight: CGFloat = 72
 
     private var recordButtonVisual: some View {
         ZStack {
@@ -601,37 +614,25 @@ struct RecordClipView: View {
         .padding(.bottom, 18)
     }
 
+    /// The wordmark, the moment's name, and — outside the free-form tab — the
+    /// way out. Nothing you press mid-shoot.
+    ///
+    /// 画幅 and 翻转 used to flank the wordmark up here, which put the two
+    /// controls you reach for while filming at the far end of the phone from
+    /// your thumb. They are beside the shutter now; see `shutterRow`. What is
+    /// left is the two things you read rather than press, so the row shrank
+    /// from 44pt to the height of its own text.
     private var topBar: some View {
         HStack {
             if isFreeform {
-                // No cover to dismiss in the tab — the left slot carries the
-                // orientation toggle instead.
-                Button {
-                    // Cycles rather than toggles now that there are three
-                    // frames. The glyph is the current one, so which way round
-                    // the cycle runs doesn't have to be learned.
-                    freeformOrientation = switch freeformOrientation {
-                    case .portrait: .landscape
-                    case .landscape: .square
-                    case .square: .portrait
-                    }
-                } label: {
-                    Image(systemName: SetupStep.orientationIcon(freeformOrientation))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.black.opacity(0.78))
-                        .frame(width: 44, height: 44)
-                        .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.switchOrientation)
-                .disabled(recorder.state == .recording || recorder.clipURL != nil)
-                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+                // No cover to dismiss in the tab, and nothing else needs the
+                // left slot now that the frame toggle moved down.
+                Color.clear.frame(width: 38, height: 1)
             } else {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .bold))
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: 17, weight: .bold))
+                        .frame(width: 38, height: 38)
                         .background(.white.opacity(0.92), in: Circle())
                         .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
                 }
@@ -652,17 +653,7 @@ struct RecordClipView: View {
 
             Spacer(minLength: 8)
 
-            Button { recorder.flipCamera() } label: {
-                Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.92), in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Strings.flipCamera)
-            .disabled(recorder.state != .ready || recorder.clipURL != nil)
-            .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+            Color.clear.frame(width: 38, height: 1)
         }
     }
 
@@ -692,28 +683,33 @@ struct RecordClipView: View {
             set: { recorder.setZoom($0) })
     }
 
-    /// Lens picker, then the shutter. Nothing else, and no panel behind it.
+    /// Just the shutter, with the frame and flip controls either side of it.
     ///
-    /// This was a white rounded card holding a row of four wide capsules, a
-    /// 66pt shutter and the words 轻点拍摄 under it — about 150pt of furniture
-    /// under a 9:16 picture that is laid out `.fit`, so every point of it came
-    /// straight off the height of the preview. On a 6.3" phone the picture was
-    /// ~570pt tall inside a 378pt-wide screen: letterboxed by its own chrome.
+    /// Three shapes in two rounds. It was a white rounded card holding four
+    /// wide zoom capsules, a 66pt shutter and the words 轻点拍摄 — about 150pt
+    /// of furniture under a 9:16 picture laid out `.fit`, so every point came
+    /// straight off the viewfinder. Then the card and the caption went and the
+    /// zoom became a ticked track, still under the picture. Now the zoom is
+    /// over the picture (above the burn-in) and this row is one control tall.
     ///
-    /// Gone, in the order they cost the most:
-    /// - the caption. The system camera does not tell you to tap the shutter,
-    ///   and this one is a 66pt brand-blue circle in the middle of the bar. It
-    ///   survives as the button's accessibility label, which is the one reader
-    ///   that genuinely needed the sentence.
-    /// - the card. A panel behind two controls that already read as controls.
-    /// - the capsules, now 36pt circles — see `ZoomControlRow`.
+    /// The two 34pt circles are 画幅 and 翻转, moved down from the top bar.
+    /// They were up there flanking the wordmark, which put the two things you
+    /// reach for mid-shoot at the far end of the phone from your thumb; beside
+    /// the shutter they are where the hand already is. The top bar keeps the
+    /// wordmark and the moment's name — the two things you read rather than
+    /// press.
     ///
     /// `recordingControls` keeps its caption: mid-take, 轻点停止 is not
     /// decoration, it is the only thing on screen that says the take can be cut
     /// short, and the ring it sits under is counting rather than inviting.
-    private var bottomControls: some View {
-        VStack(spacing: 6) {
-            zoomControls
+    private var shutterRow: some View {
+        HStack(spacing: 0) {
+            if isFreeform {
+                orientationButton
+                    .frame(maxWidth: .infinity)
+            } else {
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            }
 
             Group {
                 if recorder.state == .recording {
@@ -722,9 +718,50 @@ struct RecordClipView: View {
                     idleRecordingControl
                 }
             }
+
+            flipButton
+                .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 6)
+        .padding(.top, 8)
+    }
+
+    private var orientationButton: some View {
+        Button {
+            // Cycles rather than toggles now that there are three frames. The
+            // glyph is the current one, so which way round the cycle runs
+            // doesn't have to be learned.
+            freeformOrientation = switch freeformOrientation {
+            case .portrait: .landscape
+            case .landscape: .square
+            case .square: .portrait
+            }
+        } label: {
+            Image(systemName: SetupStep.orientationIcon(freeformOrientation))
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.black.opacity(0.78))
+                .frame(width: 38, height: 38)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.switchOrientation)
+        .disabled(recorder.state == .recording || recorder.clipURL != nil)
+        .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+    }
+
+    private var flipButton: some View {
+        Button { recorder.flipCamera() } label: {
+            Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
+                .font(.system(size: 17, weight: .bold))
+                .frame(width: 38, height: 38)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.flipCamera)
+        .disabled(recorder.state != .ready || recorder.clipURL != nil)
+        .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
     }
 }
 

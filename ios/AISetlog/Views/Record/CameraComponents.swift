@@ -260,12 +260,18 @@ struct MomentStampOverlay: View {
 /// `videoZoomFactor`. Which presets arrive is the recorder's decision — a
 /// front camera has no ultra-wide, so it sends two chips instead of three.
 ///
-/// It sits in the control bar under the picture rather than on top of it.
-/// Apple floats its lens picker over the frame; this app cannot, because the
-/// bottom of the frame is already spoken for by the moment's name and the
-/// story's progress bars, and both of those are promises about the export that
-/// a row of chips must not cover. So the Apple lesson taken here is the other
-/// one: make the controls small enough that the picture is the screen.
+/// It floats over the picture, above the burn-in block.
+///
+/// The bottom of the frame is spoken for by the moment's name and the story's
+/// progress bars, and both of those are promises about the export — a control
+/// must not cover them. That ruled out a floating picker for one round; what
+/// makes it work is sitting *above* that block rather than over it, which is
+/// what `RecordClipView.zoomControls` positions it to do. The reward is the
+/// whole control bar's height going back to the viewfinder: the picture is the
+/// screen, which is the Apple lesson that matters here.
+///
+/// On glass over video rather than on the app canvas, so the styling is dark
+/// and self-contained — an `inkSoft` number is invisible over a night shot.
 ///
 /// One ticked capsule as of 1.3, replacing four 64×34 chips and a word-width
 /// 「自定义」 — 260pt of chrome under a picture that wanted the room.
@@ -341,8 +347,12 @@ struct ZoomControlRow: View {
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 4)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.45), lineWidth: 1))
+        // Its own dark glass, not `.regularMaterial`: the material picks up the
+        // system appearance and turns near-white in light mode, which over a
+        // bright frame is a white bar on a white picture.
+        .background(.black.opacity(0.28), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
         // The whole capsule is the control. `highPriorityGesture` so the drag
         // wins over the buttons inside it — a tap still gets through, because a
         // `DragGesture` with a minimum distance does not fire on one.
@@ -364,7 +374,7 @@ struct ZoomControlRow: View {
         HStack(spacing: 2.5) {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
-                    .fill(OneDay.inkFaint.opacity(i == 2 ? 0.8 : 0.4))
+                    .fill(Color.white.opacity(i == 2 ? 0.85 : 0.45))
                     .frame(width: 1.5, height: i == 2 ? 11 : 7)
             }
         }
@@ -419,13 +429,18 @@ struct ZoomControlRow: View {
             // "9.9x" needs the last of this at accessibility sizes; VoiceOver
             // reads the full label either way.
             .minimumScaleFactor(0.62)
-            .foregroundStyle(selected ? Color.white : OneDay.inkSoft)
+            // White at 82% rather than `inkSoft`: this sits on video now, and
+            // a blue-grey number over a dark frame cannot be read at all.
+            .foregroundStyle(selected ? Color.white : Color.white.opacity(0.82))
+            .shadow(color: .black.opacity(selected ? 0 : 0.35), radius: 3)
             .padding(.horizontal, 10)
             .frame(minWidth: 34)
             .frame(height: Self.pill)
             .background {
                 if selected {
                     Capsule().fill(tint)
+                } else {
+                    Capsule().fill(.black.opacity(0.28))
                 }
             }
             .contentShape(Capsule())
@@ -438,9 +453,9 @@ struct ZoomControlRow: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.caption.weight(.black))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color(.systemGray6)))
+                    .background(Circle().fill(.black.opacity(0.35)))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.closeCustomZoom)
@@ -454,7 +469,7 @@ struct ZoomControlRow: View {
                 .font(.caption.weight(.heavy))
                 .monospacedDigit()
                 .lineLimit(1)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 // Room for the widest label the ceiling allows, so the slider
                 // doesn't shuffle sideways as the number grows a digit.
                 .frame(minWidth: 44, alignment: .trailing)
