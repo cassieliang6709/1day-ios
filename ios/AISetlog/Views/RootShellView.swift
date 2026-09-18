@@ -24,6 +24,9 @@ enum HomeLaunchAction: Equatable {
 
 struct RootShellView: View {
     @Environment(ChallengeStore.self) private var store
+    /// Read here as well as in the camera: a kept clip has to be findable from
+    /// the screen you land on, not only from the one you left.
+    @Environment(ClipDraftStore.self) private var drafts
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
@@ -35,6 +38,12 @@ struct RootShellView: View {
     @State private var unfiledGuard = UnfiledClipGuard()
     @State private var askBeforeLeavingCamera = false
     @State private var pendingSurface: Surface?
+    @State private var showDrafts = false
+    /// Raised by "保留" and cleared a few seconds later. Lives up here rather
+    /// than in the camera because the tab switch that triggers it unmounts the
+    /// camera, and a confirmation that dies with the screen that caused it is
+    /// the same as no confirmation at all.
+    @State private var justKeptADraft = false
 
     /// Bound only so a language change re-renders the tab labels.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -106,6 +115,8 @@ struct RootShellView: View {
                 selection: guardedSurface,
                 emphasisedIndex: 1)
                 .padding(.bottom, 6)
+
+            draftsBanner
         }
         .confirmationDialog(
             Strings.keepClipQuestion,
@@ -114,6 +125,7 @@ struct RootShellView: View {
         ) {
             Button(Strings.keepClip) {
                 unfiledGuard.keep?()
+                justKeptADraft = true
                 leaveCamera()
             }
             Button(Strings.discardClip, role: .destructive) {
@@ -121,6 +133,56 @@ struct RootShellView: View {
                 leaveCamera()
             }
             Button(Strings.cancel, role: .cancel) { pendingSurface = nil }
+        } message: {
+            // The camera's own ✕ has said this since drafts shipped
+            // (`RecordClipView`); this dialog — the one you get by tapping
+            // another tab, which is how most people leave — never did. So
+            // "保留" was a button with no stated destination, and a clip it
+            // saved correctly still read as one that vanished.
+            Text(Strings.keepClipFootnote)
+        }
+        .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+    }
+
+    /// Where the kept clips are, from wherever you ended up.
+    ///
+    /// Two states in one place: for a few seconds after keeping one it says so
+    /// and offers the way in, and after that it stays on the plans surface as a
+    /// quiet count — the drafts entry used to exist *only* as an overlay on the
+    /// camera, which is the one screen you are guaranteed not to be on when you
+    /// go looking for something you kept on your way out of it.
+    @ViewBuilder
+    private var draftsBanner: some View {
+        if !drafts.isEmpty, surface != .camera {
+            Button { showDrafts = true } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: justKeptADraft ? "checkmark.circle.fill" : "tray.full.fill")
+                        .font(.system(size: 12, weight: .bold))
+                    Text(justKeptADraft
+                         ? "\(Strings.draftKept) · \(Strings.draftKeptSeeIt)"
+                         : Strings.draftsPending(drafts.count))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    justKeptADraft ? AnyShapeStyle(OneDay.brandHorizontal)
+                                   : AnyShapeStyle(Color.oneDayNavy.opacity(0.9)),
+                    in: Capsule())
+                .oneDayGlow(.oneDayBlue, strength: justKeptADraft ? 0.8 : 0)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("drafts-entry")
+            // Above the capsule, clear of it.
+            .padding(.bottom, OneDay.tabBarClearance + 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(OneDay.Motion.soft, value: justKeptADraft)
+            .task(id: justKeptADraft) {
+                guard justKeptADraft else { return }
+                try? await Task.sleep(for: .seconds(4))
+                justKeptADraft = false
+            }
         }
     }
 
