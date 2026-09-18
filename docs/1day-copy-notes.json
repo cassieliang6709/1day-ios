@@ -1,0 +1,334 @@
+{
+ "_": "手写的注解，盖在 Localization.swift 解析结果之上。scripts/build-copy-editor.py 会合并它。",
+ "rows": {
+  "languageFootnote": {
+   "optional": true
+  },
+  "allRoomsOn": {
+   "note": "Sits under the friend-activity switch as a summary of the room list one level down, so you can tell at a glance whether anything is muted."
+  },
+  "notificationPrimerBody": {
+   "optional": true
+  },
+  "notificationPrimerFootnote": {
+   "optional": true
+  },
+  "eveningOneDayReminder": {
+   "note": "英文里有单复数判断（1 段 / 2 段），所以这一栏锁住了 —— 想改英文跟我说，我在代码里改。",
+   "lockEn": true,
+   "en": "\\(remaining) moment\\(remaining == 1 ? \"\" : \"s\") left today. Save one for now."
+  },
+  "momentWord": {
+   "note": "The word \"moment\", agreeing with a count. English needs this and Chinese doesn't, which is exactly how \"Preview · 1 moments\" got shipped: every caller wrote the"
+  },
+  "headerDateProgress": {
+   "note": "Home header progress, beside the date: \"今天 1/7\"."
+  },
+  "deleteStoryTitle": {
+   "note": "Deleting a story and leaving a room are one menu item but two very different outcomes, and the difference is exactly what someone needs to know before they tap."
+  },
+  "deleteStoryWarning": {
+   "note": "英文里有单复数判断（1 段 / 2 段），所以这一栏锁住了 —— 想改英文跟我说，我在代码里改。",
+   "lockEn": true,
+   "en": "The \\(clipCount) clip\\(clipCount == 1 ? \"\" : \"s\") you filmed will be deleted too. This can’t be undone."
+  },
+  "deleteStoryWarningEmpty": {
+   "note": "同一句的另一支：一段都没拍的时候显示这句（测试要求它不能出现数字）。"
+  },
+  "joinShort": {
+   "note": "On the header pill next to 新建, so the icon isn't the only clue."
+  },
+  "firstRunGuide": {
+   "optional": true
+  },
+  "firstRunStartHint": {
+   "optional": true
+  },
+  "inviteHint": {
+   "optional": true
+  },
+  "inviteCodeFormatHint": {
+   "optional": true
+  },
+  "joinRoomButton": {
+   "note": "Not \"today's room\": a room can be a seven-day story, and the button said otherwise on every one of them."
+  },
+  "orientationName": {
+   "note": "The frame a clip was filmed in, named the way the picker names it — so \"no landscape plan yet\" and the row that would have created one agree.  Taken as the orie"
+  },
+  "keepClipFootnote": {
+   "note": "Names where \"keep\" puts it. Without this the two buttons are a coin toss — nobody should have to guess whether \"保留\" means it goes somewhere findable or just sta",
+   "optional": true
+  },
+  "storyIsFull": {
+   "note": "Every slot in that story already holds a clip. Filing here would have to overwrite one, so it doesn't."
+  },
+  "noPlaceForDraft": {
+   "note": "No matching story for this clip's frame, from inside the drafts list — where \"retake\" isn't an option, so it says what would help instead."
+  },
+  "draftSize": {
+   "note": "Rounded file size, so someone can see which drafts are worth deleting."
+  },
+  "cameraDeniedTitle": {
+   "note": "Said separately from \"camera not available\", because the way out is different: iOS won't ask a second time, so retrying here can never work."
+  },
+  "cameraDeniedFootnote": {
+   "optional": true
+  },
+  "momentPosition": {
+   "note": "Spoken by the progress bars over the camera. There is no visible version of this — the bars themselves say it, and they only appear when the numbers in them are"
+  },
+  "addCaption": {
+   "optional": true
+  },
+  "rerecordShort": {
+   "note": "The same action as `rerecord`, for a chip sitting on top of the video where \"Re-record this day\" wraps to two lines and stops being a chip."
+  },
+  "thisMoment": {
+   "note": "The review screen's card of things you can do to one moment, and the button that gives the clip the whole display when you want it."
+  },
+  "meTitle": {
+   "note": "The settings screen, which leads with who you are rather than with a list of switches."
+  },
+  "statFinished": {
+   "note": "Stories with every moment filmed. Deliberately not \"films exported\" — nothing tracks exports, and a number the app can't actually count is worse than one it can"
+  },
+  "captionAction": {
+   "note": "The chip that opens the caption editor. `addCaption` is the placeholder *inside* the editor, which is a sentence; this is a button, which isn't."
+  },
+  "lookTitle": {
+   "note": "Never \"美颜\" and never \"beauty\". Both words presume something is wrong with the face in the picture; the phone's camera is what was unkind."
+  },
+  "lookFootnote": {
+   "note": "The promise, said out loud on the screen where it matters: the file is never touched, so this is always undoable.",
+   "optional": true
+  },
+  "lookExposure": {
+   "note": "The three dials. Named for what the camera got wrong, not for the Core Image filter underneath — nobody films thinking \"my white point is off\"."
+  },
+  "lookReset": {
+   "note": "Puts all three dials back to centre."
+  },
+  "lookRememberFootnote": {
+   "optional": true
+  },
+  "reminderBody": {
+   "optional": true
+  },
+  "editPlanFootnote": {
+   "optional": true
+  },
+  "saveToTemplateLibraryNote": {
+   "optional": true
+  },
+  "matchedCoverNote": {
+   "optional": true
+  },
+  "signInBody": {
+   "optional": true
+  },
+  "greeting": {
+   "note": "Time-of-day greeting. The name is optional — a solo user never signs in."
+  },
+  "resumeStory": {
+   "note": "Used instead of `todaysStory` when nothing was started today but something is still unfinished — saying \"today's story\" then would be a lie about what the card "
+  },
+  "startTodayBody": {
+   "optional": true
+  },
+  "yourStories": {
+   "note": "Heads the reverse-chronological list below today's story. Replaces the old \"your other plans\" / \"finished films\" split, which sorted by state and so couldn't an"
+  },
+  "noStoryBody": {
+   "optional": true
+  },
+  "momentsShort": {
+   "note": "Chip-length moment count. `momentCount` is a full sentence and blows a capsule out to four lines."
+  },
+  "templateRuntime": {
+   "note": "\"2s each\" — the per-clip length on a template card."
+  },
+  "openMomentLabel": {
+   "note": "One open moment, named on the home card so the story has a face on it.  It says \"还没拍\" rather than \"接下来\" on purpose: the button beside it opens this moment becau"
+  },
+  "storyCardCaption": {
+   "optional": true
+  },
+  "filmReadySubtitle": {
+   "optional": true
+  },
+  "pickOneCreatesIt": {
+   "note": "The one-screen composer: the poster *is* the submit button, so the label above the grid has to say so — there is no 下一步 left to imply it."
+  },
+  "captionGestureHint": {
+   "note": "Shown under a caption the first time it is selected, then never again. Three gestures, in the order people reach for them.",
+   "optional": true
+  },
+  "deleteCaptionAction": {
+   "note": "The ✕ on the selected caption's box, and the corner opposite it. Both are icon-only on screen, so these exist for VoiceOver and for the tests."
+  },
+  "captionPlateSample": {
+   "note": "What the four backing samples say. One character in Chinese, two letters in English — enough to show the colour on the backing, short enough that four samples f"
+  },
+  "captionPlateName": {
+   "note": "The samples are pictures, so these exist for VoiceOver and the tests."
+  },
+  "captionEditAction": {
+   "note": "On the button once a caption exists: it edits rather than adds."
+  },
+  "chatShort": {
+   "note": "Beside two other buttons on one row, so it is the short form."
+  },
+  "avatarColourN": {
+   "note": "The seven dots under your avatar are colours, and a colour has no name worth saying out loud — numbered so VoiceOver can count them."
+  },
+  "catchUpDayLabel": {
+   "note": "On the home card when the button opens a day that isn't today, because today's is already filmed and an earlier one is missing."
+  },
+  "openSystemSettings": {
+   "note": "Next to the \"needs photo access\" line, so the dead end has a door."
+  },
+  "coverFromClips": {
+   "note": "First of the three sources, because a frame out of the day is the most honest cover a story can have."
+  },
+  "useThisFrame": {
+   "note": "Confirms the lifted frame. The frame is on screen above it, so the word is 这张 and not \"保存\"."
+  },
+  "coverKeepFilming": {
+   "note": "Back to the automatic cover — newest clip, then the poster. Named after what it does next, not after \"reset\"."
+  },
+  "nextReminderAt": {
+   "note": "Under the evening reminder switch: when it will actually go off."
+  },
+  "reminderNothingToNudge": {
+   "note": "Nothing unfilmed means nothing to nudge about — true, and worth saying, because it is otherwise identical to a broken switch."
+  },
+  "followPrompts": {
+   "note": "The two halves of the one pill selector at the top of the screen. They filter what's below; they are not themselves a thing you \"pick\", which is why they're pil"
+  },
+  "rackByTime": {
+   "note": "The same two choices as `followPrompts` / `recordByTime`, shortened to share one row with 一日 and 七日. Four segments in a Chinese pill leave about three character"
+  },
+  "storySettingsTitle": {
+   "note": "The settings sheet behind a poster's gear, and the button that closes it by creating the story."
+  },
+  "noCustomTemplatesYet": {
+   "note": "The empty 自己写 rack: no saved prompt sets yet."
+  },
+  "customPromptsLead": {
+   "note": "On the entry card at the top of the composer, where it has to say what the screen behind it actually does — that one is 说说今天要干嘛 with a sentence in and prompts o",
+   "optional": true
+  },
+  "timeOnlyCaptionNote": {
+   "optional": true
+  },
+  "timeOnlySetupBody": {
+   "optional": true
+  },
+  "soloSetupSubtitle": {
+   "optional": true
+  },
+  "createByYourselfCaption": {
+   "optional": true
+  },
+  "createWithFriendsCaption": {
+   "optional": true
+  },
+  "createRoomSubtitle": {
+   "optional": true
+  },
+  "roomExplainer": {
+   "note": "Shown before the room exists, so it has to say the room is empty. The composer used to show faces here instead, which read as \"these people are already in\" — no"
+  },
+  "yourTakes": {
+   "note": "Beside the room's own count, so \"3/5\" can mean the day and this can mean me. Only shown when the two differ."
+  },
+  "theMoments": {
+   "note": "Carries the number, because it used to be hard-coded to seven and a three-moment story read \"七个瞬间\" over a list of three — a factual error the reader can see, on"
+  },
+  "guidedSubtitle": {
+   "optional": true
+  },
+  "guidedFootnote": {
+   "note": "Says what \"就用这些\" is still waiting for. A grey button whose reason lives off-screen is a dead end, and the name field scrolls away first.",
+   "optional": true
+  },
+  "storyNameNeeded": {
+   "note": "Shown on the name card itself, where the fix is."
+  },
+  "intentSubtitle": {
+   "optional": true
+  },
+  "suggestFailed": {
+   "note": "Not an error dialog: the thing they were doing still works, and the list is right there. This only explains why nothing appeared."
+  },
+  "clipLengthRow": {
+   "note": "Row labels. `clipLengthHeader` / `orientationHeader` are the older all-caps section headers and wrap awkwardly inside an `OptionRow`."
+  },
+  "appearanceFootnote": {
+   "optional": true
+  },
+  "displayAndLanguage": {
+   "note": "One heading over the three \"what the app looks and reads like\" rows. Each is a choice you make once, so they get one line apiece and the options live one screen"
+  },
+  "momentsFilmed": {
+   "note": "The story page: how far the day has got, and the words on the list of moments that are still yours to take."
+  },
+  "watchTheFilm": {
+   "note": "The way into the film, on the one card the page allows itself — and only once there's nothing left to film."
+  },
+  "startHere": {
+   "note": "The one row that's a suggestion. A question, because that's all it is — every other row does exactly the same thing when you tap it."
+  },
+  "addYourTake": {
+   "note": "A moment a friend already filmed. The thumbnail plays their take; this row is how mine gets in."
+  },
+  "peopleInRoom": {
+   "note": "The roster's caption. A room of one is worth saying out loud — an invite code nobody used looks exactly like a room full of friends until somebody counts the fa"
+  },
+  "roomWhoFilmed": {
+   "note": "Whether anyone else showed up. Four sentences rather than a count, because \"2 filmed\" answers none of the four things a room is actually being asked: who's here"
+  },
+  "roomWaitingOn": {
+   "note": "Who the room is waiting on. One line about people, never a row per moment: which moment they film is theirs to pick."
+  },
+  "generatingSubtitle": {
+   "optional": true
+  },
+  "stitchingCareBody": {
+   "optional": true
+  },
+  "filmReadyBody": {
+   "optional": true
+  },
+  "yourNameFootnote": {
+   "optional": true
+  },
+  "defaultMemberName": {
+   "note": "Apple only hands over a name on the very first sign-in. Without one, somebody has to be called something in a room full of friends."
+  },
+  "signIn": {
+   "note": "The way back in. Until this existed, signing out was one-way from here: the only other sign-in gate is the one guarding a shared story."
+  },
+  "deleteAccountFootnote": {
+   "optional": true
+  },
+  "deleteAccountFailedTitle": {
+   "note": "Said out loud, because the alternative — a spinner that ends and a screen that looks finished — is the app claiming something it can't check. Naming what is sti"
+  },
+  "deletedMemberName": {
+   "note": "Replaces a departed creator's name on a room their friends still use."
+  }
+ },
+ "extra": [
+  {
+   "k": "deleteStoryWarningEmpty",
+   "after": "deleteStoryWarning",
+   "zh": "这个故事会从这台设备上删掉，找不回来。",
+   "en": "This story will be deleted from this device. This can’t be undone.",
+   "g": "Timeline",
+   "note": "同一句的另一支：一段都没拍的时候显示这句（测试要求它不能出现数字）。",
+   "source": "Strings.deleteStoryWarning 的 else 分支（一段都没拍的时候）"
+  }
+ ]
+}
