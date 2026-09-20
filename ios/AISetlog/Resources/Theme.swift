@@ -24,25 +24,29 @@ extension UIColor {
             alpha: 1)
     }
 
-    /// #1677FF — the blue the app was born in. Pinned, and still the default
-    /// accent: caption colours and anything that must stay this exact hue
-    /// reads this one rather than `oneDayBrand`.
+    /// #1677FF — the blue the app was born in, and the only accent it wears.
     static let oneDayBlue = UIColor(hex: 0x1677FF)
 
-    /// The accent the app is currently wearing.
+    /// The app's accent. Always the brand blue.
     ///
-    /// Your avatar's colour, or the brand blue when you haven't picked one.
-    /// Computed rather than stored because it answers a preference, and a
-    /// `let` would freeze whichever colour was current at launch.
+    /// This used to read the colour you picked for your avatar, on the theory
+    /// that one choice should do both jobs. It does not: the canvas, the
+    /// mascot and the illustrated covers are all cool blues and cannot be
+    /// re-tinted, so choosing pink painted pink buttons onto a blue app and
+    /// the two fought on every screen.
     ///
-    /// Reads the same key the avatar reads, which is the whole point: people
-    /// asked for a warm app, and they had already been given a place to say
-    /// which colour is theirs. One choice, not two.
-    static var oneDayBrand: UIColor { Identity.myPickedUIColor() ?? oneDayBlue }
+    /// Picking a colour still works — it just colours your avatar now, which
+    /// is the job it was added for and the one place a warm colour has nothing
+    /// to clash with. See `Identity.color(for:)`.
+    ///
+    /// Kept as a property rather than folded into the 119 call sites: it is
+    /// the seam that made turning this off a one-line change, and it would be
+    /// the seam again if themes ever come back properly.
+    static var oneDayBrand: UIColor { oneDayBlue }
 
-    /// The lighter end of the brand gradient, derived from whatever the accent
-    /// is. Hue rotated a little and saturation eased off — the same
-    /// relationship #38B6FF has to #1677FF, applied to any of the seven.
+    /// The lighter end of the brand gradient, derived from the accent rather
+    /// than listed: hue rotated a little, saturation eased off — the
+    /// relationship #38B6FF has to #1677FF.
     static var oneDayBrandLight: UIColor {
         let base = oneDayBrand
         var hue: CGFloat = 0

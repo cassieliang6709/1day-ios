@@ -142,9 +142,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 11) {
             identityRow
             // Shown signed out too. The colour is stored against your name, so
-            // it used to need one — but it is also the app's accent now, and
-            // gating it meant somebody who films alone and never signs in had
-            // no way to change the colour of anything.
+            // it used to need one — and gating it meant somebody who films
+            // alone and never signs in could never change their own avatar.
             tintPicker
         }
         .padding(.vertical, 4)

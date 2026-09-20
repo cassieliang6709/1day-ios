@@ -28,10 +28,13 @@ enum Identity {
         .oneDayEmber, .oneDayRose, .oneDayGraphite, .oneDayGrape,
     ]
 
-    /// Which of the seven you picked for yourself, and the name it was picked
+    /// Which of the twelve you picked for yourself, and the name it was picked
     /// under. Two keys rather than one because the palette is addressed by
     /// name everywhere — every avatar in the app is drawn from a name and
     /// nothing else — so the override has to know which name is yours.
+    ///
+    /// Read only by `tintIndex(for:)`. The app's accent used to read them too;
+    /// it no longer does — see `UIColor.oneDayBrand`.
     static let myTintKey = "identity.myTint.v1"
     static let myTintNameKey = "identity.myTintName.v1"
 
@@ -52,24 +55,6 @@ enum Identity {
         }
         defaults.set(index, forKey: myTintKey)
         defaults.set(name, forKey: myTintNameKey)
-    }
-
-    /// The colour you picked for yourself, if you picked one.
-    ///
-    /// No name needed: a stored pick belongs to whoever is holding this phone,
-    /// which is why the app's accent can read it without knowing the account.
-    /// The name is still stored alongside — `tintIndex(for:)` uses it so the
-    /// override applies to your avatar and not to a friend who renamed.
-    static func myPickedIndex(in defaults: UserDefaults = .standard) -> Int? {
-        guard defaults.string(forKey: myTintNameKey) != nil,
-              let picked = defaults.object(forKey: myTintKey) as? Int,
-              paletteUIColors.indices.contains(picked)
-        else { return nil }
-        return picked
-    }
-
-    static func myPickedUIColor(in defaults: UserDefaults = .standard) -> UIColor? {
-        myPickedIndex(in: defaults).map { paletteUIColors[$0] }
     }
 
     /// The index your own avatar is currently drawn with, picked or derived.

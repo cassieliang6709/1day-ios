@@ -3,7 +3,10 @@ import XCTest
 
 @testable import AISetlog
 
-/// The app's accent follows the colour you picked for your avatar.
+/// The app's accent is the brand blue, and picking a colour only moves your
+/// avatar. 1.3 wired the accent to the avatar pick; these tests pin the
+/// unwiring, because the two are one property apart and easy to reconnect by
+/// accident.
 final class BrandAccentTests: XCTestCase {
     private var defaults: UserDefaults!
     private let suite = "brand-accent-tests"
@@ -19,30 +22,56 @@ final class BrandAccentTests: XCTestCase {
         super.tearDown()
     }
 
-    func testWithNoPickTheAccentIsTheBrandBlue() {
-        XCTAssertNil(Identity.myPickedUIColor(in: defaults))
+    func testTheAccentIsTheBrandBlue() {
+        XCTAssertEqual(UIColor.oneDayBrand, UIColor.oneDayBlue)
     }
 
-    func testAPickBecomesTheAccent() {
+    /// The whole point of the revert: a warm avatar on a blue app, not a warm
+    /// app. `oneDayBrand` reads no defaults at all now, so a real pick in the
+    /// standard domain cannot reach it either.
+    func testAPickMovesYourAvatarAndLeavesTheAccentAlone() {
+        let wanted = Identity.paletteUIColors.count - 1
+        Identity.chooseTint(wanted, forName: "Cassie", in: defaults)
+        XCTAssertEqual(Identity.tintIndex(for: "Cassie", in: defaults), wanted)
+        XCTAssertEqual(UIColor.oneDayBrand, UIColor.oneDayBlue)
+    }
+
+    /// Somebody else in the room keeps the colour their name hashes to — the
+    /// pick is yours, not the room's.
+    func testAPickDoesNotMoveSomebodyElsesAvatar() {
         let wanted = Identity.paletteUIColors.count - 1
         Identity.chooseTint(wanted, forName: "Cassie", in: defaults)
         XCTAssertEqual(
-            Identity.myPickedUIColor(in: defaults), Identity.paletteUIColors[wanted])
+            Identity.tintIndex(for: "Blue", in: defaults),
+            Identity.derivedIndex(for: "Blue"))
     }
 
     /// A pick with no name attached is not a pick — that pairing is what makes
-    /// the avatar override safe, and the accent reads the same two keys.
+    /// the avatar override safe.
     func testAHalfWrittenPickIsIgnored() {
         defaults.set(2, forKey: Identity.myTintKey)
-        XCTAssertNil(Identity.myPickedIndex(in: defaults))
+        XCTAssertEqual(
+            Identity.tintIndex(for: "Cassie", in: defaults),
+            Identity.derivedIndex(for: "Cassie"))
         defaults.set("Cassie", forKey: Identity.myTintNameKey)
-        XCTAssertEqual(Identity.myPickedIndex(in: defaults), 2)
+        XCTAssertEqual(Identity.tintIndex(for: "Cassie", in: defaults), 2)
     }
 
     func testAnOutOfRangePickIsIgnored() {
         defaults.set(99, forKey: Identity.myTintKey)
         defaults.set("Cassie", forKey: Identity.myTintNameKey)
-        XCTAssertNil(Identity.myPickedIndex(in: defaults))
+        XCTAssertEqual(
+            Identity.tintIndex(for: "Cassie", in: defaults),
+            Identity.derivedIndex(for: "Cassie"))
+    }
+
+    /// Clearing the pick goes back to the derived colour rather than to blank.
+    func testClearingThePickGoesBackToTheDerivedColour() {
+        Identity.chooseTint(4, forName: "Cassie", in: defaults)
+        Identity.chooseTint(nil, forName: nil, in: defaults)
+        XCTAssertEqual(
+            Identity.tintIndex(for: "Cassie", in: defaults),
+            Identity.derivedIndex(for: "Cassie"))
     }
 
     // MARK: - The lighter end of the gradient
@@ -53,37 +82,20 @@ final class BrandAccentTests: XCTestCase {
         return (h, s, b)
     }
 
-    /// Every accent needs a second, lighter colour to make a gradient with.
-    /// Derived rather than listed, so the seven don't need seven more hexes.
+    /// The gradient still needs a second colour, and it is still derived
+    /// rather than listed — there is just only one accent to derive it from.
     func testTheGradientsSecondColourIsLighterAndLessSaturated() {
-        for index in Identity.paletteUIColors.indices {
-            Identity.chooseTint(index, forName: "Cassie", in: defaults)
-            let base = hsb(Identity.paletteUIColors[index])
-            // `oneDayBrandLight` reads `.standard`, so derive it here the same
-            // way rather than writing to the real defaults from a test.
-            let light = hsb(lighten(Identity.paletteUIColors[index]))
-            XCTAssertLessThan(light.s, base.s, "index \(index)")
-            XCTAssertGreaterThanOrEqual(light.b, base.b, "index \(index)")
-        }
+        let base = hsb(.oneDayBrand)
+        let light = hsb(.oneDayBrandLight)
+        XCTAssertLessThan(light.s, base.s)
+        XCTAssertGreaterThanOrEqual(light.b, base.b)
     }
 
-    func testTheDefaultAccentsLighterEndLandsNearTheBrandCyan() {
-        let light = hsb(lighten(.oneDayBlue))
+    func testTheGradientsSecondColourLandsNearTheBrandCyan() {
+        let light = hsb(.oneDayBrandLight)
         let cyan = hsb(.oneDayCyan)
         XCTAssertEqual(light.h, cyan.h, accuracy: 0.05)
         XCTAssertEqual(light.b, cyan.b, accuracy: 0.1)
-    }
-
-    /// The same arithmetic `UIColor.oneDayBrandLight` does, against a colour
-    /// handed in — the production one reads the stored pick.
-    private func lighten(_ base: UIColor) -> UIColor {
-        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        base.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-        return UIColor(
-            hue: (h - 0.028 + 1).truncatingRemainder(dividingBy: 1),
-            saturation: s * 0.84,
-            brightness: min(b * 1.06, 1),
-            alpha: a)
     }
 
     // MARK: - What must not follow the accent
