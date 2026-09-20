@@ -144,33 +144,38 @@ struct RootShellView: View {
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
     }
 
-    /// Where the kept clips are, from wherever you ended up.
+    /// The four seconds after you keep a clip: what just happened, and the way
+    /// in if that is not where you meant it to go.
     ///
-    /// Two states in one place: for a few seconds after keeping one it says so
-    /// and offers the way in, and after that it stays on the plans surface as a
-    /// quiet count — the drafts entry used to exist *only* as an overlay on the
-    /// camera, which is the one screen you are guaranteed not to be on when you
-    /// go looking for something you kept on your way out of it.
+    /// It used to hold a second job — a standing "N 段待归档" count that stayed
+    /// on the plans surface indefinitely. Two problems with that, and they
+    /// compound. The tab bar is itself a floating capsule, so a permanent
+    /// second capsule directly above it made the bottom of the screen two
+    /// hovering pills with no hierarchy between them; and an overlay cannot be
+    /// scrolled out of the way, so the count sat on top of whichever story card
+    /// happened to be behind it, forever.
+    ///
+    /// Underneath that was the real mistake: a confirmation and a count are
+    /// different kinds of thing. A confirmation earns the middle of the screen
+    /// because you just did something; a count does not, and inheriting the
+    /// confirmation's placement and weight is how it ended up shouting. The
+    /// count now lives in the plans list as `PlansHomeView.draftsRow`, where it
+    /// scrolls with everything else and covers nothing.
     @ViewBuilder
     private var draftsBanner: some View {
-        if !drafts.isEmpty, surface != .camera {
+        if justKeptADraft, !drafts.isEmpty, surface != .camera {
             Button { showDrafts = true } label: {
                 HStack(spacing: 7) {
-                    Image(systemName: justKeptADraft ? "checkmark.circle.fill" : "tray.full.fill")
+                    Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .bold))
-                    Text(justKeptADraft
-                         ? "\(Strings.draftKept) · \(Strings.draftKeptSeeIt)"
-                         : Strings.draftsPending(drafts.count))
+                    Text("\(Strings.draftKept) · \(Strings.draftKeptSeeIt)")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
-                .background(
-                    justKeptADraft ? AnyShapeStyle(OneDay.brandHorizontal)
-                                   : AnyShapeStyle(Color.oneDayNavy.opacity(0.9)),
-                    in: Capsule())
-                .oneDayGlow(.oneDayBlue, strength: justKeptADraft ? 0.8 : 0)
+                .background(OneDay.brandHorizontal, in: Capsule())
+                .oneDayGlow(.oneDayBlue, strength: 0.8)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("drafts-entry")

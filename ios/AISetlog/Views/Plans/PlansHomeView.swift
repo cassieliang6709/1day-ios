@@ -9,6 +9,10 @@ import SwiftUI
 struct PlansHomeView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
+    /// Only for the standing count in `draftsRow`. The camera keeps its own
+    /// entry (`DraftsEntryButton`) and the shell keeps the four-second
+    /// confirmation; this is the third and quietest way back to the same list.
+    @Environment(ClipDraftStore.self) private var drafts
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
     /// What to lead with and what to list under it, as one decision. See
@@ -24,6 +28,7 @@ struct PlansHomeView: View {
     @State private var showJoin = false
     @State private var showSettings = false
     @State private var showRoomDemo = false
+    @State private var showDrafts = false
     @State private var joinCode = ""
     @State private var joining = false
     /// Bumped to abandon the current join — by the cancel button or the
@@ -65,6 +70,7 @@ struct PlansHomeView: View {
             }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showDrafts) { ClipDraftsView() }
         .confirmationDialog(
             pendingDeletion.map {
                 $0.isShared
@@ -188,6 +194,8 @@ struct PlansHomeView: View {
                 if stories.showsSection {
                     timelineSection
                 }
+
+                draftsRow
             }
             .padding(.top, 8)
             .padding(.bottom, OneDay.tabBarClearance + 20)
@@ -322,6 +330,62 @@ struct PlansHomeView: View {
     /// `label` varies because the card isn't always today's story — calling an
     /// unfinished story from yesterday "today's story" is the kind of small lie
     /// that makes the whole screen untrustworthy.
+    /// Clips that were kept on the way out of the camera and have not been
+    /// filed into a story yet.
+    ///
+    /// A row rather than the floating capsule it used to be — see
+    /// `RootShellView.draftsBanner` for why. Last in the list on purpose: it is
+    /// a loose end, not a thing to do today, and putting it under the stories
+    /// means it is somewhere you arrive rather than somewhere you are sent.
+    ///
+    /// Dashed border and no cover: everything above it is a story, and this
+    /// has to be reachable without being mistaken for one.
+    @ViewBuilder
+    private var draftsRow: some View {
+        if !drafts.isEmpty {
+            Button { showDrafts = true } label: {
+                HStack(spacing: 12) {
+                    // A brand tint rather than `oneDayMist`, which is a fixed
+                    // light hex: on a dark card it lit up as the brightest
+                    // thing in the row, and on a light one it matched the card
+                    // exactly and vanished. An alpha of the accent lands right
+                    // against both.
+                    Image(systemName: "tray.full.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.oneDayBrand)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Color.oneDayBrand.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Text(Strings.draftsPending(drafts.count))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.oneDayBrand)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                // `OneDay.surface`, the card background the story rows use, so
+                // this sits at the same depth as them. `oneDaySurface` — the
+                // soft chip fill — collapses onto the card in dark mode and
+                // onto the page in light.
+                .background(
+                    OneDay.surface,
+                    in: RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous)
+                        .strokeBorder(
+                            Color.oneDayBrand.opacity(0.28),
+                            style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .accessibilityIdentifier("drafts-row")
+        }
+    }
+
     private func heroSection(_ challenge: Challenge, label: String) -> some View {
         let state = cardState(for: challenge)
         return VStack(alignment: .leading, spacing: 12) {
