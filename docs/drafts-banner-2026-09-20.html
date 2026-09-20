@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>「待归档」胶囊该放哪 · 2026-09-20</title>
+<style>
+  :root {
+    --blue: #1677FF;
+    --cyan: #38B6FF;
+    --navy: #0F2E6B;
+    --ink: #10203a;
+    --mist: #DCEBFF;
+    --paper: #F5F8FF;
+    --line: #dfe6f2;
+    --muted: #6b7a94;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 48px 24px 120px;
+    font: 15px/1.75 -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    color: var(--ink);
+    background: #fff;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.35; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 56px; }
+  h2 {
+    font-size: 21px; margin: 64px 0 18px; letter-spacing: -.01em;
+  }
+  h3 { font-size: 16px; margin: 32px 0 8px; }
+  p { margin: 0 0 14px; }
+  code {
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--paper); padding: 1px 5px; border-radius: 4px;
+  }
+  pre {
+    font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--paper); padding: 14px 16px; border-radius: 10px;
+    overflow-x: auto; margin: 0 0 18px;
+  }
+  ol, ul { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  .num {
+    display: inline-block; min-width: 22px; height: 22px; line-height: 22px;
+    text-align: center; border-radius: 50%; background: var(--ink); color: #fff;
+    font-size: 12px; font-weight: 700; margin-right: 8px;
+  }
+
+  /* ---- phone mockups ---- */
+  .row { display: flex; gap: 26px; flex-wrap: wrap; margin: 24px 0 8px; }
+  .opt { width: 244px; }
+  .opt figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .opt b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 2px; }
+  .phone {
+    width: 244px; height: 460px; border-radius: 30px; overflow: hidden;
+    position: relative; background: linear-gradient(170deg, #f8fbff, #e6f1ff 60%, #dcebff);
+    border: 1px solid var(--line);
+  }
+  .status { height: 26px; display: flex; align-items: center; padding: 0 16px; font-size: 10px; color: var(--muted); }
+  .head { padding: 2px 16px 10px; display: flex; align-items: center; gap: 8px; }
+  .ava { width: 24px; height: 24px; border-radius: 50%; background: var(--blue); flex: 0 0 auto; }
+  .head .t { font-size: 12px; font-weight: 700; }
+  .head .d { font-size: 9px; color: var(--muted); }
+  .head .sp { margin-left: auto; }
+  .pillbtn { font-size: 9px; background: #fff; border-radius: 20px; padding: 4px 9px; color: var(--ink); }
+  .sect { font-size: 9px; color: var(--muted); padding: 6px 16px 4px; }
+  .hero {
+    margin: 0 16px 10px; height: 120px; border-radius: 14px;
+    background: linear-gradient(150deg, #8fd0ff, #ffe0a8 70%, #ffd0a0);
+    position: relative;
+  }
+  .hero span { position: absolute; left: 10px; bottom: 9px; color: #fff; font-size: 13px; font-weight: 700; }
+  .cta { margin: 0 16px 12px; height: 30px; border-radius: 16px; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+  .card {
+    margin: 0 16px 9px; height: 46px; border-radius: 13px; background: #fff;
+    display: flex; align-items: center; gap: 9px; padding: 0 10px;
+  }
+  .thumb { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(140deg, #cfe6ff, #ffe6bf); }
+  .card .l1 { font-size: 11px; font-weight: 700; }
+  .card .l2 { font-size: 8px; color: var(--muted); }
+  .tabbar {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px;
+    width: 176px; height: 40px; border-radius: 21px; background: rgba(255,255,255,.92);
+    display: flex; align-items: center; justify-content: space-around;
+    font-size: 9px; color: var(--muted); box-shadow: 0 6px 18px rgba(16,32,58,.10);
+  }
+  .tabbar .on { background: var(--blue); color: #fff; padding: 5px 11px; border-radius: 14px; font-weight: 700; }
+
+  /* the banner, in its several homes */
+  .banner-now {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 62px;
+    background: rgba(15,46,107,.9); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 7px 13px; border-radius: 20px; white-space: nowrap;
+  }
+  .banner-corner {
+    position: absolute; right: 12px; bottom: 62px;
+    background: rgba(15,46,107,.9); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 6px 11px; border-radius: 16px;
+  }
+  .banner-row {
+    margin: 0 16px 9px; height: 40px; border-radius: 13px;
+    background: #fff; border: 1px dashed #b9d4ff;
+    display: flex; align-items: center; gap: 9px; padding: 0 11px;
+    font-size: 11px; font-weight: 700; color: var(--blue);
+  }
+  .banner-row .ico { width: 22px; height: 22px; border-radius: 7px; background: var(--mist); }
+  .banner-head {
+    font-size: 9px; background: var(--mist); color: var(--navy);
+    border-radius: 20px; padding: 4px 8px; font-weight: 700;
+  }
+  .dot-badge {
+    position: absolute; top: -3px; right: -4px; min-width: 14px; height: 14px;
+    border-radius: 7px; background: #E14C3C; color: #fff; font-size: 8px;
+    line-height: 14px; text-align: center; font-weight: 700; padding: 0 3px;
+  }
+  .tab-badge-wrap { position: relative; }
+  .toast {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 62px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan)); color: #fff;
+    font-size: 10px; font-weight: 700; padding: 7px 13px; border-radius: 20px;
+    box-shadow: 0 8px 22px rgba(22,119,255,.35); white-space: nowrap;
+  }
+  .flag { font-size: 11px; color: #b3402f; font-weight: 700; }
+  .ok { font-size: 11px; color: #0E8A5F; font-weight: 700; }
+  .rec {
+    border-left: 3px solid var(--blue); padding: 2px 0 2px 16px; margin: 22px 0;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>「1 段待归档」这个胶囊该放哪</h1>
+<p class="sub">2026-09-20 · <code>RootShellView.draftsBanner</code></p>
+
+<h2>先说它现在是什么</h2>
+
+<p><code>RootShellView</code> 的 <code>ZStack(alignment: .bottom)</code> 最上层压着两个浮动元素：先是 <code>FloatingTabBar</code>，然后是 <code>draftsBanner</code>，后者用 <code>.padding(.bottom, tabBarClearance + 8)</code> 把自己顶到 Tab 栏上方。</p>
+
+<pre>if !drafts.isEmpty, surface != .camera {
+    Button { showDrafts = true } label: { … }
+        .background(
+            justKeptADraft ? AnyShapeStyle(OneDay.brandHorizontal)
+                           : AnyShapeStyle(Color.oneDayNavy.opacity(0.9)),
+            in: Capsule())
+        .padding(.bottom, OneDay.tabBarClearance + 8)
+}</pre>
+
+<p>一个位置，两种状态：刚点过「保留」的四秒里是蓝色渐变带辉光的确认，之后一直是深蓝色的常驻计数。</p>
+
+<h2>它丑在哪 — 五条，不是一条</h2>
+
+<table>
+  <tr><th style="width:150px">问题</th><th>为什么</th></tr>
+  <tr>
+    <td><span class="num">1</span>两个浮层叠罗汉</td>
+    <td>Tab 栏本身已经是一个悬浮胶囊。在它正上方再放一个胶囊，屏幕底部就变成两个上下挨着的浮动圆角块，谁也不像主角。这是最刺眼的一条。</td>
+  </tr>
+  <tr>
+    <td><span class="num">2</span>深色实心读作报错</td>
+    <td><code>oneDayNavy.opacity(0.9)</code>。整个 App 是白卡片加浅蓝底，没有第二个深色实心块。眼睛会把唯一的深色块当成错误提示或者 snackbar，而它其实只是个计数。</td>
+  </tr>
+  <tr>
+    <td><span class="num">3</span>盖住内容，而且滚不开</td>
+    <td>它是 overlay 不是列表内容。你截图里它正压在第二张故事卡的标题上，而且往下滚多少都甩不掉它。</td>
+  </tr>
+  <tr>
+    <td><span class="num">4</span>一个槽位装了两种东西</td>
+    <td>「刚保留了 · 查看」是一次性反馈，值得占据底部中央四秒。「1 段待归档」是常驻计数，不值得。现在后者继承了前者的位置和分量，于是一直在喊。</td>
+  </tr>
+  <tr>
+    <td><span class="num">5</span>它不属于任何地方</td>
+    <td>浮在所有内容之上、不归属任何分组，读起来像系统控件。但待归档的片子是<strong>你的东西</strong>，它应该长在「我的」里面。</td>
+  </tr>
+</table>
+
+<p>另外它在「计划」和「新建」页也一直在（只有相机页不显示）。你在选模板的时候不需要被提醒有片子没归档。</p>
+
+<h2>五个方案</h2>
+
+<div class="row">
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp pillbtn">加入</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="banner-now">🗂 1 段待归档</div>
+      <div class="tabbar"><span>计划</span><span class="on">我的</span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>现状</b><span class="flag">五条问题全中</span></figcaption>
+  </figure>
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp pillbtn">加入</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="banner-corner">🗂 1</div>
+      <div class="tabbar"><span>计划</span><span class="on">我的</span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>B · 挪到右下角缩小</b>改一行 alignment。躲开了 Tab 栏，但还是浮层、还是深色、还是盖内容。只解决了第 1 条。</figcaption>
+  </figure>
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp banner-head">🗂 1</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="tabbar"><span>计划</span><span class="on">我的</span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>C · 并进顶部那一行</b>不盖内容、有归属。但顶部已经有头像、问候、日期、进度点、加入按钮，再塞一个会挤，而且「加入」要给它让位。</figcaption>
+  </figure>
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp pillbtn">加入</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="banner-row"><div class="ico"></div>1 段待归档</div>
+      <div class="tabbar"><span>计划</span><span class="tab-badge-wrap on">我的<span class="dot-badge">1</span></span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>A + D · 列表里的一行 + Tab 角标（推荐）</b><span class="ok">五条全解</span></figcaption>
+  </figure>
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp pillbtn">加入</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="toast">✓ 已保留 · 查看</div>
+      <div class="tabbar"><span>计划</span><span class="on">我的</span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>保留后那四秒</b>这个浮层是对的，不要动。它是对刚才那个动作的回答，四秒后自己消失。</figcaption>
+  </figure>
+
+  <figure class="opt">
+    <div class="phone">
+      <div class="status">9:41</div>
+      <div class="head"><div class="ava"></div><div><div class="t">下午好</div><div class="d">9月20日 · 今天 0/7</div></div><div class="sp pillbtn">加入</div></div>
+      <div class="sect">今天的故事</div>
+      <div class="hero"><span>出门冒险</span></div>
+      <div class="cta"></div>
+      <div class="sect">今天</div>
+      <div class="card"><div class="thumb"></div><div><div class="l1">我的一天</div><div class="l2">还没拍：晨光</div></div></div>
+      <div class="banner-now" style="background:#fff;color:var(--blue);box-shadow:0 4px 14px rgba(16,32,58,.12)">🗂 1 段待归档</div>
+      <div class="tabbar"><span>计划</span><span class="on">我的</span><span>拍摄</span></div>
+    </div>
+    <figcaption><b>E · 只改配色</b>改一行。深色变浅了，不像报错了。但位置、遮挡、叠罗汉、归属都没动。</figcaption>
+  </figure>
+
+</div>
+
+<h2>推荐：A + D</h2>
+
+<div class="rec">
+<p><strong>把一个槽位拆成两件事。</strong></p>
+<ol>
+  <li><strong>保留后的四秒</strong>：浮层保持不动。它是对刚发生的动作的回应，占据底部中央是对的，四秒后消失也是对的。</li>
+  <li><strong>常驻计数</strong>：从浮层变成「我的」列表里的一行，排在「今天」那一组下面。白底、蓝字、虚线边框——和故事卡是一家人，但看得出来不是故事。</li>
+  <li><strong>Tab 角标</strong>：「我的」上一个数字角标。这样你在「计划」或「拍摄」页也知道有东西没归档，但它不会跑到那些页面上来喊。</li>
+</ol>
+</div>
+
+<h3>为什么是这个</h3>
+<ul>
+  <li>常驻信息进列表，一次性反馈留浮层——这是这两种东西各自该待的地方，不是妥协。</li>
+  <li>待归档的片子是你的东西，「我的」是你的东西的家。放进去它就有了归属，不再像系统控件。</li>
+  <li>列表行会跟着内容滚，不遮挡任何东西，也不和 Tab 栏叠在一起。</li>
+  <li>角标是 iOS 的既有语汇，不用解释。它也解决了「换个页面就看不到」这个 A 单独存在时的缺口。</li>
+</ul>
+
+<h3>要改哪些</h3>
+<table>
+  <tr><th style="width:280px">文件</th><th>改什么</th></tr>
+  <tr><td><code>Views/RootShellView.swift</code></td><td><code>draftsBanner</code> 的显示条件加上 <code>justKeptADraft</code>——只在那四秒里出现。常驻分支删掉。</td></tr>
+  <tr><td><code>Views/Plans/PlansHomeView.swift</code></td><td>列表末尾加一行 <code>DraftsEntryRow</code>，点开还是现在那个 <code>ClipDraftsView</code> sheet。</td></tr>
+  <tr><td><code>Views/Components/FloatingTabBar.swift</code></td><td>item 加一个可选 <code>badge: Int?</code>，有值就画角标。</td></tr>
+  <tr><td><code>Views/Record/ClipDraftsView.swift</code></td><td>不用改。<code>DraftsEntryButton</code> 那个相机内的入口保持原样。</td></tr>
+</table>
+
+<p>改动集中在视图层，<code>ClipDraftStore</code> 和 sheet 都不动。估计一个半小时，加上模拟器里三种状态（无草稿 / 刚保留 / 有常驻计数）各截一张图确认。</p>
+
+<h2>没解决的一个问题</h2>
+
+<p>「待归档」这个词本身。它描述的是 App 的内部状态（这个片子还没被归到某个故事里），不是用户的处境。用户的处境是「我拍了个东西，还没想好放哪」。</p>
+
+<p>空状态那句文案其实说对了：「录完找不到地方放的时候，会先存到这里。」但按钮上只剩「1 段待归档」，把那个意思丢了。</p>
+
+<p>可以考虑的替换：<code>1 段还没放好</code> / <code>1 段没归到故事里</code> / <code>暂存 1 段</code>。这一条单独拎出来，不在这次改动范围里。</p>
+
+</main>
+</body>
+</html>

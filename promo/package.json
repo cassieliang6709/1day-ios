@@ -1,0 +1,25 @@
+{
+  "name": "1day-promo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Promo video compositions for 1Day (Remotion)",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "render:solo": "remotion render src/index.ts SoloXHS out/1day-solo-xhs.mp4 --codec=h264 --crf=18",
+    "render:appstore": "remotion render src/index.ts SoloAppStore out/1day-solo-appstore.mp4 --codec=h264 --crf=18",
+    "render:friends": "remotion render src/index.ts FriendsXHS out/1day-friends-xhs.mp4 --codec=h264 --crf=18",
+    "render:all": "npm run render:solo && npm run render:appstore && npm run render:friends",
+    "render:demo": "for i in 1 2 3 4 5 6; do remotion render src/index.ts DemoClip$i out/demo/demo-clip-$i.mp4 --codec=h264 --crf=16; done"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.*",
+    "@remotion/media-utils": "4.0.*",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.*"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.6.3"
+  }
+}
