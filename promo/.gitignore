@@ -1,0 +1,9 @@
+node_modules/
+out/
+raw/
+
+# 录屏和渲染出来的素材，几百 MB，不进版本库。
+# demo-clip 用 `npm run render:demo` 重新生成；模拟器录屏见 README。
+public/*.mp4
+public/*.jpg
+public/*.png

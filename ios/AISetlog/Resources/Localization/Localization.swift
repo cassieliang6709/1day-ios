@@ -571,6 +571,13 @@ enum Strings {
         lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
     }
     static var draftKept: String { lang == .chinese ? "已存起来" : "Kept for later" }
+    /// The way back to what you just kept.
+    ///
+    /// Confirming "保留" while leaving the camera used to say 已存起来 as a
+    /// toast *on the camera*, which the tab switch then unmounted — so the
+    /// clip was saved and the person was told nothing, on a screen that no
+    /// longer had an entrance to the drafts.
+    static var draftKeptSeeIt: String { lang == .chinese ? "查看" : "View" }
 
     // Drafts: the list they live in until they're filed.
     static func draftsPending(_ count: Int) -> String {
