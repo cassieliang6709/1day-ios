@@ -6,24 +6,38 @@ import SwiftUI
 struct LocalRoomDemoView: View {
     let chinese: Bool
     @StateObject private var owner = LocalRoomDemoOwner()
-    @State private var members = 2
+    @State private var members: Int
     @State private var retry = 0
     @State private var clipRevision = 0
+    private let staging = DemoRoomStaging.fromLaunchArguments()
+
+    init(chinese: Bool) {
+        self.chinese = chinese
+        // With the chrome hidden there is no picker to set this, so the count
+        // comes from however many members were named. Two, as before, when
+        // nobody said.
+        let named = DemoRoomNaming.fromLaunchArguments().members.count
+        _members = State(initialValue: (2...3).contains(named) ? named : 2)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(chinese ? "本地示例 · 不上传房间，不保存或分享" : "Local sample · No room uploads, saving or sharing")
-                .font(.caption).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center).padding(8)
-                .accessibilityIdentifier("local-room-notice")
-            Picker(chinese ? "示例人数" : "Sample members", selection: $members) {
-                Text(chinese ? "两人" : "Two people").tag(2)
-                Text(chinese ? "三人" : "Three people").tag(3)
-            }.pickerStyle(.segmented).padding(.horizontal)
-                .accessibilityIdentifier("local-room-members")
+            if staging.showsChrome {
+                Text(chinese ? "本地示例 · 不上传房间，不保存或分享" : "Local sample · No room uploads, saving or sharing")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).padding(8)
+                    .accessibilityIdentifier("local-room-notice")
+                Picker(chinese ? "示例人数" : "Sample members", selection: $members) {
+                    Text(chinese ? "两人" : "Two people").tag(2)
+                    Text(chinese ? "三人" : "Three people").tag(3)
+                }.pickerStyle(.segmented).padding(.horizontal)
+                    .accessibilityIdentifier("local-room-members")
+            }
             if let runtime = owner.runtime, let media = owner.media {
-                LocalRoomImportControls(runtime: runtime, chinese: chinese) { clipRevision += 1 }
-                    .id(runtime.challengeID)
+                if staging.showsChrome {
+                    LocalRoomImportControls(runtime: runtime, chinese: chinese) { clipRevision += 1 }
+                        .id(runtime.challengeID)
+                }
                 NavigationStack {
                     StoryTimelineView(challengeID: runtime.challengeID)
                 }

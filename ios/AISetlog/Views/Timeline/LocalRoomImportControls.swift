@@ -29,17 +29,32 @@ struct LocalRoomImportControls: View {
     let chinese: Bool
     let didReplace: () -> Void
     @State private var target: String?
+    @State private var targetDay: Int?
     @State private var selected: PhotosPickerItem?
     @State private var showPicker = false
     @State private var busy = false
     @State private var failed = false
 
+    /// Who, and — once the room has more than one slot — which moment. With
+    /// three moments and two members the menu is six rows, and three of them
+    /// say the same name; the moment is what tells them apart.
+    private func label(for clip: DayClip, multiSlot: Bool) -> String {
+        let who = clip.authorName ?? "Sample"
+        guard multiSlot else { return who }
+        let challenge = runtime.store.challenges.first { $0.id == runtime.challengeID }
+        let what = challenge?.momentValue(forSlot: clip.day) ?? "\(clip.day)"
+        return "\(who) · \(what)"
+    }
+
     var body: some View {
-        VStack(spacing: 4) {
+        let clips = runtime.store.recordedClips(for: runtime.challengeID)
+        let multiSlot = Set(clips.map(\.day)).count > 1
+        return VStack(spacing: 4) {
             Menu(chinese ? "替换成员视频（前3秒）" : "Replace member clip (first 3s)") {
-                ForEach(runtime.store.recordedClips(for: runtime.challengeID)) { clip in
-                    Button(clip.authorName ?? "Sample") {
+                ForEach(clips) { clip in
+                    Button(label(for: clip, multiSlot: multiSlot)) {
                         target = clip.authorID
+                        targetDay = clip.day
                         selected = nil
                         failed = false
                         showPicker = true
@@ -67,7 +82,7 @@ struct LocalRoomImportControls: View {
                 }
                 defer { try? FileManager.default.removeItem(at: movie.url) }
                 try Task.checkCancellation()
-                try await runtime.replaceClip(authorID: target, from: movie.url)
+                try await runtime.replaceClip(authorID: target, day: targetDay, from: movie.url)
                 guard !Task.isCancelled, !runtime.isClosed else { return }
                 didReplace()
             } catch {
