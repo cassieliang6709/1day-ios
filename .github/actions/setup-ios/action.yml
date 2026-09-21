@@ -1,0 +1,101 @@
+name: Set up iOS build
+description: >-
+  Xcode, the generated project, and a booted iPhone simulator — the three
+  things every test lane needs before it can run xcodebuild.
+
+inputs:
+  lane:
+    description: Which test lane this is, so lanes don't share a build cache.
+    required: true
+
+outputs:
+  simulator-id:
+    description: UDID of a booted iPhone on the runtime matching the SDK.
+    value: ${{ steps.simulator.outputs.udid }}
+
+runs:
+  using: composite
+  steps:
+    # Has to be an Xcode whose iOS SDK matches a simulator the runner image
+    # still ships. 16.2 stopped qualifying: the image kept the app but dropped
+    # the iOS 18.2 runtime, and `actool` fails the whole build rather than
+    # thin an asset catalog against a runtime it has no SDK for — it won't
+    # take even a newer runtime of the same iOS major. Every simulator on the
+    # image runs iOS 26 now, so the Xcode has to be a 26 as well.
+    - name: Select Xcode
+      shell: bash
+      run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+    - name: Generate Xcode project
+      shell: bash
+      working-directory: ios
+      run: |
+        brew install xcodegen
+        xcodegen generate
+
+    # Keyed on the sources so an unchanged tree reuses the compiled modules,
+    # and per lane because the lanes build different test bundles. The
+    # restore-key gets a near-miss rather than nothing when one file changed,
+    # which is the common case on a PR. Xcode is in the key too: DerivedData
+    # from a different toolchain is not reusable, it is a confusing failure.
+    - name: Cache DerivedData
+      uses: actions/cache@v4
+      with:
+        path: ios/build/DerivedData
+        key: dd-${{ inputs.lane }}-xcode26.2-${{ hashFiles('ios/**/*.swift', 'ios/project.yml') }}
+        restore-keys: |
+          dd-${{ inputs.lane }}-xcode26.2-
+
+    # Prefer an iPhone the image already ships, on the runtime matching the
+    # SDK; only build one when there's nothing to take. Ask simctl, not
+    # `xcodebuild -showdestinations` — that list omits simulators xcodebuild
+    # will happily run on when handed their udid, so gating on it fails runs
+    # that would have passed.
+    - name: Pick a simulator
+      id: simulator
+      shell: bash
+      run: |
+        sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+        pick() {
+          xcrun simctl list devices available -j | jq -r --arg sdk "$sdk" '
+            [ .devices | to_entries[]
+              | select(.key | test("SimRuntime\\.iOS-"))
+              | (.key | capture("iOS-(?<v>[0-9-]+)$").v | gsub("-";".")) as $ver
+              | .value[] | select(.isAvailable and (.name | test("iPhone")))
+              | {ver: $ver, udid: .udid, name: .name} ]
+            | (map(select(.ver == $sdk))
+               + (sort_by(.ver | split(".") | map(tonumber)) | reverse))
+            | .[0] // {} | "\(.udid // "")\t\(.ver // "")\t\(.name // "")"'
+        }
+        found=$(pick)
+        if [ -z "${found%%$'\t'*}" ]; then
+          runtimes=$(xcrun simctl list runtimes -j)
+          runtime=$(jq -r --arg sdk "$sdk" \
+            '[.runtimes[] | select(.isAvailable and .platform == "iOS")]
+             | (map(select(.version == $sdk)) + (sort_by(.version) | reverse))
+             | .[0].identifier // ""' <<<"$runtimes")
+          device=$(jq -r --arg r "$runtime" \
+            '.runtimes[] | select(.identifier == $r)
+             | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")]
+             | .[0].identifier // ""' <<<"$runtimes")
+          if [ -z "$runtime" ] || [ -z "$device" ]; then
+            echo "::error::no iOS simulator runtime matches SDK $sdk"
+            xcrun simctl list runtimes
+            exit 1
+          fi
+          xcrun simctl create ci-iphone "$device" "$runtime" >/dev/null
+          found=$(pick)
+        fi
+        udid=${found%%$'\t'*}
+        if [ -z "$udid" ]; then
+          echo "::error::no usable iPhone simulator for SDK $sdk"
+          xcrun simctl list devices available
+          exit 1
+        fi
+        # Start the boot and move on rather than blocking on `bootstatus -b`,
+        # which cost three minutes of doing nothing else. xcodebuild waits for
+        # the device itself, so the boot now overlaps the compile instead of
+        # preceding it.
+        xcrun simctl boot "$udid" 2>/dev/null || true
+        printf 'SDK %s -> %s\n' "$sdk" "$found"
+        echo "udid=$udid" >> "$GITHUB_OUTPUT"
