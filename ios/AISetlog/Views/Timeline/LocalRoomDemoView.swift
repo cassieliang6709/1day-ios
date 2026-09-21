@@ -72,7 +72,8 @@ final class LocalRoomDemoOwner: ObservableObject {
     private var revision = 0
     private(set) var isClosed = false
 
-    func load(memberCount: Int, chinese: Bool) async {
+    func load(memberCount: Int, chinese: Bool,
+              clipSeconds: Double = DemoClipFactory.standInSeconds) async {
         guard !isClosed else { return }
         revision += 1
         let requested = revision
@@ -82,7 +83,8 @@ final class LocalRoomDemoOwner: ObservableObject {
         media = nil
         failed = false
         do {
-            let next = try await LocalRoomRuntime.make(memberCount: memberCount, chinese: chinese)
+            let next = try await LocalRoomRuntime.make(
+                memberCount: memberCount, chinese: chinese, clipSeconds: clipSeconds)
             guard !Task.isCancelled, !isClosed, revision == requested else { next.close(); return }
             next.preferences.set(chinese ? AppLanguage.chinese.rawValue : AppLanguage.english.rawValue,
                                  forKey: AppLanguage.storageKey)

@@ -10,21 +10,29 @@ final class RoomVideoDemoFrameTests: XCTestCase {
     func testGeneratedSourcesAndTogetherFilmsContainVisibleMovingFrames() async throws {
         let model = RoomVideoDemoModel()
         defer { model.close() }
-        await model.prepare(count: 2, landscape: false, chinese: true)
+        await model.prepare(count: 2, landscape: false, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         XCTAssertEqual(model.clips.count, 3)
         var urls = model.clips.map(\.url)
         urls.append(try XCTUnwrap(model.film))
-        await model.prepare(count: 3, landscape: true, chinese: true)
+        await model.prepare(count: 3, landscape: true, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         urls.append(try XCTUnwrap(model.film))
         for url in urls {
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            let asset = AVURLAsset(url: url)
+            let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
-            let first = try await generator.image(at: CMTime(seconds: 0.2, preferredTimescale: 600)).image
-            let later = try await generator.image(at: CMTime(seconds: 2.5, preferredTimescale: 600)).image
+            // Near the start and near the end, in the clip's own terms. These
+            // used to be 0.2s and 2.5s, which silently required the stand-in
+            // generator to keep producing three-second clips — a fact this
+            // test is not about, and the one that broke when it changed.
+            let duration = try await asset.load(.duration).seconds
+            let first = try await generator.image(
+                at: CMTime(seconds: duration * 0.1, preferredTimescale: 600)).image
+            let later = try await generator.image(
+                at: CMTime(seconds: duration * 0.9, preferredTimescale: 600)).image
             let a = try pixels(first)
             let b = try pixels(later)
             let count = a.count / 4

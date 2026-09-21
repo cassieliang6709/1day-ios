@@ -106,14 +106,14 @@ final class DefaultFilmAspectTests: XCTestCase {
     func testDemoAutoUpdatesAfterFirstMemberReplacementAndAllowsOverride() async throws {
         let model = RoomVideoDemoModel()
         defer { model.close() }
-        await model.prepare(count: 2, chinese: true)
+        await model.prepare(count: 2, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         XCTAssertGreaterThan(model.filmRatio, 1)
         let replacement = try await fixture(.landscape)
         await model.replace(index: 0, source: replacement, count: 2, chinese: true)
         XCTAssertFalse(model.failed)
         XCTAssertLessThan(model.filmRatio, 1)
-        await model.prepare(count: 2, landscape: true, chinese: true)
+        await model.prepare(count: 2, landscape: true, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         XCTAssertGreaterThan(model.filmRatio, 1)
     }

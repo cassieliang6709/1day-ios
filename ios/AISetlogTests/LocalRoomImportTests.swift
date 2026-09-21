@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class LocalRoomImportTests: XCTestCase {
     func testReplaceEachMemberPreservesOthersIdentitySourceAndDefaultAspect() async throws {
-        let runtime = try await LocalRoomRuntime.make(memberCount: 3, chinese: true)
+        let runtime = try await LocalRoomRuntime.make(memberCount: 3, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         defer { runtime.close() }
         let generated = await DemoClipFactory.makeClip(moment: 1, label: "Landscape", author: "Fixture",
             seconds: 4, orientation: .landscape)
@@ -47,7 +47,7 @@ final class LocalRoomImportTests: XCTestCase {
     }
 
     func testInvalidAndCancelledImportsLeaveAllClipsAndSourceUntouched() async throws {
-        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
+        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         defer { runtime.close() }
         let before = runtime.store.recordedClips(for: runtime.challengeID)
         let input = runtime.storage.root.appendingPathComponent("invalid.mov")
@@ -67,7 +67,7 @@ final class LocalRoomImportTests: XCTestCase {
     }
 
     func testDismissWhilePreparingDiscardsLateOutputWithoutResurrectingRuntime() async throws {
-        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
+        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         let clip = try XCTUnwrap(runtime.store.recordedClips(for: runtime.challengeID).first)
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("local-import-test-\(UUID()).mov")
         try Data("prepared".utf8).write(to: output)

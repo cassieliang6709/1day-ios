@@ -47,7 +47,7 @@ final class LocalRoomDemoOwnerTests: XCTestCase {
     func testRealRuntimeSwitchAndDismissOwnAllFiles() async throws {
         let owner = LocalRoomDemoOwner()
         defer { owner.close() }
-        await owner.load(memberCount: 2, chinese: false)
+        await owner.load(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         let first = try XCTUnwrap(owner.runtime)
         let media = try XCTUnwrap(owner.media)
         XCTAssertEqual(first.store.recordedClips(for: first.challengeID).count, 2)
@@ -55,7 +55,7 @@ final class LocalRoomDemoOwnerTests: XCTestCase {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try Data([1]).write(to: output)
         media.accept(output)
-        await owner.load(memberCount: 3, chinese: true)
+        await owner.load(memberCount: 3, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertTrue(first.isClosed)
         XCTAssertTrue(media.isClosed)
         XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
@@ -65,13 +65,13 @@ final class LocalRoomDemoOwnerTests: XCTestCase {
         owner.close()
         XCTAssertTrue(second.isClosed)
         XCTAssertNil(owner.runtime)
-        await owner.load(memberCount: 2, chinese: false)
+        await owner.load(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertNil(owner.runtime)
     }
 
     func testDismissDuringPreparationCannotResurrectRoom() async {
         let owner = LocalRoomDemoOwner()
-        let loading = Task { await owner.load(memberCount: 3, chinese: false) }
+        let loading = Task { await owner.load(memberCount: 3, chinese: false, clipSeconds: DemoHarness.clipSeconds) }
         await Task.yield()
         owner.close()
         await loading.value
