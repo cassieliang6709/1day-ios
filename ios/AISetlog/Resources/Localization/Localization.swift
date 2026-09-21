@@ -607,6 +607,21 @@ enum Strings {
             ? "还没有\(kind)的故事能放这段"
             : "No \(kind) story can take this yet"
     }
+    /// The dialog behind that line — see `ClipFiling.Blocker` for why there
+    /// are two of these and not one. 归档 used to disappear from the menu in
+    /// both cases, which answered "then how do I file it?" with an absence.
+    static func noStoryOfThisFrameYet(_ orientation: Challenge.Orientation) -> String {
+        let kind = orientationName(orientation)
+        return lang == .chinese
+            ? "归档是把这段放进一个同画幅的故事里。你还没有\(kind)的故事——在「\(surfaceCompose)」里新建一个，这段就能归档了。"
+            : "Filing puts the clip into a story shot the same way round, and you don't have a \(kind) one yet. Make one in \(surfaceCompose) and this clip can go in."
+    }
+    static func everyStoryOfThisFrameIsFull(_ orientation: Challenge.Orientation) -> String {
+        let kind = orientationName(orientation)
+        return lang == .chinese
+            ? "你的\(kind)故事每个瞬间都拍满了，再放就会盖掉已有的片段。新建一个\(kind)故事，或者在已有的故事里删掉一段，这段就有位置了。"
+            : "Every moment in your \(kind) stories is already filmed, and filing here would have to overwrite one. Make another \(kind) story, or clear a moment in one of them, and this clip has somewhere to go."
+    }
     /// Rounded file size, so someone can see which drafts are worth deleting.
     static func draftSize(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()

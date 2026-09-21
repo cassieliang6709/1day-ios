@@ -1,11 +1,13 @@
 # 1Day 1.4 — App Store copy
 
 Prepared 2026-09-20, for the `1.4 准备提交` version record in App Store Connect.
-Build 23.
+Build 24. (Build 23 was archived and never uploaded — a third fix landed on
+review the same night, and the drafts list is the screen it is on, so it went
+into the same version rather than waiting.)
 
 ## What actually changes in the store listing
 
-1.4 is two corrections, not a feature release. Only one field has to change —
+1.4 is three corrections, not a feature release. Only one field has to change —
 but one thing 1.3 *added* to the listing now describes behaviour this build
 removes, so it has to come back out.
 
@@ -43,26 +45,30 @@ sentences and drop the accent-colour one.
 
 ## en-US
 
-### What's New (272 characters)
+### What's New (539 characters)
 
 ```text
-Two fixes.
+Three fixes.
 
 • Your avatar colour now only colours your avatar. It used to re-tint the whole app, so a warm pick ended up fighting the blue everything else is built on.
 
 • Clips waiting to be filed no longer hover over your stories. They sit in the list, scroll with it, and cover nothing.
+
+• A clip that can't be filed anywhere now says why when you tap it: either you have no story shot that way round yet, or the ones you have are full. It used to say nothing, and the only thing you could tap was Delete.
 ```
 
 ## zh-Hans
 
-### What's New (118 characters)
+### What's New (172 characters)
 
 ```text
-两处修正。
+三处修正。
 
 • 头像颜色只改头像了。之前它会把整个 App 的主色一起换掉，挑个暖色就和蓝色的底撞在一起。
 
 • 「待归档」不再浮在内容上面，改成列表里的一行，跟着页面滚，不挡故事。
+
+• 待归档里暂时放不进去的片段，点一下会说清楚为什么：是还没有这个方向拍的故事，还是有但都拍满了。之前那里什么也不说，菜单里唯一能点的是删除。
 ```
 
 ## Screenshots

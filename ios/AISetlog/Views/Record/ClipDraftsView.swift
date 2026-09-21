@@ -12,7 +12,17 @@ struct ClipDraftsView: View {
     @Environment(ClipDraftStore.self) private var drafts
 
     @State private var filing: ClipDraft?
+    @State private var blocked: FilingBlocked?
     @State private var toast: String?
+
+    /// The explanation 归档 gives when it can't run. Carries its own text so
+    /// the alert doesn't have to re-derive the reason from a draft that may
+    /// already be gone by the time it renders.
+    private struct FilingBlocked: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
 
     /// Bound only so a language change re-renders the list.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -54,6 +64,17 @@ struct ClipDraftsView: View {
                     archive(draft, to: chosen)
                 }
             }
+            .alert(
+                blocked?.title ?? "",
+                isPresented: Binding(
+                    get: { blocked != nil },
+                    set: { if !$0 { blocked = nil } }),
+                presenting: blocked
+            ) { _ in
+                Button(Strings.ok, role: .cancel) {}
+            } message: { reason in
+                Text(reason.message)
+            }
         }
     }
 
@@ -92,22 +113,39 @@ struct ClipDraftsView: View {
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
 
+                // Tappable, not just stated. The line names the symptom; what
+                // a person wants next is what to do about it, and the row is
+                // where they are looking when they want it.
                 if !canFile {
-                    Text(Strings.noPlaceForDraft(draft.orientation))
+                    Button {
+                        blocked = filingBlocked(for: draft)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(Strings.noPlaceForDraft(draft.orientation))
+                                .lineLimit(2)
+                            Image(systemName: "info.circle")
+                        }
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkFaint)
-                        .lineLimit(2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
             Spacer(minLength: 4)
 
             Menu {
-                // Only offered when it would work: a disabled row that opens a
-                // sheet with no options in it is just a slower dead end.
-                if canFile {
-                    Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
+                // Always offered, even when it can't run. Hiding it left the
+                // menu on an unfilable draft holding nothing but 删除 — the
+                // one action that ends with the clip gone — and no statement
+                // anywhere of what would make filing possible. It says that
+                // now, in the alert.
+                Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
+                    if canFile {
                         filing = draft
+                    } else {
+                        blocked = filingBlocked(for: draft)
                     }
                 }
                 Button(Strings.deleteDraft, systemImage: "trash", role: .destructive) {
@@ -157,6 +195,21 @@ struct ClipDraftsView: View {
 
     private func candidates(for draft: ClipDraft) -> [Challenge] {
         ClipFiling.candidates(in: store.challenges, orientation: draft.orientation)
+    }
+
+    /// Only called when there are no candidates, so `blocker` never answers
+    /// nil here — but a made-up explanation would be worse than none, so the
+    /// nil case falls back to the symptom rather than guessing a cause.
+    private func filingBlocked(for draft: ClipDraft) -> FilingBlocked {
+        let message = switch ClipFiling.blocker(
+            in: store.challenges, orientation: draft.orientation
+        ) {
+        case .noStoryWithThisFrame: Strings.noStoryOfThisFrameYet(draft.orientation)
+        case .everyMatchingStoryIsFull: Strings.everyStoryOfThisFrameIsFull(draft.orientation)
+        case nil: Strings.noPlaceForDraft(draft.orientation)
+        }
+        return FilingBlocked(
+            title: Strings.noPlaceForDraft(draft.orientation), message: message)
     }
 
     /// File the draft into every chosen story, then drop it — but only once at
