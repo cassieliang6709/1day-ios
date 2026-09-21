@@ -7,8 +7,8 @@ import XCTest
 final class LocalRoomRuntimeBoundaryTests: XCTestCase {
     func testClosingOneFormalRoomInvalidatesItsChatWithoutTouchingOtherRuntime() async throws {
         let epoch = AccountStore.identityRevision
-        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
-        let second = try await LocalRoomRuntime.make(memberCount: 3, chinese: true)
+        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
+        let second = try await LocalRoomRuntime.make(memberCount: 3, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         defer { first.close(); second.close() }
         let forbidden = RoomChatSessionSource.LiveDependencies(
             directory: { XCTFail("preview read live archive directory"); return first.storage.root },

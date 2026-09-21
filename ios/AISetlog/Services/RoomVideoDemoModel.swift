@@ -15,7 +15,8 @@ final class RoomVideoDemoModel: ObservableObject {
     private var revision = 0
     private var ownedURLs: Set<URL> = []
 
-    func prepare(count: Int, landscape: Bool? = nil, chinese: Bool) async {
+    func prepare(count: Int, landscape: Bool? = nil, chinese: Bool,
+                 clipSeconds: Double = DemoClipFactory.standInSeconds) async {
         guard !closed, (2...3).contains(count) else { return }
         revision += 1
         let token = revision
@@ -30,7 +31,7 @@ final class RoomVideoDemoModel: ObservableObject {
                     let name = chinese ? "示例成员 \(index)" : "Sample member \(index)"
                     guard let url = await DemoClipFactory.makeClip(moment: 1,
                         label: chinese ? "本地动态示例" : "Local motion sample", author: name,
-                        seconds: 3, orientation: .portrait) else { throw CancellationError() }
+                        seconds: clipSeconds, orientation: .portrait) else { throw CancellationError() }
                     guard !closed, token == revision, !Task.isCancelled else {
                         try? FileManager.default.removeItem(at: url)
                         throw CancellationError()

@@ -15,7 +15,7 @@ final class LocalRoomImportConcurrencyTests: XCTestCase {
     }
 
     func testCancellationAfterPreparationAndConcurrentReplacementAreFailClosed() async throws {
-        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
+        let runtime = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         defer { runtime.close() }
         let clips = runtime.store.recordedClips(for: runtime.challengeID)
         let target = try XCTUnwrap(clips.first?.authorID)
@@ -47,8 +47,8 @@ final class LocalRoomImportConcurrencyTests: XCTestCase {
     }
 
     func testCloseDuringSuspendedPreparationDoesNotAffectAnotherRuntime() async throws {
-        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
-        let second = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
+        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
+        let second = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         defer { first.close(); second.close() }
         let firstClip = try XCTUnwrap(first.store.recordedClips(for: first.challengeID).first)
         let secondClips = second.store.recordedClips(for: second.challengeID)

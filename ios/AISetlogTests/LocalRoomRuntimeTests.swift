@@ -7,7 +7,7 @@ final class LocalRoomRuntimeTests: XCTestCase {
     func testTwoAndThreeMembersUseRealStoreAndCompositorThenCleanUp() async throws {
         let epoch = AccountStore.identityRevision
         for count in [2, 3] {
-            let runtime = try await LocalRoomRuntime.make(memberCount: count, chinese: true)
+            let runtime = try await LocalRoomRuntime.make(memberCount: count, chinese: true, clipSeconds: DemoHarness.clipSeconds)
             defer { runtime.close() }
             let clips = runtime.store.recordedClips(for: runtime.challengeID)
             XCTAssertEqual(clips.count, count)
@@ -42,8 +42,8 @@ final class LocalRoomRuntimeTests: XCTestCase {
     }
 
     func testConcurrentRuntimesAndDraftsRemainIndependent() async throws {
-        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
-        let second = try await LocalRoomRuntime.make(memberCount: 2, chinese: false)
+        let first = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
+        let second = try await LocalRoomRuntime.make(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         defer { first.close(); second.close() }
         let clip = try XCTUnwrap(first.store.recordedClips(for: first.challengeID).first)
         let draft = try first.drafts.keep(tempURL: clip.url, orientation: .portrait, overlayText: "Only mine")

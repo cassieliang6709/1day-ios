@@ -10,7 +10,7 @@ final class LocalFormalMediaLifecycleTests: XCTestCase {
         let epoch = AccountStore.identityRevision
         let owner = LocalRoomDemoOwner()
         defer { owner.close() }
-        await owner.load(memberCount: 2, chinese: false)
+        await owner.load(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         let first = try XCTUnwrap(owner.runtime)
         let oldScope = try XCTUnwrap(owner.media)
         let originals = first.store.recordedClips(for: first.challengeID)
@@ -22,7 +22,7 @@ final class LocalFormalMediaLifecycleTests: XCTestCase {
         XCTAssertEqual(oldScope.cached("moment"), output)
         XCTAssertTrue(originals.allSatisfy { FileManager.default.fileExists(atPath: $0.url.path) })
 
-        await owner.load(memberCount: 3, chinese: true)
+        await owner.load(memberCount: 3, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         let second = try XCTUnwrap(owner.runtime)
         let newScope = try XCTUnwrap(owner.media)
         XCTAssertTrue(first.isClosed)
@@ -51,7 +51,7 @@ final class LocalFormalMediaLifecycleTests: XCTestCase {
     func testCompletedRealRenderDeliveredAfterDismissalIsDiscarded() async throws {
         let owner = LocalRoomDemoOwner()
         defer { owner.close() }
-        await owner.load(memberCount: 2, chinese: false)
+        await owner.load(memberCount: 2, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         let runtime = try XCTUnwrap(owner.runtime)
         let scope = try XCTUnwrap(owner.media)
         var options = VideoStitcher.Options()
@@ -65,7 +65,7 @@ final class LocalFormalMediaLifecycleTests: XCTestCase {
         XCTAssertFalse(scope.accept(output, key: "late"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
         XCTAssertNil(scope.cached("late"))
-        await owner.load(memberCount: 3, chinese: false)
+        await owner.load(memberCount: 3, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertNil(owner.runtime)
         XCTAssertNil(owner.media)
         XCTAssertFalse(owner.failed)

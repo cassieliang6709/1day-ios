@@ -151,7 +151,9 @@ final class LocalRoomRuntime {
     /// Generates app-owned moving fixtures and feeds the production store model.
     /// Each member has a stable unique clip key; only temporary generated files
     /// are removed. No photos, real account data or real room records are read.
-    static func make(memberCount: Int, chinese: Bool) async throws -> LocalRoomRuntime {
+    static func make(memberCount: Int, chinese: Bool,
+                     clipSeconds: Double = DemoClipFactory.standInSeconds
+    ) async throws -> LocalRoomRuntime {
         guard (2...3).contains(memberCount) else { throw Failure.invalidMemberCount }
         let naming = DemoRoomNaming.fromLaunchArguments()
         let storage = try LocalRoomDemoStorage()
@@ -188,7 +190,7 @@ final class LocalRoomRuntime {
                     } else {
                         guard let made = await DemoClipFactory.makeClip(moment: day,
                             label: chinese ? "本地动态示例" : "Local motion sample", author: name,
-                            seconds: 3, orientation: .portrait) else { throw Failure.media }
+                            seconds: clipSeconds, orientation: .portrait) else { throw Failure.media }
                         generated = made
                         source = made
                     }

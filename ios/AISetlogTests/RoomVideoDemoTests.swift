@@ -7,25 +7,27 @@ final class RoomVideoDemoTests: XCTestCase {
     func testTwoAndThreeMembersProduceActualPortraitAndLandscapeFilms() async throws {
         let model = RoomVideoDemoModel()
         defer { model.close() }
-        await model.prepare(count: 2, landscape: false, chinese: true)
+        await model.prepare(count: 2, landscape: false, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         XCTAssertEqual(model.clips.count, 3)
         XCTAssertEqual(Set(model.clips.compactMap(\.authorID)).count, 3)
         let portrait = try XCTUnwrap(model.film)
         let firstAsset = AVURLAsset(url: portrait)
         let firstDuration = try await firstAsset.load(.duration).seconds
-        XCTAssertEqual(firstDuration, 3, accuracy: 0.2)
+        // The film is one moment, so it is as long as the takes in it — which
+        // is whatever this suite asked the generator for, not a literal 3.
+        XCTAssertEqual(firstDuration, DemoHarness.clipSeconds, accuracy: 0.1)
         let firstTracks = try await firstAsset.loadTracks(withMediaType: .video)
         let firstSize = try await XCTUnwrap(firstTracks.first).load(.naturalSize)
         XCTAssertGreaterThan(firstSize.height, firstSize.width)
 
-        await model.prepare(count: 3, landscape: true, chinese: true)
+        await model.prepare(count: 3, landscape: true, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertFalse(model.failed)
         let landscape = try XCTUnwrap(model.film)
         XCTAssertNotEqual(portrait, landscape)
         let nextAsset = AVURLAsset(url: landscape)
         let nextDuration = try await nextAsset.load(.duration).seconds
-        XCTAssertEqual(nextDuration, 3, accuracy: 0.2)
+        XCTAssertEqual(nextDuration, DemoHarness.clipSeconds, accuracy: 0.1)
         let tracks = try await nextAsset.loadTracks(withMediaType: .video)
         let size = try await XCTUnwrap(tracks.first).load(.naturalSize)
         XCTAssertGreaterThan(size.width, size.height)
@@ -37,7 +39,7 @@ final class RoomVideoDemoTests: XCTestCase {
     func testImportedCopyReplacesOnlySelectedMemberAndIsCleanedUp() async throws {
         let model = RoomVideoDemoModel()
         defer { model.close() }
-        await model.prepare(count: 2, landscape: false, chinese: false)
+        await model.prepare(count: 2, landscape: false, chinese: false, clipSeconds: DemoHarness.clipSeconds)
         let original = try XCTUnwrap(model.clips.first?.url)
         let unaffected = model.clips[1].url
         let copy = FileManager.default.temporaryDirectory.appendingPathComponent("import-test-\(UUID()).mov")
@@ -56,7 +58,7 @@ final class RoomVideoDemoTests: XCTestCase {
     func testClosedDemoDoesNotRegenerateMedia() async {
         let model = RoomVideoDemoModel()
         model.close()
-        await model.prepare(count: 3, landscape: false, chinese: true)
+        await model.prepare(count: 3, landscape: false, chinese: true, clipSeconds: DemoHarness.clipSeconds)
         XCTAssertTrue(model.clips.isEmpty)
         XCTAssertNil(model.film)
     }

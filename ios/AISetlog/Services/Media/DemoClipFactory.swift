@@ -23,6 +23,20 @@ enum DemoClipFactory {
 
     private static let frameRate: Int32 = 30
 
+    /// How long a stand-in clip runs when nobody says otherwise.
+    ///
+    /// Three seconds is a length a person can watch. It is not a length a test
+    /// needs: render cost is per output frame, the CI runner has no GPU, and
+    /// the suites that drive this harness pass `DemoHarness.clipSeconds`
+    /// instead — which is the difference between a 39-minute lane and a
+    /// 7-minute one.
+    ///
+    /// Named rather than written as `3` at each call site because two tests
+    /// had hardcoded the number in assertions that were not about it (a film
+    /// duration, a frame sampled at 2.5s) and both broke the first time it
+    /// moved.
+    static let standInSeconds: Double = 3
+
     /// `String.hashValue` is seeded per process, so two simulators would pick
     /// unrelated colours for the same name — and could collide on the same one.
     private static func stableHash(_ text: String) -> Int {
