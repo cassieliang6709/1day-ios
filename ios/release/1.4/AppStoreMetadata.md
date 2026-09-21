@@ -107,7 +107,7 @@ predate anyone picking a colour), and no shot had a clip waiting to be filed.
 | # | File | Screen |
 | --- | --- | --- |
 | 01 | `01-hero.png` | Onboarding: the 3-moments-to-1-film promise, sample film playing |
-| 02 | `02-home.png` | Home, empty — the clearest look at the three tabs |
+| 02 | `02-home.png` | Home with three stories going — a shared room part-filmed, a film ready, one from yesterday (en-US only; zh-Hans is still the empty state) |
 | 03 | `03-themes.png` | The poster rack: you don't have to think of anything yourself |
 | 04 | `04-setup.png` | One settings page: moments, who's filming, clip length, frame |
 | 05 | `05-timeline.png` | A story just created, nothing filmed yet |
@@ -119,6 +119,27 @@ sheet, so lead with the promise and the payoff:
 ```
 01-hero  →  06-film  →  03-themes  →  04-setup  →  05-timeline  →  02-home
 ```
+
+`02-home.png` in the English set is the one shot `capture.sh` does not
+produce. Straight after onboarding the home screen is empty — a mascot and
+"No story yet today" — which is the least interesting screen in the app. So
+`seed_home.py` runs after the capture and adds two stories beside the finished
+one, in the two states the list exists to show: a part-filmed shared room and
+a solo story from yesterday. Then shoot home again by hand and overwrite 02:
+
+```bash
+xcrun simctl terminate "$SIM" com.cassie.AISetlog
+python3 store-kit/seed_home.py "$SIM" en
+xcrun simctl bootstatus "$SIM" -b && sleep 5
+xcrun simctl launch --terminate-running-process "$SIM" com.cassie.AISetlog \
+  -onboarding.completed.v1 YES -appLanguage english
+sleep 9 && xcrun simctl io "$SIM" screenshot store-kit/en-US/02-home.png
+```
+
+The data is the app's own: `Challenge.isShared` is `roomCode != nil`, and the
+moment keys are copied from the real templates so each story's cover, title
+and moment names agree. The zh-Hans 02 is still the empty state — only the
+English one was asked for.
 
 Re-shoot with `store-kit/capture.sh english en-US` (and `chinese zh-Hans`).
 Needs a booted `1day-shots` simulator, a Debug build at
