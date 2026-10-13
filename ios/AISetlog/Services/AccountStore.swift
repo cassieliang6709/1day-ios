@@ -177,6 +177,30 @@ final class AccountStore {
     }
 #endif
 
+    /// Keeps the controller's delegate alive for the length of the request;
+    /// `ASAuthorizationController` holds it weakly.
+    private var existingAccountRelay: ExistingAccountRelay?
+
+    /// Someone reinstalling, or on a new phone, has an Apple ID this app has
+    /// already seen. Apple can offer it straight away — one tap and Face ID,
+    /// instead of finding the button. If there's no such credential the
+    /// request fails without showing anything, which is the whole point of
+    /// `preferImmediatelyAvailableCredentials`.
+    @MainActor
+    func offerExistingAccount() {
+        guard account == nil, defaults != nil, existingAccountRelay == nil else { return }
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        configure(request)
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        let relay = ExistingAccountRelay(controller: controller) { [weak self] result in
+            guard let self else { return }
+            self.existingAccountRelay = nil
+            if case .success = result { _ = try? self.completeSignIn(result) }
+        }
+        existingAccountRelay = relay
+        controller.performRequests(options: .preferImmediatelyAvailableCredentials)
+    }
+
     private func persist(_ account: Account) {
         if defaults != nil, self.account?.id != account.id { Self.identityRevision &+= 1 }
         self.account = account
@@ -188,5 +212,40 @@ final class AccountStore {
     enum SignInError: LocalizedError {
         case unexpectedCredential
         var errorDescription: String? { "Could not read your Apple ID." }
+    }
+}
+
+/// The delegate and presentation anchor for `offerExistingAccount`, kept out
+/// of `AccountStore` so the store doesn't have to become an `NSObject`.
+private final class ExistingAccountRelay: NSObject,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding {
+    private let controller: ASAuthorizationController
+    private let completion: (Result<ASAuthorization, Error>) -> Void
+
+    init(controller: ASAuthorizationController,
+         completion: @escaping (Result<ASAuthorization, Error>) -> Void) {
+        self.controller = controller
+        self.completion = completion
+        super.init()
+        controller.delegate = self
+        controller.presentationContextProvider = self
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        completion(.success(authorization))
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: Error) {
+        completion(.failure(error))
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 }

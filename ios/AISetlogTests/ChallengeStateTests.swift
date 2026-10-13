@@ -119,14 +119,14 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2s", unitPlural: "moments"),
-            "0 of 9 2s moments recorded")
+            "0 of 9 moments recorded · up to 2s each")
         UserDefaults.standard.set(
             AppLanguage.chinese.rawValue,
             forKey: AppLanguage.storageKey)
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2 秒", unitPlural: "个瞬间"),
-            "9 个瞬间中已录 0 段（2 秒）")
+            "9 个瞬间中已录 0 段（每段最长 2 秒）")
     }
 
     func testUpdatingPlanTitlesPersistsWithoutDroppingSlotsOrClips() throws {

@@ -93,5 +93,8 @@ struct FloatingTabBar<Tab: Hashable>: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        // The pill is the only thing saying which tab is current, and
+        // VoiceOver can't see a gradient.
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

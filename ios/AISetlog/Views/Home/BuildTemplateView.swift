@@ -22,7 +22,6 @@ struct BuildTemplateView: View {
         self.onSave = onSave
         _selected = State(initialValue: template?.momentKeys ?? [])
         _name = State(initialValue: template?.name.en ?? "")
-        _emoji = State(initialValue: template?.emoji ?? "🎬")
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -32,7 +31,6 @@ struct BuildTemplateView: View {
     @State private var selected: [String] = []
     @State private var hasManuallyOrdered = false
     @State private var name = ""
-    @State private var emoji = "🎬"
     @State private var coverChoice: TemplateCoverChoice = .unchanged
     @FocusState private var nameFocused: Bool
 
@@ -134,14 +132,10 @@ struct BuildTemplateView: View {
     // MARK: - Pieces
 
     private var headerCard: some View {
+        // No emoji field any more: nothing on screen shows a template's emoji
+        // (the cover is the picture), so asking for one was a question with
+        // no visible answer. The model keeps the field for old saved data.
         HStack(spacing: 12) {
-            TextField("🎬", text: $emoji)
-                .font(.title2)
-                .frame(width: 44)
-                .multilineTextAlignment(.center)
-                .onChange(of: emoji) { _, new in
-                    if new.count > 1 { emoji = String(new.suffix(1)) }
-                }
             TextField(
                 "", text: $name,
                 prompt: Text(Strings.nameYourTemplate).foregroundStyle(.secondary.opacity(0.75))
@@ -184,9 +178,14 @@ struct BuildTemplateView: View {
                 guard selected.indices.contains(index) else { return }
                 selected.remove(at: index)
             } label: {
+                // Small glyph, thumb-sized target.
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary.opacity(0.5))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(Strings.deleteMoment)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -216,6 +215,10 @@ struct BuildTemplateView: View {
                 )
         }
         .buttonStyle(.plain)
+        // Full means full here too, so a template can't hold more moments
+        // than the composer will let a story have.
+        .disabled(!isSelected && selected.count >= StoryMoments.maxCount)
+        .opacity(!isSelected && selected.count >= StoryMoments.maxCount ? 0.45 : 1)
         .sensoryFeedback(.selection, trigger: isSelected)
     }
 
@@ -233,6 +236,7 @@ struct BuildTemplateView: View {
         if let idx = selected.firstIndex(of: prompt) {
             selected.remove(at: idx)
         } else {
+            guard selected.count < StoryMoments.maxCount else { return }
             selected.append(prompt)
             if !hasManuallyOrdered {
                 selected.sort { poolIndex($0) < poolIndex($1) }
@@ -258,10 +262,9 @@ struct BuildTemplateView: View {
 
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedEmoji = emoji.trimmingCharacters(in: .whitespaces)
         let template = ChallengeTemplate(
             id: editingTemplate?.id ?? UUID(),
-            emoji: trimmedEmoji.isEmpty ? "🎬" : trimmedEmoji,
+            emoji: editingTemplate?.emoji ?? "🎬",
             name: LocalizedText(en: trimmedName, zh: trimmedName),
             momentKeys: selected.map {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines)

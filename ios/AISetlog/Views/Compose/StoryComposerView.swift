@@ -34,6 +34,9 @@ struct StoryComposerView: View {
     @State private var selection = ComposerSelection.initial(
         oneDay: ChallengeTemplate.oneDayBuiltins)
     @State private var clipLength: Challenge.ClipLength = .tiny
+    /// Set once the user picks a length, so the solo/room default stops
+    /// overriding it.
+    @State private var clipLengthChosen = false
     @State private var orientation: Challenge.Orientation = .portrait
     @State private var withFriends = false
     @State private var title = ""
@@ -117,10 +120,6 @@ struct StoryComposerView: View {
             Text(errorText ?? "")
         }
         .sheet(isPresented: $showSetup) { setupSheet }
-        .sheet(isPresented: $showSignIn) {
-            SignInView { createSharedRoom() }
-                .presentationDetents([.medium])
-        }
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView(onDone: applyCustomDraft)
         }
@@ -144,7 +143,13 @@ struct StoryComposerView: View {
         }
         // Switching to solo answers "sign into iCloud" all by itself, so the
         // warning shouldn't outlive the choice that caused it.
-        .onChange(of: withFriends) { _, _ in errorText = nil }
+        .onChange(of: withFriends) { _, together in
+            errorText = nil
+            // Lengths are a ceiling now, and in a room a ceiling of 2s cuts
+            // everyone off; 5s leaves room without making the film drag.
+            guard !clipLengthChosen else { return }
+            clipLength = together ? .story : .tiny
+        }
         .onChange(of: selection.mode) { _, _ in
             guard !isCustomPromptStory else { return }
             selection.reconcileTemplate(
@@ -190,7 +195,9 @@ struct StoryComposerView: View {
                 title: $title,
                 titleEdited: $titleEdited,
                 withFriends: $withFriends,
-                clipLength: $clipLength,
+                clipLength: Binding(
+                    get: { clipLength },
+                    set: { clipLength = $0; clipLengthChosen = true }),
                 orientation: $orientation,
                 moments: $moments,
                 isOneDay: mode == .oneDay,
@@ -199,6 +206,13 @@ struct StoryComposerView: View {
             sheetFooter
         }
         .background(OneDayCanvas(seed: 3))
+        // Here, not beside `showSetup`'s sheet: `start()` runs inside this
+        // sheet, and a presenter that's already showing one sheet won't show
+        // a second — 创建房间 did nothing until the setup sheet was closed.
+        .sheet(isPresented: $showSignIn) {
+            SignInView { createSharedRoom() }
+                .presentationDetents([.medium])
+        }
     }
 
     private var sheetFooter: some View {

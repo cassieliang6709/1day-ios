@@ -20,13 +20,13 @@ final class IntentFirstCreationUITests: XCTestCase {
         XCTAssertTrue(name.exists)
         XCTAssertLessThan(intent.frame.minY, name.frame.minY)
         XCTAssertFalse(app.buttons["suggest-prompts"].isEnabled)
-        XCTAssertFalse(app.buttons["Use these"].isEnabled)
+        XCTAssertFalse(app.buttons["use-these-moments"].isEnabled)
         // Do not call AI or save templates/stories. This verifies editable
         // production controls, not remote generation or final creation.
         name.tap()
         name.typeText("My own title")
         XCTAssertEqual(name.value as? String, "My own title")
-        XCTAssertFalse(app.buttons["Use these"].isEnabled)
+        XCTAssertFalse(app.buttons["use-these-moments"].isEnabled)
         app.buttons["Cancel"].tap()
     }
 }

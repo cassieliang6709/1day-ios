@@ -61,6 +61,10 @@ struct OneDayCanvas: View {
 
 /// A floating glass card: translucent white, hairline edge, soft ambient lift.
 /// The app's default container — use it instead of stacking bordered boxes.
+///
+/// Padding plus `glassSurface` and nothing else. The two used to carry their
+/// own copies of the same fill/tint/stroke/shadow stack, which is how a fix to
+/// one (the dark-mode shadow) would have quietly missed the other.
 struct GlassCard<Content: View>: View {
     var radius: CGFloat = OneDay.Radius.card
     var padding: CGFloat = 18
@@ -72,45 +76,77 @@ struct GlassCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(OneDay.surface)
-                    .overlay {
-                        if let tint {
-                            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .fill(tint.opacity(0.10))
-                        }
-                    }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(OneDay.hairline, lineWidth: 1)
-            }
-            .oneDaySoftShadow()
+            .glassSurface(radius: radius, tint: tint)
     }
 }
 
 extension View {
-    /// Glass treatment for a view that builds its own padding.
+    /// Glass treatment for a view that builds its own padding. The single
+    /// implementation behind `GlassCard` too.
     func glassSurface(
         radius: CGFloat = OneDay.Radius.card,
         tint: Color? = nil
     ) -> some View {
-        background {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return background {
+            shape
                 .fill(OneDay.surface)
                 .overlay {
                     if let tint {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .fill(tint.opacity(0.10))
+                        shape.fill(tint.opacity(0.10))
                     }
                 }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(OneDay.hairline, lineWidth: 1)
+            shape.strokeBorder(OneDay.hairline, lineWidth: 1)
         }
         .oneDaySoftShadow()
+    }
+}
+
+// MARK: - Controls over footage
+
+/// Dark glass for anything that floats on a live camera feed or a playing
+/// clip: white glyphs on a black-tinted material, in both appearances.
+///
+/// Why not `.regularMaterial` / `.ultraThinMaterial` on their own: a system
+/// material follows the *device's* appearance. In light mode it turns
+/// near-white, so a white label on it over a bright frame is white on white;
+/// in dark mode the app's themed inks (`oneDayNavy` → #9AB7FF) land pale on
+/// pale. Footage has no appearance — it is whatever the camera saw — so the
+/// control has to bring its own contrast. This pins the material dark,
+/// darkens it further with a black wash (so it still reads over a sunlit
+/// sky), and adds a hairline so the edge holds against a black frame too.
+///
+/// It sets the foreground to white, so pass content with no colour of its own.
+/// The same recipe `CameraComponents`' zoom capsule already used by hand.
+struct OverVideoGlass<S: InsettableShape>: ViewModifier {
+    let shape: S
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundStyle(.white)
+            .background(.black.opacity(0.28), in: shape)
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.strokeBorder(.white.opacity(0.22), lineWidth: 1))
+            // Last, so it reaches the material and anything inside the label
+            // (a `.secondary` style, a `ProgressView`) that resolves by scheme.
+            .environment(\.colorScheme, .dark)
+    }
+}
+
+extension View {
+    /// Dark-glass backing for a control over video. See `OverVideoGlass`.
+    ///
+    ///     Label(…).padding(…).overVideoControl()            // capsule
+    ///     Image(systemName: "xmark").frame(…).overVideoControl(in: Circle())
+    func overVideoControl<S: InsettableShape>(in shape: S) -> some View {
+        modifier(OverVideoGlass(shape: shape))
+    }
+
+    /// Capsule, the app's default control shape.
+    func overVideoControl() -> some View {
+        modifier(OverVideoGlass(shape: Capsule()))
     }
 }
 
@@ -130,30 +166,6 @@ struct OneDayBrandLogo: View {
     }
 }
 
-/// The app mark: a rounded blue tile with a lens and a shutter dot.
-struct OneDayLogoMark: View {
-    var body: some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height)
-
-            ZStack {
-                RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
-                    .fill(OneDay.brand)
-                    .oneDayGlow(strength: side / 92)
-
-                Circle()
-                    .stroke(.white.opacity(0.9), lineWidth: max(side * 0.055, 2))
-                    .frame(width: side * 0.46, height: side * 0.46)
-
-                Circle()
-                    .fill(.white)
-                    .frame(width: side * 0.11, height: side * 0.11)
-                    .offset(x: side * 0.23, y: -side * 0.23)
-            }
-        }
-    }
-}
-
 /// The mascot: the drawn artwork, in the same ringed circle it wears as an
 /// avatar. Shows up wherever the app is doing something on the user's behalf
 /// (stitching, waiting on a friend) or has nothing to show yet.
@@ -170,16 +182,19 @@ struct OneDayBuddy: View {
     var isWorking = false
 
     @State private var breathe = false
+    /// A loop that never ends is exactly what Reduce Motion asks apps to
+    /// stop. The mascot holds still instead; the screen it sits on already
+    /// says in words that something is happening.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         AvatarDot(name: nil, size: size)
             .scaleEffect(breathe ? 0.94 : 1)
-            .animation(
-                .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-                value: breathe)
-            .onAppear {
-                guard isWorking else { return }
-                breathe = true
+            .animation(OneDay.Motion.reduced(OneDay.Motion.pulse, if: reduceMotion), value: breathe)
+            .onAppear { breathe = isWorking && !reduceMotion }
+            // Turned on mid-loop: settle back to rest, without animating there.
+            .onChange(of: reduceMotion) { _, reduced in
+                breathe = isWorking && !reduced
             }
     }
 }

@@ -19,6 +19,57 @@ struct CuteCameraBackdrop: View {
     }
 }
 
+/// The camera's round glass buttons — close, flip, frame — and its glass
+/// capsules, all one material.
+///
+/// Dark glass with white glyphs in both appearances. They used to be a 92%
+/// white disc with no foreground set, so in dark mode the glyph inherited the
+/// system's white and sat on a white disc at about 1.3:1. Dark glass reads over
+/// a bright frame and a night shot alike, which is the same reasoning
+/// `ZoomControlRow` already follows. Pinned to `.dark` so the material doesn't
+/// flip to near-white in light mode.
+///
+/// Local to the camera on purpose: a shared over-video style is being added to
+/// the design system, and when it lands these should move onto it rather than
+/// grow a second copy there.
+struct CameraGlass: ViewModifier {
+    enum Shape { case circle, capsule }
+    var shape: Shape = .circle
+    var diameter: CGFloat = 38
+
+    func body(content: Content) -> some View {
+        switch shape {
+        case .circle:
+            content
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: diameter, height: diameter)
+                .background(.black.opacity(0.32), in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                .environment(\.colorScheme, .dark)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                // Drawn at 38, hit at 44: the HIG minimum, without the disc
+                // getting any bigger next to the shutter.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        case .capsule:
+            content
+                .foregroundStyle(.white)
+                .background(.black.opacity(0.32), in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                .environment(\.colorScheme, .dark)
+        }
+    }
+}
+
+extension View {
+    func cameraGlass(_ shape: CameraGlass.Shape = .circle, diameter: CGFloat = 38) -> some View {
+        modifier(CameraGlass(shape: shape, diameter: diameter))
+    }
+}
+
 struct CameraShell<Content: View>: View {
     /// Whose camera this is. Only the frame's tint uses it now — the picture
     /// itself no longer gets labelled with your own name.
@@ -138,9 +189,11 @@ struct MomentStampOverlay: View {
     }
 
     /// Only ever read while recording — a state read-out, not a sticker.
-    private var modeText: String {
-        "REC 00:\(String(format: "%02d", Int(clipSeconds)))"
-    }
+    ///
+    /// Just "REC". It used to print the take's *cap* as "REC 00:02", which
+    /// never moved and so read as a frozen clock; the seconds that matter are
+    /// counting down in the ring under the picture.
+    private var modeText: String { "REC" }
 
     var body: some View {
         GeometryReader { proxy in
@@ -187,14 +240,26 @@ struct MomentStampOverlay: View {
                     .padding(edgeInset)
                 }
 
+                // Top centre, between the timer chip and the date, rather than
+                // on the middle of the picture: dead centre is where the face
+                // and the caption go, and a red pill there sat on both.
                 if mode == .recording {
-                    Text(modeText)
-                        .font(.system(size: 13 * scale, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12 * scale)
-                        .padding(.vertical, 7 * scale)
-                        .background(.red, in: Capsule())
-                        .position(x: size.width * 0.5, y: size.height * 0.5)
+                    HStack(spacing: 5 * scale) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 8 * scale))
+                            .foregroundStyle(.red)
+                            // The one moving thing in the stamp, so "it is
+                            // filming" doesn't depend on reading anything.
+                            .symbolEffect(.pulse, options: .repeating)
+                        Text(modeText)
+                            .font(.system(size: 12 * scale, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 10 * scale)
+                    .padding(.vertical, 6 * scale)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .position(x: size.width * 0.5, y: edgeInset + 11 * scale)
+                    .accessibilityHidden(true)
                 }
 
                 if let overlayText, !overlayText.isEmpty {
@@ -456,6 +521,10 @@ struct ZoomControlRow: View {
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
                     .background(Circle().fill(.black.opacity(0.35)))
+                    // Hit area to 44 without growing the disc; the row's
+                    // vertical padding gives the extra height back.
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.closeCustomZoom)
@@ -531,13 +600,18 @@ struct CaptionEditor: View {
                 .frame(width: 30, height: 30)
                 .background(Color.oneDayBrand.opacity(0.12), in: Circle())
 
+            // Fixed dark ink: the capsule behind this is a fixed near-white, so
+            // the system's adaptive `.primary`/`.secondary` turned white-on-
+            // white in dark mode.
             TextField(
                 "",
                 text: $text,
                 prompt: Text(Strings.writeOnMoment)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black.opacity(0.45))
             )
             .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.black.opacity(0.86))
+            .tint(Color.oneDayBrand)
             .textInputAutocapitalization(.sentences)
             .submitLabel(.done)
             .focused(isFocused)
@@ -553,9 +627,13 @@ struct CaptionEditor: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body.bold())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.black.opacity(0.4))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .padding(.vertical, -10)
+                .accessibilityLabel(Strings.deleteCaptionAction)
             }
         }
         .padding(.horizontal, 12)

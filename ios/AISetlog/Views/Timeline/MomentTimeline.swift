@@ -151,6 +151,13 @@ struct MomentTimeline: View {
     /// A moment that happened. The title reads back in `inkSoft`, because the
     /// still under it is the content and the row is a record rather than an
     /// invitation.
+    ///
+    /// In a room, a moment a friend filmed and I haven't also carries a small
+    /// 「加上你的」. Before it did, the only row that could say "add yours" was
+    /// `OpenSlotRow`, which is drawn only for moments *nobody* has filmed — so
+    /// the moment a friend got there first, the slot quietly stopped being
+    /// mine to film. That is backwards for a room: a moment with someone in
+    /// it is the one most worth joining.
     private func filmedNode(_ slot: Int, slotClips: [DayClip]) -> some View {
         let mine = StoryGridView.mineAmong(slotClips, myID: myID)
         let lanes = StoryGridView.lanes(slotClips: slotClips, members: members, myID: myID)
@@ -173,6 +180,10 @@ struct MomentTimeline: View {
                         .foregroundStyle(OneDay.inkFaint)
                         .monospacedDigit()
                 }
+
+                if challenge.isShared, agenda.isAwaitingMine(slot: slot) {
+                    addYoursButton(slot)
+                }
             }
 
             ClipThumb(
@@ -188,14 +199,42 @@ struct MomentTimeline: View {
                 // Wide and short. This is a row in a list, not a cell in a
                 // contact sheet: it has the full width and no neighbour to
                 // match, so a portrait tile here would push the next moment
-                // most of a screen away.
-                aspectRatio: 2.1,
+                // most of a screen away. Past seven moments it gets shorter
+                // still, so a long day stays a list you can scroll rather
+                // than a wall of stills.
+                aspectRatio: agenda.total > 7 ? 3.2 : 2.1,
                 sourceAspect: challenge.resolvedOrientation == .landscape
-                    ? 16.0 / 9 : 9.0 / 16
+                    ? 16.0 / 9 : 9.0 / 16,
+                // The title is on the line above.
+                showsCaption: false
             ) {
                 onPlay(slot)
             }
         }
+    }
+
+    /// My way into a moment somebody else filmed. The same action as an open
+    /// row — it opens the camera on this slot — at the size of a tag, because
+    /// the still below is still what the row is about.
+    ///
+    /// The capsule is ~28pt; the padding pulled back out after `contentShape`
+    /// keeps a 44pt target without making the title line 44pt tall.
+    private func addYoursButton(_ slot: Int) -> some View {
+        Button { onFilm(slot) } label: {
+            Label(Strings.addYourTake, systemImage: "plus")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.oneDayBrand)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.oneDayMist.opacity(0.55), in: Capsule())
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .padding(.vertical, -8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(Strings.addYourTake))
+        .accessibilityHint(Text(title(for: slot)))
+        .accessibilityIdentifier("timeline-add-yours-\(slot)")
     }
 
     /// A moment still to take. Reuses the row the 「还没拍的」 card was built

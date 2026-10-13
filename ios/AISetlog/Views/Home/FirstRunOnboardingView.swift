@@ -1,12 +1,16 @@
-import AVFoundation
+import AuthenticationServices
 import SwiftUI
 
-/// The first screen is deliberately a promise, not a tutorial: three tiny
-/// moments become one film. More capable creation stays available after the
+/// The first screen is deliberately a promise, not a tutorial: a few moments
+/// become one film. More capable creation stays available after the
 /// first film, once there is something meaningful to build on.
 struct FirstRunOnboardingView: View {
     let onCreateStory: () -> Void
     let onJoin: () -> Void
+
+    @Environment(AccountStore.self) private var account
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var signInError: String?
 
     /// Bound so Settings changes immediately redraw the localized lockup and
     /// copy even before someone has made their first story.
@@ -19,12 +23,6 @@ struct FirstRunOnboardingView: View {
             GeometryReader { proxy in
                 let isCompactHeight = proxy.size.height < 700
                 let horizontalInset = min(max(proxy.size.width * 0.08, 24), 36)
-                let sampleWidth = min(
-                    min(
-                        proxy.size.width * (isCompactHeight ? 0.48 : 0.60),
-                        proxy.size.height * (isCompactHeight ? 0.28 : 0.25)),
-                    280)
-
                 ScrollView {
                     VStack(spacing: 0) {
                         Spacer(minLength: max(proxy.size.height * 0.04, 18))
@@ -39,27 +37,19 @@ struct FirstRunOnboardingView: View {
                             .minimumScaleFactor(0.76)
                             .padding(.top, isCompactHeight ? 20 : 26)
 
-                        equation
-                            .padding(.top, isCompactHeight ? 17 : 24)
+                        SameDayAnimation()
+                            .frame(height: isCompactHeight ? 200 : 250)
+                            .padding(.top, isCompactHeight ? 10 : 18)
 
                         Text(Strings.firstRunGuide)
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundStyle(OneDay.inkSoft)
                             .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.85)
-                            .padding(.top, 10)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 6)
 
-                        SampleFilmCard()
-                            .frame(width: sampleWidth)
-                            .padding(.top, isCompactHeight ? 18 : 28)
-
-                        Button(action: onCreateStory) {
-                            Text(Strings.firstRunStart)
-                        }
-                        .buttonStyle(.primaryAction)
-                        .accessibilityHint(Strings.firstRunStartHint)
-                        .padding(.top, isCompactHeight ? 26 : 38)
+                        primaryAction
+                            .padding(.top, isCompactHeight ? 26 : 38)
 
                         Button(action: onJoin) {
                             Text(Strings.firstRunJoin)
@@ -68,13 +58,65 @@ struct FirstRunOnboardingView: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.top, isCompactHeight ? 20 : 27)
-                        .padding(.bottom, 24)
+
+                        if !account.isSignedIn {
+                            Button(action: onCreateStory) {
+                                Text(Strings.firstRunSoloFirst)
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(OneDay.inkSoft)
+                                    .frame(minHeight: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 6)
+                        }
+
+                        Spacer().frame(height: 18)
                     }
                     .padding(.horizontal, horizontalInset)
                     .frame(minHeight: proxy.size.height, alignment: .top)
                 }
                 .scrollIndicators(.hidden)
                 .scrollBounceBehavior(.basedOnSize)
+            }
+        }
+        // A reinstall gets its Apple ID offered before anything is tapped.
+        .task { account.offerExistingAccount() }
+    }
+
+    /// Signing in comes first, because filming together is what most people
+    /// come for, and asking halfway through a join — a sheet over a sheet — is
+    /// where it kept going wrong. Filming solo still doesn't need an account,
+    /// so the way past it stays on the screen.
+    @ViewBuilder
+    private var primaryAction: some View {
+        if account.isSignedIn {
+            Button(action: onCreateStory) {
+                Text(Strings.firstRunStart)
+            }
+            .buttonStyle(.primaryAction)
+            .accessibilityHint(Strings.firstRunStartHint)
+        } else {
+            VStack(spacing: 8) {
+                SignInWithAppleButton(.continue) { request in
+                    account.configure(request)
+                } onCompletion: { result in
+                    do {
+                        try account.completeSignIn(result)
+                        onCreateStory()
+                    } catch {
+                        if (error as? ASAuthorizationError)?.code == .canceled { return }
+                        signInError = Strings.signInFailed
+                    }
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 52)
+                .clipShape(Capsule())
+
+                Text(signInError ?? Strings.firstRunSignInNote)
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(signInError == nil ? OneDay.inkSoft : Color.oneDayEmber)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -95,218 +137,173 @@ struct FirstRunOnboardingView: View {
     private var brand: some View {
         OneDayBrandLogo(width: 196)
     }
-
-    private var equation: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 9) {
-            Text("3")
-                .font(.system(size: 31, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
-            Text(Strings.firstRunThreeMoments)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-            Image(systemName: "arrow.right")
-                .font(.system(size: 19, weight: .semibold))
-                .foregroundStyle(OneDay.inkFaint)
-                .padding(.horizontal, 2)
-            Text("1")
-                .font(.system(size: 31, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
-            Text(Strings.firstRunOneFilm)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-        }
-        .lineLimit(1)
-        .minimumScaleFactor(0.66)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Strings.firstRunEquationAccessibility)
-    }
 }
 
-/// A real, looping sample film so the first screen shows the product's payoff
-/// before anyone has to make their own story.
-private struct SampleFilmCard: View {
-    @State private var isPlaying = true
+/// The headline, shown: three people each film their own take of the same
+/// moment, and the takes slide together into one split frame that plays —
+/// which is exactly what a shared room's film looks like at that moment.
+///
+/// It replaced a strip of film with a play button. That one said "clips become
+/// a film", which the line under it already says; this says the part only
+/// 1Day does, that the film is everyone's at once.
+///
+/// Drawn, not filmed: nothing to bundle, and it follows light and dark.
+private struct SameDayAnimation: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var sampleURL: URL? {
-        Bundle.main.url(forResource: "sample-film", withExtension: "mp4")
+    private enum Phase: Int, CaseIterable {
+        case empty, first, second, third, together, playing
     }
 
-    var body: some View {
-        Group {
-            if let sampleURL {
-                Button {
-                    isPlaying.toggle()
-                } label: {
-                    videoPreview(url: sampleURL)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.firstRunSampleFilmAccessibility)
-                .accessibilityHint(
-                    isPlaying
-                        ? Strings.firstRunSampleFilmPause
-                        : Strings.firstRunSampleFilmPlay)
-            } else {
-                SampleFilmFallback()
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(Strings.firstRunSampleFilmAccessibility)
-            }
-        }
-        .aspectRatio(9 / 16, contentMode: .fit)
-        .onAppear { isPlaying = true }
-        .accessibilityIdentifier("onboardingSampleFilm")
+    private struct Take {
+        let name: String
+        /// nil draws a person glyph: the viewer has no name yet on this screen,
+        /// and 「你」 in the dot beside 「你」 read twice.
+        let initial: String?
+        let tint: Color
+        let colors: [Color]
+        let apart: CGPoint
+        let tilt: Double
+        let together: CGPoint
     }
 
-    @ViewBuilder
-    private func videoPreview(url: URL) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            MutedLoopingSamplePlayer(url: url, isPlaying: isPlaying)
+    /// Laid out on this canvas and scaled to the room the screen gives it, so
+    /// the choreography never has to be re-measured.
+    private static let canvas = CGSize(width: 260, height: 250)
+    private static let take = CGSize(width: 68, height: 124)
+    /// The three takes side by side, edge to edge, like the film's split frame.
+    private static let frame = CGRect(x: 28, y: 52, width: 204, height: 124)
 
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.68)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 92)
-            .allowsHitTesting(false)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(Strings.quickStartTitle)
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                Text("0:12")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-            }
-            .foregroundStyle(.white)
-            .padding(14)
-
-            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(.black.opacity(0.28), in: Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.64), lineWidth: 1.5))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(.white.opacity(0.78), lineWidth: 5)
-        }
-        .oneDaySoftShadow(strength: 1.1)
+    private var takes: [Take] {
+        [
+            Take(name: Strings.firstRunTakeYou, initial: nil,
+                 tint: Color(uiColor: .identityBlue),
+                 colors: [.oneDaySky, .oneDayLavender],
+                 apart: CGPoint(x: 46, y: 118), tilt: -8,
+                 together: CGPoint(x: 62, y: 114)),
+            Take(name: "Mia", initial: "M",
+                 tint: Color(uiColor: .identityAmber),
+                 colors: [.oneDayButter, .oneDayBlush],
+                 apart: CGPoint(x: 130, y: 100), tilt: 2,
+                 together: CGPoint(x: 130, y: 114)),
+            Take(name: "Sam", initial: "S",
+                 tint: Color(uiColor: .identityGrape),
+                 colors: [.oneDayMint, .oneDayCyan],
+                 apart: CGPoint(x: 214, y: 122), tilt: 8,
+                 together: CGPoint(x: 198, y: 114)),
+        ]
     }
-}
-
-/// A static preview keeps the onboarding understandable if the bundle is
-/// accidentally stripped by a build configuration.
-private struct SampleFilmFallback: View {
-    private let frames = [
-        "TemplatePerfectDay",
-        "TemplateMainCharacter",
-        "TemplateLittleAdventure",
-    ]
 
     var body: some View {
         GeometryReader { proxy in
-            let stripHeight = proxy.size.height / 3
-
-            ZStack(alignment: .bottomLeading) {
-                VStack(spacing: 2) {
-                    ForEach(frames, id: \.self) { name in
-                        Image(name)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: stripHeight - 1)
-                            .clipped()
-                            .overlay(alignment: .bottomLeading) {
-                                Text("0:02")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .shadow(color: .black.opacity(0.38), radius: 3, y: 1)
-                                    .padding(10)
-                            }
+            let scale = min(proxy.size.width / Self.canvas.width,
+                            proxy.size.height / Self.canvas.height)
+            Group {
+                if reduceMotion {
+                    // The end state, still: the point survives without the motion.
+                    drawing(at: .playing)
+                } else {
+                    PhaseAnimator(Phase.allCases) { phase in
+                        drawing(at: phase)
+                    } animation: { phase in
+                        switch phase {
+                        case .empty: .easeIn(duration: 0.25).delay(0.9)
+                        case .first: .spring(duration: 0.5, bounce: 0.3).delay(0.2)
+                        case .second, .third: .spring(duration: 0.5, bounce: 0.3).delay(0.2)
+                        case .together: .smooth(duration: 0.6).delay(0.55)
+                        // The progress bar's run *is* this animation's length.
+                        case .playing: .linear(duration: 2.2)
+                        }
                     }
                 }
+            }
+            .frame(width: Self.canvas.width, height: Self.canvas.height)
+            .scaleEffect(scale)
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.firstRunAnimationAccessibility)
+    }
 
-                Image(systemName: "play.fill")
-                    .font(.system(size: 25, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 62, height: 62)
-                    .background(.black.opacity(0.28), in: Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.64), lineWidth: 1.5))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private func drawing(at phase: Phase) -> some View {
+        let joined = phase.rawValue >= Phase.together.rawValue
+        return ZStack(alignment: .topLeading) {
+            // The split frame's border, drawn behind so the takes fill it.
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(OneDay.surface)
+                .frame(width: Self.frame.width + 10, height: Self.frame.height + 10)
+                .position(x: Self.frame.midX, y: Self.frame.midY)
+                .oneDaySoftShadow(strength: 1)
+                .opacity(joined ? 1 : 0)
+                .scaleEffect(joined ? 1 : 0.92)
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.68)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 92)
-                .allowsHitTesting(false)
+            ForEach(Array(takes.enumerated()), id: \.offset) { index, take in
+                let shown = phase.rawValue >= index + 1
+                takeCard(take, index: index, joined: joined)
+                    .rotationEffect(.degrees(joined ? 0 : take.tilt))
+                    .position(joined ? take.together : take.apart)
+                    .offset(y: shown ? 0 : -24)
+                    .opacity(shown ? 1 : 0)
+            }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(Strings.quickStartTitle)
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    Text("0:06")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+            playbackBar(progress: phase == .playing ? 1 : 0)
+                .position(x: Self.frame.midX, y: Self.frame.maxY + 26)
+                .opacity(joined ? 1 : 0)
+        }
+        .frame(width: Self.canvas.width, height: Self.canvas.height, alignment: .topLeading)
+    }
+
+    /// Apart, each take is its own rounded card with its owner on it; joined,
+    /// only the outer corners stay round, so the three read as one picture.
+    private func takeCard(_ take: Take, index: Int, joined: Bool) -> some View {
+        let r: CGFloat = 16
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: !joined || index == 0 ? r : 0,
+            bottomLeadingRadius: !joined || index == 0 ? r : 0,
+            bottomTrailingRadius: !joined || index == 2 ? r : 0,
+            topTrailingRadius: !joined || index == 2 ? r : 0,
+            style: .continuous)
+        return ZStack(alignment: .bottomLeading) {
+            LinearGradient(colors: take.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+            HStack(spacing: 5) {
+                Group {
+                    if let initial = take.initial {
+                        Text(initial).font(.system(size: 10, weight: .heavy, design: .rounded))
+                    } else {
+                        Image(systemName: "person.fill").font(.system(size: 9, weight: .bold))
+                    }
                 }
-                .foregroundStyle(.white)
-                .padding(14)
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(take.tint, in: Circle())
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                Text(take.name)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(.white.opacity(0.78), lineWidth: 5)
-            }
-            .oneDaySoftShadow(strength: 1.1)
+            .padding(7)
         }
-    }
-}
-
-private struct MutedLoopingSamplePlayer: UIViewRepresentable {
-    let url: URL
-    let isPlaying: Bool
-
-    final class PlayerView: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+        .frame(width: Self.take.width, height: Self.take.height)
+        .clipShape(shape)
+        .shadow(color: .black.opacity(joined ? 0 : 0.14), radius: 8, y: 4)
     }
 
-    final class Coordinator {
-        let player = AVQueuePlayer()
-        var looper: AVPlayerLooper?
-        var loadedURL: URL?
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> PlayerView {
-        let view = PlayerView()
-        view.playerLayer.videoGravity = .resizeAspectFill
-        view.playerLayer.player = context.coordinator.player
-        configure(context.coordinator)
-        context.coordinator.player.play()
-        return view
-    }
-
-    func updateUIView(_ uiView: PlayerView, context: Context) {
-        if context.coordinator.loadedURL != url {
-            configure(context.coordinator)
+    /// Under the joined frame: the film playing, not a button promising it will.
+    private func playbackBar(progress: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "play.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color.oneDayBrand)
+            Capsule()
+                .fill(OneDay.surfaceSoft)
+                .frame(width: 150, height: 5)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.oneDayBrand)
+                        .frame(width: 150 * progress, height: 5)
+                }
         }
-        isPlaying ? context.coordinator.player.play() : context.coordinator.player.pause()
-    }
-
-    static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
-        coordinator.player.pause()
-    }
-
-    private func configure(_ coordinator: Coordinator) {
-        coordinator.player.pause()
-        coordinator.player.removeAllItems()
-        coordinator.player.isMuted = true
-        coordinator.loadedURL = url
-        coordinator.looper = AVPlayerLooper(
-            player: coordinator.player,
-            templateItem: AVPlayerItem(url: url))
     }
 }

@@ -308,6 +308,9 @@ struct SetupStep: View {
     let isTimeOnly: Bool
 
     @FocusState private var titleFocused: Bool
+    /// Which moment row has the keyboard, so return walks down the list and a
+    /// freshly added row is ready to type into.
+    @FocusState private var focusedMoment: Int?
     @State private var momentsExpanded = false
 
     /// The shape of the frame, as a glyph. Shared with the camera's own
@@ -370,7 +373,9 @@ struct SetupStep: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(withFriends ? Strings.withFriends : Strings.composerSetupStep)
+            // Fixed: the company picker below already says who's filming, and
+            // a title that renamed itself on that toggle read as a new screen.
+            Text(Strings.composerSetupStep)
                 .font(.system(size: 30, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
         }
@@ -400,6 +405,8 @@ struct SetupStep: View {
                         .foregroundStyle(OneDay.ink)
                         .tint(Color.oneDayBrand)
                         .focused($titleFocused)
+                        .submitLabel(isTimeOnly ? .done : .next)
+                        .onSubmit(focusFirstMoment)
                         .onChange(of: title) { _, _ in
                             if titleFocused { titleEdited = true }
                         }
@@ -437,10 +444,12 @@ struct SetupStep: View {
                             }
                         }
 
-                        if moments.count < 12 {
+                        if moments.count < StoryMoments.maxCount {
                             Divider().overlay(OneDay.hairline).padding(.leading, 38)
                             Button {
                                 withAnimation(OneDay.Motion.soft) { moments.append("") }
+                                let newRow = moments.count - 1
+                                DispatchQueue.main.async { focusedMoment = newRow }
                             } label: {
                                 Label(Strings.addMoment, systemImage: "plus.circle.fill")
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -481,6 +490,11 @@ struct SetupStep: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(OneDay.ink)
                 .tint(Color.oneDayBrand)
+                .focused($focusedMoment, equals: index)
+                .submitLabel(index == moments.count - 1 ? .done : .next)
+                .onSubmit {
+                    focusedMoment = index < moments.count - 1 ? index + 1 : nil
+                }
 
             if moments.count > 2 {
                 Button {
@@ -489,14 +503,29 @@ struct SetupStep: View {
                         moments.remove(at: index)
                     }
                 } label: {
+                    // The glyph stays small; the hit area is a full 44pt so a
+                    // thumb aimed at it doesn't land in the text field instead.
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 15))
                         .foregroundStyle(OneDay.inkFaint)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Strings.deleteMoment)
             }
         }
         .padding(.vertical, 7)
+    }
+
+    /// Return on the name goes to the first moment — opening the list first if
+    /// it's collapsed, since there's nothing to focus in a summary.
+    private func focusFirstMoment() {
+        guard !isTimeOnly, !moments.isEmpty else { return }
+        withAnimation(OneDay.Motion.soft) { momentsExpanded = true }
+        // Next runloop: the rows don't exist until the expansion has rendered,
+        // and focusing a field that isn't there yet is silently dropped.
+        DispatchQueue.main.async { focusedMoment = 0 }
     }
 
     /// Two big choices, side by side. Cards rather than a toggle — who you're

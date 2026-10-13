@@ -79,23 +79,40 @@ struct GuidedMomentsView: View {
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
             }
+            // The decision this screen exists for gets the one primary button,
+            // pinned where the composer keeps its own — it used to be a small
+            // word in the nav bar losing to a full-width 出题目 mid-page.
+            .safeAreaInset(edge: .bottom) { saveFooter }
             .navigationTitle(Strings.customPromptsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(Strings.cancel) { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.useTheseMoments, action: save)
-                        .fontWeight(.bold)
-                        .disabled(!canSave)
-                }
             }
+            // The intent field is the first thing on screen, so this is about
+            // as early as a warm-up can go without doing it for people who
+            // never open the composer.
+            .task { await suggestions.warmUp() }
             .sheet(isPresented: $showPromptLibrary) {
                 PromptLibraryPicker(onChoose: addFromLibrary)
                     .presentationDetents([.medium, .large])
             }
         }
+    }
+
+    private var saveFooter: some View {
+        Button(action: save) {
+            Text(filledCount > 0
+                ? Strings.useTheseMomentsCount(filledCount)
+                : Strings.useTheseMoments)
+        }
+        .buttonStyle(.primaryAction)
+        .disabled(!canSave)
+        .accessibilityIdentifier("use-these-moments")
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
     }
 
     private var heading: some View {
@@ -138,14 +155,11 @@ struct GuidedMomentsView: View {
     private var intentCard: some View {
         GlassCard(padding: 14) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.oneDayBrand)
-                    Text(Strings.intentHeading)
-                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                }
+                // No sparkles on the heading: the glyph marks the one thing
+                // that calls the AI, and that's the button below.
+                Text(Strings.intentHeading)
+                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
 
                 TextField("", text: $intent, prompt: Text(Strings.intentPlaceholder))
                     .font(.system(size: 15.5, weight: .medium, design: .rounded))
@@ -155,27 +169,60 @@ struct GuidedMomentsView: View {
                     .onSubmit(generatePrompts)
                     .disabled(isSuggesting)
                     .accessibilityIdentifier("today-intent")
+                    // A note about the last sentence is wrong about this one.
+                    .onChange(of: intent) { _, _ in suggestionNote = nil }
 
+                // Secondary on purpose: generating is a helper, saving is the
+                // decision. Two primaries on one screen read as two exits.
                 Button(action: generatePrompts) {
                     HStack(spacing: 7) {
                         if isSuggesting {
-                            ProgressView().controlSize(.small).tint(.white)
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
                         }
-                        Text(isSuggesting ? Strings.suggestingPrompts : Strings.suggestPrompts)
+                        Text(generateLabel)
                     }
                 }
-                .buttonStyle(.primaryAction)
+                .buttonStyle(.softAction)
                 .disabled(isSuggesting || trimmedIntent.isEmpty)
+                // The soft style doesn't dim itself when disabled.
+                .opacity(trimmedIntent.isEmpty ? 0.55 : 1)
                 .accessibilityIdentifier("suggest-prompts")
 
                 if let suggestionNote {
-                    Text(suggestionNote)
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "exclamationmark.circle")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .accessibilityHidden(true)
+                        Text(suggestionNote)
+                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        Button(Strings.retry, action: generatePrompts)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.oneDayBrand)
+                            .buttonStyle(.plain)
+                            .frame(minHeight: 44)
+                            .disabled(isSuggesting || trimmedIntent.isEmpty)
+                            .accessibilityIdentifier("suggest-retry")
+                    }
+                    .transition(.opacity)
                 }
             }
         }
+        .animation(OneDay.Motion.soft, value: suggestionNote)
+    }
+
+    /// 换一批 once the list still shows the last round untouched: the same
+    /// tap now swaps those rows instead of looking for blanks that aren't there.
+    private var generateLabel: String {
+        if isSuggesting { return Strings.suggestingPrompts }
+        return SuggestedPromptFill.canReplace(answers, offered: offeredPrompts)
+            ? Strings.suggestAnotherSet
+            : Strings.suggestPrompts
     }
 
     private var promptEditor: some View {
@@ -191,7 +238,7 @@ struct GuidedMomentsView: View {
                         }
                     }
 
-                    if answers.count < 7 {
+                    if answers.count < StoryMoments.maxCount {
                         Divider().overlay(OneDay.hairline).padding(.leading, 38)
                         Button(action: addBlankPrompt) {
                             Label(Strings.addAnotherPrompt, systemImage: "plus.circle.fill")
@@ -231,13 +278,16 @@ struct GuidedMomentsView: View {
 
             if answers.count > 2 {
                 Button {
+                    guard answers.indices.contains(index) else { return }
                     answers.remove(at: index)
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .foregroundStyle(OneDay.inkFaint)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Strings.delete)
+                .accessibilityLabel(Strings.deleteMoment)
             }
         }
         .padding(.vertical, 9)
@@ -304,7 +354,7 @@ struct GuidedMomentsView: View {
     }
 
     private func addBlankPrompt() {
-        guard answers.count < 7 else { return }
+        guard answers.count < StoryMoments.maxCount else { return }
         answers.append("")
         focused = answers.count - 1
     }
@@ -314,7 +364,7 @@ struct GuidedMomentsView: View {
             $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }) {
             answers[emptyIndex] = prompt
-        } else if answers.count < 7 {
+        } else if answers.count < StoryMoments.maxCount {
             answers.append(prompt)
         }
     }
@@ -342,8 +392,11 @@ struct GuidedMomentsView: View {
                     count: Self.suggestionCount,
                     language: appLanguage)
                 metrics.recordGenerated()
+                // Rows still reading as the previous round are swapped, so a
+                // second tap on a full list gives a new set instead of nothing.
+                answers = SuggestedPromptFill.apply(
+                    suggestion.prompts, to: answers, replacing: offeredPrompts)
                 offeredPrompts = suggestion.prompts
-                answers = SuggestedPromptFill.apply(suggestion.prompts, to: answers)
                 // Read the current fields after the await: edits made while
                 // generating win as well. Old servers still seed from intent.
                 if needsName, let seeded = suggestion.title ?? IntentStoryName.derive(from: sentence) {
@@ -353,6 +406,11 @@ struct GuidedMomentsView: View {
                 suggestionNote = Strings.suggestRateLimited
             } catch {
                 suggestionNote = Strings.suggestFailed
+            }
+            // Quiet on screen, but not silent: VoiceOver users otherwise hear
+            // the spinner stop and nothing else.
+            if let suggestionNote {
+                AccessibilityNotification.Announcement(suggestionNote).post()
             }
         }
     }

@@ -41,6 +41,11 @@ struct RecordClipView: View {
     @Environment(AccountStore.self) private var account
     @State private var recorder = ClipRecorder()
     @State private var ringProgress: CGFloat = 0
+    /// When the finger went down on an idle shutter; nil when it isn't down.
+    @State private var pressStartedAt: Date?
+    /// Whether this take is being held. A held take stops on release; a tapped
+    /// one runs to the cap, as every take used to.
+    @State private var isHolding = false
     @State private var overlayText = ""
     @State private var showSavePicker = false
     @State private var showNoPlaceExits = false
@@ -60,6 +65,10 @@ struct RecordClipView: View {
     /// A pinch reports a running multiple of where it began, so where it began
     /// has to be remembered for the length of the gesture. nil = not pinching.
     @State private var pinchStartZoom: CGFloat?
+    /// Set once this screen has decided to go — the toast saying what happened
+    /// is on screen and the dismiss is a beat behind it. Blocks the shutter in
+    /// that beat, so a take can't start on a camera that's about to close.
+    @State private var isLeaving = false
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -75,6 +84,11 @@ struct RecordClipView: View {
     /// account, so this (and the identity tint it drives) falls back to a
     /// fixed default.
     private var myName: String? { account.account?.displayName }
+    /// Only for what's *about* you: the frame around the picture and the
+    /// countdown ring of the take you're filming. Buttons are actions, and
+    /// actions are brand blue everywhere in the app — an identity-tinted "Use"
+    /// made the camera the one screen where the primary button changed colour
+    /// with whoever was signed in.
     private var myTint: Color { Identity.tint(for: myName) }
 
     private var clipSeconds: Double { clipLength.seconds }
@@ -88,8 +102,12 @@ struct RecordClipView: View {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : text
     }
+    /// Falls back to 「这个瞬间」, not 「第 N 天」: a time-only story passes no
+    /// slot title, and its moments are not days — the top bar of a camera
+    /// opened at 3pm said 「第 1 天」. The stamp on the frame never shows this
+    /// for those stories (`showsPrompt` is off for them), only the header.
     private var localizedMomentTitle: String {
-        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
+        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.thisMoment
     }
 
     /// What to stamp on the picture as the moment's name — nil in free-form,
@@ -144,14 +162,36 @@ struct RecordClipView: View {
             Task { await recorder.configure() }
         }
         .onDisappear { recorder.teardown() }
+        .allowsHitTesting(!isLeaving)
+        // Felt rather than seen: with hold-to-record the finger is on the
+        // shutter, covering the ring, at exactly the moments these fire.
+        .sensoryFeedback(.impact(weight: .medium), trigger: recorder.state) { _, now in
+            now == .recording
+        }
+        .sensoryFeedback(.success, trigger: recorder.clipURL) { _, now in now != nil }
+        .sensoryFeedback(.error, trigger: recorder.failureCount)
+        .onChange(of: recorder.failureCount) { _, _ in
+            ringProgress = 0
+            isHolding = false
+            pressStartedAt = nil
+            showToast(Strings.recordingFailed)
+        }
         .confirmationDialog(
-            Strings.keepClipQuestion,
+            // Not the free-form 「这段还没归档」: this take already has a home,
+            // the moment the camera was opened from, so the first answer
+            // offered is to put it there.
+            isFreeform ? Strings.keepClipQuestion : Strings.unusedClipQuestion,
             isPresented: $askBeforeDiscarding,
             titleVisibility: .visible
         ) {
-            // Same three words as the free-form guard, deliberately: it is the
-            // same question, and answering it should not feel like a different
-            // decision depending on which camera you opened.
+            // X out of habit used to offer keep-as-draft or discard — never the
+            // thing the take was filmed for. Same call as the Use button.
+            if !isFreeform, let url = recorder.clipURL {
+                Button(Strings.useClip) {
+                    onSave(url, trimmedOverlayText)
+                    dismiss()
+                }
+            }
             Button(Strings.keepClip) { keepAsDraft { dismiss() } }
             Button(Strings.discardClip, role: .destructive) {
                 clearReview()
@@ -208,17 +248,37 @@ struct RecordClipView: View {
                     case .scene: .tiny
                     }
                 } label: {
-                    Label("每段 \(clipSecondsText)", systemImage: "timer")
+                    Label(Strings.clipCap(clipSecondsText), systemImage: "timer")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(.regularMaterial, in: Capsule())
+                        .cameraGlass(.capsule)
                 }
                 .buttonStyle(.plain)
                 .disabled(recorder.state == .recording || recorder.clipURL != nil)
                 .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
                 .padding(12)
+            }
+            // Under the timer chip, inside the frame: a refused microphone
+            // films silent clips, and a silent preview looks exactly like a
+            // working one. iOS won't ask twice, so the only fix is Settings.
+            .overlay(alignment: .topLeading) {
+                if !recorder.hasAudioAccess {
+                    Button {
+                        guard let url = URL(string: UIApplication.openSettingsURLString)
+                        else { return }
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Label(Strings.noSoundOpenSettings, systemImage: "mic.slash.fill")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .cameraGlass(.capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 12)
+                    .padding(.top, 48)
+                }
             }
             // Pinch the picture itself, which is where the hand already is.
             // The chips are the quick answer; this is the whole range, and it
@@ -266,39 +326,87 @@ struct RecordClipView: View {
         }
     }
 
-    /// The whole control surface starts recording. The centered layout makes
-    /// the primary camera action obvious and gives it a forgiving tap target.
-    ///
-    /// The 轻点拍摄 caption that used to sit under the ring is gone: a 66pt
-    /// brand-blue circle alone in a bar is not a control anybody needs a
-    /// sentence for, and the sentence was one of the lines making the picture
-    /// above it smaller. It is still the button's accessibility label.
+    /// Shorter than this and a release counts as a tap, not a hold.
+    private static let holdThreshold: TimeInterval = 0.35
+    /// The floor on any take. Under a second there's nothing to see, and a
+    /// stop that lands before the movie output has started is ignored by it —
+    /// the take would then run on to the cap instead.
+    static let minimumClipSeconds: TimeInterval = 1
+
+    /// Not a `Button`: a button fires on release, and a hold has to start on
+    /// touch-down. The press itself is read by `shutterGesture`, which sits on
+    /// the row so it survives this view being swapped for the countdown ring
+    /// under the finger. The instruction is back because holding isn't
+    /// guessable from a circle the way tapping is.
     private var idleRecordingControl: some View {
-        Button {
-            recorder.startRecording(seconds: clipSeconds)
-        } label: {
+        CenteredCaptureControl(instruction: Strings.holdToFilm) {
             recordButtonVisual
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(Strings.captureState(
             recording: false,
             secondsLabel: clipSecondsText
         ))
+        // VoiceOver can't hold; activating gets a tapped take, which stops on
+        // its own at the cap or on the ring.
+        .accessibilityAction { startCapture() }
     }
 
     /// Match the idle shutter's center axis; translated instructions sit below
     /// rather than pushing the countdown sideways.
     private var recordingControls: some View {
-        CenteredCaptureControl(instruction: Strings.tapToStop) {
+        CenteredCaptureControl(instruction: isHolding ? Strings.releaseToStop : Strings.tapToStop) {
             countdownRing
+        }
+    }
+
+    /// Press starts a take at once. Let go quickly and it was a tap — the take
+    /// runs to the cap. Hold, and letting go is the stop.
+    private var shutterGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard pressStartedAt == nil, !isLeaving, recorder.state == .ready,
+                      recorder.clipURL == nil
+                else { return }
+                pressStartedAt = .now
+                startCapture()
+            }
+            .onEnded { _ in
+                guard let pressed = pressStartedAt else { return }
+                pressStartedAt = nil
+                if Date.now.timeIntervalSince(pressed) >= Self.holdThreshold {
+                    stopCapture()
+                } else {
+                    isHolding = false
+                }
+            }
+    }
+
+    private func startCapture() {
+        isHolding = true
+        recorder.startRecording(seconds: clipSeconds)
+    }
+
+    /// Stops now, or at the one-second floor if the take is younger than that.
+    private func stopCapture() {
+        isHolding = false
+        guard recorder.state == .recording, let started = recorder.recordedAt else { return }
+        let wait = Self.minimumClipSeconds - Date.now.timeIntervalSince(started)
+        guard wait > 0 else { return recorder.stopRecording() }
+        Task {
+            try? await Task.sleep(for: .seconds(wait))
+            // Only the take this stop was meant for.
+            guard recorder.recordedAt == started else { return }
+            recorder.stopRecording()
         }
     }
 
     private var countdownRing: some View {
         Button {
-            recorder.stopRecording()
+            stopCapture()
         } label: {
             ZStack {
                 Circle()
@@ -319,6 +427,8 @@ struct RecordClipView: View {
                 }
             }
         }
+        .accessibilityLabel(Strings.captureState(recording: true, secondsLabel: clipSecondsText))
+        .accessibilityHint(Strings.tapToStop)
     }
 
     // MARK: - Review (Use / Retake)
@@ -373,7 +483,10 @@ struct RecordClipView: View {
                         .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(myTint, in: Capsule())
+                        // The brand gradient `.primaryAction` uses, at this
+                        // row's height: the full style is 17pt type and 17pt
+                        // padding, which would stand taller than 重拍 beside it.
+                        .background(OneDay.brandHorizontal, in: Capsule())
                 }
                 .buttonStyle(.plain)
 
@@ -396,6 +509,10 @@ struct RecordClipView: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
+        // Same rule as `ClipPreviewView`: the keyboard covers the buttons
+        // rather than squeezing the frame. Typing a caption used to shrink the
+        // picture the caption was being placed on.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(isPresented: $showSavePicker) {
             ClipFilingSheet(candidates: filingCandidates) { chosen in
                 file(url, to: chosen)
@@ -477,7 +594,17 @@ struct RecordClipView: View {
                 overlayText: trimmedOverlayText)
             clearReview()
             showToast(Strings.draftKept)
-            next?()
+            // The next step — dismissing, or walking to the composer — unmounts
+            // this screen and the toast with it, so it used to say 已存起来 to
+            // nobody. A beat first, with the camera held still meanwhile.
+            if let next {
+                isLeaving = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    next()
+                    isLeaving = false
+                }
+            }
         } catch {
             showToast(Strings.draftSaveFailed)
         }
@@ -549,7 +676,7 @@ struct RecordClipView: View {
                     UIApplication.shared.open(url)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(myTint)
+                .tint(Color.oneDayBrand)
             } else {
                 Text(Strings.cameraUnavailable)
                     .font(.headline)
@@ -557,7 +684,7 @@ struct RecordClipView: View {
                     Task { await recorder.configure() }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(myTint)
+                .tint(Color.oneDayBrand)
             }
             // Same gate as the home screen's demo button, for the same
             // reason: the Simulator has no camera, so this is the only way to
@@ -587,7 +714,7 @@ struct RecordClipView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(myTint)
+            .tint(Color.oneDayBrand)
             }
             #endif
             Spacer()
@@ -627,16 +754,14 @@ struct RecordClipView: View {
             if isFreeform {
                 // No cover to dismiss in the tab, and nothing else needs the
                 // left slot now that the frame toggle moved down.
-                Color.clear.frame(width: 38, height: 1)
+                Color.clear.frame(width: 44, height: 1)
             } else {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .bold))
-                        .frame(width: 38, height: 38)
-                        .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                        .cameraGlass()
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Strings.closeCamera)
             }
 
             Spacer(minLength: 8)
@@ -653,7 +778,7 @@ struct RecordClipView: View {
 
             Spacer(minLength: 8)
 
-            Color.clear.frame(width: 38, height: 1)
+            Color.clear.frame(width: 44, height: 1)
         }
     }
 
@@ -671,7 +796,7 @@ struct RecordClipView: View {
             ZoomControlRow(
                 presets: presets,
                 capabilities: recorder.zoomCapabilities,
-                tint: myTint,
+                tint: Color.oneDayBrand,
                 zoom: zoomBinding,
                 showsSlider: $showsZoomSlider)
         }
@@ -711,13 +836,15 @@ struct RecordClipView: View {
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
             }
 
-            Group {
+            ZStack {
                 if recorder.state == .recording {
                     recordingControls
                 } else {
                     idleRecordingControl
                 }
             }
+            .contentShape(Rectangle())
+            .simultaneousGesture(shutterGesture)
 
             flipButton
                 .frame(maxWidth: .infinity)
@@ -738,11 +865,7 @@ struct RecordClipView: View {
             }
         } label: {
             Image(systemName: SetupStep.orientationIcon(freeformOrientation))
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.black.opacity(0.78))
-                .frame(width: 38, height: 38)
-                .background(.white.opacity(0.92), in: Circle())
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .cameraGlass()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.switchOrientation)
@@ -753,32 +876,11 @@ struct RecordClipView: View {
     private var flipButton: some View {
         Button { recorder.flipCamera() } label: {
             Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
-                .font(.system(size: 17, weight: .bold))
-                .frame(width: 38, height: 38)
-                .background(.white.opacity(0.92), in: Circle())
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .cameraGlass()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.flipCamera)
         .disabled(recorder.state != .ready || recorder.clipURL != nil)
         .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
-    }
-}
-
-/// Decorative symmetric waveform bars flanking the countdown ring while
-/// recording — pure ornament, not a live level meter.
-private struct WaveformBars: View {
-    let tint: Color
-    private let heights: [CGFloat] = [4, 9, 14, 7, 12, 18, 8, 5]
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
-                Capsule()
-                    .fill(tint.opacity(0.28))
-                    .frame(width: 3, height: height)
-            }
-        }
-        .accessibilityHidden(true)
     }
 }

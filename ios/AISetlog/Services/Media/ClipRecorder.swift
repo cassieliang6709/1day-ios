@@ -34,6 +34,20 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private(set) var clipURL: URL?
     private(set) var recordedAt: Date?
 
+    /// Bumped each time a take fails to reach a file. A counter rather than a
+    /// Bool so two failures in a row still read as two changes to whoever is
+    /// watching it — the camera turns each one into a toast and a haptic. The
+    /// failure path used to go straight back to `.ready`, which on screen is
+    /// indistinguishable from "the press didn't register".
+    private(set) var failureCount = 0
+    /// When the latest failure happened; nil until there has been one.
+    private(set) var lastFailure: Date?
+
+    /// Whether the microphone was granted at the last `configure()`. Without
+    /// it the session films silently, and nothing about a silent preview says
+    /// so — the camera reads this to put up a "no sound" chip.
+    private(set) var hasAudioAccess = true
+
     /// What the current lens can reach, and where it is pointed now — both in
     /// display values (0.5, 1, 2), never in `videoZoomFactor`. See `CameraZoom`.
     private(set) var zoomCapabilities: CameraZoom = .unavailable
@@ -87,6 +101,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             return
         }
         let hasAudioAccess = await AVCaptureDevice.requestAccess(for: .audio)
+        self.hasAudioAccess = hasAudioAccess
 
         let configured = await withCheckedContinuation { continuation in
             Self.sessionQueue.async { [self] in
@@ -347,10 +362,25 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     #endif
 
     /// Back to live preview after reviewing a take.
+    ///
+    /// Deletes the take's file when it is still in the temp directory. Every
+    /// caller that keeps the take — filing (`ClipFileStore.storeClip`) and
+    /// drafts (`ClipDraftStore.keep`) — copies synchronously *before* calling
+    /// this, so by now the temp file is a leftover; without this each retake
+    /// left a .mov behind until the OS got round to purging tmp. Anything
+    /// outside tmp is somebody else's file and is never touched.
     func retake() {
+        if let clipURL, Self.isTemporary(clipURL) {
+            try? FileManager.default.removeItem(at: clipURL)
+        }
         clipURL = nil
         recordedAt = nil
         if state != .unavailable { state = .ready }
+    }
+
+    private static func isTemporary(_ url: URL) -> Bool {
+        let tmp = FileManager.default.temporaryDirectory.standardizedFileURL.path
+        return url.standardizedFileURL.path.hasPrefix(tmp)
     }
 
     func teardown() {
@@ -374,6 +404,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 try? FileManager.default.removeItem(at: outputFileURL)
                 self.recordedAt = nil
                 self.state = .ready
+                self.lastFailure = .now
+                self.failureCount += 1
                 return
             }
             // The crop happens here rather than on the way out of the review

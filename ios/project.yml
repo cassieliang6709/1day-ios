@@ -42,9 +42,9 @@ targets:
         CFBundleDisplayName: 1Day
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSCameraUsageDescription: "Record your 2-second daily challenge clip."
-        NSMicrophoneUsageDescription: "Capture audio for your daily clip."
-        NSPhotoLibraryAddUsageDescription: "Save your finished weekly vlog."
+        NSCameraUsageDescription: "To film the moments of your day."
+        NSMicrophoneUsageDescription: "So your clips have sound."
+        NSPhotoLibraryAddUsageDescription: "To save your finished film to Photos."
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes: [remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

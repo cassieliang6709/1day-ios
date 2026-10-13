@@ -114,7 +114,9 @@ struct PlansHomeView: View {
                     startJoin(joinCode)
                 }
             )
-            .presentationDetents([.height(430)])
+            // Not a fixed height: with the keyboard up on an SE, 430pt pushed
+            // the join button off screen. The sheet scrolls and pins its button.
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
         .sheet(isPresented: Binding(
@@ -574,6 +576,9 @@ struct PlansHomeView: View {
     private func consumePendingJoinCode() {
         guard let code = pendingJoinCode else { return }
         pendingJoinCode = nil
+        // Kept in the join field too: if sign-in is cancelled, startJoin's
+        // deferred run never fires, and the link's code would be gone.
+        joinCode = code
         startJoin(code)
     }
 

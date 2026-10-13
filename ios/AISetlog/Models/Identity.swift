@@ -2,41 +2,58 @@ import UIKit
 
 /// A stable visual identity (color + initial) derived from a recorder's
 /// name — used to tell whose clip is whose in a shared room, instead of the
-/// old free-choice "sticker pack". `MemberChip` (ChallengeBoardView) shares
-/// this same palette so a person's color matches everywhere in the app.
+/// old free-choice "sticker pack". Every avatar, byline and timeline node
+/// reads this same palette so a person's color matches everywhere in the app.
 enum Identity {
-    /// Twelve hues, spread across the wheel, in the order the picker draws them.
+    /// Eight hues, in the order the picker draws them.
     ///
-    /// This is also the app's accent palette (`UIColor.oneDayBrand`), so every
-    /// entry has to carry white text twice over: the initial `AvatarDot` draws
-    /// on it, and the label on a filled button. The bar is 4:1 and these were
-    /// picked by measuring, not by eye — which is how two of the previous seven
-    /// turned out to be under it. `oneDayCyan` was **2.26:1**, and the comment
-    /// here used to claim all seven cleared 4:1; `oneDayCoral` was 3.96:1.
-    /// Both are replaced (`oneDaySteel`, `oneDayEmber`) rather than kept at a
-    /// size where nobody can read their own initial.
+    /// White text has to sit on every entry — the initial `AvatarDot` draws —
+    /// so each clears 4.5:1 against white, measured rather than eyeballed
+    /// (an earlier comment here claimed 4:1 for a list containing a 2.26:1
+    /// cyan). They are also *fixed* hexes: a person is not chrome, and must
+    /// not change colour with the viewer's Appearance setting. Why these eight
+    /// and not the previous twelve is written up next to the hexes in
+    /// `Resources/Theme.swift` — short version, four pairs of the twelve were
+    /// indistinguishable, two of them to everyone.
     ///
     /// `oneDayMint` is not a candidate: it rings "this is you" in `AvatarStack`.
     ///
-    /// Growing the list from seven to twelve moves everybody's *derived*
-    /// colour, because that is `sum % count`. Unavoidable when the palette
-    /// changes size, and only affects people who never picked one — a pick is
-    /// stored by name and survives.
+    /// Shrinking the list moves everybody's *derived* colour, because that is
+    /// `sum % count`. Unavoidable when the palette changes size, and only
+    /// affects people who never picked one — a pick is carried across by
+    /// `legacyTintRemap`.
     static let paletteUIColors: [UIColor] = [
-        .oneDayNavy, .oneDayBlue, .oneDaySteel, .oneDayPeacock,
-        .oneDayEmerald, .oneDayMoss, .oneDayMustard, .oneDayAmber,
-        .oneDayEmber, .oneDayRose, .oneDayGraphite, .oneDayGrape,
+        .identityNavy, .identityBlue, .identityTeal, .identityGreen,
+        .identityAmber, .identityRose, .identityGrape, .identityGraphite,
     ]
 
-    /// Which of the twelve you picked for yourself, and the name it was picked
+    /// Which of the eight you picked for yourself, and the name it was picked
     /// under. Two keys rather than one because the palette is addressed by
     /// name everywhere — every avatar in the app is drawn from a name and
     /// nothing else — so the override has to know which name is yours.
     ///
+    /// The index key is `v2` because the palette it indexes changed: a `v1`
+    /// index meant a slot in the twelve, and reading it against the eight
+    /// would quietly hand somebody who chose rose (old 9) nothing at all, or
+    /// somebody who chose emerald (old 4) amber. The name key didn't change
+    /// meaning, so it keeps its name.
+    ///
     /// Read only by `tintIndex(for:)`. The app's accent used to read them too;
     /// it no longer does — see `UIColor.oneDayBrand`.
-    static let myTintKey = "identity.myTint.v1"
+    static let myTintKey = "identity.myTint.v2"
     static let myTintNameKey = "identity.myTintName.v1"
+    /// Where a pick made against the twelve-colour palette lives. Read, never
+    /// written; cleared the first time you pick again.
+    static let legacyTintKey = "identity.myTint.v1"
+
+    /// Old twelve-colour slot → nearest of the eight. Explicit rather than
+    /// `% count`, which would map a rose pick onto green.
+    ///
+    ///   0 navy → navy      4 emerald → green    8 ember    → amber
+    ///   1 blue → blue      5 moss    → green    9 rose     → rose
+    ///   2 steel → blue     6 mustard → amber   10 graphite → graphite
+    ///   3 peacock → teal   7 amber   → amber   11 grape    → grape
+    static let legacyTintRemap: [Int] = [0, 1, 1, 2, 3, 3, 4, 4, 4, 5, 7, 6]
 
     /// Your own colour, from now on, on this device.
     ///
@@ -47,6 +64,8 @@ enum Identity {
         _ index: Int?, forName name: String?,
         in defaults: UserDefaults = .standard
     ) {
+        // Any write supersedes a pick made against the old palette.
+        defaults.removeObject(forKey: legacyTintKey)
         guard let index, let name, !name.isEmpty, paletteUIColors.indices.contains(index)
         else {
             defaults.removeObject(forKey: myTintKey)
@@ -59,11 +78,17 @@ enum Identity {
 
     /// The index your own avatar is currently drawn with, picked or derived.
     static func tintIndex(for name: String?, in defaults: UserDefaults = .standard) -> Int {
-        if let name, !name.isEmpty,
-           name == defaults.string(forKey: myTintNameKey),
-           let picked = defaults.object(forKey: myTintKey) as? Int,
-           paletteUIColors.indices.contains(picked) {
-            return picked
+        guard let name, !name.isEmpty, name == defaults.string(forKey: myTintNameKey)
+        else { return derivedIndex(for: name) }
+        // Anything out of range — a corrupted value, or one from a build with
+        // a longer palette — falls back to derived rather than indexing past
+        // the end.
+        if let picked = defaults.object(forKey: myTintKey) as? Int {
+            return paletteUIColors.indices.contains(picked) ? picked : derivedIndex(for: name)
+        }
+        if let legacy = defaults.object(forKey: legacyTintKey) as? Int,
+           legacyTintRemap.indices.contains(legacy) {
+            return legacyTintRemap[legacy]
         }
         return derivedIndex(for: name)
     }
@@ -83,7 +108,9 @@ enum Identity {
 
     static func uiColor(for name: String?) -> UIColor {
         guard let name, !name.isEmpty else { return .oneDayBlue }
-        return paletteUIColors[tintIndex(for: name)]
+        // `%` as a last guard: `tintIndex` already range-checks, but this is
+        // the one subscript in the app that a stored value reaches.
+        return paletteUIColors[tintIndex(for: name) % paletteUIColors.count]
     }
     /// An absent name has no text fallback; views use the mascot artwork for
     /// that state so the retired "1D" initials never return as a brand mark.

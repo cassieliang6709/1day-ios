@@ -12,6 +12,10 @@ struct ClipDraftsView: View {
     @Environment(ClipDraftStore.self) private var drafts
 
     @State private var filing: ClipDraft?
+    /// The draft whose delete is waiting on a yes. A draft is the only copy of
+    /// that take — it exists because there was nowhere else to put it — so a
+    /// menu item one mis-tap from 归档到… can't be the whole decision.
+    @State private var pendingDelete: ClipDraft?
     @State private var toast: String?
 
     /// Bound only so a language change re-renders the list.
@@ -48,6 +52,20 @@ struct ClipDraftsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.done) { dismiss() }
                 }
+            }
+            .confirmationDialog(
+                Strings.deleteDraftQuestion,
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingDelete
+            ) { draft in
+                Button(Strings.deleteDraft, role: .destructive) {
+                    drafts.remove(draft)
+                    pendingDelete = nil
+                }
+                Button(Strings.cancel, role: .cancel) { pendingDelete = nil }
             }
             .sheet(item: $filing) { draft in
                 ClipFilingSheet(candidates: candidates(for: draft)) { chosen in
@@ -111,13 +129,13 @@ struct ClipDraftsView: View {
                     }
                 }
                 Button(Strings.deleteDraft, systemImage: "trash", role: .destructive) {
-                    drafts.remove(draft)
+                    pendingDelete = draft
                 }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(OneDay.inkSoft)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
@@ -332,24 +350,34 @@ struct ClipFilingSheet: View {
 
 /// The camera tab's way in: only there when there's something waiting, so it
 /// never becomes another permanent piece of chrome over the viewfinder.
+///
+/// `compact` is the camera's top-bar form: tray and count only, sized to the
+/// slot beside the wordmark. The full sentence used to float 88pt down, inside
+/// the frame, where on a small phone it sat on the timer chip; VoiceOver still
+/// gets the sentence.
 struct DraftsEntryButton: View {
     let count: Int
+    var compact = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
+            HStack(spacing: compact ? 4 : 7) {
                 Image(systemName: "tray.full.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text(Strings.draftsPending(count))
+                Text(compact ? "\(count)" : Strings.draftsPending(count))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, compact ? 10 : 14)
             .padding(.vertical, 9)
             .background(.black.opacity(0.55), in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Strings.draftsPending(count))
         .accessibilityIdentifier("drafts-entry")
     }
 }

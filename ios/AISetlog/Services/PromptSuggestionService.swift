@@ -14,6 +14,8 @@ import Foundation
 protocol PromptSuggesting: Sendable {
     func suggest(intent: String, count: Int, language: AppLanguage) async throws -> [String]
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion
+    /// Opens the connection ahead of time. Fire-and-forget; never throws.
+    func warmUp() async
 }
 
 struct StorySuggestion: Equatable, Sendable {
@@ -26,6 +28,8 @@ extension PromptSuggesting {
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
         StorySuggestion(title: nil, prompts: try await suggest(intent: intent, count: count, language: language))
     }
+
+    func warmUp() async {}
 }
 
 enum PromptSuggestionError: Error, Equatable {
@@ -45,9 +49,12 @@ struct RemotePromptSuggestionService: PromptSuggesting {
     static let defaultEndpoint = URL(
         string: "https://oneday-suggest-prompts.oneday-cassie.workers.dev/api/suggest-prompts")!
 
-    /// Long enough for a model round-trip, short enough that a hung network
-    /// doesn't leave someone watching a spinner instead of writing prompts.
-    static let timeout: TimeInterval = 20
+    /// The model answers in about a second; the rest of a slow call is the
+    /// network. Past this the connection is stuck, and a fresh one does
+    /// better than waiting on it — hence the retry rather than a longer wait.
+    static let timeout: TimeInterval = 8
+    /// One retry. Two attempts cap the spinner at ~16s, down from 20s for one.
+    static let attempts = 2
 
     var session: URLSession = .shared
     var endpoint: URL = RemotePromptSuggestionService.defaultEndpoint
@@ -58,7 +65,32 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         try await suggestStory(intent: intent, count: count, language: language).prompts
     }
 
+    /// A HEAD the Worker answers without touching the model, so DNS and the
+    /// TLS handshake — seconds, on a bad mobile network — are paid while the
+    /// user is still typing. `session` keeps the connection for the real call.
+    func warmUp() async {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = Self.timeout
+        _ = try? await session.data(for: request)
+    }
+
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
+        var lastError = PromptSuggestionError.unavailable
+        for _ in 0..<Self.attempts {
+            do {
+                return try await attempt(intent: intent, count: count, language: language)
+            } catch PromptSuggestionError.unavailable {
+                // Network or server trouble is worth one more go. A rate limit
+                // or a malformed answer would only come back the same.
+                lastError = .unavailable
+                if Task.isCancelled { break }
+            }
+        }
+        throw lastError
+    }
+
+    private func attempt(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = Self.timeout

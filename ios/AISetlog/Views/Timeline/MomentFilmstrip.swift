@@ -112,6 +112,30 @@ struct MomentFilmstrip: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .frame(width: Self.cellWidth)
+                // The thumbnail's own label already says this.
+                .accessibilityHidden(isFilmed)
+
+            // A friend's cell I haven't added to. The big button below only
+            // ever points at a cell nobody has filmed, so without this a
+            // shared 按时间 day had no way to join a moment once one person
+            // had got there first.
+            if challenge.isShared, agenda.isAwaitingMine(slot: slot) {
+                Button { onFilm(slot) } label: {
+                    Text(Strings.addYourTake)
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.oneDayBrand)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.oneDayMist.opacity(0.55), in: Capsule())
+                        .frame(width: Self.cellWidth, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, -9)
+                .accessibilityIdentifier("filmstrip-add-yours-\(slot)")
+            }
         }
     }
 
@@ -132,7 +156,10 @@ struct MomentFilmstrip: View {
             reaction: (mine ?? slotClips.first)?.emoji.first,
             awaitingMine: mine == nil,
             aspectRatio: Self.cellWidth / Self.cellHeight,
-            sourceAspect: challenge.resolvedOrientation == .landscape ? 16.0 / 9 : 9.0 / 16
+            sourceAspect: challenge.resolvedOrientation == .landscape ? 16.0 / 9 : 9.0 / 16,
+            // The time is printed under the cell; across the still too, it was
+            // the same four digits twice in 104 points.
+            showsCaption: false
         ) {
             onPlay(slot)
         }
@@ -169,6 +196,9 @@ struct MomentFilmstrip: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(label(for: slot, slotClips: [])))
+        // Every empty cell is 「还没拍」, so without a position VoiceOver reads
+        // seven identical buttons in a row.
+        .accessibilityValue(Text(Strings.slotPosition(slot, of: agenda.total)))
         .accessibilityHint(Text(Strings.filmThisOne))
     }
 

@@ -79,9 +79,7 @@ struct StoryCard: View {
                     .foregroundStyle(.white)
                     .lineLimit(2)
 
-                Text(Strings.storyCardCaption(
-                    open: openMoment,
-                    isComplete: progress.isComplete))
+                Text(caption)
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
@@ -135,12 +133,30 @@ struct StoryCard: View {
 
     private var footer: some View {
         Button(action: isDone ? onOpen : onContinue) {
-            Label(
-                isDone ? Strings.watchYourFilm : Strings.continueTodaysStory,
-                systemImage: isDone ? "play.fill" : "video.fill")
+            Label(ctaTitle, systemImage: isDone ? "play.fill" : "video.fill")
         }
         .buttonStyle(.primaryAction)
         .padding(16)
+    }
+
+    /// Says which day the tap opens. 继续今天的故事 was wrong whenever the
+    /// button actually opened an earlier, missed day — and the same story's
+    /// row in the list already said so.
+    private var ctaTitle: String {
+        if isDone { return Strings.watchYourFilm }
+        if progress.filled == 0 { return Strings.startTodaysStory }
+        guard todaySlot != nil else { return Strings.continueTodaysStory }
+        return Strings.continueDayLabel(offeredSlot)
+    }
+
+    /// The same sentence the list row shows for this story (see
+    /// `StoryRowCard.subtitle`), so moving a story between hero and list
+    /// doesn't change what it claims is next.
+    private var caption: String {
+        if progress.isComplete || challenge.isTimeOnly || progress.offeringToday(today: todaySlot) {
+            return Strings.storyCardCaption(open: openMoment, isComplete: progress.isComplete)
+        }
+        return Strings.catchUpDayLabel(day: offeredSlot, moment: openMoment)
     }
 }
 

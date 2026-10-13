@@ -250,10 +250,13 @@ struct CameraTabView: View {
             // clips came from, and home doesn't need another section. Clear of
             // the wordmark, and gone while a take is in review — the clip in
             // front of you is the one that needs deciding about.
-            .overlay(alignment: .top) {
+            // In the top bar's empty trailing slot, beside the wordmark, rather
+            // than 88pt down: that put it inside the frame, and on a small
+            // phone on top of the timer chip. Compact so it fits the slot.
+            .overlay(alignment: .topTrailing) {
                 if !drafts.isEmpty, unfiledGuard?.hasUnfiledClip != true {
-                    DraftsEntryButton(count: drafts.count) { showDrafts = true }
-                        .padding(.top, 88)
+                    DraftsEntryButton(count: drafts.count, compact: true) { showDrafts = true }
+                        .padding(.trailing, 12)
                 }
             }
             .sheet(isPresented: $showDrafts) { ClipDraftsView() }
