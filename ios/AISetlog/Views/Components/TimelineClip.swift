@@ -264,7 +264,7 @@ struct TimelineClip: View {
                 VStack(spacing: 7) {
                     Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(OneDay.Font.rounded(.title2, weight: .medium))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                         .symbolEffect(.pulse)
                     if showsMomentTitle {
                         Text(momentTitle)

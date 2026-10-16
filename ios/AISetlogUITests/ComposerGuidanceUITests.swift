@@ -15,9 +15,10 @@ final class ComposerGuidanceUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
-        let plan = app.buttons["Plan"]
-        XCTAssertTrue(plan.waitForExistence(timeout: 15), "Plan tab missing")
-        plan.tap()
+        // 1.5: the composer is the header's + New, not a tab.
+        let compose = app.buttons["home-compose"]
+        XCTAssertTrue(compose.waitForExistence(timeout: 15), "New button missing")
+        compose.tap()
 
         XCTAssertTrue(app.staticTexts["composer-question"].waitForExistence(timeout: 15))
         // No progress counter and no bottom button: both only made sense when
@@ -28,6 +29,7 @@ final class ComposerGuidanceUITests: XCTestCase {
         // No gear to find: the poster is the way in, and tapping it no longer
         // creates anything by itself.
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
+        app.buttons["more-templates"].tap()
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()

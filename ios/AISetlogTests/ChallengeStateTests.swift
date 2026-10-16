@@ -75,16 +75,16 @@ final class ChallengeStateTests: XCTestCase {
 
         let challenge = store.createQuickStart()
 
+        // 1.5: the first story is 按时间 — no prompts, seven open slots.
         XCTAssertEqual(challenge.title, "My day")
-        XCTAssertEqual(challenge.cards.count, 3)
+        XCTAssertEqual(challenge.cards.count, 7)
         XCTAssertEqual(challenge.resolvedMode, .oneDay)
         XCTAssertEqual(challenge.resolvedClipLength, .tiny)
         XCTAssertEqual(challenge.resolvedOrientation, .portrait)
-        XCTAssertEqual(
-            challenge.momentTitles,
-            ["morning_light", "on_the_move", "golden_hour"])
+        XCTAssertTrue(challenge.isTimeOnly)
+        XCTAssertNil(challenge.momentTitles)
         XCTAssertEqual(try XCTUnwrap(repository.savedChallenges.first).id, challenge.id)
-        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 3)
+        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 7)
     }
 
     func testPresenterUnitNamesFollowMode() {

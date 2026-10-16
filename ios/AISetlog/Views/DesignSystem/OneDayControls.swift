@@ -30,7 +30,7 @@ struct PrimaryActionStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(OneDay.Font.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 17)
                 .background(tint, in: Capsule())
@@ -215,7 +215,7 @@ struct PillSelector<Value: Hashable>: View {
                 Text(option.label)
                     .font(OneDay.Font.rounded(compact ? .footnote : .subheadline, weight: .bold))
             }
-            .foregroundStyle(isOn ? .white : OneDay.inkSoft)
+            .foregroundStyle(isOn ? OneDay.onBrand : OneDay.inkSoft)
             .frame(maxWidth: .infinity)
             .padding(.vertical, compact ? 7 : 9)
             .background {

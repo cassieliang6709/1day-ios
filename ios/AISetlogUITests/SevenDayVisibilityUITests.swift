@@ -15,11 +15,14 @@ final class SevenDayVisibilityUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
-        // The composer is the left tab as of 1.3; the plus in the home header
-        // is gone.
-        let plan = app.buttons["计划"]
-        XCTAssertTrue(plan.waitForExistence(timeout: 15), "计划 tab missing")
-        plan.tap()
+        // The composer is the header's ＋ 新建 as of 1.5.
+        let compose = app.buttons["home-compose"]
+        XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
+        compose.tap()
+        // Templates are folded under 更多模板 as of 1.5.
+        let more = app.buttons["more-templates"]
+        XCTAssertTrue(more.waitForExistence(timeout: 15))
+        more.tap()
         let seven = app.buttons["七日"]
         XCTAssertTrue(seven.waitForExistence(timeout: 15))
         seven.tap()
@@ -65,7 +68,7 @@ final class SevenDayVisibilityUITests: XCTestCase {
         demo.tap()
         XCTAssertTrue(app.staticTexts["local-room-notice"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["三人"].exists)
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.buttons["聊天"].exists)
         XCTAssertFalse(app.staticTexts["每个人的原片"].exists)
         XCTAssertFalse(app.buttons["邀请"].exists)

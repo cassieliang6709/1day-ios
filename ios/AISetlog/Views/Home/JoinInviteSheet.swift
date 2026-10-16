@@ -106,7 +106,7 @@ struct JoinInviteSheet: View {
             }
             .font(.headline)
         }
-        .foregroundStyle(Color.oneDayBrand)
+        .foregroundStyle(OneDay.brandText)
     }
 
     private var header: some View {
@@ -119,7 +119,7 @@ struct JoinInviteSheet: View {
 
                 Image(systemName: "envelope.open.fill")
                     .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
             }
             .accessibilityHidden(true)
 

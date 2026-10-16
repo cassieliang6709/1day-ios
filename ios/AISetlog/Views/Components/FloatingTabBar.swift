@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The app's entire navigation: three surfaces in a floating capsule.
+/// The app's entire navigation: a floating capsule of surfaces, optionally
+/// split by one round action in the middle (1.5: 故事 · camera · 朋友).
 ///
 /// It deliberately looks like an iOS floating control (Maps' mode switcher,
 /// the Camera's photo/video selector) rather than a tab bar — 1Day has three
@@ -32,18 +33,41 @@ struct FloatingTabBar<Tab: Hashable>: View {
     /// one of them being visibly the home screen means the other two are read
     /// as "somewhere else", which is what they are.
     var emphasisedIndex: Int? = nil
+    /// A round button drawn between the two halves of `items` — an action, not
+    /// a tab: it is never the selection. 1.5 puts the camera here.
+    var center: CenterAction? = nil
+
+    struct CenterAction {
+        /// Not drawn; the button is a glyph. VoiceOver reads this.
+        let label: String
+        let icon: String
+        var identifier: String? = nil
+        let action: () -> Void
+    }
 
     @Namespace private var indicator
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+            let split = center == nil ? items.count : items.count / 2
+            ForEach(Array(items.prefix(split).enumerated()), id: \.element.id) { index, item in
                 segment(item, emphasised: index == emphasisedIndex)
+            }
+            if let center {
+                centerButton(center)
+            }
+            ForEach(Array(items.dropFirst(split).enumerated()), id: \.element.id) { index, item in
+                segment(item, emphasised: index + split == emphasisedIndex)
             }
         }
         .padding(5)
+        // The rim goes under the content, not over it: as an overlay it was
+        // drawn across the round camera button, which hangs past the
+        // capsule's edge, as two white lines.
+        .background {
+            Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+        }
         .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
         .shadow(color: Color.oneDayNavy.opacity(0.16), radius: 20, y: 8)
         .sensoryFeedback(.selection, trigger: selection)
         // Two segments had slack to spare; three do not. Plans/New/Camera is
@@ -53,6 +77,26 @@ struct FloatingTabBar<Tab: Hashable>: View {
         // labels are two words in Chinese and one in English — there is
         // nothing to shrink — so the type size is what gets capped.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    /// Bigger than the capsule on purpose, so it reads as the thing the bar is
+    /// for. The negative padding lets it hang over the capsule's edge instead
+    /// of making the whole bar taller.
+    private func centerButton(_ center: CenterAction) -> some View {
+        Button(action: center.action) {
+            Image(systemName: center.icon)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(OneDay.onBrand)
+                .frame(width: 60, height: 60)
+                .background(OneDay.brandHorizontal, in: Circle())
+                .oneDayGlow(strength: 0.9)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, -10)
+        .padding(.horizontal, 6)
+        .accessibilityLabel(center.label)
+        .accessibilityIdentifier(center.identifier ?? "")
     }
 
     private func segment(_ item: Item, emphasised: Bool = false) -> some View {
@@ -75,7 +119,7 @@ struct FloatingTabBar<Tab: Hashable>: View {
             // emphasis when it isn't the current tab — no second background, no
             // badge: a permanently highlighted pill next to the selection pill
             // gives the bar two things that look selected.
-            .foregroundStyle(isOn ? Color.white : (emphasised ? OneDay.ink : OneDay.inkSoft))
+            .foregroundStyle(isOn ? OneDay.onBrand : (emphasised ? OneDay.ink : OneDay.inkSoft))
             .padding(.vertical, emphasised ? 11 : 10)
             // 22 with two segments, 16 with three: the capsule has to clear an
             // iPhone SE and the third label is what spent the margin. The

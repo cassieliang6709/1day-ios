@@ -158,7 +158,7 @@ struct VlogPlayer: View {
             // Fixed size: the glyph is centred in a fixed 62pt disc.
             Image(systemName: "play.fill")
                 .font(.system(size: 24))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
                 .frame(width: 62, height: 62)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))

@@ -64,7 +64,7 @@ struct MomentFilmstrip: View {
                 Button { onFilm(next) } label: {
                     Text(buttonTitle(for: next))
                         .font(.system(size: 15.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(OneDay.onBrand)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
                         .background(
@@ -123,7 +123,7 @@ struct MomentFilmstrip: View {
                 Button { onFilm(slot) } label: {
                     Text(Strings.addYourTake)
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .padding(.horizontal, 8)
@@ -184,7 +184,7 @@ struct MomentFilmstrip: View {
                             style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
                     Text(Strings.filmThisOne)
                         .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                 } else {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .bold))

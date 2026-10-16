@@ -107,7 +107,7 @@ enum Identity {
     }
 
     static func uiColor(for name: String?) -> UIColor {
-        guard let name, !name.isEmpty else { return .oneDayBlue }
+        guard let name, !name.isEmpty else { return .oneDayBrand }
         // `%` as a last guard: `tintIndex` already range-checks, but this is
         // the one subscript in the app that a stored value reaches.
         return paletteUIColors[tintIndex(for: name) % paletteUIColors.count]

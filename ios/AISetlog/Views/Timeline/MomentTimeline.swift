@@ -223,7 +223,7 @@ struct MomentTimeline: View {
         Button { onFilm(slot) } label: {
             Label(Strings.addYourTake, systemImage: "plus")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Color.oneDayMist.opacity(0.55), in: Capsule())

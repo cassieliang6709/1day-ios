@@ -174,21 +174,26 @@ private struct SameDayAnimation: View {
     /// The three takes side by side, edge to edge, like the film's split frame.
     private static let frame = CGRect(x: 28, y: 52, width: 204, height: 124)
 
+    /// Stepped by a loop rather than `PhaseAnimator`: the drawn people inside
+    /// each take redraw every frame, and under `PhaseAnimator` that kept the
+    /// sequence from ever leaving its first step.
+    @State private var phase: Phase = .empty
+
     private var takes: [Take] {
         [
             Take(name: Strings.firstRunTakeYou, initial: nil,
-                 tint: Color(uiColor: .identityBlue),
-                 colors: [.oneDaySky, .oneDayLavender],
+                 tint: Color(uiColor: .identityAmber),
+                 colors: [Color(red: 0.62, green: 0.82, blue: 1), Color(red: 0.8, green: 0.88, blue: 1)],
                  apart: CGPoint(x: 46, y: 118), tilt: -8,
                  together: CGPoint(x: 62, y: 114)),
             Take(name: "Mia", initial: "M",
-                 tint: Color(uiColor: .identityAmber),
+                 tint: Color.oneDayBrand,
                  colors: [.oneDayButter, .oneDayBlush],
                  apart: CGPoint(x: 130, y: 100), tilt: 2,
                  together: CGPoint(x: 130, y: 114)),
             Take(name: "Sam", initial: "S",
-                 tint: Color(uiColor: .identityGrape),
-                 colors: [.oneDayMint, .oneDayCyan],
+                 tint: Color(uiColor: .identityTeal),
+                 colors: [Color(red: 0.78, green: 0.94, blue: 0.86), Color(red: 0.62, green: 0.86, blue: 0.95)],
                  apart: CGPoint(x: 214, y: 122), tilt: 8,
                  together: CGPoint(x: 198, y: 114)),
         ]
@@ -203,18 +208,8 @@ private struct SameDayAnimation: View {
                     // The end state, still: the point survives without the motion.
                     drawing(at: .playing)
                 } else {
-                    PhaseAnimator(Phase.allCases) { phase in
-                        drawing(at: phase)
-                    } animation: { phase in
-                        switch phase {
-                        case .empty: .easeIn(duration: 0.25).delay(0.9)
-                        case .first: .spring(duration: 0.5, bounce: 0.3).delay(0.2)
-                        case .second, .third: .spring(duration: 0.5, bounce: 0.3).delay(0.2)
-                        case .together: .smooth(duration: 0.6).delay(0.55)
-                        // The progress bar's run *is* this animation's length.
-                        case .playing: .linear(duration: 2.2)
-                        }
-                    }
+                    drawing(at: phase)
+                        .task { await run() }
                 }
             }
             .frame(width: Self.canvas.width, height: Self.canvas.height)
@@ -223,6 +218,26 @@ private struct SameDayAnimation: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Strings.firstRunAnimationAccessibility)
+    }
+
+    /// Each step: wait, then animate into it. The progress bar's run is the
+    /// `.playing` step's length.
+    private func run() async {
+        let steps: [(Phase, Animation, Double)] = [
+            (.first, .spring(duration: 0.5, bounce: 0.3), 0.5),
+            (.second, .spring(duration: 0.5, bounce: 0.3), 0.45),
+            (.third, .spring(duration: 0.5, bounce: 0.3), 0.45),
+            (.together, .smooth(duration: 0.6), 0.9),
+            (.playing, .linear(duration: 2.2), 0.6),
+            (.empty, .easeIn(duration: 0.25), 3.0),
+        ]
+        while !Task.isCancelled {
+            for (next, animation, wait) in steps {
+                try? await Task.sleep(for: .seconds(wait))
+                guard !Task.isCancelled else { return }
+                withAnimation(animation) { phase = next }
+            }
+        }
     }
 
     private func drawing(at phase: Phase) -> some View {
@@ -265,6 +280,9 @@ private struct SameDayAnimation: View {
             style: .continuous)
         return ZStack(alignment: .bottomLeading) {
             LinearGradient(colors: take.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+            // A person in each take, so the three read as three people's
+            // moments rather than three coloured blocks.
+            TakeScene(kind: TakeScene.Kind(rawValue: index) ?? .wave)
             HStack(spacing: 5) {
                 Group {
                     if let initial = take.initial {
@@ -295,7 +313,7 @@ private struct SameDayAnimation: View {
         HStack(spacing: 8) {
             Image(systemName: "play.fill")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
             Capsule()
                 .fill(OneDay.surfaceSoft)
                 .frame(width: 150, height: 5)
@@ -304,6 +322,110 @@ private struct SameDayAnimation: View {
                         .fill(Color.oneDayBrand)
                         .frame(width: 150 * progress, height: 5)
                 }
+        }
+    }
+}
+
+/// One take's picture on the first-run animation: a 1day mascot in a small
+/// place, moving. Yellow waves under a sun, blue sways beside a steaming cup,
+/// mint bounces in a park. Still under Reduce Motion.
+private struct TakeScene: View {
+    enum Kind: Int { case wave, coffee, park }
+    let kind: Kind
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+            GeometryReader { proxy in
+                let w = proxy.size.width, h = proxy.size.height
+                ZStack {
+                    props(t: t, w: w, h: h)
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 58)
+                        .rotationEffect(.degrees(tilt(t)), anchor: .bottom)
+                        .scaleEffect(squash(t), anchor: .bottom)
+                        .position(x: w * 0.5, y: h - 40 + bounce(t))
+                        .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var imageName: String {
+        switch kind {
+        case .wave: "OneDayBuddyYellow"
+        case .coffee: "OneDayBuddyBlue"
+        case .park: "OneDayBuddyMint"
+        }
+    }
+
+    private func tilt(_ t: Double) -> Double {
+        switch kind {
+        case .wave: 9 * sin(t * 4)
+        case .coffee: 4 * sin(t * 1.6)
+        case .park: 0
+        }
+    }
+
+    private func bounce(_ t: Double) -> CGFloat {
+        kind == .park ? CGFloat(-abs(sin(t * 3.2)) * 9) : CGFloat(sin(t * 2) * 1.2)
+    }
+
+    /// A little squash at the bottom of each hop, so the bounce lands.
+    private func squash(_ t: Double) -> CGFloat {
+        guard kind == .park else { return 1 }
+        let ground = 1 - abs(sin(t * 3.2))
+        return 1 - CGFloat(max(0, ground - 0.8)) * 0.4
+    }
+
+    @ViewBuilder
+    private func props(t: Double, w: CGFloat, h: CGFloat) -> some View {
+        switch kind {
+        case .wave:
+            Circle()
+                .fill(Color(red: 1, green: 0.85, blue: 0.35))
+                .frame(width: 22, height: 22)
+                .shadow(color: .yellow.opacity(0.6), radius: 6)
+                .position(x: w * 0.72, y: 26 + CGFloat(sin(t)) * 2)
+            Capsule()
+                .fill(.white.opacity(0.8))
+                .frame(width: 26, height: 9)
+                .position(x: w * 0.3 + CGFloat(sin(t / 2)) * 4, y: 40)
+        case .coffee:
+            // A cup on the right, steam rising off it.
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.white)
+                .frame(width: 13, height: 14)
+                .overlay(alignment: .trailing) {
+                    Circle().strokeBorder(.white, lineWidth: 2.5)
+                        .frame(width: 8, height: 8).offset(x: 5)
+                }
+                .position(x: w * 0.82, y: h - 30)
+            ForEach(0..<2, id: \.self) { i in
+                let phase = (t * 0.8 + Double(i) * 0.5).truncatingRemainder(dividingBy: 1)
+                Capsule()
+                    .fill(.white.opacity(0.85 * (1 - phase)))
+                    .frame(width: 2.5, height: 7)
+                    .position(x: w * 0.82 - 2 + CGFloat(i) * 4, y: h - 42 - CGFloat(phase) * 14)
+            }
+        case .park:
+            Ellipse()
+                .fill(Color(red: 0.42, green: 0.74, blue: 0.48))
+                .frame(width: w * 1.6, height: 40)
+                .position(x: w * 0.5, y: h + 8)
+            Circle()
+                .fill(Color(red: 0.3, green: 0.62, blue: 0.4))
+                .frame(width: 22, height: 22)
+                .position(x: w * 0.8, y: 34)
+            Rectangle()
+                .fill(Color(red: 0.45, green: 0.3, blue: 0.2))
+                .frame(width: 3, height: 14)
+                .position(x: w * 0.8, y: 51)
         }
     }
 }

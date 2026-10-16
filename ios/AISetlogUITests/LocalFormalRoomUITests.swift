@@ -51,7 +51,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.staticTexts["local-room-notice"].exists)
         capture(app, "Formal two-member StoryTimelineView")
         app.buttons["聊天"].tap()
@@ -67,9 +67,9 @@ final class LocalFormalRoomUITests: XCTestCase {
 
         // The shell's member selector remains outside the navigation stack;
         // changing it replaces only this local session and its navigation state.
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: 15))
         app.buttons["三人"].tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
         app.buttons["聊天"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         // The three-member session is a different room: the message typed into
@@ -81,7 +81,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         XCTAssertTrue(demo.isHittable)
         demo.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.buttons["两人"].isSelected)
     }
 
@@ -92,7 +92,7 @@ final class LocalFormalRoomUITests: XCTestCase {
     /// outruns the 240s ceiling on a GPU-less runner, so on CI this measures
     /// the machine. On a Mac it takes about 40 seconds.
     ///
-    /// What it pins that no unit test can: that 「看成片」 reaches a rendered
+    /// What it pins that no unit test can: that 「生成 vlog」 reaches a rendered
     /// film through the real navigation stack, and that 保存 and 分享 are
     /// disabled for a demo room — a demo must not be able to write to the photo
     /// library or leave the device.
@@ -101,7 +101,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        let film = app.buttons["看成片"]
+        let film = app.buttons["生成 vlog"]
         XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
         film.tap()
         XCTAssertTrue(app.buttons["调整"].waitForExistence(timeout: UITestWait.media))

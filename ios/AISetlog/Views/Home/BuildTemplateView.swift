@@ -156,7 +156,7 @@ struct BuildTemplateView: View {
         HStack(spacing: 10) {
             Text("\(index + 1)")
                 .font(.caption.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
                 .frame(width: 22, height: 22)
                 .background(Color.oneDayBrand, in: Circle())
             TextField(

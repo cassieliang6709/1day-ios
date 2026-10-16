@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// The app's three surfaces — your plans, making a new one, and the free-form
-/// camera — swapped by a floating capsule instead of a tab bar. The plans
-/// surface stays mounted so switching never loses its navigation stack.
+/// The app's surfaces — your stories, the ones with friends, making a new one,
+/// and the free-form camera. 故事 and 朋友 are the floating capsule's tabs, with
+/// the camera as the round button between them (1.5). Both tabs stay mounted so
+/// switching never loses a navigation stack.
 ///
-/// 新建 became the middle tab in 1.3. It used to be a 36pt wordless `plus` in
-/// the corner of the plans header, which made the app's second-most-used action
-/// the smallest target on its first screen — and put it in the one place a
-/// thumb holding a phone cannot reach. The composer is a full screen either
-/// way; as a tab it is also somewhere you can back out of by tapping 计划,
-/// rather than hunting for an ✕.
+/// 新建 was a tab in 1.3–1.4. In 1.5 it is a labelled button in the stories
+/// header — not the wordless 36pt `plus` it was before 1.3, which was the
+/// smallest target on the first screen.
 enum HomeLaunchAction: Equatable {
     /// First-run path: make the three-moment personal story immediately.
     case quickStart
@@ -30,8 +28,17 @@ struct RootShellView: View {
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
-    enum Surface: Hashable { case plans, compose, camera }
+    /// 故事 and 朋友 are tabs; compose and camera are full-screen surfaces you
+    /// enter from them and leave back to them, with the bar hidden. The camera
+    /// especially: its shutter sits where the bar's round button is, and two
+    /// round buttons stacked at the bottom of the screen is one too many.
+    enum Surface: Hashable { case plans, friends, compose, camera }
     @State private var surface: Surface = .plans
+    /// The tab compose or the camera was opened from, and goes back to.
+    @State private var returnTab: Surface = .plans
+    /// Whether the composer opens with 和朋友一起 already on — set by 朋友's
+    /// invite button, which is otherwise the same composer.
+    @State private var composeTogether = false
 
     /// The camera surface reports through this whether it's still holding a
     /// clip nobody has filed, and hands back the two ways out.
@@ -61,9 +68,22 @@ struct RootShellView: View {
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $launchAction,
                 stories: stories,
-                onCompose: { surface = .compose })
+                onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
+
+            // A second instance rather than a new screen: every row, the join
+            // sheet, sign-in and the story push already live in PlansHomeView.
+            // `.friends` filters it to shared stories and keeps the launch
+            // routing to the first one.
+            PlansHomeView(
+                pendingJoinCode: .constant(nil),
+                launchAction: .constant(nil),
+                stories: stories,
+                scope: .friends,
+                onCompose: { openCompose(together: true) })
+                .opacity(surface == .friends ? 1 : 0)
+                .allowsHitTesting(surface == .friends)
 
             // Not kept mounted behind the others the way plans is: it holds a
             // half-filled form, and coming back to 新建 after wandering off
@@ -78,7 +98,8 @@ struct RootShellView: View {
                         surface = .plans
                         launchAction = .openStory(id)
                     },
-                    onClose: { surface = .plans })
+                    onClose: { surface = returnTab },
+                    startsWithFriends: composeTogether)
             }
 
             // Mounted only while active so the capture session stops on leave.
@@ -87,34 +108,33 @@ struct RootShellView: View {
             if surface == .camera {
                 CameraTabView(
                     unfiledGuard: unfiledGuard,
-                    onStartStory: { surface = .compose })
+                    onStartStory: { openCompose(together: false) },
+                    onClose: { guardedSurface.wrappedValue = returnTab })
             }
 
-            // 计划 · 我的 · 拍摄, in that order, with 我的 in the middle and
-            // emphasised — see `FloatingTabBar.emphasisedIndex`. The middle
-            // slot is the one a thumb reaches without moving the phone, so it
-            // holds the screen the app opens on rather than an action.
-            FloatingTabBar(
-                items: [
-                    .init(
-                        tab: Surface.compose,
-                        label: Strings.surfaceCompose,
-                        icon: "sparkles.rectangle.stack",
-                        activeIcon: "sparkles.rectangle.stack.fill"),
-                    .init(
-                        tab: Surface.plans,
-                        label: Strings.surfacePlans,
-                        icon: "rectangle.stack",
-                        activeIcon: "rectangle.stack.fill"),
-                    .init(
-                        tab: Surface.camera,
+            if surface == .plans || surface == .friends {
+                FloatingTabBar(
+                    items: [
+                        .init(
+                            tab: Surface.plans,
+                            label: Strings.surfacePlans,
+                            icon: "rectangle.stack",
+                            activeIcon: "rectangle.stack.fill"),
+                        .init(
+                            tab: Surface.friends,
+                            label: Strings.surfaceFriends,
+                            icon: "person.2",
+                            activeIcon: "person.2.fill"),
+                    ],
+                    selection: guardedSurface,
+                    center: .init(
                         label: Strings.surfaceCamera,
-                        icon: "camera",
-                        activeIcon: "camera.fill"),
-                ],
-                selection: guardedSurface,
-                emphasisedIndex: 1)
-                .padding(.bottom, 6)
+                        icon: "camera.fill",
+                        identifier: "tab-camera",
+                        action: openCamera))
+                    .padding(.bottom, 6)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
 
             draftsBanner
         }
@@ -171,11 +191,11 @@ struct RootShellView: View {
                     Text("\(Strings.draftKept) · \(Strings.draftKeptSeeIt)")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
                 .background(OneDay.brandHorizontal, in: Capsule())
-                .oneDayGlow(.oneDayBlue, strength: 0.8)
+                .oneDayGlow(.oneDayBrand, strength: 0.8)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("drafts-entry")
@@ -208,8 +228,21 @@ struct RootShellView: View {
     }
 
     private func leaveCamera() {
-        surface = pendingSurface ?? .plans
+        surface = pendingSurface ?? returnTab
         pendingSurface = nil
+    }
+
+    private func openCamera() {
+        if surface == .plans || surface == .friends { returnTab = surface }
+        withAnimation(OneDay.Motion.snap) { surface = .camera }
+    }
+
+    private func openCompose(together: Bool) {
+        if surface == .plans || surface == .friends { returnTab = surface }
+        composeTogether = together
+        // Leaving the camera for the composer still goes through the guard: a
+        // clip in review would otherwise vanish with the camera.
+        guardedSurface.wrappedValue = .compose
     }
 }
 
@@ -229,6 +262,9 @@ final class UnfiledClipGuard {
 struct CameraTabView: View {
     var unfiledGuard: UnfiledClipGuard?
     var onStartStory: (() -> Void)?
+    /// Back to the tab the camera was opened from. The bar is hidden while the
+    /// camera is up, so this ✕ is the way out.
+    var onClose: (() -> Void)?
 
     @Environment(ClipDraftStore.self) private var drafts
     @State private var showDrafts = false
@@ -244,7 +280,8 @@ struct CameraTabView: View {
             slotTitle: Strings.freeformSlot,
             isFreeform: true,
             unfiledGuard: unfiledGuard,
-            onStartStory: onStartStory
+            onStartStory: onStartStory,
+            onCloseFreeform: onClose
         ) { _, _ in }
             // Over the camera rather than on the home screen: this is where the
             // clips came from, and home doesn't need another section. Clear of

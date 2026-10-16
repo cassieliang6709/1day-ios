@@ -31,7 +31,7 @@ struct AvatarDot: View {
                     .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
                     .foregroundStyle(isPending ? tint : .white)
             } else {
-                Image("OneDayMascot")
+                Image(AppSkin.mascotImageName)
                     .resizable()
                     .scaledToFill()
                     .opacity(isPending ? 0.58 : 1)
@@ -42,8 +42,12 @@ struct AvatarDot: View {
             .background {
                 if isPending {
                     Circle().fill(tint.opacity(0.14))
-                } else {
+                } else if hasName {
                     Circle().fill(tint.gradient)
+                } else {
+                    // The mascot brings its own colour; behind it, the skin's
+                    // soft fill rather than an identity hue nobody chose.
+                    Circle().fill(Color.oneDayMist)
                 }
             }
             .clipShape(Circle())

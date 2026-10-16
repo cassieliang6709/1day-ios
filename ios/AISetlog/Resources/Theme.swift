@@ -15,6 +15,44 @@ private extension UIColor {
     }
 }
 
+/// The app's colour skin (1.5). 奶油黄 is the default; 经典蓝 is the blue the
+/// app shipped in through 1.4. Picked in Settings → 皮肤.
+///
+/// Every palette token below is computed and reads `current`, and the app
+/// root re-applies `.tint(Color.oneDayBrand)` whenever the setting changes —
+/// a new environment value invalidates the whole tree, so every screen
+/// re-reads its colours.
+enum AppSkin: String, CaseIterable, Identifiable, Codable {
+    case cream, blue
+
+    var id: String { rawValue }
+    static let storageKey = "appSkin"
+    /// Set by Settings when the skin changes; see `AISetlogApp.appSkin`.
+    static let reopenSettingsKey = "appSkin.reopenSettings"
+
+    static var current: AppSkin {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(AppSkin.init) ?? .cream
+    }
+
+    var displayName: String {
+        switch self {
+        case .cream: Strings.skinCream
+        case .blue: Strings.skinBlue
+        }
+    }
+
+    /// The mascot and the logo are pictures, so each skin has its own copy.
+    static var mascotImageName: String { current == .cream ? "OneDayMascotCream" : "OneDayMascot" }
+    static var lockupImageName: String { current == .cream ? "OneDayBrandLockupCream" : "OneDayBrandLockup" }
+}
+
+extension UIColor {
+    /// One colour per skin.
+    static func skin(cream: UIColor, blue: UIColor) -> UIColor {
+        AppSkin.current == .cream ? cream : blue
+    }
+}
+
 extension UIColor {
     convenience init(hex: UInt32) {
         self.init(
@@ -42,12 +80,18 @@ extension UIColor {
     /// Kept as a property rather than folded into the 119 call sites: it is
     /// the seam that made turning this off a one-line change, and it would be
     /// the seam again if themes ever come back properly.
-    static var oneDayBrand: UIColor { oneDayBlue }
+    static var oneDayBrand: UIColor { skin(cream: oneDayCream, blue: oneDayBlue) }
+
+    /// #FFCB45 — the 奶油黄 skin's accent.
+    static let oneDayCream = UIColor(hex: 0xFFCB45)
 
     /// The lighter end of the brand gradient, derived from the accent rather
     /// than listed: hue rotated a little, saturation eased off — the
     /// relationship #38B6FF has to #1677FF.
     static var oneDayBrandLight: UIColor {
+        // 奶油黄: a paler butter rather than a hue rotation, which on yellow
+        // lands on orange.
+        if oneDayBrand == oneDayCream { return UIColor(hex: 0xFFE08A) }
         let base = oneDayBrand
         var hue: CGFloat = 0
         var saturation: CGFloat = 0
@@ -63,14 +107,16 @@ extension UIColor {
             alpha: alpha)
     }
     /// #38B6FF — the lighter half of the brand gradient.
-    static let oneDayCyan = UIColor(hex: 0x38B6FF)
+    static var oneDayCyan: UIColor { skin(cream: UIColor(hex: 0xFFB86B), blue: UIColor(hex: 0x38B6FF)) }
     /// #7FB4FF — tinted rails, inactive strokes, gradient midpoints.
-    static let oneDaySky = UIColor(hex: 0x7FB4FF)
+    static var oneDaySky: UIColor { skin(cream: UIColor(hex: 0xFFD98A), blue: UIColor(hex: 0x7FB4FF)) }
     /// #0F2E6B — headline ink in light mode. In dark mode we keep the same
     /// intent with lighter blue so text remains legible.
-    static let oneDayNavy = UIColor.themed(
-        light: UIColor(hex: 0x0F2E6B),
-        dark: UIColor(hex: 0x9AB7FF))
+    static var oneDayNavy: UIColor {
+        skin(
+            cream: .themed(light: UIColor(hex: 0x3A2B1B), dark: UIColor(hex: 0xF3E3C3)),
+            blue: .themed(light: UIColor(hex: 0x0F2E6B), dark: UIColor(hex: 0x9AB7FF)))
+    }
     /// #DCEBFF — soft blue surfaces (chips, icon tiles, empty slots).
     ///
     /// Themed since 1.4. It used to be a fixed hex, so in dark mode a sheet
@@ -79,22 +125,28 @@ extension UIColor {
     /// the "a step up from the page" intent with the same deep blue as
     /// `oneDaySurface`. The canvas blooms opt out explicitly — they pass their
     /// own dark colour — so nothing decorative changed.
-    static let oneDayMist = UIColor.themed(
-        light: UIColor(hex: 0xDCEBFF),
-        dark: UIColor(hex: 0x22304D))
+    static var oneDayMist: UIColor {
+        skin(
+            cream: .themed(light: UIColor(hex: 0xFFF1CC), dark: UIColor(hex: 0x3A2F22)),
+            blue: .themed(light: UIColor(hex: 0xDCEBFF), dark: UIColor(hex: 0x22304D)))
+    }
     /// #F5F8FF — the page behind everything.
-    static let oneDayCanvas = UIColor.themed(
-        light: UIColor(hex: 0xF5F8FF),
-        dark: UIColor(hex: 0x131B2A))
+    static var oneDayCanvas: UIColor {
+        skin(
+            cream: .themed(light: UIColor(hex: 0xFFF8E8), dark: UIColor(hex: 0x1E1912)),
+            blue: .themed(light: UIColor(hex: 0xF5F8FF), dark: UIColor(hex: 0x131B2A)))
+    }
     /// Soft surface token for cards / form fields that used to be white.
     ///
     /// Dark is #22304D, not the #171F33 it used to share with `OneDay.surface`:
     /// a soft chip inside a card was the same colour as the card, so the chip
     /// simply vanished. One clear step lighter than the card, the way the
     /// light pair (#DCEBFF on white) already worked.
-    static let oneDaySurface = UIColor.themed(
-        light: UIColor(hex: 0xDCEBFF),
-        dark: UIColor(hex: 0x22304D))
+    static var oneDaySurface: UIColor {
+        skin(
+            cream: .themed(light: UIColor(hex: 0xFFF1CC), dark: UIColor(hex: 0x3A2F22)),
+            blue: .themed(light: UIColor(hex: 0xDCEBFF), dark: UIColor(hex: 0x22304D)))
+    }
 
     // Accents. Used sparingly — one per surface, to keep things cute not busy.
     static let oneDayLavender = UIColor(hex: 0xB3A4FF)
@@ -154,12 +206,12 @@ extension Color {
     /// `let` here would hand every view the accent as it was at launch.
     static var oneDayBrand: Color { Color(uiColor: .oneDayBrand) }
     static var oneDayBrandLight: Color { Color(uiColor: .oneDayBrandLight) }
-    static let oneDayCyan = Color(uiColor: .oneDayCyan)
-    static let oneDaySky = Color(uiColor: .oneDaySky)
-    static let oneDayNavy = Color(uiColor: .oneDayNavy)
-    static let oneDayMist = Color(uiColor: .oneDayMist)
-    static let oneDayCanvas = Color(uiColor: .oneDayCanvas)
-    static let oneDaySurface = Color(uiColor: .oneDaySurface)
+    static var oneDayCyan: Color { Color(uiColor: .oneDayCyan) }
+    static var oneDaySky: Color { Color(uiColor: .oneDaySky) }
+    static var oneDayNavy: Color { Color(uiColor: .oneDayNavy) }
+    static var oneDayMist: Color { Color(uiColor: .oneDayMist) }
+    static var oneDayCanvas: Color { Color(uiColor: .oneDayCanvas) }
+    static var oneDaySurface: Color { Color(uiColor: .oneDaySurface) }
     static let oneDayLavender = Color(uiColor: .oneDayLavender)
     static let oneDayMint = Color(uiColor: .oneDayMint)
     static let oneDayButter = Color(uiColor: .oneDayButter)
@@ -175,10 +227,12 @@ extension Color {
 enum OneDay {
     // MARK: Ink
 
-    static let ink = Color.oneDayNavy
-    static let inkSoft = Color(uiColor: UIColor.themed(
-        light: UIColor(hex: 0x5B7099),
-        dark: UIColor(hex: 0x7E95C5)))
+    static var ink: Color { Color.oneDayNavy }
+    static var inkSoft: Color {
+        Color(uiColor: .skin(
+            cream: .themed(light: UIColor(hex: 0x7A6650), dark: UIColor(hex: 0xC9B593)),
+            blue: .themed(light: UIColor(hex: 0x5B7099), dark: UIColor(hex: 0x7E95C5))))
+    }
     /// The quietest ink — timestamps, placeholders, "optional".
     ///
     /// Light was #93A6C6 until 1.4, which is 2.47:1 on white: decorative,
@@ -186,9 +240,11 @@ enum OneDay {
     /// copy this is for, while staying visibly a step below `inkSoft`. Anything
     /// a user needs to read to act (a section heading, a label) takes
     /// `inkSoft` instead.
-    static let inkFaint = Color(uiColor: UIColor.themed(
-        light: UIColor(hex: 0x6F84A8),
-        dark: UIColor(hex: 0x657FAF)))
+    static var inkFaint: Color {
+        Color(uiColor: .skin(
+            cream: .themed(light: UIColor(hex: 0x8F7C66), dark: UIColor(hex: 0xA08D70)),
+            blue: .themed(light: UIColor(hex: 0x6F84A8), dark: UIColor(hex: 0x657FAF))))
+    }
 
     /// Brand blue for *text* under 18pt.
     ///
@@ -197,24 +253,40 @@ enum OneDay {
     /// as the same blue at caption size. Dark mode lifts it to #8CB8FF
     /// (8.6:1 on the canvas), because the raw brand blue on #131B2A is 4.2:1.
     /// Fills and glows keep `Color.oneDayBrand`; only letters use this.
-    static let brandText = Color(uiColor: UIColor.themed(
-        light: UIColor(hex: 0x0F62D6),
-        dark: UIColor(hex: 0x8CB8FF)))
+    ///
+    /// 奶油黄 can't be text at all — #FFCB45 on white is 1.5:1 — so its
+    /// letters are a deep amber (#8A5A00, 5.9:1).
+    static var brandText: Color {
+        Color(uiColor: .skin(
+            cream: .themed(light: UIColor(hex: 0x8A5A00), dark: UIColor(hex: 0xFFD66B)),
+            blue: .themed(light: UIColor(hex: 0x0F62D6), dark: UIColor(hex: 0x8CB8FF))))
+    }
+
+    /// Letters and glyphs drawn *on* a brand fill — the primary button, the
+    /// selected tab, the camera disc. White on blue; on 奶油黄 white is
+    /// unreadable, so a deep brown that works in both appearances.
+    static var onBrand: Color {
+        Color(uiColor: .skin(cream: UIColor(hex: 0x3A2B1B), blue: .white))
+    }
 
     // MARK: Surfaces
 
-    static let canvas = Color.oneDayCanvas
+    static var canvas: Color { Color.oneDayCanvas }
     /// System-surface-aware card background in light mode and a deep blue in dark
     /// mode so it never turns “gray on gray”.
-    static let surface = Color(uiColor: UIColor.themed(
-        light: UIColor.white,
-        dark: UIColor(hex: 0x171F33)))
+    static var surface: Color {
+        Color(uiColor: .skin(
+            cream: .themed(light: .white, dark: UIColor(hex: 0x2A2219)),
+            blue: .themed(light: .white, dark: UIColor(hex: 0x171F33))))
+    }
     /// Soft fill for chips/cards, now adapted for both modes.
-    static let surfaceSoft = Color.oneDaySurface
+    static var surfaceSoft: Color { Color.oneDaySurface }
     /// Hairline border on glass — barely there, just enough to catch an edge.
-    static let hairline = Color(uiColor: .themed(
-        light: UIColor.oneDayBlue.withAlphaComponent(0.10),
-        dark: UIColor.white.withAlphaComponent(0.16)))
+    static var hairline: Color {
+        Color(uiColor: .themed(
+            light: UIColor.skin(cream: UIColor(hex: 0x3A2B1B), blue: .oneDayBlue).withAlphaComponent(0.10),
+            dark: UIColor.white.withAlphaComponent(0.16)))
+    }
 
     // MARK: Radii
     //

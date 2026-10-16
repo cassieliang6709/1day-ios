@@ -161,7 +161,7 @@ struct StoryCoverSheet: View {
             HStack(spacing: 11) {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
                     .frame(width: 34, height: 34)
                     .background(
                         Color.oneDayBrand.opacity(0.13),

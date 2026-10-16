@@ -222,7 +222,7 @@ struct StoryRowCard: View {
                     Text("\(progress.filled)/\(progress.total)")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                 }
             }
 

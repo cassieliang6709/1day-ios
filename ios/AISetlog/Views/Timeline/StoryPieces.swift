@@ -118,7 +118,7 @@ struct FilmReadyCard: View {
 
                 Text(Strings.filmFromMoments(momentCount))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
+                    .foregroundStyle(OneDay.onBrand.opacity(0.88))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -127,7 +127,7 @@ struct FilmReadyCard: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(OneDay.onBrand.opacity(0.9))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -344,7 +344,7 @@ struct OpenSlotRow: View {
             HStack(spacing: 12) {
                 Image(systemName: momentIcon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
                     .frame(width: 34, height: 34)
                     .background(Color.oneDayMist.opacity(0.55), in: Circle())
 
@@ -358,7 +358,7 @@ struct OpenSlotRow: View {
 
                 Text(trailingLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 

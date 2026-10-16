@@ -21,6 +21,9 @@ struct GuidedMomentsView: View {
     let onDone: (CustomStoryDraft) -> Void
     /// Injectable so previews and tests don't reach the network.
     var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
+    /// 自己写 (1.5): put the cursor in the first prompt row on open, rather
+    /// than leaving the page on its AI sentence.
+    var startsWriting = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(PromptSuggestionMetrics.self) private var metrics
@@ -94,6 +97,11 @@ struct GuidedMomentsView: View {
             // as early as a warm-up can go without doing it for people who
             // never open the composer.
             .task { await suggestions.warmUp() }
+            .task {
+                guard startsWriting else { return }
+                try? await Task.sleep(for: .milliseconds(450))
+                focused = 0
+            }
             .sheet(isPresented: $showPromptLibrary) {
                 PromptLibraryPicker(onChoose: addFromLibrary)
                     .presentationDetents([.medium, .large])
@@ -141,7 +149,7 @@ struct GuidedMomentsView: View {
                 if needsName, filledCount >= 2 {
                     Text(Strings.storyNameNeeded)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                         .padding(.top, 3)
                         .transition(.opacity)
                 }
@@ -203,7 +211,7 @@ struct GuidedMomentsView: View {
                         Spacer(minLength: 4)
                         Button(Strings.retry, action: generatePrompts)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.oneDayBrand)
+                            .foregroundStyle(OneDay.brandText)
                             .buttonStyle(.plain)
                             .frame(minHeight: 44)
                             .disabled(isSuggesting || trimmedIntent.isEmpty)
@@ -243,7 +251,7 @@ struct GuidedMomentsView: View {
                         Button(action: addBlankPrompt) {
                             Label(Strings.addAnotherPrompt, systemImage: "plus.circle.fill")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color.oneDayBrand)
+                                .foregroundStyle(OneDay.brandText)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 11)
                         }
@@ -258,7 +266,7 @@ struct GuidedMomentsView: View {
         HStack(spacing: 10) {
             Text("\(index + 1)")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
                 .frame(width: 28, height: 28)
                 .background(Color.oneDayBrand, in: Circle())
 

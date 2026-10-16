@@ -158,7 +158,7 @@ struct OneDayBrandLogo: View {
     var width: CGFloat = 96
 
     var body: some View {
-        Image("OneDayBrandLockup")
+        Image(AppSkin.lockupImageName)
             .resizable()
             .scaledToFit()
             .frame(width: width, height: width * 0.49)

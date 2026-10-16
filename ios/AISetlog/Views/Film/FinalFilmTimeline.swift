@@ -142,7 +142,7 @@ struct FinalFilmTimeline: View {
                         .multilineTextAlignment(.center)
                     Button(Strings.openSystemSettings, action: onOpenSettings)
                         .font(.system(size: 12.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("film-open-settings")
                 }

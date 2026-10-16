@@ -27,6 +27,7 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    @AppStorage(AppSkin.storageKey) private var appSkin: AppSkin = .cream
 
     /// Who you are, what you've made, then the two things worth changing.
     ///
@@ -52,6 +53,9 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 OneDayCanvas(seed: 5)
+                    .onChange(of: appSkin) { _, _ in
+                        UserDefaults.standard.set(true, forKey: AppSkin.reopenSettingsKey)
+                    }
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -279,7 +283,7 @@ struct SettingsView: View {
                     // so getting back in meant starting one.
                     Button(Strings.signIn) { showSignIn = true }
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                 }
             }
 
@@ -334,7 +338,7 @@ struct SettingsView: View {
         HStack(spacing: 6) {
             Link(Strings.privacyPolicy, destination: Self.privacyPolicyURL)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
             Text("·")
             Text(Self.versionString)
         }
@@ -371,8 +375,19 @@ struct SettingsView: View {
         }
         rowDivider
         SettingsLinkRow(
+            symbol: "paintpalette",
+            accent: OneDay.brandText,
+            title: Strings.skinTitle,
+            value: appSkin.displayName
+        ) {
+            SettingsOptionPage(
+                title: Strings.skinTitle,
+                selection: $appSkin)
+        }
+        rowDivider
+        SettingsLinkRow(
             symbol: "globe",
-            accent: .oneDayBrand,
+            accent: OneDay.brandText,
             title: Strings.language,
             value: appLanguage.displayName
         ) {
