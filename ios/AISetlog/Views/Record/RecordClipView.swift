@@ -133,7 +133,13 @@ struct RecordClipView: View {
         isFreeform ? nil : localizedMomentTitle
     }
 
+    // Split in three so each chain type-checks on its own: as one expression
+    // it ran past the compiler's time limit on CI's slower runners.
     var body: some View {
+        observingTake(withCaptureLifecycle(screen))
+    }
+
+    private var screen: some View {
         ZStack {
             OneDay.canvas.ignoresSafeArea()
             CuteCameraBackdrop()
@@ -165,6 +171,10 @@ struct RecordClipView: View {
                 .transition(.opacity)
             }
         }
+    }
+
+    private func withCaptureLifecycle(_ content: some View) -> some View {
+        content
         .task {
             recorder.orientation = effectiveOrientation
             if !CameraStyle.selectable.contains(cameraStyle) {
@@ -219,6 +229,10 @@ struct RecordClipView: View {
         } message: {
             Text(Strings.keepClipFootnote)
         }
+    }
+
+    private func observingTake(_ content: some View) -> some View {
+        content
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = newValue
         }
