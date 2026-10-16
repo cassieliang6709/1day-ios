@@ -231,9 +231,10 @@ struct StoryTimelineView: View {
                 // gives each name its own line and keeps seven readable; a
                 // 按时间 story has no names — its slots are 「第 N 个瞬间」,
                 // the numbering 1.3 deleted — so a vertical list of them is a
-                // list of nothing, one per line. That story gets a strip of
-                // frames labelled with the times instead, which is the only
-                // real fact it has and the reason somebody picked 按时间.
+                // list of nothing, one per line. That story gets a diary
+                // instead — one row per clip, headed by the time it was
+                // filmed — which is the only real fact it has and the reason
+                // somebody picked 按时间.
                 // See `MomentTimeline` and `MomentFilmstrip`.
                 //
                 // A moment in a story only you filmed is one clip, so it opens

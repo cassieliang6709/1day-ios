@@ -16,7 +16,7 @@ final class ClipLibraryTests: XCTestCase {
                 authorID: author, recordedAt: Date(timeIntervalSince1970: seconds))
     }
 
-    func testFiltersMineFriendsAndRoom() {
+    func testFiltersMineAndFriends() {
         let room = story("Trip", shared: true)
         let solo = story("Solo", shared: false)
         let library = ClipLibrary(
@@ -30,9 +30,55 @@ final class ClipLibraryTests: XCTestCase {
         XCTAssertEqual(library.filtered(.all).count, 3)
         XCTAssertEqual(library.filtered(.mine).count, 2)
         XCTAssertEqual(library.filtered(.friends).count, 1)
-        XCTAssertEqual(library.filtered(.room(room.id)).count, 2)
         // Newest first.
         XCTAssertEqual(library.clips.map(\.recordedAt.timeIntervalSince1970), [300, 200, 100])
+    }
+
+    private func cameraLibrary() -> (ClipLibrary, [String: CameraStyle]) {
+        let s = story("A", shared: true)
+        func at(_ seconds: TimeInterval, _ author: String) -> DayClip {
+            DayClip(day: 1, url: URL(fileURLWithPath: "/tmp/\(Int(seconds)).mov"),
+                    authorName: nil, authorID: author,
+                    recordedAt: Date(timeIntervalSince1970: seconds))
+        }
+        let library = ClipLibrary(
+            stories: [(s, [at(1, me), at(2, me), at(3, "friend"), at(4, me), at(5, me)])],
+            drafts: [], myIDs: [me])
+        var cameras: [String: CameraStyle] = [:]
+        for item in library.clips {
+            switch Int(item.recordedAt.timeIntervalSince1970) {
+            case 1, 3: cameras[item.cameraKey] = .film
+            case 2: cameras[item.cameraKey] = .instant
+            case 4: cameras[item.cameraKey] = .standard
+            default: break // 5: metadata not read yet
+            }
+        }
+        return (library, cameras)
+    }
+
+    func testFiltersByCamera() {
+        let (library, cameras) = cameraLibrary()
+        XCTAssertEqual(library.filtered(.all, cameras: cameras).count, 5)
+        XCTAssertEqual(library.filtered(.camera(.film), cameras: cameras).count, 2)
+        XCTAssertEqual(library.filtered(.camera(.instant), cameras: cameras).count, 1)
+        XCTAssertEqual(library.filtered(.camera(.camcorder), cameras: cameras).count, 0)
+        // A clip whose camera hasn't been read matches no camera.
+        XCTAssertEqual(library.filtered(.camera(.film)).count, 0)
+    }
+
+    func testCameraAndPeopleCombine() {
+        let (library, cameras) = cameraLibrary()
+        let mineOnFilm = LibraryFilter(camera: .film, people: .mine)
+        let friendsOnFilm = LibraryFilter(camera: .film, people: .friends)
+        XCTAssertEqual(library.filtered(mineOnFilm, cameras: cameras).count, 1)
+        XCTAssertEqual(library.filtered(friendsOnFilm, cameras: cameras).count, 1)
+    }
+
+    func testCameraChipsOnlyForUsedCamerasInPickerOrder() {
+        let (library, cameras) = cameraLibrary()
+        // `.standard` never gets a chip; camcorder has no clips.
+        XCTAssertEqual(library.cameras(in: cameras), [.film, .instant])
+        XCTAssertEqual(library.cameras(in: [:]), [])
     }
 
     func testCoverIsEarliestClipOfEachDay() {

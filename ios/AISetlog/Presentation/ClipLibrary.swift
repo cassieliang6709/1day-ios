@@ -30,11 +30,25 @@ struct LibraryClip: Identifiable, Hashable {
         if case .story(let id, _, _) = source { return id }
         return nil
     }
+
+    /// What `ClipCameraIndex` files this clip's camera under. The file, plus
+    /// its date, so a re-recorded take at the same path is read again.
+    var cameraKey: String { "\(url.path)|\(recordedAt.timeIntervalSince1970)" }
 }
 
-enum LibraryFilter: Hashable {
-    case all, mine, friends
-    case room(UUID)
+/// The archive's two independent filters: which camera (the chip row) and
+/// whose clips (the people menu). `.all` is neither.
+struct LibraryFilter: Hashable {
+    enum People: Hashable, CaseIterable { case everyone, mine, friends }
+
+    /// Nil = every camera.
+    var camera: CameraStyle?
+    var people: People = .everyone
+
+    static let all = LibraryFilter()
+    static let mine = LibraryFilter(people: .mine)
+    static let friends = LibraryFilter(people: .friends)
+    static func camera(_ style: CameraStyle) -> LibraryFilter { LibraryFilter(camera: style) }
 }
 
 struct ClipLibrary {
@@ -87,18 +101,31 @@ struct ClipLibrary {
         self.init(clips: all)
     }
 
-    func filtered(_ filter: LibraryFilter, on day: Date? = nil, calendar: Calendar = .current) -> [LibraryClip] {
+    /// - Parameter cameras: each clip's camera, keyed by `cameraKey`. A clip
+    ///   not in it yet (its metadata hasn't been read) matches no camera.
+    func filtered(
+        _ filter: LibraryFilter, cameras: [String: CameraStyle] = [:],
+        on day: Date? = nil, calendar: Calendar = .current
+    ) -> [LibraryClip] {
         clips.filter { clip in
-            let passes: Bool = switch filter {
-            case .all: true
+            let person: Bool = switch filter.people {
+            case .everyone: true
             case .mine: clip.isMine
             case .friends: !clip.isMine
-            case .room(let id): clip.storyID == id
             }
-            guard passes else { return false }
+            guard person else { return false }
+            if let camera = filter.camera, cameras[clip.cameraKey] != camera { return false }
             guard let day else { return true }
             return calendar.isDate(clip.recordedAt, inSameDayAs: day)
         }
+    }
+
+    /// The cameras worth a chip: the selectable ones at least one clip was
+    /// filmed with, in the picker's order. `.standard` (no camera) never gets
+    /// one — those clips live under 全部.
+    func cameras(in cameras: [String: CameraStyle]) -> [CameraStyle] {
+        let used = Set(clips.compactMap { cameras[$0.cameraKey] })
+        return CameraStyle.selectable.filter(used.contains)
     }
 
     /// The first clip filmed on each day that has any — what a calendar cell

@@ -1,12 +1,13 @@
 import SwiftUI
 
 /// 我的's archive (1.5): every clip — yours, your friends', drafts — with a
-/// filter row, a grid or a month calendar, and a select mode that turns any
+/// camera filter row, a people menu, a grid or a month calendar, and a select mode that turns any
 /// set of clips into a vlog. Lives inside `PlansHomeView`'s scroll view, which
 /// keeps the header, the in-progress story card and all launch routing.
 struct LibrarySection: View {
     let library: ClipLibrary
-    /// Shared stories, for one filter chip each.
+    /// Shared stories. No longer drawn as chips (the row filters by camera
+    /// now); kept so the page's call site doesn't change.
     let rooms: [Challenge]
     let onOpenStory: (UUID) -> Void
     let onOpenDrafts: () -> Void
@@ -24,7 +25,10 @@ struct LibrarySection: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var shown: [LibraryClip] { library.filtered(filter, on: day) }
+    private var cameraIndex: ClipCameraIndex { .shared }
+    private var shown: [LibraryClip] {
+        library.filtered(filter, cameras: cameraIndex.cameras, on: day)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -37,7 +41,8 @@ struct LibrarySection: View {
                 if mode == .calendar {
                     LibraryCalendar(
                         month: $month,
-                        covers: library.coverByDay(library.filtered(filter)),
+                        covers: library.coverByDay(
+                            library.filtered(filter, cameras: cameraIndex.cameras)),
                         selectedDay: $day)
                         .padding(.horizontal, 20)
                 }
@@ -68,6 +73,10 @@ struct LibrarySection: View {
         .onChange(of: isSelecting) { _, selecting in
             if !selecting { picked = [] }
         }
+        // Reads each clip's camera off the main actor, once; cached app-wide.
+        .task(id: library.clips.map(\.cameraKey)) {
+            cameraIndex.load(library.clips)
+        }
     }
 
     // MARK: - Header
@@ -78,6 +87,8 @@ struct LibrarySection: View {
             Spacer(minLength: 6)
 
             if !library.clips.isEmpty {
+                peopleMenu
+
                 Button {
                     withAnimation(OneDay.Motion.snap) {
                         mode = mode == .grid ? .calendar : .grid
@@ -109,25 +120,63 @@ struct LibrarySection: View {
         .padding(.horizontal, 20)
     }
 
-    private var filterRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                chip(Strings.filterAll, .all)
-                chip(Strings.filterMine, .mine)
-                chip(Strings.filterFriends, .friends)
-                ForEach(rooms) { room in
-                    chip(room.title, .room(room.id))
+    /// 全部人 / 我拍的 / 朋友拍的. A menu rather than chips: it is the less
+    /// used of the two filters, and the chip row belongs to the cameras.
+    private var peopleMenu: some View {
+        Menu {
+            Picker(Strings.filterWhoFilmed, selection: $filter.people) {
+                ForEach(LibraryFilter.People.allCases, id: \.self) { people in
+                    Text(peopleName(people)).tag(people)
                 }
             }
-            .padding(.horizontal, 20)
+        } label: {
+            HStack(spacing: 4) {
+                Text(peopleName(filter.people))
+                Image(systemName: "chevron.down").font(.system(size: 10, weight: .heavy))
+            }
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(filter.people == .everyone ? OneDay.inkSoft : OneDay.brandText)
+            .padding(.horizontal, 11)
+            .frame(height: 38)
+            .background(OneDay.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
         }
-        .scrollIndicators(.hidden)
+        .accessibilityLabel(Strings.filterWhoFilmed)
+        .accessibilityValue(peopleName(filter.people))
+        .accessibilityIdentifier("library-people")
     }
 
-    private func chip(_ label: String, _ value: LibraryFilter) -> some View {
-        let isOn = filter == value
+    private func peopleName(_ people: LibraryFilter.People) -> String {
+        switch people {
+        case .everyone: Strings.filterEveryone
+        case .mine: Strings.filterMine
+        case .friends: Strings.filterFriends
+        }
+    }
+
+    /// 全部, then one chip per camera that has at least one clip. With no
+    /// camera clips at all the row would be a lone 全部, so it isn't drawn.
+    @ViewBuilder
+    private var filterRow: some View {
+        let cameras = library.cameras(in: cameraIndex.cameras)
+        if !cameras.isEmpty {
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    chip(Strings.filterAll, nil)
+                    ForEach(cameras) { style in
+                        chip(style.displayName, style)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func chip(_ label: String, _ value: CameraStyle?) -> some View {
+        let isOn = filter.camera == value
         return Button {
-            withAnimation(OneDay.Motion.snap) { filter = value }
+            withAnimation(OneDay.Motion.snap) { filter.camera = value }
         } label: {
             Text(label)
                 .font(.system(size: 13.5, weight: .bold, design: .rounded))
