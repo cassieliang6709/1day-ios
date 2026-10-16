@@ -19,8 +19,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
         TARGETED_DEVICE_FAMILY: "1"
-        MARKETING_VERSION: "1.4"
-        CURRENT_PROJECT_VERSION: "24"
+        MARKETING_VERSION: "1.5"
+        CURRENT_PROJECT_VERSION: "26"
       configs:
         Debug:
           APS_ENVIRONMENT: development
