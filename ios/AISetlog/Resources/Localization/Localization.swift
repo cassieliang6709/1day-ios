@@ -643,9 +643,9 @@ enum Strings {
     static var cameraFilm: String { lang == .chinese ? "胶片机" : "Film camera" }
     static var cameraInstant: String { lang == .chinese ? "拍立得" : "Instant" }
     static var pickCamera: String { lang == .chinese ? "用哪台相机拍" : "Which camera" }
-    static var cameraCamcorderCaption: String { lang == .chinese ? "3:4 · 冷色 · 时间码" : "3:4 · cool · timecode" }
-    static var cameraFilmCaption: String { lang == .chinese ? "2:3 · 暖色 · 橙色日期" : "2:3 · warm · orange date" }
-    static var cameraInstantCaption: String { lang == .chinese ? "3:4 · 淡色 · 白边相纸" : "3:4 · faded · white border" }
+    static var cameraCamcorderCaption: String { lang == .chinese ? "3:4 · 原色 · 时间码" : "3:4 · true colour · timecode" }
+    static var cameraFilmCaption: String { lang == .chinese ? "2:3 · 微暖 · 橙色日期" : "2:3 · a little warm · orange date" }
+    static var cameraInstantCaption: String { lang == .chinese ? "3:4 · 原色 · 白边相纸" : "3:4 · true colour · white border" }
 
     // The zoom values themselves ("0.5x") are formatted by `CameraZoom.label`
     // and are the same in both languages, so they are not copy.
