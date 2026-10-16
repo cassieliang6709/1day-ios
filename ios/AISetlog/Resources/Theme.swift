@@ -45,9 +45,11 @@ enum AppSkin: String, CaseIterable, Identifiable, Codable {
     static var mascotImageName: String { current == .cream ? "OneDayMascotCream" : "OneDayMascot" }
     static var lockupImageName: String { current == .cream ? "OneDayBrandLockupCream" : "OneDayBrandLockup" }
 
-    /// The home-screen icon for this skin: `nil` is the primary (blue)
-    /// `AppIcon`, 奶油黄 is the alternate `AppIconCream` set.
-    var alternateIconName: String? { self == .cream ? "AppIconCream" : nil }
+    /// The home-screen icon for this skin: `nil` is the primary `AppIcon`,
+    /// which is the yellow 奶油黄 icon because that is the default skin — so a
+    /// new install never triggers iOS's "icon changed" alert on first launch.
+    /// 经典蓝 is the alternate `AppIconBlue` set.
+    var alternateIconName: String? { self == .cream ? nil : "AppIconBlue" }
 
     /// Puts the home-screen icon in line with `skin`. iOS shows an alert on
     /// every icon change, so this only asks when the icon is actually
