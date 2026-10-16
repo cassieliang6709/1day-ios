@@ -100,15 +100,58 @@ final class ClipLibraryTests: XCTestCase {
             day + 100)
     }
 
-    func testStitchableRenumbersInFilmOrder() {
+    func testStitchableKeepsPickedOrderAndRenumbers() {
         let a = story("A", shared: false)
         let b = story("B", shared: false)
         let library = ClipLibrary(
             stories: [(a, [clip(day: 1, author: me, at: 300)]), (b, [clip(day: 1, author: me, at: 100)])],
             drafts: [], myIDs: [me])
+        // Newest first as picked; the vlog plays them in that order.
         let stitched = ClipLibrary.stitchable(library.clips)
         XCTAssertEqual(stitched.map(\.day), [1, 2])
-        XCTAssertEqual(stitched.map { $0.recordedAt?.timeIntervalSince1970 }, [100, 300])
+        XCTAssertEqual(stitched.map { $0.recordedAt?.timeIntervalSince1970 }, [300, 100])
+        // Dragged into the other order in the arrange sheet.
+        let reordered = ClipLibrary.stitchable(library.clips.reversed())
+        XCTAssertEqual(reordered.map(\.day), [1, 2])
+        XCTAssertEqual(reordered.map { $0.recordedAt?.timeIntervalSince1970 }, [100, 300])
+        XCTAssertEqual(reordered.map(\.id), library.clips.reversed().map(\.id))
+    }
+
+    private func draft(at seconds: TimeInterval) -> (draft: ClipDraft, url: URL) {
+        let d = ClipDraft(
+            fileName: "d\(Int(seconds)).mov", recordedAt: Date(timeIntervalSince1970: seconds),
+            orientation: .portrait, overlayText: nil, byteSize: 1)
+        return (d, URL(fileURLWithPath: "/tmp/d\(Int(seconds)).mov"))
+    }
+
+    func testDraftsFilterShowsOnlyUnfiledClips() {
+        let s = story("A", shared: true)
+        let library = ClipLibrary(
+            stories: [(s, [clip(day: 1, author: me, at: 100), clip(day: 2, author: "friend", at: 200)])],
+            drafts: [draft(at: 150), draft(at: 50)],
+            myIDs: [me])
+        XCTAssertEqual(library.draftCount, 2)
+        XCTAssertEqual(library.filtered(.all).count, 4)
+        let drafts = library.filtered(.drafts)
+        XCTAssertEqual(drafts.map(\.recordedAt.timeIntervalSince1970), [150, 50])
+        XCTAssertTrue(drafts.allSatisfy { $0.storyID == nil })
+        // Drafts are mine, so 朋友拍的 + 待归档 is empty.
+        XCTAssertEqual(library.filtered(LibraryFilter(people: .friends, draftsOnly: true)).count, 0)
+        XCTAssertEqual(library.filtered(LibraryFilter(people: .mine, draftsOnly: true)).count, 2)
+    }
+
+    func testDraftsFilterCombinesWithDay() {
+        let s = story("A", shared: false)
+        let dayLength: TimeInterval = 86_400
+        let library = ClipLibrary(
+            stories: [(s, [clip(day: 1, author: me, at: dayLength + 10)])],
+            drafts: [draft(at: dayLength + 20), draft(at: dayLength * 3)],
+            myIDs: [me])
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let onDay = library.filtered(
+            .drafts, on: Date(timeIntervalSince1970: dayLength + 5), calendar: calendar)
+        XCTAssertEqual(onDay.map(\.recordedAt.timeIntervalSince1970), [dayLength + 20])
     }
 
     func testDominantAspectPrefersMajorityThenPortrait() {

@@ -39,6 +39,8 @@
 	<string>So your clips have sound.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>To save your finished film to Photos.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用来把你说的话转成心情日记里的文字。</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

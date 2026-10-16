@@ -1,19 +1,25 @@
 import Photos
 import SwiftUI
 
-/// A vlog from clips picked in 我的: any stories, any people, in the order they
-/// were filmed. Renders on open with the shape most of the clips were shot in;
-/// changing the shape renders again.
+/// A vlog from clips picked in 我的: any stories, any people. Opens on an
+/// arrange step — the clips in the order they were picked, draggable, each
+/// one previewable — and renders once 生成 vlog is tapped, in that order.
+/// No shape picker: the cameras decide the shape, so the stitcher builds the
+/// canvas from the takes themselves (`Options.aspect = nil`).
 struct LibraryVlogSheet: View {
-    let clips: [LibraryClip]
-
     @Environment(\.dismiss) private var dismiss
-    @State private var aspect: VideoStitcher.Aspect
+    @State private var order: [LibraryClip]
+    @State private var stage: Stage = .arrange
+    /// What the player lays out before the film is read; the film's own
+    /// shape wins once it is.
+    private let layoutRatio: CGFloat
     @State private var phase: Phase = .rendering
     @State private var saveMessage: String?
     @State private var isSaving = false
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    enum Stage { case arrange, film }
 
     enum Phase: Equatable {
         case rendering
@@ -22,27 +28,37 @@ struct LibraryVlogSheet: View {
     }
 
     init(clips: [LibraryClip]) {
-        self.clips = clips
-        _aspect = State(initialValue: ClipLibrary.dominantAspect(of: clips))
+        _order = State(initialValue: clips)
+        layoutRatio = ClipLibrary.dominantAspect(of: clips).ratio
     }
 
     var body: some View {
+        Group {
+            switch stage {
+            case .arrange:
+                LibraryVlogArrange(order: $order) { stage = .film }
+            case .film:
+                film
+            }
+        }
+        .background(OneDayCanvas().ignoresSafeArea())
+        .task(id: stage) {
+            if stage == .film { await render() }
+        }
+    }
+
+    private var film: some View {
         VStack(spacing: 16) {
             HStack {
+                IconBubble(systemName: "chevron.left") { stage = .arrange }
+                    .accessibilityLabel(Strings.vlogArrangeTitle)
+                Spacer()
                 Text(Strings.vlogTitle)
                     .font(.system(size: 20, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                 Spacer()
                 IconBubble(systemName: "xmark") { dismiss() }
             }
-
-            Picker(Strings.vlogShape, selection: $aspect) {
-                ForEach(VideoStitcher.Aspect.allCases) { option in
-                    Text(Strings.orientationName(orientation(option))).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .disabled(phase == .rendering)
 
             Group {
                 switch phase {
@@ -55,7 +71,7 @@ struct LibraryVlogSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .done(let url):
-                    VlogPlayer(url: url, aspectRatio: aspect.ratio)
+                    VlogPlayer(url: url, aspectRatio: layoutRatio)
                         .id(url)
                 case .failed:
                     VStack(spacing: 12) {
@@ -87,16 +103,6 @@ struct LibraryVlogSheet: View {
             }
         }
         .padding(20)
-        .background(OneDayCanvas().ignoresSafeArea())
-        .task(id: aspect) { await render() }
-    }
-
-    private func orientation(_ aspect: VideoStitcher.Aspect) -> Challenge.Orientation {
-        switch aspect {
-        case .portrait: .portrait
-        case .landscape: .landscape
-        case .square: .square
-        }
     }
 
     private func render() async {
@@ -104,10 +110,10 @@ struct LibraryVlogSheet: View {
         saveMessage = nil
         var options = VideoStitcher.Options()
         options.layout = .sequential
-        options.aspect = aspect
+        options.aspect = nil
         do {
             let url = try await VideoStitcher.stitch(
-                clips: ClipLibrary.stitchable(clips), options: options)
+                clips: ClipLibrary.stitchable(order), options: options)
             guard !Task.isCancelled else { return }
             phase = .done(url)
         } catch {

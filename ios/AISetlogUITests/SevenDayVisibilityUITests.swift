@@ -19,8 +19,8 @@ final class SevenDayVisibilityUITests: XCTestCase {
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
         compose.tap()
-        // One page as of 1.5: two rows say how many days, and the chosen
-        // row opens its own posters underneath. No 更多模板, no 一日/七日 pills.
+        // One page as of 1.5: two rows say how many days, and the 模板 grid
+        // below shows that length's posters.
         let oneDayRow = app.buttons["plan-one-day"]
         let sevenDayRow = app.buttons["plan-seven-day"]
         XCTAssertTrue(sevenDayRow.waitForExistence(timeout: 15), "7-day row missing")
@@ -28,24 +28,40 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertTrue(sevenDayRow.isSelected)
         let moving = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "动起来的一周")).firstMatch
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
+        // The grid sits under the two rows; on a small phone it starts below
+        // the fold.
+        reveal(moving, in: app)
         XCTAssertTrue(moving.isHittable)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "Seven day after switch"
         shot.lifetime = .keepAlways
         add(shot)
+        reveal(oneDayRow, in: app, upward: false)
         oneDayRow.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch.waitForExistence(timeout: 15))
         sevenDayRow.tap()
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
+        let early = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch
+        reveal(early, in: app)
         // Picking a seven-day poster names the story after it, in the field
         // on the same page — the first chance anybody gets to change it.
-        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch.tap()
+        early.tap()
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         XCTAssertEqual(name.value as? String, "7 天早起的人")
         // And the page asks who you are filming with before anything exists.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
+    }
+
+    /// Short drags, not `swipeUp()`: a full swipe on a small phone throws the
+    /// grid past the top of the page.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = true) {
+        for _ in 0..<6 where !element.isHittable {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: upward ? 0.6 : 0.3))
+            let end = start.withOffset(CGVector(dx: 0, dy: upward ? -160 : 160))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
     }
 
     func testDemoIsReachableFromHomeWithoutSharedRoom() {

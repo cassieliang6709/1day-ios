@@ -16,17 +16,8 @@ struct ClipDraftsView: View {
     /// that take — it exists because there was nowhere else to put it — so a
     /// menu item one mis-tap from 归档到… can't be the whole decision.
     @State private var pendingDelete: ClipDraft?
-    @State private var blocked: FilingBlocked?
+    @State private var blocked: DraftFilingBlocked?
     @State private var toast: String?
-
-    /// The explanation 归档 gives when it can't run. Carries its own text so
-    /// the alert doesn't have to re-derive the reason from a draft that may
-    /// already be gone by the time it renders.
-    private struct FilingBlocked: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
 
     /// Bound only so a language change re-renders the list.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -111,6 +102,12 @@ struct ClipDraftsView: View {
             .padding(20)
         }
         .scrollIndicators(.hidden)
+        .task(id: drafts.sortedDrafts.map(\.id)) {
+            ClipCameraIndex.shared.load(drafts.sortedDrafts.map {
+                (key: ClipCameraIndex.key(url: drafts.url(for: $0), recordedAt: $0.recordedAt),
+                 url: drafts.url(for: $0))
+            })
+        }
     }
 
     private func row(_ draft: ClipDraft) -> some View {
@@ -139,7 +136,7 @@ struct ClipDraftsView: View {
                         blocked = filingBlocked(for: draft)
                     } label: {
                         HStack(spacing: 3) {
-                            Text(Strings.noPlaceForDraft(draft.orientation))
+                            Text(Strings.draftNoPlace)
                                 .lineLimit(2)
                             Image(systemName: "info.circle")
                         }
@@ -200,89 +197,28 @@ struct ClipDraftsView: View {
                 .locale(AppLanguage.effective.locale))
     }
 
+    /// 「胶片机 · 3.2 MB」: the camera it was filmed with, read from the file
+    /// (`ClipCameraIndex`), then its size. No camera, or not read yet: size only.
     private func detailLine(_ draft: ClipDraft) -> String {
-        let frame = switch draft.orientation {
-        case .portrait: Strings.orientationPortrait
-        case .landscape: Strings.orientationLandscape
-        case .square: Strings.orientationSquare
-        }
-        return "\(frame) · \(Strings.draftSize(draft.byteSize))"
+        let key = ClipCameraIndex.key(url: drafts.url(for: draft), recordedAt: draft.recordedAt)
+        let camera = ClipCameraIndex.shared.cameras[key].flatMap { $0 == .standard ? nil : $0 }
+        return [camera?.displayName, Strings.draftSize(draft.byteSize)]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: - Actions
 
     private func candidates(for draft: ClipDraft) -> [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: draft.orientation)
+        DraftFiler.candidates(for: draft, in: store)
     }
 
-    /// Only called when there are no candidates, so `blocker` never answers
-    /// nil here — but a made-up explanation would be worse than none, so the
-    /// nil case falls back to the symptom rather than guessing a cause.
-    private func filingBlocked(for draft: ClipDraft) -> FilingBlocked {
-        let message = switch ClipFiling.blocker(
-            in: store.challenges, orientation: draft.orientation
-        ) {
-        case .noStoryWithThisFrame: Strings.noStoryOfThisFrameYet(draft.orientation)
-        case .everyMatchingStoryIsFull: Strings.everyStoryOfThisFrameIsFull(draft.orientation)
-        case nil: Strings.noPlaceForDraft(draft.orientation)
-        }
-        return FilingBlocked(
-            title: Strings.noPlaceForDraft(draft.orientation), message: message)
+    private func filingBlocked(for draft: ClipDraft) -> DraftFilingBlocked {
+        DraftFiler.blocked(for: draft, in: store)
     }
 
-    /// File the draft into every chosen story, then drop it — but only once at
-    /// least one copy has actually landed. `saveClip` reports failure by doing
-    /// nothing, so deleting first would throw away the only remaining copy.
-    ///
-    /// Takes a list as of 1.3. Each story gets its own copy in its own first
-    /// open slot; `ClipFileStore.storeClip` copies the file, so the same draft
-    /// URL can be handed to `saveClip` once per story.
-    ///
-    /// Partial success is a success for the draft's purposes: it exists because
-    /// the clip had nowhere to go, and once it is somewhere, keeping it here as
-    /// well leaves a copy nobody will come back for. What failed is named.
+    /// See `DraftFiler.archive`: shared with 我的's grid.
     private func archive(_ draft: ClipDraft, to challenges: [Challenge]) {
-        var landed: [Challenge] = []
-        var refused: [Challenge] = []
-
-        for challenge in challenges {
-            // No open slot means no filing. The old code filed into the day the
-            // story was on, which for a full story is a day that already holds
-            // a clip: the draft overwrote it, and the check below — true before
-            // the save as well as after — then deleted the draft either way.
-            guard let day = ClipFiling.targetDay(in: challenge) else {
-                refused.append(challenge)
-                continue
-            }
-            store.saveClip(
-                from: drafts.url(for: draft),
-                day: day,
-                challengeID: challenge.id,
-                overlayText: draft.overlayText)
-
-            if store.challenge(challenge.id)?.cards
-                .first(where: { $0.day == day })?.clipFileName != nil {
-                landed.append(challenge)
-            } else {
-                refused.append(challenge)
-            }
-        }
-
-        guard !landed.isEmpty else {
-            showToast(
-                refused.count == challenges.count && challenges.allSatisfy {
-                    ClipFiling.targetDay(in: $0) == nil
-                }
-                    ? Strings.storyIsFull
-                    : Strings.draftArchiveFailed)
-            return
-        }
-
-        drafts.remove(draft)
-        showToast(
-            landed.count == 1
-                ? Strings.filedTo(ChallengePresenter(challenge: landed[0]).displayTitle)
-                : Strings.filedToCount(landed.count))
+        showToast(DraftFiler.archive(draft, to: challenges, store: store, drafts: drafts))
     }
 
     private func showToast(_ text: String) {

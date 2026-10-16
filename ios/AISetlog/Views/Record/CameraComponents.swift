@@ -741,7 +741,14 @@ struct DualCameraStage<Primary: View, Secondary: View>: View {
                     .zIndex(swapped ? 0 : 1)
             }
         }
+        .coordinateSpace(.named(Self.stageSpace))
     }
+
+    /// The drag is measured in the stage's space, not the inset's own. The
+    /// inset moves under the finger, so in its local space every move
+    /// shrank the next reading by the same amount: the inset was pulled
+    /// back, the translation grew again, and it shook between the two.
+    private static var stageSpace: String { "DualCameraStage" }
 
     /// The committed rect with the gesture in flight applied on top.
     private func liveRect(in size: CGSize) -> CGRect {
@@ -749,8 +756,8 @@ struct DualCameraStage<Primary: View, Secondary: View>: View {
     }
 
     private func applying(_ adjustment: Adjustment, in size: CGSize) -> CGRect {
-        let scaled = PiPInsetLayout.resized(inset, by: adjustment.scale)
-        return PiPInsetLayout.moved(scaled, by: adjustment.translation, in: size)
+        PiPInsetLayout.adjusted(
+            inset, scale: adjustment.scale, translation: adjustment.translation, in: size)
     }
 
     /// The decoration is always applied and only switched by `isInset`, so a
@@ -779,7 +786,7 @@ struct DualCameraStage<Primary: View, Secondary: View>: View {
     }
 
     private func insetGestures(canvas: CGSize) -> some Gesture {
-        let adjust = DragGesture(minimumDistance: 6)
+        let adjust = DragGesture(minimumDistance: 6, coordinateSpace: .named(Self.stageSpace))
             .simultaneously(with: MagnifyGesture(minimumScaleDelta: 0.01))
             .updating($live) { value, state, _ in
                 state = Adjustment(

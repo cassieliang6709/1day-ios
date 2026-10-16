@@ -44,6 +44,22 @@ enum AppSkin: String, CaseIterable, Identifiable, Codable {
     /// The mascot and the logo are pictures, so each skin has its own copy.
     static var mascotImageName: String { current == .cream ? "OneDayMascotCream" : "OneDayMascot" }
     static var lockupImageName: String { current == .cream ? "OneDayBrandLockupCream" : "OneDayBrandLockup" }
+
+    /// The home-screen icon for this skin: `nil` is the primary (blue)
+    /// `AppIcon`, 奶油黄 is the alternate `AppIconCream` set.
+    var alternateIconName: String? { self == .cream ? "AppIconCream" : nil }
+
+    /// Puts the home-screen icon in line with `skin`. iOS shows an alert on
+    /// every icon change, so this only asks when the icon is actually
+    /// different; a failure just leaves the old icon.
+    @MainActor
+    static func syncAppIcon(to skin: AppSkin) {
+        let app = UIApplication.shared
+        guard app.supportsAlternateIcons,
+              app.alternateIconName != skin.alternateIconName
+        else { return }
+        app.setAlternateIconName(skin.alternateIconName) { _ in }
+    }
 }
 
 extension UIColor {

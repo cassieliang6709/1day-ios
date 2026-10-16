@@ -39,6 +39,12 @@ struct RootShellView: View {
     /// Whether the composer opens with 和朋友一起 already on — set by 朋友's
     /// invite button, which is otherwise the same composer.
     @State private var composeTogether = false
+    /// Counts picks of 朋友 in the tab bar, re-picks included, so the friends
+    /// page can open its only room each time. See `PlansHomeView.tabSelections`.
+    @State private var friendsTabSelections = 0
+    /// Bumped by the camera's drafts button: 我的 scrolls to 所有片段 with
+    /// 待归档 picked. See `PlansHomeView.draftsRequest`.
+    @State private var draftsRequests = 0
 
     /// The camera surface reports through this whether it's still holding a
     /// clip nobody has filed, and hands back the two ways out.
@@ -68,6 +74,7 @@ struct RootShellView: View {
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $launchAction,
                 stories: stories,
+                draftsRequest: draftsRequests,
                 onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
@@ -81,6 +88,7 @@ struct RootShellView: View {
                 launchAction: .constant(nil),
                 stories: stories,
                 scope: .friends,
+                tabSelections: friendsTabSelections,
                 onCompose: { openCompose(together: true) })
                 .opacity(surface == .friends ? 1 : 0)
                 .allowsHitTesting(surface == .friends)
@@ -109,7 +117,11 @@ struct RootShellView: View {
                 CameraTabView(
                     unfiledGuard: unfiledGuard,
                     onStartStory: { openCompose(together: false) },
-                    onClose: { guardedSurface.wrappedValue = returnTab })
+                    onClose: { guardedSurface.wrappedValue = returnTab },
+                    onOpenDrafts: {
+                        guardedSurface.wrappedValue = .plans
+                        draftsRequests += 1
+                    })
             }
 
             if surface == .plans || surface == .friends {
@@ -220,6 +232,7 @@ struct RootShellView: View {
             set: { next in
                 guard surface == .camera, next != .camera, unfiledGuard.hasUnfiledClip else {
                     surface = next
+                    if next == .friends { friendsTabSelections += 1 }
                     return
                 }
                 pendingSurface = next
@@ -229,6 +242,7 @@ struct RootShellView: View {
 
     private func leaveCamera() {
         surface = pendingSurface ?? returnTab
+        if surface == .friends { friendsTabSelections += 1 }
         pendingSurface = nil
     }
 
@@ -265,6 +279,9 @@ struct CameraTabView: View {
     /// Back to the tab the camera was opened from. The bar is hidden while the
     /// camera is up, so this ✕ is the way out.
     var onClose: (() -> Void)?
+    /// The drafts button: 我的 with 待归档 picked. Nil opens the drafts list
+    /// over the camera instead.
+    var onOpenDrafts: (() -> Void)?
 
     @Environment(ClipDraftStore.self) private var drafts
     @State private var showDrafts = false
@@ -292,7 +309,9 @@ struct CameraTabView: View {
             // phone on top of the timer chip. Compact so it fits the slot.
             .overlay(alignment: .topTrailing) {
                 if !drafts.isEmpty, unfiledGuard?.hasUnfiledClip != true {
-                    DraftsEntryButton(count: drafts.count, compact: true) { showDrafts = true }
+                    DraftsEntryButton(count: drafts.count, compact: true) {
+                        if let onOpenDrafts { onOpenDrafts() } else { showDrafts = true }
+                    }
                         .padding(.trailing, 12)
                 }
             }

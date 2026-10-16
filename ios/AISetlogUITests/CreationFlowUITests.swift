@@ -31,21 +31,18 @@ final class CreationFlowUITests: XCTestCase {
         compose.tap()
     }
 
-    func testTimeOnlyCreationExplainsThePromptFreeMode() throws {
+    func testTimeOnlyCreationAsksNothingMore() throws {
         app.launch()
         openComposer()
 
-        // 1.5: 不写，按时间拍 is one of three entry cards; choosing it shows
-        // the prompt-free explanation on the same page, no sheet.
+        // 1.5: 不写，按时间拍 is the second of two ways in. Choosing it adds
+        // nothing under the name — no list row, no sheet.
         let byTime = app.buttons["by-time-entry"]
         XCTAssertTrue(byTime.waitForExistence(timeout: 15))
         byTime.tap()
-
-        XCTAssertTrue(app.staticTexts["只记录时间"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["拍下当下，1Day 会自动保留拍摄时间；画面上的文字由每个人自己填写。"].exists)
-        XCTAssertFalse(app.staticTexts["七个瞬间"].exists)
-        // The page asks 谁一起拍 before anything exists — the whole reason the
-        // gear went away.
+        XCTAssertTrue(byTime.isSelected)
+        XCTAssertFalse(app.buttons["composer-list-summary"].exists)
+        // 自己拍 / 和朋友一起拍 is a two-part control, asked before anything exists.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["company-with-friends"].exists)
 
@@ -59,24 +56,23 @@ final class CreationFlowUITests: XCTestCase {
         app.launch()
         openComposer()
 
-        // 1.5: one page. Three equal ways in, 自己写 first; 拍几天 as two
-        // explained rows; no 更多模板 fold and no second 设置 sheet.
-        XCTAssertTrue(app.buttons["write-own-entry"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["custom-prompts-entry"].exists)
-        XCTAssertTrue(app.buttons["by-time-entry"].exists)
-        XCTAssertLessThan(
-            app.buttons["write-own-entry"].frame.minX,
-            app.buttons["by-time-entry"].frame.minX)
+        // 1.5: one page. Two ways in (写今天的清单 above 按时间拍), 拍几天 as
+        // two rows, templates in a grid with 更多模板, no second 设置 sheet.
+        let list = app.buttons["write-own-entry"]
+        let byTime = app.buttons["by-time-entry"]
+        XCTAssertTrue(list.waitForExistence(timeout: 15))
+        XCTAssertTrue(byTime.exists)
+        XCTAssertLessThan(list.frame.minY, byTime.frame.minY)
+        XCTAssertFalse(app.buttons["custom-prompts-entry"].exists)
         XCTAssertTrue(app.buttons["plan-one-day"].exists)
         XCTAssertTrue(app.buttons["plan-seven-day"].exists)
-        XCTAssertFalse(app.buttons["more-templates"].exists)
+        XCTAssertFalse(app.buttons["made-before"].exists)
         XCTAssertTrue(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
-        // 谁来拍 and the camera are on the same page, with the one button.
+        // Who's filming and the camera are on the same page, with the one button.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["camera-option-film"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
         XCTAssertFalse(app.buttons["下一步"].exists)
-        // The plus in the home header is gone, not moved.
         XCTAssertFalse(app.buttons["新建故事"].exists)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -85,19 +81,34 @@ final class CreationFlowUITests: XCTestCase {
         add(attachment)
     }
 
-    func testCustomPromptsStartWithTwoBlankRows() throws {
+    func testWriteListOpensOneEditorWithTwoBlankRows() throws {
         app.launch()
         openComposer()
 
-        // 自己写题目 sits above the racks, not at the bottom under posters it
-        // has nothing to do with — so it is reachable without changing rack.
-        let custom = app.buttons["custom-prompts-entry"]
-        XCTAssertTrue(custom.waitForExistence(timeout: 15))
-        custom.tap()
+        let list = app.buttons["write-own-entry"]
+        XCTAssertTrue(list.waitForExistence(timeout: 15))
+        list.tap()
 
-        XCTAssertTrue(app.staticTexts["想拍什么，由你来写"].waitForExistence(timeout: 15))
+        // One editor for both ways of writing: the sentence and 帮我写 on
+        // top, then the list.
+        XCTAssertTrue(app.textFields["today-intent"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["suggest-prompts"].exists)
         XCTAssertTrue(app.textFields["custom-prompt-1"].exists)
         XCTAssertTrue(app.textFields["custom-prompt-2"].exists)
         XCTAssertFalse(app.textFields["custom-prompt-3"].exists)
+
+        app.textFields["custom-prompt-1"].tap()
+        app.textFields["custom-prompt-1"].typeText("出门前")
+        app.textFields["custom-prompt-2"].tap()
+        app.textFields["custom-prompt-2"].typeText("回家以后")
+        let use = app.buttons["use-these-moments"]
+        XCTAssertTrue(use.isEnabled)
+        use.tap()
+
+        // Back on the page, folded to one row.
+        let summary = app.buttons["composer-list-summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 15))
+        XCTAssertTrue(summary.label.contains("2"))
+        XCTAssertTrue(app.buttons["write-own-entry"].isSelected)
     }
 }

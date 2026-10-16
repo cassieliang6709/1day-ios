@@ -18,10 +18,19 @@ final class ClipCameraIndex {
 
     @ObservationIgnored private var inFlight: Set<String> = []
 
+    /// A file plus its date, so a re-recorded take at the same path is read again.
+    nonisolated static func key(url: URL, recordedAt: Date) -> String {
+        "\(url.path)|\(recordedAt.timeIntervalSince1970)"
+    }
+
     func load(_ clips: [LibraryClip]) {
-        let missing = clips.filter { cameras[$0.cameraKey] == nil && !inFlight.contains($0.cameraKey) }
-        guard !missing.isEmpty else { return }
-        let jobs = missing.map { (key: $0.cameraKey, url: $0.url) }
+        load(clips.map { (key: $0.cameraKey, url: $0.url) })
+    }
+
+    /// For files that aren't `LibraryClip`s — the drafts list.
+    func load(_ files: [(key: String, url: URL)]) {
+        let jobs = files.filter { cameras[$0.key] == nil && !inFlight.contains($0.key) }
+        guard !jobs.isEmpty else { return }
         inFlight.formUnion(jobs.map(\.key))
 
         Task.detached(priority: .utility) { [weak self] in

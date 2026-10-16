@@ -52,6 +52,15 @@ enum MoodDay {
 
 /// What the store needs from the cloud. `nil` in tests and previews, so they
 /// never touch CloudKit.
+/// One line in the 和小方块聊两句 sheet. Local only: never synced, never sent
+/// anywhere except back to the chat endpoint as context.
+struct MascotChatMessage: Codable, Equatable, Identifiable {
+    enum Role: String, Codable { case user, assistant }
+    var id = UUID()
+    var role: Role
+    var content: String
+}
+
 protocol MoodSyncing {
     /// Overwrite these entries remotely.
     func push(_ entries: [MoodEntry]) async throws
@@ -72,6 +81,15 @@ final class MoodStore {
     /// Days changed locally that the cloud hasn't confirmed yet.
     private var pending: Set<String> = []
 
+    /// Per-day chat with the mascot, `yyyy-MM-dd` → messages. Lives in a
+    /// sibling file so it can never ride along with the CloudKit snapshot.
+    private(set) var chats: [String: [MascotChatMessage]] = [:]
+
+    /// A day's conversation stops here; the sheet then says goodnight.
+    static let chatLimit = 10
+    /// Older days are dropped on save. Nobody scrolls back to last month's chat.
+    static let chatDaysKept = 14
+
     private let fileURL: URL?
     private let sync: MoodSyncing?
     private let now: () -> Date
@@ -91,6 +109,7 @@ final class MoodStore {
         self.sync = sync
         self.now = now
         load()
+        loadChats()
         guard sync != nil else { return }
         // Fetch on launch, and again whenever the app comes back to the front.
         Task { await syncNow() }
@@ -136,6 +155,32 @@ final class MoodStore {
         pending.insert(entry.day)
         save()
         Task { await syncNow() }
+    }
+
+    // MARK: Mascot chat (local only)
+
+    func chat(on date: Date? = nil) -> [MascotChatMessage] {
+        chats[MoodDay.key(for: date ?? now())] ?? []
+    }
+
+    /// Room for one more user line *and* the reply to it.
+    func canSendChat(on date: Date? = nil) -> Bool {
+        chat(on: date).count <= Self.chatLimit - 2
+    }
+
+    /// Appends one line to the day's chat. Ignored once the day is full, for
+    /// empty text, or before a mood exists (there's nothing to chat about).
+    @discardableResult
+    func appendChat(_ role: MascotChatMessage.Role, _ content: String, on date: Date? = nil) -> Bool {
+        let key = MoodDay.key(for: date ?? now())
+        let text = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard entries[key] != nil, !text.isEmpty else { return false }
+        var day = chats[key] ?? []
+        guard day.count < Self.chatLimit else { return false }
+        day.append(MascotChatMessage(role: role, content: String(text.prefix(300))))
+        chats[key] = day
+        saveChats()
+        return true
     }
 
     // MARK: Sync
@@ -214,6 +259,30 @@ final class MoodStore {
             try JSONEncoder().encode(snapshot).write(to: fileURL, options: .atomic)
         } catch {
             print("[mood] save failed: \(error)")
+        }
+    }
+
+    private var chatFileURL: URL? {
+        fileURL?.deletingLastPathComponent().appendingPathComponent("mascot-chat.json")
+    }
+
+    private func loadChats() {
+        guard let chatFileURL, let data = try? Data(contentsOf: chatFileURL),
+              let decoded = try? JSONDecoder().decode([String: [MascotChatMessage]].self, from: data)
+        else { return }
+        chats = decoded
+    }
+
+    private func saveChats() {
+        guard let chatFileURL else { return }
+        let keep = Set(chats.keys.sorted().suffix(Self.chatDaysKept))
+        chats = chats.filter { keep.contains($0.key) }
+        do {
+            try FileManager.default.createDirectory(
+                at: chatFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(chats).write(to: chatFileURL, options: .atomic)
+        } catch {
+            print("[mood] chat save failed: \(error)")
         }
     }
 

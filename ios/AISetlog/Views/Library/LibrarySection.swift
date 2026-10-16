@@ -10,7 +10,8 @@ struct LibrarySection: View {
     /// now); kept so the page's call site doesn't change.
     let rooms: [Challenge]
     let onOpenStory: (UUID) -> Void
-    let onOpenDrafts: () -> Void
+    /// Bumped by the camera's drafts button (via the shell): show 待归档.
+    var draftsRequest = 0
     /// Owned by the page, which floats the 生成 vlog bar over its scroll view
     /// and presents the sheet. See `LibrarySelectionBar`.
     @Binding var isSelecting: Bool
@@ -22,6 +23,11 @@ struct LibrarySection: View {
     @State private var mode: Mode = .grid
     @State private var day: Date?
     @State private var month = Calendar.current.startOfMonth(for: .now)
+    /// The draft whose 放进故事 / 删除 choice is up. See `draftActions`.
+    @State private var activeDraft: ClipDraft?
+
+    @Environment(MoodStore.self) private var moodStore: MoodStore?
+    @Environment(ClipDraftStore.self) private var draftStore
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -43,7 +49,8 @@ struct LibrarySection: View {
                         month: $month,
                         covers: library.coverByDay(
                             library.filtered(filter, cameras: cameraIndex.cameras)),
-                        selectedDay: $day)
+                        selectedDay: $day,
+                        showsMoods: true)
                         .padding(.horizontal, 20)
                 }
 
@@ -73,6 +80,8 @@ struct LibrarySection: View {
         .onChange(of: isSelecting) { _, selecting in
             if !selecting { picked = [] }
         }
+        .onChange(of: draftsRequest) { _, _ in showDrafts() }
+        .draftActions(for: $activeDraft)
         // Reads each clip's camera off the main actor, once; cached app-wide.
         .task(id: library.clips.map(\.cameraKey)) {
             cameraIndex.load(library.clips)
@@ -154,17 +163,32 @@ struct LibrarySection: View {
         }
     }
 
-    /// 全部, then one chip per camera that has at least one clip. With no
-    /// camera clips at all the row would be a lone 全部, so it isn't drawn.
+    /// 全部, 待归档 (N) when there are drafts, then one chip per camera that
+    /// has at least one clip. With nothing but 全部 the row isn't drawn.
     @ViewBuilder
     private var filterRow: some View {
         let cameras = library.cameras(in: cameraIndex.cameras)
-        if !cameras.isEmpty {
+        let draftCount = library.draftCount
+        if !cameras.isEmpty || draftCount > 0 {
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    chip(Strings.filterAll, nil)
+                    chip(Strings.filterAll, isOn: filter.camera == nil && !filter.draftsOnly) {
+                        filter.camera = nil
+                        filter.draftsOnly = false
+                    }
+                    .accessibilityIdentifier("library-filter-all")
+                    if draftCount > 0 {
+                        chip(Strings.libraryDraftsChip(draftCount), isOn: filter.draftsOnly) {
+                            filter.camera = nil
+                            filter.draftsOnly = true
+                        }
+                        .accessibilityIdentifier("library-filter-drafts")
+                    }
                     ForEach(cameras) { style in
-                        chip(style.displayName, style)
+                        chip(style.displayName, isOn: filter.camera == style) {
+                            filter.draftsOnly = false
+                            filter.camera = style
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -173,14 +197,23 @@ struct LibrarySection: View {
         }
     }
 
-    private func chip(_ label: String, _ value: CameraStyle?) -> some View {
-        let isOn = filter.camera == value
-        return Button {
-            withAnimation(OneDay.Motion.snap) { filter.camera = value }
+    /// 待归档 from the camera's drafts button: the grid, every date, drafts only.
+    private func showDrafts() {
+        isSelecting = false
+        mode = .grid
+        day = nil
+        filter.camera = nil
+        filter.draftsOnly = true
+    }
+
+    private func chip(_ label: String, isOn: Bool, select: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(OneDay.Motion.snap) { select() }
         } label: {
             Text(label)
                 .font(.system(size: 13.5, weight: .bold, design: .rounded))
                 .lineLimit(1)
+                .monospacedDigit()
                 .foregroundStyle(isOn ? OneDay.onBrand : OneDay.inkSoft)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 8)
@@ -216,16 +249,7 @@ struct LibrarySection: View {
         LazyVStack(alignment: .leading, spacing: 22) {
             ForEach(dayGroups, id: \.day) { group in
                 VStack(alignment: .leading, spacing: 9) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(dayTitle(group.day))
-                            .font(.system(size: 17, weight: .heavy, design: .rounded))
-                            .foregroundStyle(OneDay.ink)
-                        Spacer()
-                        Text(Strings.libraryClipCount(group.clips.count))
-                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.inkFaint)
-                    }
-                    .padding(.horizontal, 20)
+                    dayHeader(group.day, count: group.clips.count)
 
                     LazyVGrid(
                         columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3),
@@ -249,11 +273,33 @@ struct LibrarySection: View {
             .sorted { $0.day > $1.day }
     }
 
+    /// 「10月16日 周四 😀 · 3 段」: the date, that day's mood face if one was
+    /// picked, and how many clips the day holds.
+    private func dayHeader(_ day: Date, count: Int) -> some View {
+        HStack(alignment: .center, spacing: 6) {
+            Text(dayTitle(day))
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+            if let mood = moodStore?.mood(on: day)?.mood {
+                Image(mood.imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .accessibilityLabel(mood.label)
+            }
+            Text("· \(Strings.libraryClipCount(count))")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(OneDay.inkFaint)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .accessibilityElement(children: .combine)
+    }
+
     private func dayTitle(_ day: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return Strings.libraryToday }
-        if calendar.isDateInYesterday(day) { return Strings.libraryYesterday }
-        return day.formatted(.dateTime.month().day().weekday(.abbreviated))
+        day.formatted(
+            .dateTime.month().day().weekday(.abbreviated)
+                .locale(AppLanguage.effective.locale))
     }
 
     private func cell(_ clip: LibraryClip) -> some View {
@@ -263,8 +309,8 @@ struct LibrarySection: View {
                 if let order { picked.remove(at: order) } else { picked.append(clip) }
             } else if let story = clip.storyID {
                 onOpenStory(story)
-            } else {
-                onOpenDrafts()
+            } else if case .draft(let id) = clip.source {
+                activeDraft = draftStore.sortedDrafts.first { $0.id == id }
             }
         } label: {
             // A fixed 3:4 box with the thumbnail cropped into it: given the
@@ -275,6 +321,9 @@ struct LibrarySection: View {
                 .overlay { ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt) }
                 .clipped()
                 .overlay(alignment: .bottomLeading) { caption(clip) }
+                .overlay(alignment: .bottomTrailing) {
+                    if clip.storyID == nil { draftBadge }
+                }
                 .overlay(alignment: .topLeading) {
                     // Only someone else's clip says whose it is; yours don't
                     // need a face on every tile.
@@ -302,12 +351,29 @@ struct LibrarySection: View {
     /// label and one tap away; on the tile it was a second line of text on
     /// every picture.
     private func caption(_ clip: LibraryClip) -> some View {
-        Text(clip.recordedAt.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+        Text(clockTime(clip.recordedAt))
             .font(.system(size: 11.5, weight: .bold, design: .rounded))
             .monospacedDigit()
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
             .padding(6)
+    }
+
+    /// 24-hour 「17:05」. `.dateTime.hour(.twoDigits(amPM: .omitted)).minute()`
+    /// gave 「05:0」 for 5:00 pm: twelve-hour, and the minute unpadded.
+    private func clockTime(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    private var draftBadge: some View {
+        Text(Strings.libraryDraftBadge)
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(.black.opacity(0.55), in: Capsule())
+            .padding(5)
     }
 
     private func pickMark(_ order: Int?) -> some View {
@@ -339,19 +405,45 @@ struct LibrarySection: View {
     }
 }
 
-/// Floats above the tab bar while picking clips; presents the vlog sheet.
+/// Floats above the tab bar while picking clips: how many, roughly how long,
+/// and the button that opens the arrange sheet.
 struct LibrarySelectionBar: View {
     let picked: [LibraryClip]
     let onMake: () -> Void
 
+    @State private var seconds: Int?
+
     var body: some View {
-        Button(action: onMake) {
-            Text(picked.isEmpty ? Strings.pickClipsHint : Strings.makeVlog(picked.count))
+        HStack(spacing: 12) {
+            Text(picked.isEmpty
+                 ? Strings.pickClipsHint
+                 : Strings.librarySelectedSummary(picked.count, seconds: seconds))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(OneDay.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityIdentifier("library-selected-summary")
+            Spacer(minLength: 4)
+            Button(Strings.libraryMakeVlogCTA, action: onMake)
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.onBrand)
+                .padding(.horizontal, 18)
+                .frame(height: 44)
+                .background(Color.oneDayBrand, in: Capsule())
+                .opacity(picked.isEmpty ? 0.45 : 1)
+                .disabled(picked.isEmpty)
+                .accessibilityIdentifier("library-make-vlog")
         }
-        .buttonStyle(.primaryAction)
-        .disabled(picked.isEmpty)
+        .padding(.leading, 18)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .glassSurface(radius: 30)
         .padding(.horizontal, 20)
-        .accessibilityIdentifier("library-make-vlog")
+        .task(id: picked.map(\.id)) {
+            seconds = nil
+            seconds = await ClipDurations.totalSeconds(of: picked.map(\.url))
+        }
     }
 }
 
@@ -369,7 +461,11 @@ struct LibraryCalendar: View {
     @Binding var month: Date
     let covers: [Date: LibraryClip]
     @Binding var selectedDay: Date?
+    /// 我的 shows each day's mood face in place of the clip dot. Room
+    /// calendars leave it off: a mood is private to its owner.
+    var showsMoods = false
 
+    @Environment(MoodStore.self) private var moodStore: MoodStore?
     private let calendar = Calendar.current
 
     var body: some View {
@@ -398,7 +494,7 @@ struct LibraryCalendar: View {
                         .foregroundStyle(OneDay.inkFaint)
                 }
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, date in
-                    if let date { dayCell(date) } else { Color.clear.frame(height: 50) }
+                    if let date { dayCell(date) } else { Color.clear.frame(height: 52) }
                 }
             }
         }
@@ -430,24 +526,40 @@ struct LibraryCalendar: View {
                     .background {
                         if isSelected { Circle().fill(Color.oneDayBrand) }
                     }
-                Group {
-                    if let cover {
-                        Color.clear
-                            .overlay { ClipThumbnail(url: cover.url, refreshToken: cover.recordedAt) }
-                            .clipShape(Circle())
-                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
-                            .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    } else {
-                        Color.clear
-                    }
-                }
-                .frame(width: 14, height: 14)
+                dayMark(cover: cover, mood: mood(on: date))
             }
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity, minHeight: 52)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(cover == nil)
+    }
+
+    private func mood(on date: Date) -> Mood? {
+        guard showsMoods else { return nil }
+        return moodStore?.mood(on: date)?.mood
+    }
+
+    /// The mood face if the day has one, else the first clip as a small dot.
+    @ViewBuilder
+    private func dayMark(cover: LibraryClip?, mood: Mood?) -> some View {
+        if let mood {
+            Image(mood.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 19, height: 19)
+                .accessibilityLabel(mood.label)
+        } else if let cover {
+            Color.clear
+                .overlay { ClipThumbnail(url: cover.url, refreshToken: cover.recordedAt) }
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                .frame(width: 14, height: 14)
+                .frame(height: 19)
+        } else {
+            Color.clear.frame(width: 14, height: 19)
+        }
     }
 
     /// Leading blanks, then each day of the month.

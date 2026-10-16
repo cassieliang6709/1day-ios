@@ -60,6 +60,41 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertEqual(PiPInsetLayout.resized(start, by: 0.1).width, PiPInsetLayout.minShare, accuracy: 1e-9)
     }
 
+    /// A drag in flight is always start + the fingers' total translation.
+    /// Fed a finger moving steadily across the stage, the inset moves the
+    /// same points per update and never steps back — the jitter was the
+    /// translation being read in the moving inset's own space instead.
+    func testDragInFlightIsStartPlusTranslationAndNeverStepsBack() {
+        let start = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3)
+        var lastX = PiPInsetLayout.box(start, in: phone).minX
+        for step in 1...10 {
+            let translation = CGSize(width: CGFloat(step) * 10, height: CGFloat(step) * 5)
+            let rect = PiPInsetLayout.adjusted(start, scale: 1, translation: translation, in: phone)
+            let box = PiPInsetLayout.box(rect, in: phone)
+            XCTAssertEqual(box.minX - lastX, 10, accuracy: 1e-6)
+            XCTAssertEqual(box.minY, start.minY * phone.height + translation.height, accuracy: 1e-6)
+            lastX = box.minX
+        }
+        // Same total translation, same rect, however many updates came first.
+        let oneShot = PiPInsetLayout.adjusted(
+            start, scale: 1, translation: CGSize(width: 100, height: 50), in: phone)
+        XCTAssertEqual(PiPInsetLayout.box(oneShot, in: phone).minX, lastX, accuracy: 1e-6)
+    }
+
+    /// Pinch and drag together: grown around the start rect's centre, then
+    /// moved, both measured from where the fingers went down.
+    func testPinchAndDragTogetherShareOneStartRect() {
+        let start = CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.3)
+        let rect = PiPInsetLayout.adjusted(
+            start, scale: 1.2, translation: CGSize(width: 36, height: -64), in: phone)
+        XCTAssertEqual(rect.width, 0.36, accuracy: 1e-9)
+        XCTAssertEqual(rect.midX, start.midX + 0.1, accuracy: 1e-9)
+        XCTAssertEqual(rect.midY, start.midY - 0.1, accuracy: 1e-9)
+        let still = PiPInsetLayout.adjusted(start, scale: 1, translation: .zero, in: phone)
+        XCTAssertEqual(still.minX, start.minX, accuracy: 1e-9)
+        XCTAssertEqual(still.minY, start.minY, accuracy: 1e-9)
+    }
+
     /// Preview and file are different sizes; the same normalized rect has to
     /// land on the same proportion of each.
     func testPreviewAndFileBoxesAreTheSameProportion() {

@@ -77,6 +77,17 @@ enum PiPInsetLayout {
             width: share, height: share))
     }
 
+    /// The rect a gesture in flight shows: `start` (the rect when the
+    /// fingers went down) pinched by `scale`, then moved by `translation`.
+    /// Always from the start rect, never from the last drawn one, so the
+    /// result depends only on how far the fingers have gone — the same
+    /// translation gives the same rect however many updates came before it.
+    static func adjusted(
+        _ start: CGRect, scale: CGFloat, translation: CGSize, in canvas: CGSize
+    ) -> CGRect {
+        moved(resized(start, by: scale), by: translation, in: canvas)
+    }
+
     /// The box on a real canvas, in its points or pixels.
     static func box(_ rect: CGRect, in canvas: CGSize) -> CGRect {
         let rect = clamped(rect)

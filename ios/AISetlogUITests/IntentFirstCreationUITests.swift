@@ -9,24 +9,27 @@ final class IntentFirstCreationUITests: XCTestCase {
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "New button missing")
         compose.tap()
-        // 自己写 is the first of the composer's three entry cards, and it
-        // opens the write-your-own editor.
+        // 写今天的清单 is one editor: the sentence about today with a small
+        // Draft it, then the list.
         let own = app.buttons["write-own-entry"]
         XCTAssertTrue(own.waitForExistence(timeout: 15))
         own.tap()
         let intent = app.textFields["today-intent"]
-        let name = app.textFields["custom-story-name"]
+        let firstRow = app.textFields["custom-prompt-1"]
         XCTAssertTrue(intent.waitForExistence(timeout: 15))
-        XCTAssertTrue(name.exists)
-        XCTAssertLessThan(intent.frame.minY, name.frame.minY)
+        XCTAssertTrue(firstRow.exists)
+        XCTAssertLessThan(intent.frame.minY, firstRow.frame.minY)
         XCTAssertFalse(app.buttons["suggest-prompts"].isEnabled)
         XCTAssertFalse(app.buttons["use-these-moments"].isEnabled)
-        // Do not call AI or save templates/stories. This verifies editable
-        // production controls, not remote generation or final creation.
-        name.tap()
-        name.typeText("My own title")
-        XCTAssertEqual(name.value as? String, "My own title")
+        // Typing the sentence enables the helper; never tap it (no AI call).
+        intent.tap()
+        intent.typeText("Moving house")
+        XCTAssertTrue(app.buttons["suggest-prompts"].isEnabled)
+        // One row is not a list yet.
+        firstRow.tap()
+        firstRow.typeText("Empty room")
         XCTAssertFalse(app.buttons["use-these-moments"].isEnabled)
         app.buttons["Cancel"].tap()
+        XCTAssertFalse(app.buttons["composer-list-summary"].exists)
     }
 }

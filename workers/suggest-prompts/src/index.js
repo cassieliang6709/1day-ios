@@ -51,19 +51,155 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
  */
 const recentCalls = new Map();
 
-function overRateLimit(deviceKey, now) {
-  const window = (recentCalls.get(deviceKey) ?? []).filter(
+function overRateLimit(deviceKey, now, calls = recentCalls, limit = RATE_LIMIT) {
+  const window = (calls.get(deviceKey) ?? []).filter(
     (t) => now - t < RATE_WINDOW_MS
   );
   window.push(now);
-  recentCalls.set(deviceKey, window);
+  calls.set(deviceKey, window);
 
-  if (recentCalls.size > 5000) {
-    for (const [key, times] of recentCalls) {
-      if (times.every((t) => now - t >= RATE_WINDOW_MS)) recentCalls.delete(key);
+  if (calls.size > 5000) {
+    for (const [key, times] of calls) {
+      if (times.every((t) => now - t >= RATE_WINDOW_MS)) calls.delete(key);
     }
   }
-  return window.length > RATE_LIMIT;
+  return window.length > limit;
+}
+
+// MARK: - Mascot chat
+
+/**
+ * 我的 → 今天的心情 → 和小方块聊两句. Same shape as the prompt route: the
+ * caller sends a mood, the day's note and a short history, and gets one line
+ * back. Nothing here lets the caller change who the model is asked to be.
+ */
+const MOODS = ['happy', 'calm', 'tired', 'sad', 'angry'];
+const MAX_NOTE = 120;
+/** The app caps a day at 10; a little slack for the opening line. */
+const MAX_CHAT_MESSAGES = 12;
+const MAX_MESSAGE_CHARS = 300;
+const MAX_REPLY_CHARS = 200;
+/** A conversation is many calls; still a small number per hour. */
+const CHAT_RATE_LIMIT = 60;
+const recentChats = new Map();
+
+const MOOD_WORDS = {
+  happy: ['开心', 'happy'],
+  calm: ['平静', 'calm'],
+  tired: ['累', 'tired'],
+  sad: ['难过', 'sad'],
+  angry: ['生气', 'angry'],
+};
+
+export function mascotSystemPrompt(mood, note, language) {
+  const inChinese = language !== 'en';
+  const word = MOOD_WORDS[mood]?.[inChinese ? 0 : 1] ?? mood;
+  return [
+    'You are 小方块 (Little Cube), the small square mascot of a one-day video diary app.',
+    `Today the user picked the mood "${word}".`,
+    note ? `Their note about today: "${note}"` : 'They did not write a note.',
+    'Talk like a warm, brief friend:',
+    '- 1 or 2 short sentences per reply. Never more.',
+    '- React to what they said. Ask at most one light question.',
+    '- No advice lists, no bullet points, no numbered steps, no emoji spam.',
+    '- You are not a therapist or a doctor. Never diagnose, never claim to treat anything.',
+    '- If the user mentions self-harm, suicide or not wanting to live: reply with care, say you are glad they told you, and gently suggest talking to someone they trust right now or calling a local crisis hotline. Do not lecture.',
+    '- Stay on the user\'s day. If asked to do unrelated tasks (code, essays, homework), say kindly that you are only here to chat about today.',
+    `- Reply in ${inChinese ? 'Simplified Chinese' : 'English'}.`,
+  ].join('\n');
+}
+
+/** Validates and trims the history; `null` means the request is malformed. */
+export function cleanMessages(raw) {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_CHAT_MESSAGES) return null;
+  const out = [];
+  for (const m of raw) {
+    const role = m?.role;
+    const content = typeof m?.content === 'string' ? m.content.trim() : '';
+    if (role !== 'user' && role !== 'assistant') return null;
+    if (!content || content.length > MAX_MESSAGE_CHARS) return null;
+    out.push({ role, content });
+  }
+  return out;
+}
+
+/** Plain text, one line-ish; strips quotes a model sometimes wraps it in. */
+export function cleanReply(text) {
+  const trimmed = String(text ?? '')
+    .trim()
+    .replace(/^["“「]+|["”」]+$/g, '')
+    .trim();
+  if (!trimmed) return null;
+  return [...trimmed].slice(0, MAX_REPLY_CHARS).join('');
+}
+
+async function mascotChat(request, env) {
+  const key = env.DEEPSEEK_API_KEY;
+  if (!key) return json({ error: 'unavailable' }, 503);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'bad_request' }, 400);
+  }
+
+  const mood = typeof body?.mood === 'string' ? body.mood : '';
+  const note = typeof body?.note === 'string' ? body.note.trim() : '';
+  const language = body?.language === 'en' ? 'en' : 'zh';
+  const device = typeof body?.device === 'string' ? body.device : '';
+  const messages = cleanMessages(body?.messages);
+
+  if (!MOODS.includes(mood) || note.length > MAX_NOTE || !messages) {
+    return json({ error: 'bad_request' }, 400);
+  }
+
+  const deviceKey = await hash(
+    device || request.headers.get('cf-connecting-ip') || 'anonymous'
+  );
+  if (overRateLimit(deviceKey, Date.now(), recentChats, CHAT_RATE_LIMIT)) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  // An empty history asks for the opening line.
+  const turns = messages.length
+    ? messages
+    : [{ role: 'user', content: language === 'en' ? '(I just saved my mood. Say hi.)' : '（我刚记下了今天的心情，跟我打个招呼吧）' }];
+
+  try {
+    const upstream = await fetch(DEEPSEEK_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
+        thinking: { type: 'disabled' },
+        max_tokens: 300,
+        temperature: 0.9,
+        messages: [
+          { role: 'system', content: mascotSystemPrompt(mood, note, language) },
+          ...turns,
+        ],
+      }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+
+    if (!upstream.ok) {
+      console.error('upstream', upstream.status);
+      return json({ error: 'unavailable' }, 502);
+    }
+
+    const payload = await upstream.json();
+    const reply = cleanReply(payload?.choices?.[0]?.message?.content);
+    if (!reply) return json({ error: 'unavailable' }, 502);
+    return json({ reply });
+  } catch (error) {
+    console.error('failed', error?.name ?? 'error');
+    return json({ error: 'unavailable' }, 502);
+  }
 }
 
 function systemPrompt(count, language) {
@@ -167,7 +303,8 @@ async function hash(value) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/suggest-prompts' && url.pathname !== '/') {
+    const isChat = url.pathname === '/api/mascot-chat';
+    if (!isChat && url.pathname !== '/api/suggest-prompts' && url.pathname !== '/') {
       return json({ error: 'not_found' }, 404);
     }
     // The app sends this when the composer opens, so the TLS handshake — the
@@ -181,6 +318,7 @@ export default {
         headers: { 'content-type': 'application/json', allow: 'POST' },
       });
     }
+    if (isChat) return mascotChat(request, env);
 
     const key = env.DEEPSEEK_API_KEY;
     if (!key) return json({ error: 'unavailable' }, 503);

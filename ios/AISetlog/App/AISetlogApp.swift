@@ -64,6 +64,9 @@ struct AISetlogApp: App {
                 // buttons and links in the tint, and 奶油黄 can't be text.
                 .tint(OneDay.brandText)
                 .preferredColorScheme(appAppearance.colorScheme)
+                // Runs on launch and on every skin change; outside `.id` so
+                // the rebuild doesn't re-trigger it.
+                .task(id: appSkin) { AppSkin.syncAppIcon(to: appSkin) }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
                     ReminderService.reconcile(for: store.challenges)

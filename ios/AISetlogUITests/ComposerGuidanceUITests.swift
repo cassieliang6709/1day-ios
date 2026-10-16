@@ -29,12 +29,12 @@ final class ComposerGuidanceUITests: XCTestCase {
         // No gear to find: the poster is the way in, and tapping it no longer
         // creates anything by itself.
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
-        // 1.5: no 更多模板 fold — the posters for the chosen length are on
-        // the page, and the name field sits on the same page below them.
-        XCTAssertFalse(app.buttons["more-templates"].exists)
+        // 1.5: the templates are a grid on the page, and the name field sits
+        // on the same page below them.
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()
+        XCTAssertTrue(poster.isSelected)
 
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
@@ -48,6 +48,9 @@ final class ComposerGuidanceUITests: XCTestCase {
         name.typeText("My edited story")
         XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
+        // Tapping the chosen template again lets it go.
+        poster.tap()
+        XCTAssertFalse(poster.isSelected)
         // Deliberately never create or join a room, or call the AI service.
     }
 }

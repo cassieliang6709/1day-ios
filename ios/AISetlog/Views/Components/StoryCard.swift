@@ -269,3 +269,89 @@ struct StoryRowCard: View {
             : Strings.catchUpDayLabel(day: offeredSlot, moment: moment)
     }
 }
+
+// MARK: - Today row
+
+/// One of today's stories on 我的: cover on the left, name and how far it
+/// has got in the middle, 继续拍 on the right. Several stack vertically — the
+/// big swipeable card made the second story of the day something you had to
+/// know to swipe for.
+struct TodayStoryRow: View {
+    let challenge: Challenge
+    let progress: RoomProgress
+    let coverURL: URL?
+    var refreshToken: Date?
+    let onContinue: () -> Void
+    let onOpen: () -> Void
+
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
+    private var isDone: Bool { progress.isComplete && challenge.isComplete }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onOpen) {
+                HStack(spacing: 12) {
+                    cover
+                    details
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("today-story-open")
+
+            Button(isDone ? Strings.todayWatch : Strings.todayKeepFilming,
+                   action: isDone ? onOpen : onContinue)
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.onBrand)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .background(Color.oneDayBrand, in: Capsule())
+                .accessibilityIdentifier("today-story-continue")
+        }
+        .padding(10)
+        .glassSurface(radius: OneDay.Radius.card)
+    }
+
+    private var cover: some View {
+        Group {
+            if let coverURL {
+                ClipThumbnail(url: coverURL, refreshToken: refreshToken)
+            } else {
+                Image(presenter.coverAssetName)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .frame(width: 52, height: 64)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(presenter.displayTitle)
+                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(1)
+                if challenge.isShared {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+            }
+            HStack(spacing: 7) {
+                MomentPips(
+                    filled: progress.filled, total: max(progress.total, 1),
+                    size: 5, tint: .oneDayBrand)
+                Text("\(progress.filled)/\(progress.total)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(OneDay.brandText)
+            }
+        }
+    }
+}

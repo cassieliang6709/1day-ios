@@ -180,6 +180,7 @@ struct ClipPreviewView: View {
     var body: some View {
         ZStack {
             backdrop
+            if editingCaption { outsideTapCatcher }
             reviewLayout
             if showLook { lookOverlay }
             if deletedCaption != nil { undoToast }
@@ -195,7 +196,18 @@ struct ClipPreviewView: View {
         .onChange(of: captionFocused) { _, focused in
             if !focused, editingCaption { saveCaption() }
         }
-        .onSubmit { captionFocused = false }
+        .onSubmit { commitCaption() }
+        .onChange(of: captionDraft) { _, new in limitCaptionLines(new) }
+    }
+
+    /// While typing, a tap anywhere off the picture means "done". The bed
+    /// behind is `allowsHitTesting(false)`, so without this the only taps that
+    /// committed were the ones that landed on the video itself.
+    private var outsideTapCatcher: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .ignoresSafeArea()
+            .onTapGesture { commitCaption() }
     }
 
     // MARK: - The video, and the one thing drawn where the film draws it
@@ -924,14 +936,39 @@ struct ClipPreviewView: View {
                 IconBubble(systemName: "xmark") { dismiss() }
                     .accessibilityLabel(Strings.close)
                 Spacer(minLength: 0)
-                // Up here rather than down with the caption and retake buttons,
-                // because it isn't a thing you do to this clip — it's how you
-                // want to see all of them.
-                IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
-                    withAnimation(OneDay.Motion.soft) { showLook = true }
-                }
-                .accessibilityLabel(Strings.lookTitle)
+                topTrailing
             }
+        }
+    }
+
+    /// 完成 while a caption is being typed; otherwise the look button, and
+    /// that only on somebody else's clip.
+    ///
+    /// Your own take shows no filter entry: the camera already gave it its
+    /// look, and this screen changes the frame and the words, not the colour.
+    /// `LookPanel` and `lookOverlay` stay, unreachable from here, so the
+    /// stored look and the film export that reads it are untouched.
+    @ViewBuilder
+    private var topTrailing: some View {
+        if editingCaption {
+            Button(action: commitCaption) {
+                Text(Strings.done)
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.onBrand)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(OneDay.brandHorizontal))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("caption-done")
+        } else if !isMine {
+            // Up here rather than down with the caption and retake buttons,
+            // because it isn't a thing you do to this clip — it's how you
+            // want to see all of them.
+            IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
+                withAnimation(OneDay.Motion.soft) { showLook = true }
+            }
+            .accessibilityLabel(Strings.lookTitle)
         }
     }
 
@@ -1027,6 +1064,28 @@ struct ClipPreviewView: View {
     private func saveCaption() {
         editingCaption = false
         guard let challengeID else { return }
-        store.updateOverlayText(captionDraft, day: day, challengeID: challengeID)
+        // A Return pressed at the end leaves a trailing newline; the burned
+        // caption shouldn't carry an empty second line.
+        let text = captionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        captionDraft = text
+        store.updateOverlayText(text, day: day, challengeID: challengeID)
+    }
+
+    /// The one way out of the editor: the 完成 button, a tap off the caption,
+    /// the keyboard's Return on the second line, and focus leaving all end here.
+    private func commitCaption() {
+        captionFocused = false
+        if editingCaption { saveCaption() }
+    }
+
+    /// Two lines at most, the same cap the burned caption has. Return on the
+    /// first line starts the second; Return on the second is 完成 — the extra
+    /// line break is dropped and the caption is saved.
+    private func limitCaptionLines(_ text: String) {
+        guard editingCaption else { return }
+        let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard parts.count > 2 else { return }
+        captionDraft = String(parts[0]) + "\n" + parts[1...].joined()
+        commitCaption()
     }
 }

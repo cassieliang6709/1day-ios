@@ -1,107 +1,64 @@
 import SwiftUI
 
-/// What the guided flow hands back: a story to start now, and — if the user
-/// wants it — a template to keep.
+/// What 写今天的清单 hands back to the composer.
 struct CustomStoryDraft {
     var moments: [String]
-    var name: String
-    /// Whether this also becomes a reusable template rather than evaporating
-    /// once the story is made.
+    /// A name the AI offered, or one derived from the sentence about today.
+    /// The composer only uses it while the user hasn't typed a name.
+    var suggestedName: String?
+    /// Keep this list as one of the user's own templates when the story starts.
     var savesToLibrary: Bool
-    /// Bytes of a cover picked from the photo library. Nil means the app
-    /// matches one from the prompts.
-    var coverImageData: Data?
-    /// A bundled scene chosen from the preset cover library.
-    var presetCoverAssetName: String?
 }
 
-/// A small blank canvas for a user's own prompts. It starts with two rows so
-/// the user does not have to predict an entire day before anything happens.
+/// 写今天的清单 (1.5): the one editor behind the composer's list. A single
+/// line about today with a small 帮我写 that asks the AI to fill the list,
+/// then the list itself — typed, reordered, trimmed — and one button at the
+/// bottom. 自己写 and AI 帮我写 used to be two entries into this page.
 struct GuidedMomentsView: View {
+    /// What the list holds now: a template's moments, or the last edit.
+    var initialMoments: [String] = []
+    /// Whether to offer 存为我的模板 — not when the list came from a template.
+    var allowsSaving = true
+    var savesToLibrary = true
     let onDone: (CustomStoryDraft) -> Void
     /// Injectable so previews and tests don't reach the network.
     var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
-    /// 自己写 (1.5): put the cursor in the first prompt row on open, rather
-    /// than leaving the page on its AI sentence.
-    var startsWriting = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(PromptSuggestionMetrics.self) private var metrics
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    @State private var answers = ["", ""]
-    @State private var storyName = ""
+    @State private var rows: [ListRow] = []
+    @State private var saves = true
     @State private var showPromptLibrary = false
-    @FocusState private var focused: Int?
+    @FocusState private var focused: UUID?
 
-    /// On by default. Writing seven prompts is the expensive part; throwing
-    /// them away after one story is the surprising outcome, not keeping them.
-    @State private var savesToLibrary = true
-    @State private var coverChoice: TemplateCoverChoice = .unchanged
-
-    /// The sentence about today, and what came back from it.
     @State private var intent = ""
     @State private var isSuggesting = false
     @State private var suggestionNote: String?
+    @State private var suggestedName: String?
     /// Kept so the rewrite rate has something to compare against at save time.
     @State private var offeredPrompts: [String] = []
 
-    /// A full day's worth. The whole point is not having to invent them one at
-    /// a time, and every row is editable afterwards.
+    /// A full day's worth; every row stays editable afterwards.
     private static let suggestionCount = 7
-
-    private var filledCount: Int {
-        answers.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
-    }
-
-    private var needsName: Bool {
-        storyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var canSave: Bool {
-        filledCount >= 2 && !needsName
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 OneDayCanvas(seed: 1)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        heading
-                        intentCard
-                        nameCard
-                        promptEditor
-                        libraryButton
-                        keepItCard
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
-                }
-                .scrollIndicators(.hidden)
-                .scrollDismissesKeyboard(.interactively)
+                list
             }
-            // The decision this screen exists for gets the one primary button,
-            // pinned where the composer keeps its own — it used to be a small
-            // word in the nav bar losing to a full-width 出题目 mid-page.
             .safeAreaInset(edge: .bottom) { saveFooter }
-            .navigationTitle(Strings.customPromptsTitle)
+            .navigationTitle(Strings.composerWriteList)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(Strings.cancel) { dismiss() }
                 }
             }
-            // The intent field is the first thing on screen, so this is about
-            // as early as a warm-up can go without doing it for people who
-            // never open the composer.
             .task { await suggestions.warmUp() }
-            .task {
-                guard startsWriting else { return }
-                try? await Task.sleep(for: .milliseconds(450))
-                focused = 0
-            }
+            .onAppear(perform: seed)
             .sheet(isPresented: $showPromptLibrary) {
                 PromptLibraryPicker(onChoose: addFromLibrary)
                     .presentationDetents([.medium, .large])
@@ -109,285 +66,212 @@ struct GuidedMomentsView: View {
         }
     }
 
+    // MARK: - Layout
+
+    private var list: some View {
+        List {
+            Section { intentRow } footer: { noteFooter }
+            Section { listRows; addRow } header: { SectionLabel(text: Strings.listSection) }
+            if allowsSaving {
+                Section { saveRow } footer: { saveNote }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .listSectionSpacing(16)
+        .contentMargins(.horizontal, ComposerLayout.margin, for: .scrollContent)
+        // Always reorderable: the handles are the only edit-mode chrome,
+        // because every row opts out of swipe-to-delete below.
+        .environment(\.editMode, .constant(.active))
+    }
+
+    private var intentRow: some View {
+        HStack(spacing: 10) {
+            TextField("", text: $intent, prompt: Text(Strings.listIntentPlaceholder))
+                .font(.system(size: 15.5, weight: .medium, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .tint(Color.oneDayBrand)
+                .submitLabel(.go)
+                .onSubmit(generatePrompts)
+                .disabled(isSuggesting)
+                .accessibilityIdentifier("today-intent")
+                .onChange(of: intent) { _, _ in suggestionNote = nil }
+            helpButton
+        }
+        .listRowBackground(OneDay.surface)
+    }
+
+    private var helpButton: some View {
+        Button(action: generatePrompts) {
+            HStack(spacing: 5) {
+                if isSuggesting {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "sparkles")
+                }
+                Text(helpLabel)
+            }
+        }
+        .buttonStyle(PillButtonStyle(filled: true))
+        .disabled(isSuggesting || trimmedIntent.isEmpty)
+        .accessibilityIdentifier("suggest-prompts")
+    }
+
+    @ViewBuilder private var noteFooter: some View {
+        if let suggestionNote {
+            HStack(spacing: 8) {
+                Text(suggestionNote)
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                Button(Strings.retry, action: generatePrompts)
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.brandText)
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("suggest-retry")
+            }
+        }
+    }
+
+    private var listRows: some View {
+        ForEach($rows) { $row in
+            ListRowView(
+                number: number(of: row.id),
+                text: $row.text,
+                placeholder: Strings.customPromptPlaceholder(number(of: row.id)),
+                isLast: row.id == rows.last?.id,
+                canRemove: rows.count > 2,
+                focused: $focused,
+                rowID: row.id,
+                onSubmit: { focusNext(after: row.id) },
+                onRemove: { remove(row.id) })
+                .deleteDisabled(true)
+                .listRowBackground(OneDay.surface)
+        }
+        .onMove { rows.move(fromOffsets: $0, toOffset: $1) }
+    }
+
+    private var addRow: some View {
+        HStack(spacing: 8) {
+            if rows.count < StoryMoments.maxCount {
+                Button(action: addBlankRow) {
+                    PillLabel(text: Strings.listAddRow, systemImage: "plus")
+                }
+                .buttonStyle(PillButtonStyle(filled: false))
+                .accessibilityIdentifier("list-add-row")
+            }
+            Button { showPromptLibrary = true } label: {
+                PillLabel(text: Strings.listFromIdeas, systemImage: "lightbulb")
+            }
+            .buttonStyle(PillButtonStyle(filled: false))
+            Spacer(minLength: 0)
+        }
+        .moveDisabled(true)
+        .listRowBackground(OneDay.surface)
+    }
+
+    private var saveRow: some View {
+        Toggle(isOn: $saves) {
+            Text(Strings.listSaveAsTemplate)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+        }
+        .tint(Color.oneDayBrand)
+        .accessibilityIdentifier("save-to-template-library")
+        .listRowBackground(OneDay.surface)
+    }
+
+    private var saveNote: some View {
+        Text(Strings.listSaveAsTemplateNote)
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .foregroundStyle(OneDay.inkSoft)
+    }
+
     private var saveFooter: some View {
         Button(action: save) {
-            Text(filledCount > 0
-                ? Strings.useTheseMomentsCount(filledCount)
-                : Strings.useTheseMoments)
+            Text(filledCount >= 2 ? Strings.listUseCount(filledCount) : Strings.listUse)
         }
         .buttonStyle(.primaryAction)
         .disabled(!canSave)
         .accessibilityIdentifier("use-these-moments")
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
+        .padding(.horizontal, ComposerLayout.margin)
+        .padding(.top, 8)
         .padding(.bottom, 8)
     }
 
-    private var heading: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(Strings.guidedHeading)
-                .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-        }
-        .padding(.top, 8)
-    }
-
-    private var nameCard: some View {
-        GlassCard(padding: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(Strings.storyNameLabel)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkFaint)
-                TextField("", text: $storyName, prompt: Text(Strings.guidedNamePlaceholder))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .tint(Color.oneDayBrand)
-                    .accessibilityIdentifier("custom-story-name")
-
-                // Only once there are prompts to save: before that the empty
-                // field is obviously unfinished and doesn't need telling on.
-                if needsName, filledCount >= 2 {
-                    Text(Strings.storyNameNeeded)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.brandText)
-                        .padding(.top, 3)
-                        .transition(.opacity)
-                }
-            }
-        }
-        .animation(OneDay.Motion.soft, value: canSave)
-    }
-
-    /// A day that hasn't happened yet is hard to write prompts for, which is
-    /// where the blank list loses people. But "今天要搬家" is sayable now.
-    private var intentCard: some View {
-        GlassCard(padding: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                // No sparkles on the heading: the glyph marks the one thing
-                // that calls the AI, and that's the button below.
-                Text(Strings.intentHeading)
-                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-
-                TextField("", text: $intent, prompt: Text(Strings.intentPlaceholder))
-                    .font(.system(size: 15.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .tint(Color.oneDayBrand)
-                    .submitLabel(.go)
-                    .onSubmit(generatePrompts)
-                    .disabled(isSuggesting)
-                    .accessibilityIdentifier("today-intent")
-                    // A note about the last sentence is wrong about this one.
-                    .onChange(of: intent) { _, _ in suggestionNote = nil }
-
-                // Secondary on purpose: generating is a helper, saving is the
-                // decision. Two primaries on one screen read as two exits.
-                Button(action: generatePrompts) {
-                    HStack(spacing: 7) {
-                        if isSuggesting {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "sparkles")
-                        }
-                        Text(generateLabel)
-                    }
-                }
-                .buttonStyle(.softAction)
-                .disabled(isSuggesting || trimmedIntent.isEmpty)
-                // The soft style doesn't dim itself when disabled.
-                .opacity(trimmedIntent.isEmpty ? 0.55 : 1)
-                .accessibilityIdentifier("suggest-prompts")
-
-                if let suggestionNote {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Image(systemName: "exclamationmark.circle")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .accessibilityHidden(true)
-                        Text(suggestionNote)
-                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 4)
-                        Button(Strings.retry, action: generatePrompts)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.brandText)
-                            .buttonStyle(.plain)
-                            .frame(minHeight: 44)
-                            .disabled(isSuggesting || trimmedIntent.isEmpty)
-                            .accessibilityIdentifier("suggest-retry")
-                    }
-                    .transition(.opacity)
-                }
-            }
-        }
-        .animation(OneDay.Motion.soft, value: suggestionNote)
-    }
-
-    /// 换一批 once the list still shows the last round untouched: the same
-    /// tap now swaps those rows instead of looking for blanks that aren't there.
-    private var generateLabel: String {
-        if isSuggesting { return Strings.suggestingPrompts }
-        return SuggestedPromptFill.canReplace(answers, offered: offeredPrompts)
-            ? Strings.suggestAnotherSet
-            : Strings.suggestPrompts
-    }
-
-    private var promptEditor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: Strings.yourPrompts)
-
-            GlassCard(padding: 12) {
-                VStack(spacing: 0) {
-                    ForEach(answers.indices, id: \.self) { index in
-                        promptRow(index)
-                        if index < answers.count - 1 {
-                            Divider().overlay(OneDay.hairline).padding(.leading, 38)
-                        }
-                    }
-
-                    if answers.count < StoryMoments.maxCount {
-                        Divider().overlay(OneDay.hairline).padding(.leading, 38)
-                        Button(action: addBlankPrompt) {
-                            Label(Strings.addAnotherPrompt, systemImage: "plus.circle.fill")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(OneDay.brandText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 11)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private func promptRow(_ index: Int) -> some View {
-        HStack(spacing: 10) {
-            Text("\(index + 1)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(OneDay.onBrand)
-                .frame(width: 28, height: 28)
-                .background(Color.oneDayBrand, in: Circle())
-
-            TextField(
-                "",
-                text: binding(index),
-                prompt: Text(Strings.customPromptPlaceholder(index + 1)))
-                .font(.system(size: 15.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .tint(Color.oneDayBrand)
-                .focused($focused, equals: index)
-                .submitLabel(index == answers.count - 1 ? .done : .next)
-                .onSubmit {
-                    focused = index < answers.count - 1 ? index + 1 : nil
-                }
-                .accessibilityIdentifier("custom-prompt-\(index + 1)")
-
-            if answers.count > 2 {
-                Button {
-                    guard answers.indices.contains(index) else { return }
-                    answers.remove(at: index)
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .foregroundStyle(OneDay.inkFaint)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.deleteMoment)
-            }
-        }
-        .padding(.vertical, 9)
-    }
-
-    private var libraryButton: some View {
-        Button {
-            showPromptLibrary = true
-        } label: {
-            Label(Strings.chooseFromPromptLibrary, systemImage: "rectangle.stack.badge.plus")
-        }
-        .buttonStyle(.softAction)
-    }
-
-    /// Keeping the prompts is a decision about the future, so it sits at the
-    /// end — after the list it's talking about exists and is worth keeping.
-    private var keepItCard: some View {
-        GlassCard(padding: 14) {
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle(isOn: $savesToLibrary) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(Strings.saveToTemplateLibrary)
-                            .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.ink)
-                        Text(Strings.saveToTemplateLibraryNote)
-                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .tint(Color.oneDayBrand)
-                .accessibilityIdentifier("save-to-template-library")
-
-                if savesToLibrary {
-                    Divider().overlay(OneDay.hairline)
-                    SectionLabel(text: Strings.templateCoverLabel)
-                    TemplateCoverField(
-                        matchedAssetName: matchedCoverAssetName,
-                        choice: $coverChoice)
-                }
-            }
-        }
-        .animation(OneDay.Motion.soft, value: savesToLibrary)
-    }
-
-    /// What the cover would be if the user leaves it alone — recomputed as
-    /// they type, so the preview is honest about what they'd get.
-    private var matchedCoverAssetName: String {
-        TemplateCoverMatcher.assetName(forMomentKeys: filledAnswers, name: storyName)
-            ?? TemplateCoverMatcher.fallbackAssetName
-    }
+    // MARK: - State
 
     private var filledAnswers: [String] {
-        answers
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        rows.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     }
 
-
-    private func binding(_ index: Int) -> Binding<String> {
-        Binding(
-            get: { answers.indices.contains(index) ? answers[index] : "" },
-            set: { if answers.indices.contains(index) { answers[index] = $0 } })
-    }
-
-    private func addBlankPrompt() {
-        guard answers.count < StoryMoments.maxCount else { return }
-        answers.append("")
-        focused = answers.count - 1
-    }
-
-    private func addFromLibrary(_ prompt: String) {
-        if let emptyIndex = answers.firstIndex(where: {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }) {
-            answers[emptyIndex] = prompt
-        } else if answers.count < StoryMoments.maxCount {
-            answers.append(prompt)
-        }
-    }
+    private var filledCount: Int { filledAnswers.count }
+    private var canSave: Bool { filledCount >= 2 }
 
     private var trimmedIntent: String {
         intent.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Failure is quiet on purpose. The list underneath is still there and
-    /// still works, so there's nothing to interrupt anyone about — one line
-    /// saying why nothing appeared, and no alert.
+    /// 换一批 once the list still shows the last round untouched.
+    private var helpLabel: String {
+        if isSuggesting { return Strings.listHelpWorking }
+        return SuggestedPromptFill.canReplace(rows.map(\.text), offered: offeredPrompts)
+            ? Strings.listHelpAgain
+            : Strings.listHelpWrite
+    }
+
+    private func number(of id: UUID) -> Int {
+        (rows.firstIndex { $0.id == id } ?? 0) + 1
+    }
+
+    private func seed() {
+        guard rows.isEmpty else { return }
+        var texts = initialMoments.map { MomentCatalog.localize($0) }
+        while texts.count < 2 { texts.append("") }
+        rows = texts.map { ListRow(text: $0) }
+        saves = savesToLibrary
+    }
+
+    private func focusNext(after id: UUID) {
+        guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
+        focused = index < rows.count - 1 ? rows[index + 1].id : nil
+    }
+
+    private func remove(_ id: UUID) {
+        guard rows.count > 2 else { return }
+        withAnimation(OneDay.Motion.soft) { rows.removeAll { $0.id == id } }
+    }
+
+    private func addBlankRow() {
+        guard rows.count < StoryMoments.maxCount else { return }
+        let row = ListRow(text: "")
+        rows.append(row)
+        DispatchQueue.main.async { focused = row.id }
+    }
+
+    private func addFromLibrary(_ prompt: String) {
+        if let empty = rows.firstIndex(where: {
+            $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) {
+            rows[empty].text = prompt
+        } else if rows.count < StoryMoments.maxCount {
+            rows.append(ListRow(text: prompt))
+        }
+    }
+
+    /// Rewrites the texts in place, keeping each surviving row's identity so
+    /// focus and reordering don't jump.
+    private func setTexts(_ texts: [String]) {
+        rows = texts.enumerated().map { index, text in
+            ListRow(id: index < rows.count ? rows[index].id : UUID(), text: text)
+        }
+    }
+
+    /// Failure is quiet on purpose: the list still works, so one line under
+    /// the field says why nothing appeared, and no alert.
     private func generatePrompts() {
         let sentence = trimmedIntent
         guard !sentence.isEmpty, !isSuggesting else { return }
-
         focused = nil
         isSuggesting = true
         suggestionNote = nil
@@ -396,27 +280,17 @@ struct GuidedMomentsView: View {
             defer { isSuggesting = false }
             do {
                 let suggestion = try await suggestions.suggestStory(
-                    intent: sentence,
-                    count: Self.suggestionCount,
-                    language: appLanguage)
+                    intent: sentence, count: Self.suggestionCount, language: appLanguage)
                 metrics.recordGenerated()
-                // Rows still reading as the previous round are swapped, so a
-                // second tap on a full list gives a new set instead of nothing.
-                answers = SuggestedPromptFill.apply(
-                    suggestion.prompts, to: answers, replacing: offeredPrompts)
+                setTexts(SuggestedPromptFill.apply(
+                    suggestion.prompts, to: rows.map(\.text), replacing: offeredPrompts))
                 offeredPrompts = suggestion.prompts
-                // Read the current fields after the await: edits made while
-                // generating win as well. Old servers still seed from intent.
-                if needsName, let seeded = suggestion.title ?? IntentStoryName.derive(from: sentence) {
-                    storyName = seeded
-                }
+                suggestedName = suggestion.title ?? IntentStoryName.derive(from: sentence)
             } catch PromptSuggestionError.rateLimited {
                 suggestionNote = Strings.suggestRateLimited
             } catch {
                 suggestionNote = Strings.suggestFailed
             }
-            // Quiet on screen, but not silent: VoiceOver users otherwise hear
-            // the spinner stop and nothing else.
             if let suggestionNote {
                 AccessibilityNotification.Announcement(suggestionNote).post()
             }
@@ -426,16 +300,105 @@ struct GuidedMomentsView: View {
     private func save() {
         let moments = filledAnswers
         guard moments.count >= 2 else { return }
-        // Which of the generated prompts survived contact with a person. This
-        // is the number the whole feature exists to produce.
         metrics.recordAdopted(offered: offeredPrompts, saved: moments)
         onDone(CustomStoryDraft(
             moments: moments,
-            name: storyName.trimmingCharacters(in: .whitespacesAndNewlines),
-            savesToLibrary: savesToLibrary,
-            coverImageData: coverChoice.pickedData,
-            presetCoverAssetName: coverChoice.resolvedPreset(existing: nil)))
+            suggestedName: suggestedName,
+            savesToLibrary: allowsSaving && saves))
         dismiss()
+    }
+}
+
+private struct ListRow: Identifiable {
+    var id = UUID()
+    var text: String
+}
+
+/// One line of the checklist: its number, the text, a small remove button.
+/// The reorder handle is the List's own, drawn after it.
+private struct ListRowView: View {
+    let number: Int
+    @Binding var text: String
+    let placeholder: String
+    let isLast: Bool
+    let canRemove: Bool
+    var focused: FocusState<UUID?>.Binding
+    let rowID: UUID
+    let onSubmit: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(number)")
+                .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(OneDay.inkFaint)
+                .frame(width: 18, alignment: .trailing)
+            TextField("", text: $text, prompt: Text(placeholder))
+                .font(.system(size: 15.5, weight: .medium, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .tint(Color.oneDayBrand)
+                .focused(focused, equals: rowID)
+                .submitLabel(isLast ? .done : .next)
+                .onSubmit(onSubmit)
+                .accessibilityIdentifier("custom-prompt-\(number)")
+            if canRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(OneDay.inkFaint)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(Strings.deleteMoment)
+            }
+        }
+        .frame(minHeight: 32)
+    }
+}
+
+/// Icon and words side by side. Not `Label`: inside a List row in edit mode
+/// a `Label` drops to its icon alone.
+private struct PillLabel: View {
+    let text: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+            Text(text)
+        }
+    }
+}
+
+/// A small capsule for helpers (帮我写, 加一项) — never the screen's main
+/// action, which stays the one `.primaryAction` at the bottom.
+private struct PillButtonStyle: ButtonStyle {
+    let filled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Pill(configuration: configuration, filled: filled)
+    }
+
+    private struct Pill: View {
+        let configuration: Configuration
+        let filled: Bool
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(OneDay.brandText)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.oneDayBrand.opacity(filled ? 0.14 : 0), in: Capsule())
+                .overlay(Capsule().strokeBorder(filled ? .clear : OneDay.hairline, lineWidth: 1))
+                .opacity(isEnabled ? 1 : 0.45)
+                .scaleEffect(configuration.isPressed ? 0.96 : 1)
+                .animation(OneDay.Motion.snap, value: configuration.isPressed)
+                .fixedSize()
+        }
     }
 }
 

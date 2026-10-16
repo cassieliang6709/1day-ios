@@ -264,6 +264,10 @@ struct RoomFeed: View {
                 .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        // On the play button itself: a `.contain` container's label isn't
+        // read by VoiceOver or matched by UI tests, so the moment's name has
+        // to live on the element that is actually tapped.
+        .accessibilityLabel(tileLabel(tile, clip: clip))
         // Outside the play button, so a tap on a heart doesn't also open the clip.
         .overlay(alignment: .trailing) {
             if !tile.isMine {
@@ -292,10 +296,13 @@ struct RoomFeed: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel([slotTitle(clip.day), tile.name,
-                             clip.recordedAt?.formatted(date: .omitted, time: .shortened),
-                             clip.overlayText]
-            .compactMap { $0 }.joined(separator: ", "))
+    }
+
+    private func tileLabel(_ tile: Tile, clip: DayClip) -> String {
+        [slotTitle(clip.day), tile.name,
+         clip.recordedAt?.formatted(date: .omitted, time: .shortened),
+         clip.overlayText]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     private func greyStatus(_ tile: Tile) -> String {

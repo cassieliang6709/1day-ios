@@ -67,12 +67,15 @@ enum CameraStyle: String, CaseIterable, Identifiable, Codable {
 
     /// The camera's own grade, on the same dials as `LookPanel`. Applied once,
     /// at bake time; your dials still go on top of it afterwards.
+    ///
+    /// Kept to a slight warmth on film and nothing at all on the other two:
+    /// the earlier lifted exposure and flattened contrast left every take with
+    /// a grey, washed-out look. Exposure and contrast stay at zero on purpose —
+    /// a camera here is its frame and its date, not a filter.
     var tone: PersonalEffectParameters {
         switch self {
-        case .standard: .none
-        case .camcorder: PersonalEffectParameters(exposure: 4, temperature: -16, contrast: 16)
-        case .film: PersonalEffectParameters(exposure: 4, temperature: 24, contrast: 10)
-        case .instant: PersonalEffectParameters(exposure: 12, temperature: 12, contrast: -22)
+        case .standard, .camcorder, .instant: .none
+        case .film: PersonalEffectParameters(temperature: 12)
         }
     }
 
@@ -98,13 +101,12 @@ enum CameraStyle: String, CaseIterable, Identifiable, Codable {
 
     /// A rough stand-in for `tone` over the live preview, which is a capture
     /// layer and can't be run through Core Image. The take itself gets the
-    /// real grade.
+    /// real grade. Only film has a tone, so only film gets a (faint, warm)
+    /// wash; a light or white wash here is what read as a grey mask.
     var previewWash: (color: Color, opacity: Double) {
         switch self {
-        case .standard: (.clear, 0)
-        case .camcorder: (Color(red: 0.35, green: 0.55, blue: 1), 0.10)
-        case .film: (Color(red: 1, green: 0.62, blue: 0.25), 0.14)
-        case .instant: (Color(red: 1, green: 0.95, blue: 0.85), 0.20)
+        case .standard, .camcorder, .instant: (.clear, 0)
+        case .film: (Color(red: 1, green: 0.62, blue: 0.25), 0.06)
         }
     }
 
@@ -411,8 +413,10 @@ struct CameraStyleOverlay: View {
                     let pixels = CGSize(
                         width: proxy.size.width * scale, height: proxy.size.height * scale)
                     ZStack {
-                        style.previewWash.color.opacity(style.previewWash.opacity)
-                            .blendMode(.softLight)
+                        if style.previewWash.opacity > 0 {
+                            style.previewWash.color.opacity(style.previewWash.opacity)
+                                .blendMode(.softLight)
+                        }
                         if let image = style.overlay(size: pixels, date: date ?? context.date) {
                             Image(uiImage: image)
                                 .resizable()

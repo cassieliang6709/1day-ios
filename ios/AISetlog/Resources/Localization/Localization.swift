@@ -671,8 +671,10 @@ enum Strings {
     }
 
     static func noMatchingPlan(_ orientation: Challenge.Orientation) -> String {
-        let kind = orientationName(orientation)
-        return lang == .chinese ? "没有\(kind)计划，先创建一个" : "No \(kind) plan yet — create one first"
+        // The camera decides the shape now (1.5), so the message no longer
+        // names a 竖屏 / 横屏 / 正方形 plan; the parameter stays for callers.
+        _ = orientation
+        return lang == .chinese ? "还没有能放这段的计划，先创建一个" : "No plan fits this clip yet — create one first"
     }
 
     // Drafts: what a clip does when there's nowhere to file it yet.

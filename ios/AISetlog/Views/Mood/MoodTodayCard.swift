@@ -1,29 +1,133 @@
 import SwiftUI
 
-/// 我的 → 今天的心情. One tap on a face records today's mood; the optional
-/// one-line note appears once a mood is picked. Both can be changed all day.
+/// 我的 → 今天的心情. Pick a face, optionally write (or say) one line, tap
+/// 记下了. After that the card shows the saved day — big face, the note — with
+/// a small 改 to edit and a way to chat with the mascot about it.
 /// Private: nothing here goes to rooms or friends.
 struct MoodTodayCard: View {
     @Environment(MoodStore.self) private var moods
+    @State private var isEditing = false
+    @State private var showChat = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: Strings.moodSectionTitle)
                 .padding(.horizontal, 20)
-            GlassCard {
-                MoodCardContent(today: moods.today, onPick: { moods.setMood($0) },
-                                onNote: { moods.setNote($0) })
-            }
-            .padding(.horizontal, 20)
+            GlassCard { content }
+                .padding(.horizontal, 20)
         }
+        .animation(OneDay.Motion.soft, value: phase)
+        .sheet(isPresented: $showChat) { MascotChatSheet() }
         .accessibilityIdentifier("mood-today-card")
+    }
+
+    private var phase: MoodCardPhase {
+        MoodCardPhase(entry: moods.today, isEditing: isEditing)
+    }
+
+    @ViewBuilder private var content: some View {
+        if phase == .saved, let today = moods.today {
+            MoodSavedContent(entry: today, onEdit: { isEditing = true }, onChat: { showChat = true })
+        } else {
+            MoodEditorContent(today: moods.today, onPick: pick,
+                              onNote: { moods.setNote($0) }, onDone: { isEditing = false })
+        }
+    }
+
+    private func pick(_ mood: Mood) {
+        // The first pick of the day keeps the editor open for the note.
+        if moods.today == nil { isEditing = true }
+        moods.setMood(mood)
     }
 }
 
-private struct MoodCardContent: View {
+/// Which face of the card to show. A day with a mood is saved unless the user
+/// is editing it; a day without one is always the editor.
+enum MoodCardPhase: Equatable {
+    case editing, saved
+
+    init(entry: MoodEntry?, isEditing: Bool) {
+        self = entry != nil && !isEditing ? .saved : .editing
+    }
+}
+
+// MARK: - Saved
+
+private struct MoodSavedContent: View {
+    let entry: MoodEntry
+    let onEdit: () -> Void
+    let onChat: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 14) {
+                face
+                summary
+                Spacer(minLength: 0)
+                editButton
+            }
+            Button(action: onChat) {
+                Label(Strings.moodChatButton, systemImage: "bubble.left.and.bubble.right.fill")
+            }
+            .buttonStyle(.softAction)
+            .accessibilityIdentifier("mood-chat")
+            MoodPrivateHint()
+        }
+    }
+
+    private var face: some View {
+        Button(action: onEdit) {
+            Image(entry.mood.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+                .padding(6)
+                .background(Circle().fill(Color.oneDayBrand.opacity(0.16)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(entry.mood.label), \(Strings.moodEditFaceHint)")
+        .accessibilityIdentifier("mood-saved-face")
+    }
+
+    private var summary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Strings.moodSaved)
+                .font(OneDay.Font.micro)
+                .foregroundStyle(OneDay.inkSoft)
+            Text(entry.mood.label)
+                .font(OneDay.Font.headline)
+                .foregroundStyle(OneDay.ink)
+            if !entry.note.isEmpty {
+                Text(entry.note)
+                    .font(OneDay.Font.subhead)
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var editButton: some View {
+        Button(Strings.moodEdit, action: onEdit)
+            .font(OneDay.Font.caption)
+            .foregroundStyle(OneDay.brandText)
+            .padding(.horizontal, 14)
+            .frame(minWidth: 44, minHeight: 32)
+            .background(OneDay.surfaceSoft, in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("mood-edit")
+    }
+}
+
+// MARK: - Editor
+
+private struct MoodEditorContent: View {
     let today: MoodEntry?
     let onPick: (Mood) -> Void
     let onNote: (String) -> Void
+    let onDone: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -33,11 +137,20 @@ private struct MoodCardContent: View {
             MoodFaceRow(selected: today?.mood, onPick: onPick)
             if let today {
                 MoodNoteField(entry: today, onCommit: onNote)
+                Button(Strings.moodDone, action: onDone)
+                    .buttonStyle(.primaryAction)
+                    .accessibilityIdentifier("mood-done")
             }
-            Label(Strings.moodPrivateHint, systemImage: "lock.fill")
-                .font(OneDay.Font.micro)
-                .foregroundStyle(OneDay.inkFaint)
+            MoodPrivateHint()
         }
+    }
+}
+
+private struct MoodPrivateHint: View {
+    var body: some View {
+        Label(Strings.moodPrivateHint, systemImage: "lock.fill")
+            .font(OneDay.Font.micro)
+            .foregroundStyle(OneDay.inkFaint)
     }
 }
 
@@ -93,29 +206,5 @@ struct MoodFaceButton: View {
             .padding(4)
             .background(Circle().fill(Color.oneDayBrand.opacity(state == .selected ? 0.18 : 0)))
             .scaleEffect(state == .selected ? 1.08 : 1)
-    }
-}
-
-private struct MoodNoteField: View {
-    let entry: MoodEntry
-    let onCommit: (String) -> Void
-    @State private var text = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        TextField(Strings.moodNotePlaceholder, text: $text)
-            .font(OneDay.Font.subhead)
-            .foregroundStyle(OneDay.ink)
-            .submitLabel(.done)
-            .focused($focused)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 44)
-            .background(OneDay.surfaceSoft, in: RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
-            .onAppear { text = entry.note }
-            .onChange(of: entry.day) { _, _ in text = entry.note }
-            .onChange(of: focused) { _, isFocused in if !isFocused { onCommit(text) } }
-            .onSubmit { onCommit(text) }
-            .onDisappear { onCommit(text) }
-            .accessibilityIdentifier("mood-note")
     }
 }

@@ -13,6 +13,7 @@ struct PlansHomeView: View {
     /// entry (`DraftsEntryButton`) and the shell keeps the four-second
     /// confirmation; this is the third and quietest way back to the same list.
     @Environment(ClipDraftStore.self) private var drafts
+    @Environment(MoodStore.self) private var moods: MoodStore?
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
     /// What to lead with and what to list under it, as one decision. See
@@ -23,6 +24,13 @@ struct PlansHomeView: View {
     /// exist once.
     var scope: Scope = .stories
     enum Scope { case stories, friends }
+    /// Bumped by the shell each time 朋友 is picked in the tab bar. This
+    /// screen stays mounted behind the bar, so `onAppear` runs once; this is
+    /// what tells it the tab was chosen again.
+    var tabSelections = 0
+    /// Bumped by the shell when the camera's drafts button is tapped: scroll
+    /// to 所有片段 with 待归档 picked. See `LibrarySection.draftsRequest`.
+    var draftsRequest = 0
     /// Open the composer. The composer used to be a
     /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
     /// every in-page CTA that used to raise the cover asks the shell instead.
@@ -203,6 +211,34 @@ struct PlansHomeView: View {
     }
 
     private var storiesContent: some View {
+        ScrollViewReader { proxy in
+            storiesScroll
+                .onChange(of: draftsRequest) { _, _ in
+                    withAnimation(OneDay.Motion.soft) {
+                        proxy.scrollTo(Self.libraryAnchor, anchor: .top)
+                    }
+                }
+        }
+        .overlay(alignment: .bottom) {
+            if isSelectingClips {
+                LibrarySelectionBar(picked: pickedClips) {
+                    vlogRequest = VlogRequest(clips: pickedClips)
+                }
+                .padding(.bottom, OneDay.tabBarClearance + 10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .sheet(item: $vlogRequest) { request in
+            LibraryVlogSheet(clips: request.clips)
+        }
+        #if DEBUG
+        .onAppear { LibraryDebugSeed.runIfAsked(store: store, drafts: drafts, moods: moods) }
+        #endif
+    }
+
+    private static let libraryAnchor = "library-section"
+
+    private var storiesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
@@ -224,11 +260,14 @@ struct PlansHomeView: View {
                 }
                 #endif
 
+                // 我的, top to bottom: today's mood, today's stories, every clip.
+                MoodTodayCard()
+
                 switch stories.hero {
                 case .today(let challenge):
-                    heroSection(challenge, label: Strings.todaysStory)
+                    todaySection(todayStories(leading: challenge), label: Strings.todaysStory)
                 case .resume(let challenge):
-                    heroSection(challenge, label: Strings.resumeStory)
+                    todaySection([challenge], label: Strings.resumeStory)
                 case .startToday:
                     // 1.5: no "start today's story" card. With nothing in
                     // progress the archive is the page, and the round camera
@@ -237,17 +276,16 @@ struct PlansHomeView: View {
                     if store.challenges.isEmpty, library.clips.isEmpty { emptyState }
                 }
 
-                MoodTodayCard()
-
                 // Replaces the date-grouped story list (`timelineSection`):
                 // every clip, filterable by room, with a calendar.
                 LibrarySection(
                     library: library,
                     rooms: store.challenges.filter(\.isShared),
                     onOpenStory: { path.append($0) },
-                    onOpenDrafts: { showDrafts = true },
+                    draftsRequest: draftsRequest,
                     isSelecting: $isSelectingClips,
                     picked: $pickedClips)
+                    .id(Self.libraryAnchor)
             }
             .padding(.top, 8)
             .padding(.bottom, OneDay.tabBarClearance + 20)
@@ -258,18 +296,6 @@ struct PlansHomeView: View {
         }
         .scrollIndicators(.hidden)
         .overlay { joiningOverlay }
-        .overlay(alignment: .bottom) {
-            if isSelectingClips {
-                LibrarySelectionBar(picked: pickedClips) {
-                    vlogRequest = VlogRequest(clips: pickedClips)
-                }
-                .padding(.bottom, OneDay.tabBarClearance + 10)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .sheet(item: $vlogRequest) { request in
-            LibraryVlogSheet(clips: request.clips)
-        }
     }
 
     /// Every clip on this device, as 我的 lists it.
@@ -340,15 +366,18 @@ struct PlansHomeView: View {
         .overlay { joiningOverlay }
         .onAppear { openSoleRoom() }
         .onChange(of: sharedStories.count) { _, _ in openSoleRoom() }
+        .onChange(of: tabSelections) { _, _ in openSoleRoom() }
     }
 
     /// 一进朋友页就是房间: with exactly one room, 朋友 opens on it. Pushed
     /// rather than embedded so the room's back button leads somewhere — the
     /// list, where 加入 and 邀请朋友一起拍 still are.
     ///
-    /// Runs when the page is first built and when the room count changes, not
-    /// on every appearance of the list: going back to it is how somebody asks
-    /// for the list, and pushing them back in would make it unreachable.
+    /// Runs when the page is first built, when the room count changes, and
+    /// every time 朋友 is picked in the tab bar — so 朋友 always means the room,
+    /// even after going back to the list. Not on the list's own appearance:
+    /// the room's back button still leads to the list and stays there, which
+    /// is where 加入 and 邀请 are.
     private func openSoleRoom() {
         guard scope == .friends, path.isEmpty, sharedStories.count == 1 else { return }
         path = [sharedStories[0].id]
@@ -649,6 +678,43 @@ struct PlansHomeView: View {
             .padding(.horizontal, 20)
             .accessibilityIdentifier("drafts-row")
         }
+    }
+
+    /// 今天的故事 as rows, one per story today is for, stacked. `leading` is
+    /// the one `HomeHeroChoice` picked and goes first.
+    private func todaySection(_ challenges: [Challenge], label: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: label)
+                .padding(.horizontal, 20)
+            ForEach(challenges) { challenge in
+                todayRow(challenge)
+            }
+        }
+    }
+
+    private func todayRow(_ challenge: Challenge) -> some View {
+        let state = cardState(for: challenge)
+        return TodayStoryRow(
+            challenge: challenge,
+            progress: state.progress,
+            coverURL: state.coverURL,
+            refreshToken: state.refreshToken,
+            onContinue: { recordChallenge = challenge },
+            onOpen: { path.append(challenge.id) })
+            .padding(.horizontal, 20)
+    }
+
+    /// The leading story, then every other unfinished one today is for —
+    /// a one-day story started today, or a multi-day one whose week this is.
+    private func todayStories(leading: Challenge) -> [Challenge] {
+        let calendar = Calendar.current
+        let others = store.challenges.filter { challenge in
+            guard challenge.id != leading.id, !challenge.isComplete, !challenge.cards.isEmpty
+            else { return false }
+            if challenge.isOneDay { return calendar.isDateInToday(challenge.startDate) }
+            return (1...max(challenge.cards.count, 1)).contains(challenge.currentDay)
+        }
+        return [leading] + others.sorted { $0.startDate > $1.startDate }
     }
 
     private func heroSection(_ challenge: Challenge, label: String) -> some View {

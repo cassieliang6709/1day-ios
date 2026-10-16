@@ -33,17 +33,21 @@ struct LibraryClip: Identifiable, Hashable {
 
     /// What `ClipCameraIndex` files this clip's camera under. The file, plus
     /// its date, so a re-recorded take at the same path is read again.
-    var cameraKey: String { "\(url.path)|\(recordedAt.timeIntervalSince1970)" }
+    var cameraKey: String { ClipCameraIndex.key(url: url, recordedAt: recordedAt) }
 }
 
-/// The archive's two independent filters: which camera (the chip row) and
-/// whose clips (the people menu). `.all` is neither.
+/// The archive's filters: the chip row (待归档, or one camera) and whose
+/// clips (the people menu). `.all` is none of them.
 struct LibraryFilter: Hashable {
     enum People: Hashable, CaseIterable { case everyone, mine, friends }
 
     /// Nil = every camera.
     var camera: CameraStyle?
     var people: People = .everyone
+    /// 待归档: only the drafts nobody has filed into a story yet.
+    var draftsOnly = false
+
+    static let drafts = LibraryFilter(draftsOnly: true)
 
     static let all = LibraryFilter()
     static let mine = LibraryFilter(people: .mine)
@@ -114,11 +118,15 @@ struct ClipLibrary {
             case .friends: !clip.isMine
             }
             guard person else { return false }
+            if filter.draftsOnly, clip.storyID != nil { return false }
             if let camera = filter.camera, cameras[clip.cameraKey] != camera { return false }
             guard let day else { return true }
             return calendar.isDate(clip.recordedAt, inSameDayAs: day)
         }
     }
+
+    /// How many clips the 待归档 chip counts.
+    var draftCount: Int { clips.filter { $0.storyID == nil }.count }
 
     /// The cameras worth a chip: the selectable ones at least one clip was
     /// filmed with, in the picker's order. `.standard` (no camera) never gets
@@ -155,10 +163,11 @@ struct ClipLibrary {
     }
 
     /// Clips from different stories share `day` numbers; the stitcher's
-    /// captions and grouping read them. Renumber in film order so every clip is
-    /// its own moment.
+    /// captions and grouping read them. Renumber in the order given — the
+    /// order they were picked in, then dragged into — so every clip is its own
+    /// moment and the film plays them in that order.
     static func stitchable(_ clips: [LibraryClip]) -> [DayClip] {
-        clips.sorted { $0.recordedAt < $1.recordedAt }
+        clips
             .enumerated()
             .map { index, item in
                 let c = item.clip
