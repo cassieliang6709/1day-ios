@@ -19,13 +19,13 @@ final class SevenDayVisibilityUITests: XCTestCase {
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
         compose.tap()
-        // Templates are folded under 更多模板 as of 1.5.
-        let more = app.buttons["more-templates"]
-        XCTAssertTrue(more.waitForExistence(timeout: 15))
-        more.tap()
-        let seven = app.buttons["七日"]
-        XCTAssertTrue(seven.waitForExistence(timeout: 15))
-        seven.tap()
+        // One page as of 1.5: two rows say how many days, and the chosen
+        // row opens its own posters underneath. No 更多模板, no 一日/七日 pills.
+        let oneDayRow = app.buttons["plan-one-day"]
+        let sevenDayRow = app.buttons["plan-seven-day"]
+        XCTAssertTrue(sevenDayRow.waitForExistence(timeout: 15), "7-day row missing")
+        sevenDayRow.tap()
+        XCTAssertTrue(sevenDayRow.isSelected)
         let moving = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "动起来的一周")).firstMatch
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
         XCTAssertTrue(moving.isHittable)
@@ -33,19 +33,19 @@ final class SevenDayVisibilityUITests: XCTestCase {
         shot.name = "Seven day after switch"
         shot.lifetime = .keepAlways
         add(shot)
-        app.buttons["一日"].tap()
+        oneDayRow.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch.waitForExistence(timeout: 15))
-        seven.tap()
+        sevenDayRow.tap()
         XCTAssertTrue(moving.waitForExistence(timeout: 15))
-        // A poster opens the settings page as of 1.3 — it used to create the
-        // story outright. The name is pre-filled from the template there, in a
-        // field, which is also the first chance anybody gets to change it.
+        // Picking a seven-day poster names the story after it, in the field
+        // on the same page — the first chance anybody gets to change it.
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch.tap()
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         XCTAssertEqual(name.value as? String, "7 天早起的人")
         // And the page asks who you are filming with before anything exists.
         XCTAssertTrue(app.buttons["company-solo"].exists)
+        XCTAssertTrue(app.buttons["composer-start"].exists)
     }
 
     func testDemoIsReachableFromHomeWithoutSharedRoom() {

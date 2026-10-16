@@ -6,6 +6,7 @@ struct AISetlogApp: App {
     @State private var account: AccountStore
     @State private var store: ChallengeStore
     @State private var drafts = ClipDraftStore()
+    @State private var moods = MoodStore()
     @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
@@ -52,6 +53,7 @@ struct AISetlogApp: App {
                 .environment(store)
                 .environment(account)
                 .environment(drafts)
+                .environment(moods)
                 .environment(promptMetrics)
                 // `.tint` is enough on its own: it is an environment value, so
                 // changing it invalidates the whole subtree and every screen

@@ -52,6 +52,10 @@ struct PlansHomeView: View {
     @State private var isSelectingClips = false
     @State private var pickedClips: [LibraryClip] = []
     @State private var vlogRequest: VlogRequest?
+    /// 邀请朋友一起拍 with at least one room to invite to. See `inviteFriends`.
+    @State private var inviteRequest: InviteRequest?
+    /// The debug test room's own alert, so its failures aren't titled 无法加入.
+    @State private var debugAlert: DebugAlert?
 
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -166,6 +170,9 @@ struct PlansHomeView: View {
             openPendingNotificationRoute()
             consumePendingJoinCode()
             consumeLaunchAction()
+            #if DEBUG
+            createDebugTestRoomIfAsked()
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .oneDayNotificationRoutePending
@@ -175,6 +182,14 @@ struct PlansHomeView: View {
         }
         .onChange(of: pendingJoinCode) { _, _ in consumePendingJoinCode() }
         .onChange(of: launchAction) { _, _ in consumeLaunchAction() }
+        .sheet(item: $inviteRequest) { inviteSheet($0) }
+        .alert(debugAlert?.title ?? "", isPresented: Binding(
+            get: { debugAlert != nil }, set: { if !$0 { debugAlert = nil } }
+        )) {
+            Button(Strings.ok, role: .cancel) {}
+        } message: {
+            Text(debugAlert?.message ?? "")
+        }
     }
 
     // MARK: - Content
@@ -221,6 +236,8 @@ struct PlansHomeView: View {
                     // no stories and no clips, still gets the mascot.
                     if store.challenges.isEmpty, library.clips.isEmpty { emptyState }
                 }
+
+                MoodTodayCard()
 
                 // Replaces the date-grouped story list (`timelineSection`):
                 // every clip, filterable by room, with a calendar.
@@ -303,7 +320,7 @@ struct PlansHomeView: View {
                 if sharedStories.isEmpty {
                     friendsEmptyState
                 } else {
-                    Button(Strings.inviteFriends) { onCompose() }
+                    Button(Strings.inviteFriends) { inviteFriends() }
                         .buttonStyle(.primaryAction)
                         .padding(.horizontal, 20)
                         .accessibilityIdentifier("friends-invite")
@@ -321,7 +338,94 @@ struct PlansHomeView: View {
         }
         .scrollIndicators(.hidden)
         .overlay { joiningOverlay }
+        .onAppear { openSoleRoom() }
+        .onChange(of: sharedStories.count) { _, _ in openSoleRoom() }
     }
+
+    /// 一进朋友页就是房间: with exactly one room, 朋友 opens on it. Pushed
+    /// rather than embedded so the room's back button leads somewhere — the
+    /// list, where 加入 and 邀请朋友一起拍 still are.
+    ///
+    /// Runs when the page is first built and when the room count changes, not
+    /// on every appearance of the list: going back to it is how somebody asks
+    /// for the list, and pushing them back in would make it unreachable.
+    private func openSoleRoom() {
+        guard scope == .friends, path.isEmpty, sharedStories.count == 1 else { return }
+        path = [sharedStories[0].id]
+    }
+
+    struct DebugAlert {
+        let title: String
+        let message: String
+    }
+
+    struct InviteRequest: Identifiable {
+        let id = UUID()
+        /// The room whose code to show straight away; nil shows the picker.
+        let roomID: UUID?
+    }
+
+    /// 邀请朋友一起拍, by how many rooms there already are.
+    /// - none: the composer, opened by the shell with 和朋友一起 on.
+    /// - one: into that room, with its code up.
+    /// - more: a list to pick the room from, ending in 新建房间.
+    private func inviteFriends() {
+        let rooms = sharedStories
+        switch rooms.count {
+        case 0:
+            onCompose()
+        case 1:
+            showInvite(for: rooms[0])
+        default:
+            inviteRequest = InviteRequest(roomID: nil)
+        }
+    }
+
+    private func showInvite(for room: Challenge) {
+        openRoomForInvite(room)
+        inviteRequest = InviteRequest(roomID: room.id)
+    }
+
+    /// The room page offers its code once on its own (`RoomShareNudge`);
+    /// marked here so it doesn't ask a second time under this sheet.
+    private func openRoomForInvite(_ room: Challenge) {
+        if let code = room.roomCode { RoomShareNudge.markOffered(code: code) }
+        path = [room.id]
+    }
+
+    private func inviteSheet(_ request: InviteRequest) -> some View {
+        FriendsInviteSheet(
+            rooms: sharedStories,
+            initialRoomID: request.roomID,
+            memberCount: { store.members(for: $0.id).count },
+            onPick: { openRoomForInvite($0) },
+            onNewRoom: {
+                inviteRequest = nil
+                onCompose()
+            })
+    }
+
+    #if DEBUG
+    /// `-debugCreateTestRoom YES`: make the test room once at launch, then
+    /// show its code the way 邀请朋友一起拍 would.
+    private func createDebugTestRoomIfAsked() {
+        guard DebugTestRoom.consumeLaunchRequest() else { return }
+        guard account.isSignedIn else {
+            debugAlert = DebugAlert(
+                title: Strings.signInRequiredTitle, message: Strings.debugTestRoomNeedsSignIn)
+            return
+        }
+        Task {
+            do {
+                let room = try await DebugTestRoom.create(in: store)
+                showInvite(for: room)
+            } catch {
+                debugAlert = DebugAlert(
+                    title: Strings.debugTestRoomFailedTitle, message: error.localizedDescription)
+            }
+        }
+    }
+    #endif
 
     private var friendsHeader: some View {
         HStack(spacing: 11) {
@@ -354,7 +458,7 @@ struct PlansHomeView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button(Strings.inviteFriends) { onCompose() }
+            Button(Strings.inviteFriends) { inviteFriends() }
                 .buttonStyle(.primaryAction)
                 .padding(.top, 4)
                 .accessibilityIdentifier("friends-invite")

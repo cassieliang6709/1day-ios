@@ -68,6 +68,9 @@ struct SettingsView: View {
                         if account.isSignedIn {
                             group(Strings.account, rows: accountRows)
                         }
+                        #if DEBUG
+                        group(Strings.debugSection, rows: DebugTestRoomRows())
+                        #endif
                         smallPrint
                     }
                     .padding(.horizontal, 20)
@@ -615,3 +618,48 @@ private struct SettingsButtonRow: View {
         .contentShape(Rectangle())
     }
 }
+
+#if DEBUG
+/// 创建测试房间: a real room in the CloudKit development database with two
+/// fake friends' clips in it. See `DebugTestRoom`.
+private struct DebugTestRoomRows: View {
+    @Environment(ChallengeStore.self) private var store
+    @Environment(AccountStore.self) private var account
+
+    @State private var creating = false
+    @State private var created: Challenge?
+    @State private var message: String?
+
+    var body: some View {
+        SettingsButtonRow(
+            symbol: "testtube.2",
+            accent: .oneDayNavy,
+            title: creating ? Strings.debugCreatingTestRoom : Strings.debugCreateTestRoom,
+            caption: message ?? Strings.debugTestRoomCaption,
+            isDisabled: creating,
+            action: create)
+            .accessibilityIdentifier("settings-debug-create-test-room")
+        if let created {
+            RoomInviteCodeCard(challenge: created)
+        }
+    }
+
+    private func create() {
+        guard account.isSignedIn else {
+            message = Strings.debugTestRoomNeedsSignIn
+            return
+        }
+        creating = true
+        message = nil
+        Task {
+            defer { creating = false }
+            do {
+                created = try await DebugTestRoom.create(in: store)
+                message = Strings.debugTestRoomCreated
+            } catch {
+                message = error.localizedDescription
+            }
+        }
+    }
+}
+#endif
