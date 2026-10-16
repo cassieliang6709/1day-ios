@@ -13,6 +13,10 @@ struct MascotChatSheet: View {
     /// Shown under the chat when a call fails. Not saved, so it never goes
     /// back to the model as something the mascot said.
     @State private var fallback: String?
+    @AppStorage(MascotName.storageKey) private var savedName = ""
+    @AppStorage(MascotName.askedKey) private var nameAsked = false
+    @State private var naming = false
+    @State private var draftName = ""
 
     var body: some View {
         NavigationStack {
@@ -22,16 +26,49 @@ struct MascotChatSheet: View {
                 inputBar
             }
             .background(OneDay.canvas)
-            .navigationTitle(Strings.moodChatTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Button { askName() } label: {
+                        HStack(spacing: 4) {
+                            Text(Strings.moodChatTitle).font(.headline)
+                            Image(systemName: "pencil").font(.system(size: 12, weight: .bold))
+                        }
+                        .foregroundStyle(OneDay.ink)
+                    }
+                    .accessibilityHint(Strings.mascotRename)
+                    .accessibilityIdentifier("mascot-name")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.moodChatClose) { dismiss() }
                 }
             }
         }
         .presentationDetents([.medium, .large])
-        .task { if moods.chat().isEmpty { await askMascot() } }
+        .alert(Strings.mascotNameQuestion, isPresented: $naming) {
+            TextField(Strings.mascotNamePlaceholder, text: $draftName)
+            Button(Strings.mascotNameSave) { MascotName.save(draftName) }
+            Button(Strings.mascotNameSkip, role: .cancel) { nameAsked = true }
+        } message: {
+            Text(Strings.mascotNameMessage)
+        }
+        .task {
+            // Asked once, the first time the chat opens; the title renames it
+            // after. The opening line waits for the answer so it uses the name.
+            if !nameAsked {
+                askName()
+            } else if moods.chat().isEmpty {
+                await askMascot()
+            }
+        }
+        .onChange(of: naming) { _, open in
+            if !open, moods.chat().isEmpty { Task { await askMascot() } }
+        }
+    }
+
+    private func askName() {
+        draftName = savedName
+        naming = true
     }
 
     private var faceName: String { moods.today?.mood.imageName ?? Mood.calm.imageName }
@@ -132,7 +169,24 @@ private struct MascotChatInput: View {
         !isWaiting && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    @State private var dictation = SpeechDictation()
+    @State private var textBeforeDictation = ""
+    /// Off once the message is sent, so a late final transcript can't refill the box.
+    @State private var acceptsTranscript = false
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            row
+            DictationStatusLine(status: dictation.status)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(OneDay.surface)
+        .onChange(of: dictation.transcript) { _, spoken in applyTranscript(spoken) }
+        .onDisappear { dictation.stop() }
+    }
+
+    private var row: some View {
         HStack(spacing: 8) {
             TextField(Strings.moodChatPlaceholder, text: $text, axis: .vertical)
                 .lineLimit(1...3)
@@ -140,9 +194,10 @@ private struct MascotChatInput: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background(OneDay.surfaceSoft, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .onSubmit(onSend)
+                .onSubmit(send)
                 .accessibilityIdentifier("mascot-chat-input")
-            Button(action: onSend) {
+            MoodMicButton(isListening: dictation.isListening, action: toggleDictation)
+            Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(OneDay.onBrand)
@@ -154,8 +209,26 @@ private struct MascotChatInput: View {
             .opacity(canSend ? 1 : 0.4)
             .accessibilityLabel(Strings.moodChatSend)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(OneDay.surface)
+    }
+
+    private func send() {
+        acceptsTranscript = false
+        dictation.stop()
+        onSend()
+    }
+
+    private func toggleDictation() {
+        if !dictation.isListening {
+            textBeforeDictation = text
+            acceptsTranscript = true
+        }
+        Task { await dictation.toggle(language: AppLanguage.effective) }
+    }
+
+    private func applyTranscript(_ spoken: String) {
+        guard acceptsTranscript, !spoken.isEmpty else { return }
+        let base = textBeforeDictation
+        let joiner = base.isEmpty || AppLanguage.effective.resolved == .chinese ? "" : " "
+        text = base + joiner + spoken
     }
 }

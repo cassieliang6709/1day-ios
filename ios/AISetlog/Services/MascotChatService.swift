@@ -25,7 +25,9 @@ struct RemoteMascotChatService: MascotChatting {
     var deviceID: String = DeviceIdentity.installID
 
     func reply(mood: Mood, note: String, history: [MascotChatMessage], language: AppLanguage) async throws -> String {
-        let body = Self.requestBody(mood: mood, note: note, history: history, language: language, device: deviceID)
+        let body = Self.requestBody(
+            mood: mood, note: note, history: history, language: language, device: deviceID,
+            name: MascotName.current)
         var lastError = MascotChatError.unavailable
         for _ in 0..<Self.attempts {
             do {
@@ -60,13 +62,14 @@ struct RemoteMascotChatService: MascotChatting {
 
     /// The last messages only, matching the Worker's cap of 12.
     static func requestBody(mood: Mood, note: String, history: [MascotChatMessage],
-                            language: AppLanguage, device: String) -> Data? {
+                            language: AppLanguage, device: String, name: String? = nil) -> Data? {
         let messages = history.suffix(12).map { Request.Message(role: $0.role.rawValue, content: $0.content) }
         return try? JSONEncoder().encode(Request(
             mood: mood.rawValue,
             note: String(note.prefix(120)),
             language: language.resolved == .chinese ? "zh" : "en",
             device: device,
+            name: name,
             messages: Array(messages)))
     }
 
@@ -85,6 +88,8 @@ struct RemoteMascotChatService: MascotChatting {
         var note: String
         var language: String
         var device: String
+        /// The user's nickname for the mascot; left out when there isn't one.
+        var name: String?
         var messages: [Message]
     }
 

@@ -61,7 +61,7 @@ struct MoodNoteField: View {
     }
 }
 
-private struct MoodMicButton: View {
+struct MoodMicButton: View {
     let isListening: Bool
     let action: () -> Void
 
@@ -80,7 +80,7 @@ private struct MoodMicButton: View {
     }
 }
 
-private struct DictationStatusLine: View {
+struct DictationStatusLine: View {
     let status: SpeechDictation.Status
 
     var body: some View {

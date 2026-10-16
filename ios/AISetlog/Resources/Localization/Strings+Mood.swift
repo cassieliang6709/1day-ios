@@ -33,12 +33,42 @@ extension Strings {
     static var moodOpenSettings: String { mood("去设置", "Settings") }
 
     // Mascot chat
-    static var moodChatButton: String { mood("和小方块聊两句", "Chat with Little Cube") }
-    static var moodChatTitle: String { mood("小方块", "Little Cube") }
+    static var moodChatButton: String { mood("和\(mascotName)聊两句", "Chat with \(mascotName)") }
+    static var moodChatTitle: String { mascotName }
+    /// The name the user gave the mascot, else 小方块.
+    static var mascotName: String { MascotName.current ?? mood("小方块", "Little Cube") }
+    static var mascotNameQuestion: String { mood("给它起个名字吧", "Give it a name") }
+    static var mascotNameMessage: String {
+        mood("它会用这个名字和你聊天。之后点标题可以再改。", "It'll go by this name when you chat. Tap the title to change it later.")
+    }
+    static var mascotNamePlaceholder: String { mood("比如：豆豆", "e.g. Mochi") }
+    static var mascotNameSave: String { mood("就叫这个", "Save") }
+    static var mascotNameSkip: String { mood("先不起", "Not now") }
+    static var mascotRename: String { mood("改名字", "Rename") }
     static var moodChatPlaceholder: String { mood("说点什么…", "Say something…") }
     static var moodChatSend: String { mood("发送", "Send") }
     static var moodChatClose: String { mood("完成", "Done") }
     static var moodChatFull: String { mood("今天先聊到这儿，明天见。", "That's it for today. See you tomorrow.") }
     static var moodChatFallback: String { mood("我这会儿连不上网，不过我在听。等会儿再聊？", "I can't reach the internet right now, but I'm listening. Try again in a bit?") }
     static var moodChatPrivate: String { mood("聊天只存在这台手机上", "This chat stays on this phone") }
+}
+
+/// The mascot's nickname, kept on this phone. Nil until the user picks one.
+enum MascotName {
+    static let storageKey = "mascotName"
+    /// Set once the name has been asked, so skipping isn't asked again.
+    static let askedKey = "mascotNameAsked"
+    static let maxLength = 12
+
+    static var current: String? {
+        let name = UserDefaults.standard.string(forKey: storageKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    static func save(_ raw: String) {
+        let name = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxLength))
+        UserDefaults.standard.set(name, forKey: storageKey)
+        UserDefaults.standard.set(true, forKey: askedKey)
+    }
 }
