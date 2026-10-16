@@ -16,6 +16,9 @@ struct LibraryVlogSheet: View {
     @State private var phase: Phase = .rendering
     @State private var saveMessage: String?
     @State private var isSaving = false
+    /// The film remixed with music or voiceover; nil while it's the original.
+    @State private var mixedURL: URL?
+    @Environment(MoodStore.self) private var moodStore: MoodStore?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -71,8 +74,8 @@ struct LibraryVlogSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .done(let url):
-                    VlogPlayer(url: url, aspectRatio: layoutRatio)
-                        .id(url)
+                    VlogPlayer(url: mixedURL ?? url, aspectRatio: layoutRatio)
+                        .id(mixedURL ?? url)
                 case .failed:
                     VStack(spacing: 12) {
                         Text(Strings.vlogFailed)
@@ -87,8 +90,12 @@ struct LibraryVlogSheet: View {
             .frame(maxHeight: .infinity)
 
             if case .done(let url) = phase {
+                FilmSoundtrackPanel(
+                    baseURL: url,
+                    mood: order.first.flatMap { moodStore?.mood(on: $0.recordedAt)?.mood },
+                    mixedURL: $mixedURL)
                 Button {
-                    Task { await save(url) }
+                    Task { await save(mixedURL ?? url) }
                 } label: {
                     if isSaving { ProgressView().tint(.white) } else { Text(Strings.saveVlogToPhotos) }
                 }
@@ -108,6 +115,7 @@ struct LibraryVlogSheet: View {
     private func render() async {
         phase = .rendering
         saveMessage = nil
+        mixedURL = nil
         var options = VideoStitcher.Options()
         options.layout = .sequential
         options.aspect = nil

@@ -103,7 +103,7 @@ struct FilmView: View {
                     isSaved: isSaved,
                     saveMessage: saveMessage,
                     onOpenSettings: photosDenied ? openSystemSettings : nil,
-                    onSave: { Task { await saveToPhotos(exportURL) } },
+                    onSave: { url in Task { await saveToPhotos(url) } },
                     onAdjust: { showAdjust = true })
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else if let errorMessage {

@@ -19,11 +19,17 @@ struct FinalFilmTimeline: View {
     /// way out of it. Nil for "saved" and for an ordinary failure, neither of
     /// which iOS Settings can do anything about.
     var onOpenSettings: (() -> Void)?
-    let onSave: () -> Void
+    /// Saves the film as it sounds now: with its music and voiceover, if any.
+    let onSave: (URL) -> Void
     let onAdjust: () -> Void
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.roomPreviewMediaScope) private var previewMedia
+    @Environment(MoodStore.self) private var moodStore: MoodStore?
+    /// `filmURL` remixed by `FilmSoundtrackPanel`; nil while it's the original.
+    @State private var mixedURL: URL?
+
+    private var shownURL: URL { mixedURL ?? filmURL }
 
     private var schedule: StorySchedule { StorySchedule(challenge) }
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
@@ -36,6 +42,10 @@ struct FinalFilmTimeline: View {
             VStack(spacing: 22) {
                 heading
                 player
+                FilmSoundtrackPanel(
+                    baseURL: filmURL,
+                    mood: moodStore?.mood(on: challenge.startDate)?.mood,
+                    mixedURL: $mixedURL)
                 actions
                 facts
                 timeline
@@ -84,8 +94,10 @@ struct FinalFilmTimeline: View {
 
     private var player: some View {
         VlogPlayer(
-            url: filmURL,
+            url: shownURL,
             aspectRatio: challenge.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16)
+            // The player reads its URL once; a remix is a new player.
+            .id(shownURL)
             .frame(maxHeight: 460)
     }
 
@@ -103,10 +115,10 @@ struct FinalFilmTimeline: View {
                         : (isSaving ? Strings.saving : Strings.saveAction),
                     accent: .oneDayBrand,
                     isBusy: isSaving,
-                    action: onSave)
+                    action: { onSave(shownURL) })
                     .disabled(previewMedia != nil || isSaved)
 
-                ShareLink(item: filmURL) {
+                ShareLink(item: shownURL) {
                     FilmActionLabel(
                         icon: "paperplane.fill",
                         label: Strings.shareAction,
