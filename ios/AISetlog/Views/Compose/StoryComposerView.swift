@@ -21,6 +21,9 @@ struct StoryComposerView: View {
     /// this the ✕ did nothing and creating a story left the composer on screen
     /// behind the story it had just made.
     var onClose: (() -> Void)? = nil
+    /// Opens with 和朋友一起 already chosen — the 朋友 tab's invite button.
+    /// Only the starting value; the toggle on the settings page still works.
+    var startsWithFriends = false
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
@@ -33,12 +36,14 @@ struct StoryComposerView: View {
     /// the style can't be inferred from the template.
     @State private var selection = ComposerSelection.initial(
         oneDay: ChallengeTemplate.oneDayBuiltins)
-    @State private var clipLength: Challenge.ClipLength = .tiny
-    /// Set once the user picks a length, so the solo/room default stops
-    /// overriding it.
-    @State private var clipLengthChosen = false
-    @State private var orientation: Challenge.Orientation = .portrait
+    /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
+    /// and the camera you pick already decides the frame's shape.
+    private let clipLength: Challenge.ClipLength = .scene
+    private let orientation: Challenge.Orientation = .portrait
+    @State private var cameraStyle: CameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
+    /// 自己写 rather than AI 帮我写: the guided page opens on its first row.
+    @State private var startsWritingOwn = false
     @State private var title = ""
     /// Set once the user edits the name, so switching templates stops
     /// overwriting what they typed.
@@ -90,6 +95,10 @@ struct StoryComposerView: View {
                     customTemplates: store.customTemplates,
                     rack: $rack,
                     onBuildOwn: beginCustomPromptFlow,
+                    onWriteOwn: {
+                        startsWritingOwn = true
+                        showGuided = true
+                    },
                     onChoose: openSettings,
                     onEdit: { editingTemplate = $0 },
                     onDelete: deleteTemplate,
@@ -121,7 +130,7 @@ struct StoryComposerView: View {
         }
         .sheet(isPresented: $showSetup) { setupSheet }
         .sheet(isPresented: $showGuided) {
-            GuidedMomentsView(onDone: applyCustomDraft)
+            GuidedMomentsView(onDone: applyCustomDraft, startsWriting: startsWritingOwn)
         }
         .sheet(item: $editingTemplate) { template in
             BuildTemplateView(
@@ -131,7 +140,10 @@ struct StoryComposerView: View {
                 store.updateCustomTemplate(updated, coverImageData: coverImageData)
             }
         }
-        .onAppear(perform: syncTitleToTemplate)
+        .onAppear {
+            if startsWithFriends { withFriends = true }
+            syncTitleToTemplate()
+        }
         .onChange(of: selection.templateID) { _, newID in
             guard newID != nil else { return }
             isCustomPromptStory = false
@@ -145,10 +157,6 @@ struct StoryComposerView: View {
         // warning shouldn't outlive the choice that caused it.
         .onChange(of: withFriends) { _, together in
             errorText = nil
-            // Lengths are a ceiling now, and in a room a ceiling of 2s cuts
-            // everyone off; 5s leaves room without making the film drag.
-            guard !clipLengthChosen else { return }
-            clipLength = together ? .story : .tiny
         }
         .onChange(of: selection.mode) { _, _ in
             guard !isCustomPromptStory else { return }
@@ -195,10 +203,7 @@ struct StoryComposerView: View {
                 title: $title,
                 titleEdited: $titleEdited,
                 withFriends: $withFriends,
-                clipLength: Binding(
-                    get: { clipLength },
-                    set: { clipLength = $0; clipLengthChosen = true }),
-                orientation: $orientation,
+                cameraStyle: $cameraStyle,
                 moments: $moments,
                 isOneDay: mode == .oneDay,
                 isTimeOnly: selection.style == .timeOnly)
@@ -288,6 +293,7 @@ struct StoryComposerView: View {
                 mode: mode,
                 clipLength: clipLength,
                 orientation: orientation,
+                cameraStyle: cameraStyle,
                 templateName: selected?.identityKey,
                 momentTitles: resolvedMoments)
             // Closing the sheet first: dismissing the composer out from under
@@ -309,6 +315,7 @@ struct StoryComposerView: View {
                     mode: mode,
                     clipLength: clipLength,
                     orientation: orientation,
+                    cameraStyle: cameraStyle,
                     templateName: selected?.identityKey,
                     momentTitles: resolvedMoments)
                 showSetup = false
@@ -329,6 +336,7 @@ struct StoryComposerView: View {
     }
 
     private func beginCustomPromptFlow() {
+        startsWritingOwn = false
         showGuided = true
     }
 

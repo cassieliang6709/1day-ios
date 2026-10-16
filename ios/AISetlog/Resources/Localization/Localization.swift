@@ -266,6 +266,14 @@ enum Strings {
         return named(name).map { "\($0) commented on your shared film." }
             ?? "Someone commented on your shared film."
     }
+    static func roomPokeActivity(name: String?) -> String {
+        if lang == .chinese {
+            return named(name).map { "\($0) 拍了拍你，快来拍一段" } ?? "有人拍了拍你，快来拍一段"
+        }
+        return named(name).map { "\($0) poked you — come film something" }
+            ?? "Someone poked you — come film something"
+    }
+
     static func roomReactionActivity(name: String?) -> String {
         if lang == .chinese {
             return named(name).map { "\($0) 回应了你们的片段。" } ?? "有人回应了你们的片段。"
@@ -499,18 +507,88 @@ enum Strings {
         lang == .chinese ? "没有声音 · 去设置" : "No sound · Settings"
     }
     static var closeCamera: String { lang == .chinese ? "关闭相机" : "Close camera" }
-    /// The middle tab, and where the app opens: your stories.
+    /// The left tab, and where the app opens: every clip you have (1.5).
     ///
-    /// It was 计划 through 1.2, which named the *contents* of the screen rather
-    /// than what the screen is for — and left the app with no tab that read as
-    /// "my stuff". 计划 moved left onto the composer, which is the thing that
-    /// actually makes a plan.
+    /// 计划 through 1.2, 我的 in 1.3. 1.5 puts the camera in the middle of the
+    /// bar and makes this the archive of all your clips.
     static var surfacePlans: String { lang == .chinese ? "我的" : "Mine" }
-    /// The left tab: making a new story. Called 计划 because that is what it
-    /// produces; it was a wordless 36pt plus in the corner of the home screen
-    /// until 1.3.
-    static var surfaceCompose: String { lang == .chinese ? "计划" : "Plan" }
+    /// The right tab: only the stories filmed with other people, plus the two
+    /// ways a room starts — inviting, and a code arriving.
+    static var surfaceFriends: String { lang == .chinese ? "朋友" : "Friends" }
+    /// Making a new story. A tab in 1.3–1.4; from 1.5 the labelled button in
+    /// the stories header, so the bar's middle slot can be the camera.
+    static var surfaceCompose: String { lang == .chinese ? "新建" : "New" }
+    /// The round button in the middle of the bar. No visible label — it's the
+    /// accessibility name.
     static var surfaceCamera: String { lang == .chinese ? "拍摄" : "Camera" }
+    static var friendsEmptyTitle: String {
+        lang == .chinese ? "还没有和朋友一起拍的故事" : "No stories with friends yet"
+    }
+    static var friendsEmptyBody: String {
+        lang == .chinese
+            ? "建一个一起拍的故事，把邀请码发给朋友。大家拍的片段会剪进同一支片。"
+            : "Start a story together and send your friends the code. Everyone's clips go into one film."
+    }
+    static var inviteFriends: String { lang == .chinese ? "邀请朋友一起拍" : "Invite friends" }
+
+    // MARK: 我的 — every clip (1.5)
+    static var makeRoomVlog: String { lang == .chinese ? "生成 vlog" : "Make vlog" }
+    static var roomFeedFilm: String { lang == .chinese ? "拍一段" : "Film a clip" }
+    static var roomFeedEmpty: String {
+        lang == .chinese ? "还没有人拍。你来拍第一段。" : "Nobody's filmed yet. Be the first."
+    }
+    static var roomTileNotToday: String { lang == .chinese ? "今天还没拍" : "Not filmed today" }
+    static var roomTileNeverFilmed: String { lang == .chinese ? "还没拍过" : "Hasn't filmed yet" }
+    static func roomTileLastFilmed(daysAgo: Int) -> String {
+        lang == .chinese ? "\(daysAgo) 天没拍了" : "Last filmed \(daysAgo)d ago"
+    }
+    static var roomTileLike: String { lang == .chinese ? "点赞" : "Like" }
+    static var roomTileReply: String { lang == .chinese ? "回复" : "Reply" }
+    static var roomTilePoke: String { lang == .chinese ? "拍一拍" : "Poke" }
+    static var roomTilePoked: String { lang == .chinese ? "已拍" : "Poked" }
+    static var skinTitle: String { lang == .chinese ? "皮肤" : "Theme" }
+    static var skinCream: String { lang == .chinese ? "奶油黄" : "Cream" }
+    static var skinBlue: String { lang == .chinese ? "经典蓝" : "Classic blue" }
+    static var byTimeEntryTitle: String { lang == .chinese ? "按时间拍" : "Film by time" }
+    static var byTimeEntryLead: String {
+        lang == .chinese ? "不用想题目，看到什么拍什么，按时间排成一支片" : "No prompts. Film what happens; it lines up by time."
+    }
+    static var writeOwnTitle: String { lang == .chinese ? "自己写" : "Write your own" }
+    static var writeOwnLead: String { lang == .chinese ? "列出今天想拍的几件事" : "List what you want to film today" }
+    static var aiWriteTitle: String { lang == .chinese ? "AI 帮我写" : "Let AI write it" }
+    static var aiWriteLead: String { lang == .chinese ? "说一句今天干嘛，自动列好" : "Say what today is; get a shot list" }
+    static var moreTemplates: String { lang == .chinese ? "更多模板" : "More templates" }
+    static var saveToMine: String { lang == .chinese ? "存到我的" : "Save to Mine" }
+    static var libraryTitle: String { lang == .chinese ? "所有片段" : "All clips" }
+    static var filterAll: String { lang == .chinese ? "全部" : "All" }
+    static var filterMine: String { lang == .chinese ? "我拍的" : "Mine" }
+    static var filterFriends: String { lang == .chinese ? "朋友拍的" : "Friends'" }
+    static var libraryGrid: String { lang == .chinese ? "网格" : "Grid" }
+    static var libraryCalendar: String { lang == .chinese ? "日历" : "Calendar" }
+    static var librarySelect: String { lang == .chinese ? "选择" : "Select" }
+    static var libraryToday: String { lang == .chinese ? "今天" : "Today" }
+    static var libraryYesterday: String { lang == .chinese ? "昨天" : "Yesterday" }
+    static func libraryClipCount(_ n: Int) -> String { lang == .chinese ? "\(n) 段" : (n == 1 ? "1 clip" : "\(n) clips") }
+    static var libraryAllDays: String { lang == .chinese ? "看全部日期" : "All dates" }
+    static var libraryEmpty: String {
+        lang == .chinese ? "还没有片段。点下面的圆按钮，拍第一段。" : "No clips yet. Tap the round button below to film one."
+    }
+    static var libraryNothingHere: String {
+        lang == .chinese ? "这里没有片段。" : "Nothing here."
+    }
+    static var libraryUnfiled: String { lang == .chinese ? "未归档" : "Unfiled" }
+    static func makeVlog(_ count: Int) -> String {
+        lang == .chinese ? "用 \(count) 段生成 vlog" : "Make a vlog from \(count)"
+    }
+    static var pickClipsHint: String { lang == .chinese ? "点片段来选" : "Tap clips to pick them" }
+    static var vlogTitle: String { lang == .chinese ? "我的 vlog" : "My vlog" }
+    static var vlogMaking: String { lang == .chinese ? "正在生成 vlog…" : "Making your vlog…" }
+    static var vlogFailed: String {
+        lang == .chinese ? "生成失败，再试一次。" : "Couldn't make the vlog. Try again."
+    }
+    static var vlogRetry: String { lang == .chinese ? "重新生成" : "Try again" }
+    static var saveVlogToPhotos: String { lang == .chinese ? "存到相册" : "Save to Photos" }
+    static var vlogShape: String { lang == .chinese ? "画幅" : "Shape" }
     static var freeformSlot: String { lang == .chinese ? "自由拍摄" : "Free-form" }
     static var fileToPlan: String { lang == .chinese ? "放进故事" : "Add to a story" }
     static var fileThisClipTo: String { lang == .chinese ? "把这段视频存入…" : "File this clip to…" }
@@ -558,6 +636,16 @@ enum Strings {
     static var orientationSquare: String { lang == .chinese ? "正方形" : "Square" }
     static var switchOrientation: String { lang == .chinese ? "切换画幅" : "Switch frame" }
     static var flipCamera: String { lang == .chinese ? "切换前后摄像头" : "Flip camera" }
+    static var dualCamera: String { lang == .chinese ? "前后同时拍" : "Front and back together" }
+    static var cameraPicker: String { lang == .chinese ? "换相机" : "Camera" }
+    static var cameraStandard: String { lang == .chinese ? "标准" : "Standard" }
+    static var cameraCamcorder: String { lang == .chinese ? "DV 机" : "Camcorder" }
+    static var cameraFilm: String { lang == .chinese ? "胶片机" : "Film camera" }
+    static var cameraInstant: String { lang == .chinese ? "拍立得" : "Instant" }
+    static var pickCamera: String { lang == .chinese ? "用哪台相机拍" : "Which camera" }
+    static var cameraCamcorderCaption: String { lang == .chinese ? "3:4 · 冷色 · 时间码" : "3:4 · cool · timecode" }
+    static var cameraFilmCaption: String { lang == .chinese ? "2:3 · 暖色 · 橙色日期" : "2:3 · warm · orange date" }
+    static var cameraInstantCaption: String { lang == .chinese ? "3:4 · 淡色 · 白边相纸" : "3:4 · faded · white border" }
 
     // The zoom values themselves ("0.5x") are formatted by `CameraZoom.label`
     // and are the same in both languages, so they are not copy.
@@ -652,8 +740,8 @@ enum Strings {
     static func noStoryOfThisFrameYet(_ orientation: Challenge.Orientation) -> String {
         let kind = orientationName(orientation)
         return lang == .chinese
-            ? "归档是把这段放进一个同画幅的故事里。你还没有\(kind)的故事——在「\(surfaceCompose)」里新建一个，这段就能归档了。"
-            : "Filing puts the clip into a story shot the same way round, and you don't have a \(kind) one yet. Make one in \(surfaceCompose) and this clip can go in."
+            ? "归档是把这段放进一个同画幅的故事里。你还没有\(kind)的故事——在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，这段就能归档了。"
+            : "Filing puts the clip into a story shot the same way round, and you don't have a \(kind) one yet. Tap + \(surfaceCompose) on \(surfacePlans) to make one, and this clip can go in."
     }
     static func everyStoryOfThisFrameIsFull(_ orientation: Challenge.Orientation) -> String {
         let kind = orientationName(orientation)
@@ -897,6 +985,18 @@ enum Strings {
         lang == .chinese
             ? "连不上 iCloud，检查一下网络再试。"
             : "Can't reach iCloud. Check your connection and try again."
+    }
+    /// The last line of defence: what an unrecognised CloudKit code says
+    /// instead of "未能完成操作。（CKErrorDomain 错误 4。）".
+    static var errorRoomCreateFailed: String {
+        lang == .chinese
+            ? "房间没建起来，过一会儿再试一次。也可以先选自己来。"
+            : "Couldn't create the room. Try again in a moment, or record on your own."
+    }
+    static var errorRoomJoinFailed: String {
+        lang == .chinese
+            ? "进不去这个房间，过一会儿再试一次。"
+            : "Couldn't join that room. Try again in a moment."
     }
 
     // MARK: Plans home

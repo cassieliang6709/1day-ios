@@ -9,11 +9,16 @@ import Observation
 final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unchecked Sendable {
     enum State { case idle, ready, recording, unavailable }
 
-    let session = AVCaptureSession()
+    /// A multi-cam session on phones that have one, so the front camera can
+    /// be added next to the back one without rebuilding the session. Single
+    /// camera filming goes through it exactly as through a plain session.
+    let session: AVCaptureSession = AVCaptureMultiCamSession.isMultiCamSupported
+        ? AVCaptureMultiCamSession()
+        : AVCaptureSession()
     private static let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
     private let movieOutput = AVCaptureMovieFileOutput()
     private var videoInput: AVCaptureDeviceInput?
-    private var position: AVCaptureDevice.Position = .front
+    private var position: AVCaptureDevice.Position = .back
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
@@ -22,6 +27,34 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private var captureAngleObservation: NSKeyValueObservation?
     private var previewAngleObservation: NSKeyValueObservation?
 
+    // MARK: Dual camera (picture in picture)
+    //
+    // The second camera gets its own input, movie output and preview layer,
+    // wired with explicit connections so nothing auto-connects across the two.
+    // Each take writes two files; `PiPComposer` folds them into the one clip
+    // everything after the camera already expects.
+    private let secondaryOutput = AVCaptureMovieFileOutput()
+    private var secondaryInput: AVCaptureDeviceInput?
+    private var secondaryConnections: [AVCaptureConnection] = []
+    private weak var secondaryPreviewLayer: AVCaptureVideoPreviewLayer?
+    private var secondaryCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var secondaryAngleObservation: NSKeyValueObservation?
+
+    /// Both cameras are filming: the main camera full frame, the other one in
+    /// the corner inset.
+    private(set) var isDualCamera = false
+    /// In dual mode, true when the secondary camera is the big picture. Flip
+    /// toggles this instead of swapping inputs.
+    private(set) var isSwapped = false
+    /// Files of the take in flight, collected as each output finishes.
+    private var pendingPrimary: URL??
+    private var pendingSecondary: URL??
+
+    /// Whether this phone can film both cameras at once.
+    var supportsDualCamera: Bool {
+        session is AVCaptureMultiCamSession && !Self.isSimulated
+    }
+
     private var isConfigured = false
     /// Recording orientation — locks both the output file and the preview to
     /// upright portrait or landscape. The UI never rotates (the app stays
@@ -29,6 +62,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     var orientation: Challenge.Orientation = .portrait {
         didSet { applyOrientation() }
     }
+    /// The camera picked in the viewfinder. Baked into each take as it lands —
+    /// see `CameraStyleBaker`.
+    var cameraStyle: CameraStyle = .standard
 
     private(set) var state: State = .idle
     private(set) var clipURL: URL?
@@ -95,7 +131,29 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         return discovery.devices.first
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    /// A camera for screenshots on the simulator, which has none: launch with
+    /// `-simulatedCamera YES`. The preview is `SimulatedCameraPreview` and a
+    /// take is a `DemoClipFactory` clip, delivered through the same state
+    /// changes a real take goes through. Opt-in, so UI tests still get the
+    /// 相机不可用 screen and its 示例片段 button.
+    static var isSimulated: Bool {
+        UserDefaults.standard.bool(forKey: "simulatedCamera")
+    }
+    private var simulatedTake: Task<Void, Never>?
+    private var simulatedSeconds: Double = 0
+    #else
+    static var isSimulated: Bool { false }
+    #endif
+
     func configure() async {
+        #if DEBUG && targetEnvironment(simulator)
+        if Self.isSimulated {
+            hasAudioAccess = true
+            state = .ready
+            return
+        }
+        #endif
         guard await AVCaptureDevice.requestAccess(for: .video) else {
             state = .unavailable
             return
@@ -116,10 +174,14 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 }
 
                 session.beginConfiguration()
-                session.sessionPreset = .high
+                // A multi-cam session takes formats per device, not a preset.
+                if session.canSetSessionPreset(.high) {
+                    session.sessionPreset = .high
+                }
 
                 guard
                     let camera = camera(for: position),
+                    Self.prepare(camera, for: session),
                     let input = try? AVCaptureDeviceInput(device: camera),
                     session.canAddInput(input),
                     session.canAddOutput(movieOutput)
@@ -275,6 +337,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
            connection.isVideoRotationAngleSupported(previewAngle) {
             connection.videoRotationAngle = previewAngle
         }
+
+        guard let secondaryCoordinator else { return }
+        let secondaryCapture = secondaryCoordinator.videoRotationAngleForHorizonLevelCapture
+        let secondaryPreview = secondaryCoordinator.videoRotationAngleForHorizonLevelPreview
+        for connection in secondaryConnections {
+            let angle = connection.videoPreviewLayer == nil ? secondaryCapture : secondaryPreview
+            if connection.isVideoRotationAngleSupported(angle) {
+                connection.videoRotationAngle = angle
+            }
+        }
     }
 
     /// The angle to put on a connection.
@@ -293,10 +365,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
     func flipCamera() {
         guard state == .ready else { return }
+        // Both cameras are already on: flipping means trading places.
+        if isDualCamera {
+            isSwapped.toggle()
+            return
+        }
         let newPosition: AVCaptureDevice.Position = position == .front ? .back : .front
         session.beginConfiguration()
         if let videoInput { session.removeInput(videoInput) }
         if let camera = camera(for: newPosition),
+           Self.prepare(camera, for: session),
            let input = try? AVCaptureDeviceInput(device: camera),
            session.canAddInput(input) {
             session.addInput(input)
@@ -316,6 +394,18 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
     func startRecording(seconds: Double) {
         guard state == .ready else { return }
+        #if DEBUG && targetEnvironment(simulator)
+        if Self.isSimulated {
+            recordedAt = .now
+            state = .recording
+            simulatedSeconds = seconds
+            simulatedTake = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(seconds))
+                await self?.finishSimulatedTake()
+            }
+            return
+        }
+        #endif
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("clip_\(UUID().uuidString).mov")
@@ -338,7 +428,19 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             movieOutput.maxRecordedDuration = CMTime(
                 seconds: seconds,
                 preferredTimescale: 600)
+            let dual = !secondaryConnections.isEmpty
+            Task { @MainActor in
+                self.pendingPrimary = nil
+                self.pendingSecondary = dual ? nil : .some(nil)
+            }
             movieOutput.startRecording(to: url, recordingDelegate: self)
+            if dual {
+                secondaryOutput.maxRecordedDuration = movieOutput.maxRecordedDuration
+                secondaryOutput.startRecording(
+                    to: FileManager.default.temporaryDirectory
+                        .appendingPathComponent("clip_inset_\(UUID().uuidString).mov"),
+                    recordingDelegate: self)
+            }
         }
     }
 
@@ -346,10 +448,42 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     /// exactly as if the max-duration limit had been hit.
     func stopRecording() {
         guard state == .recording else { return }
-        Self.sessionQueue.async { [movieOutput] in
+        #if DEBUG && targetEnvironment(simulator)
+        if Self.isSimulated {
+            simulatedTake?.cancel()
+            Task { @MainActor in await finishSimulatedTake() }
+            return
+        }
+        #endif
+        Self.sessionQueue.async { [movieOutput, secondaryOutput] in
             if movieOutput.isRecording { movieOutput.stopRecording() }
+            if secondaryOutput.isRecording { secondaryOutput.stopRecording() }
         }
     }
+
+    #if DEBUG && targetEnvironment(simulator)
+    /// What the movie output's delegate does at the end of a real take: the
+    /// clip lands, then `.ready`. Length is how long the shutter was held.
+    @MainActor
+    private func finishSimulatedTake() async {
+        guard state == .recording, let started = recordedAt else { return }
+        simulatedTake = nil
+        let held = min(max(Date.now.timeIntervalSince(started), 1), simulatedSeconds)
+        let url = await DemoClipFactory.makeClip(
+            moment: Int.random(in: 1...4),
+            label: "Simulator",
+            author: nil,
+            seconds: held,
+            orientation: orientation)
+        if let url {
+            clipURL = await CameraStyleBaker.bake(
+                url, style: cameraStyle, orientation: orientation, recordedAt: started)
+        } else {
+            clipURL = nil
+        }
+        state = .ready
+    }
+    #endif
 
     #if DEBUG
     /// Drop a generated clip in as if it had just been filmed, so the review
@@ -399,9 +533,23 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         let finishedSuccessfully = error == nil
             || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
 
+        let isPrimary = output === movieOutput
+
         Task { @MainActor in
-            guard finishedSuccessfully else {
+            let file: URL? = finishedSuccessfully ? outputFileURL : nil
+            if !finishedSuccessfully {
                 try? FileManager.default.removeItem(at: outputFileURL)
+            }
+            if isPrimary { self.pendingPrimary = .some(file) } else { self.pendingSecondary = .some(file) }
+            // Wait for both outputs of a dual take before doing anything.
+            guard case .some(let primary) = self.pendingPrimary,
+                  case .some(let secondary) = self.pendingSecondary
+            else { return }
+            self.pendingPrimary = nil
+            self.pendingSecondary = nil
+
+            guard let primary else {
+                if let secondary { try? FileManager.default.removeItem(at: secondary) }
                 self.recordedAt = nil
                 self.state = .ready
                 self.lastFailure = .now
@@ -417,12 +565,366 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             // clip yet puts the live preview and a live shutter back for the
             // half second the export takes, which invites a second take over
             // the top of the one being written.
+            //
+            // A dual take that cannot be composed falls back to the main
+            // camera's file alone: still the take, just without the inset.
+            if let secondary,
+               let composed = await PiPComposer.compose(
+                   primary: primary,
+                   secondary: secondary,
+                   secondaryIsMain: self.isSwapped,
+                   square: self.orientation.cropsAfterRecording) {
+                self.clipURL = await CameraStyleBaker.bake(
+                    composed, style: self.cameraStyle,
+                    orientation: self.orientation, recordedAt: self.recordedAt)
+                self.state = .ready
+                return
+            }
+            if let secondary { try? FileManager.default.removeItem(at: secondary) }
             let kept = self.orientation.cropsAfterRecording
-                ? await SquareCrop.copy(of: outputFileURL)
-                : outputFileURL
-            self.clipURL = kept
+                ? await SquareCrop.copy(of: primary)
+                : primary
+            self.clipURL = await CameraStyleBaker.bake(
+                kept, style: self.cameraStyle,
+                    orientation: self.orientation, recordedAt: self.recordedAt)
             self.state = .ready
         }
+    }
+
+    // MARK: - Dual camera
+
+    /// Puts the device on a 1080p, 30 fps format a multi-cam session can run.
+    /// A plain session uses its `.high` preset instead, so this does nothing
+    /// there. Returns false only when the device cannot be configured at all.
+    static func prepare(_ device: AVCaptureDevice, for session: AVCaptureSession) -> Bool {
+        guard session is AVCaptureMultiCamSession else { return true }
+        let formats = device.formats.filter { format in
+            let size = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            return format.isMultiCamSupported
+                && size.width <= 1920 && size.height <= 1080
+                && format.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 30 }
+        }
+        guard let best = formats.max(by: {
+            CMVideoFormatDescriptionGetDimensions($0.formatDescription).width
+                < CMVideoFormatDescriptionGetDimensions($1.formatDescription).width
+        }) else { return true }
+        do {
+            try device.lockForConfiguration()
+            device.activeFormat = best
+            device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
+            device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Turns the second camera on or off. Ignored mid-take and on phones that
+    /// cannot run two cameras; if the hardware refuses the pair, the camera
+    /// stays single and `isDualCamera` stays false.
+    func setDualCamera(_ on: Bool) {
+        guard state == .ready, clipURL == nil, supportsDualCamera, on != isDualCamera else { return }
+        Self.sessionQueue.async { [self] in
+            let ok = on ? addSecondaryCamera() : { removeSecondaryCamera(); return true }()
+            Task { @MainActor in
+                self.isDualCamera = on && ok
+                if !self.isDualCamera { self.isSwapped = false }
+                self.applyOrientation()
+                self.refreshZoom()
+            }
+        }
+    }
+
+    /// Called by the inset's preview view once its layer exists.
+    func attachSecondaryPreview(_ layer: AVCaptureVideoPreviewLayer) {
+        Self.sessionQueue.async { [self] in
+            secondaryPreviewLayer = layer
+            guard let secondaryInput, let port = Self.videoPort(of: secondaryInput),
+                  !secondaryConnections.contains(where: { $0.videoPreviewLayer === layer })
+            else { return }
+            let connection = AVCaptureConnection(inputPort: port, videoPreviewLayer: layer)
+            session.beginConfiguration()
+            if session.canAddConnection(connection) {
+                session.addConnection(connection)
+                secondaryConnections.append(connection)
+            }
+            session.commitConfiguration()
+            Task { @MainActor in self.applyAngles() }
+        }
+    }
+
+    private static func videoPort(of input: AVCaptureDeviceInput) -> AVCaptureInput.Port? {
+        input.ports(
+            for: .video,
+            sourceDeviceType: input.device.deviceType,
+            sourceDevicePosition: input.device.position
+        ).first
+    }
+
+    /// The opposite camera, plus — when the phone cannot pair it with the
+    /// current back lens set — a back lens it can pair with. Runs on the
+    /// session queue.
+    private func addSecondaryCamera() -> Bool {
+        guard let multi = session as? AVCaptureMultiCamSession,
+              let primary = videoInput else { return false }
+        let pairs = AVCaptureDevice.DiscoverySession(
+            deviceTypes: Self.backCameraTypes + Self.frontCameraTypes,
+            mediaType: .video,
+            position: .unspecified
+        ).supportedMultiCamDeviceSets
+
+        // Keep the current lens if it pairs; otherwise step down the back
+        // lens list until one does.
+        let backTypes = position == .back
+            ? [primary.device.deviceType] + Self.backCameraTypes
+            : Self.backCameraTypes
+        var chosen: (main: AVCaptureDevice, other: AVCaptureDevice)?
+        for type in backTypes {
+            guard let back = AVCaptureDevice.default(type, for: .video, position: .back),
+                  let front = AVCaptureDevice.default(
+                      .builtInWideAngleCamera, for: .video, position: .front),
+                  pairs.contains(where: { $0.contains(back) && $0.contains(front) })
+            else { continue }
+            chosen = position == .back ? (back, front) : (front, back)
+            break
+        }
+        guard let chosen, Self.prepare(chosen.main, for: session),
+              Self.prepare(chosen.other, for: session),
+              let otherInput = try? AVCaptureDeviceInput(device: chosen.other)
+        else { return false }
+
+        session.beginConfiguration()
+        if chosen.main != primary.device {
+            session.removeInput(primary)
+            if let input = try? AVCaptureDeviceInput(device: chosen.main),
+               session.canAddInput(input) {
+                session.addInput(input)
+                videoInput = input
+            } else {
+                session.addInput(primary)
+            }
+        }
+        guard session.canAddInput(otherInput), session.canAddOutput(secondaryOutput) else {
+            session.commitConfiguration()
+            return false
+        }
+        session.addInputWithNoConnections(otherInput)
+        session.addOutputWithNoConnections(secondaryOutput)
+        var added: [AVCaptureConnection] = []
+        if let port = Self.videoPort(of: otherInput) {
+            let toFile = AVCaptureConnection(inputPorts: [port], output: secondaryOutput)
+            if session.canAddConnection(toFile) {
+                session.addConnection(toFile)
+                added.append(toFile)
+            }
+            if let layer = secondaryPreviewLayer {
+                let toPreview = AVCaptureConnection(inputPort: port, videoPreviewLayer: layer)
+                if session.canAddConnection(toPreview) {
+                    session.addConnection(toPreview)
+                    added.append(toPreview)
+                }
+            }
+        }
+        session.commitConfiguration()
+
+        // Two cameras at 1080p can still be over the phone's budget.
+        guard !added.isEmpty, multi.hardwareCost <= 1, multi.systemPressureCost <= 1 else {
+            secondaryInput = otherInput
+            secondaryConnections = added
+            removeSecondaryCamera()
+            return false
+        }
+        secondaryInput = otherInput
+        secondaryConnections = added
+        Task { @MainActor in self.makeSecondaryCoordinator() }
+        return true
+    }
+
+    /// Runs on the session queue.
+    private func removeSecondaryCamera() {
+        session.beginConfiguration()
+        for connection in secondaryConnections { session.removeConnection(connection) }
+        secondaryConnections = []
+        if let secondaryInput { session.removeInput(secondaryInput) }
+        secondaryInput = nil
+        if session.outputs.contains(secondaryOutput) { session.removeOutput(secondaryOutput) }
+        // Back to the widest back lens, so 0.5x is there again.
+        if position == .back, let current = videoInput,
+           let widest = camera(for: .back), widest != current.device,
+           Self.prepare(widest, for: session) {
+            session.removeInput(current)
+            if let input = try? AVCaptureDeviceInput(device: widest), session.canAddInput(input) {
+                session.addInput(input)
+                videoInput = input
+            } else {
+                session.addInput(current)
+            }
+        }
+        session.commitConfiguration()
+        Task { @MainActor in
+            self.secondaryCoordinator = nil
+            self.secondaryAngleObservation = nil
+        }
+    }
+
+    private func makeSecondaryCoordinator() {
+        guard let device = secondaryInput?.device else { return }
+        let coordinator = AVCaptureDevice.RotationCoordinator(
+            device: device, previewLayer: secondaryPreviewLayer)
+        secondaryCoordinator = coordinator
+        secondaryAngleObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture, options: [.new]
+        ) { [weak self] _, _ in
+            Task { @MainActor in self?.applyAngles() }
+        }
+        applyAngles()
+    }
+}
+
+/// Folds a dual-camera take — two files, one per camera — into one clip: the
+/// main camera fills the frame, the other sits in the top-right corner.
+///
+/// Same reasoning as `SquareCrop`: done once, straight after the take, so
+/// every reader of `clipURL` still sees one ordinary file. The audio comes
+/// from the primary file, which is the only one with a microphone connected.
+enum PiPComposer {
+    /// Inset width as a share of the canvas width, and its margin.
+    static let insetShare: CGFloat = 0.3
+    static let marginShare: CGFloat = 0.04
+
+    /// The composed clip, or nil on any failure (inputs left in place for
+    /// the caller's fallback). Deletes both inputs on success.
+    static func compose(
+        primary: URL, secondary: URL, secondaryIsMain: Bool, square: Bool
+    ) async -> URL? {
+        guard let url = try? await build(
+            main: secondaryIsMain ? secondary : primary,
+            inset: secondaryIsMain ? primary : secondary,
+            audio: primary,
+            square: square)
+        else { return nil }
+        try? FileManager.default.removeItem(at: primary)
+        try? FileManager.default.removeItem(at: secondary)
+        return url
+    }
+
+    /// Upright frame size, and the transform that puts the stored frame
+    /// upright at the origin.
+    private static func upright(_ track: AVAssetTrack) async throws -> (CGSize, CGAffineTransform) {
+        let natural = try await track.load(.naturalSize)
+        let transform = try await track.load(.preferredTransform)
+        let rect = CGRect(origin: .zero, size: natural).applying(transform)
+        return (
+            CGSize(width: abs(rect.width), height: abs(rect.height)),
+            transform.concatenating(CGAffineTransform(translationX: -rect.minX, y: -rect.minY)))
+    }
+
+    private static func even(_ value: CGFloat) -> CGFloat { (value / 2).rounded(.down) * 2 }
+
+    private static func build(main: URL, inset: URL, audio: URL, square: Bool) async throws -> URL {
+        let mainAsset = AVURLAsset(url: main)
+        let insetAsset = AVURLAsset(url: inset)
+        let audioAsset = AVURLAsset(url: audio)
+        guard let mainTrack = try await mainAsset.loadTracks(withMediaType: .video).first,
+              let insetTrack = try await insetAsset.loadTracks(withMediaType: .video).first
+        else { throw SquareCrop.CropError.noVideoTrack }
+
+        let duration = CMTimeMinimum(
+            try await mainAsset.load(.duration), try await insetAsset.load(.duration))
+        let range = CMTimeRange(start: .zero, duration: duration)
+
+        let composition = AVMutableComposition()
+        guard let mainOut = composition.addMutableTrack(
+                  withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let insetOut = composition.addMutableTrack(
+                  withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else { throw SquareCrop.CropError.sessionUnavailable }
+        try mainOut.insertTimeRange(range, of: mainTrack, at: .zero)
+        try insetOut.insertTimeRange(range, of: insetTrack, at: .zero)
+        if let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first,
+           let audioOut = composition.addMutableTrack(
+               withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try audioOut.insertTimeRange(range, of: audioTrack, at: .zero)
+        }
+
+        let (mainSize, mainUpright) = try await upright(mainTrack)
+        let (insetSize, insetUpright) = try await upright(insetTrack)
+        guard mainSize.width > 0, mainSize.height > 0, insetSize.width > 0, insetSize.height > 0
+        else { throw SquareCrop.CropError.noVideoTrack }
+
+        let canvas: CGSize = {
+            guard square else { return CGSize(width: even(mainSize.width), height: even(mainSize.height)) }
+            let side = even(min(mainSize.width, mainSize.height))
+            return CGSize(width: side, height: side)
+        }()
+
+        // Main: aspect-fill the canvas, centred.
+        let mainScale = max(canvas.width / mainSize.width, canvas.height / mainSize.height)
+        let mainLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: mainOut)
+        mainLayer.setTransform(
+            mainUpright
+                .concatenating(CGAffineTransform(scaleX: mainScale, y: mainScale))
+                .concatenating(CGAffineTransform(
+                    translationX: (canvas.width - mainSize.width * mainScale) / 2,
+                    y: (canvas.height - mainSize.height * mainScale) / 2)),
+            at: .zero)
+
+        // Inset: same shape as the canvas, top-right, aspect-filled and
+        // cropped to its box so it does not spill over the main picture.
+        let box = insetRect(in: canvas)
+        let insetScale = max(box.width / insetSize.width, box.height / insetSize.height)
+        let visible = CGRect(
+            x: (insetSize.width - box.width / insetScale) / 2,
+            y: (insetSize.height - box.height / insetScale) / 2,
+            width: box.width / insetScale,
+            height: box.height / insetScale)
+        let insetLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: insetOut)
+        insetLayer.setCropRectangle(
+            visible.applying(insetUpright.inverted()).standardized, at: .zero)
+        insetLayer.setTransform(
+            insetUpright
+                .concatenating(CGAffineTransform(translationX: -visible.minX, y: -visible.minY))
+                .concatenating(CGAffineTransform(scaleX: insetScale, y: insetScale))
+                .concatenating(CGAffineTransform(translationX: box.minX, y: box.minY)),
+            at: .zero)
+
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = range
+        // First is on top.
+        instruction.layerInstructions = [insetLayer, mainLayer]
+
+        let video = AVMutableVideoComposition()
+        video.renderSize = canvas
+        video.frameDuration = CMTime(value: 1, timescale: 30)
+        video.instructions = [instruction]
+
+        guard let export = AVAssetExportSession(
+            asset: composition, presetName: AVAssetExportPresetHighestQuality)
+        else { throw SquareCrop.CropError.sessionUnavailable }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pip-\(UUID().uuidString).mov")
+        export.outputURL = output
+        export.outputFileType = .mov
+        export.videoComposition = video
+
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            export.exportAsynchronously { cont.resume() }
+        }
+        guard export.status == .completed else {
+            try? FileManager.default.removeItem(at: output)
+            throw SquareCrop.CropError.failed(export.error?.localizedDescription ?? "unknown")
+        }
+        return output
+    }
+
+    /// Where the inset sits on a canvas — shared with the live preview so
+    /// what is framed is what gets filmed.
+    static func insetRect(in canvas: CGSize) -> CGRect {
+        let width = even(canvas.width * insetShare)
+        let height = even(width * canvas.height / canvas.width)
+        let margin = (canvas.width * marginShare).rounded()
+        return CGRect(x: canvas.width - margin - width, y: margin, width: width, height: height)
     }
 }
 
@@ -546,4 +1048,21 @@ struct CameraPreview: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {}
+}
+
+/// The inset's live picture. A no-connection layer: the recorder wires it to
+/// the second camera itself, so it never picks up the main camera.
+struct SecondaryCameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+    var onLayer: (AVCaptureVideoPreviewLayer) -> Void = { _ in }
+
+    func makeUIView(context: Context) -> CameraPreview.PreviewView {
+        let view = CameraPreview.PreviewView()
+        view.previewLayer.setSessionWithNoConnection(session)
+        view.previewLayer.videoGravity = .resizeAspectFill
+        onLayer(view.previewLayer)
+        return view
+    }
+
+    func updateUIView(_ uiView: CameraPreview.PreviewView, context: Context) {}
 }

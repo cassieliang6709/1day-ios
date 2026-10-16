@@ -87,6 +87,11 @@ struct CameraShell<Content: View>: View {
     var showsPrompt = true
     /// nil = the classic portrait frame; set for landscape challenges.
     var aspectRatio: CGFloat? = nil
+    /// The camera picked in the viewfinder; draws its frame over the picture.
+    var cameraStyle: CameraStyle = .standard
+    /// Off when a camera prints its own date — on the live picture, or already
+    /// baked into the take under review.
+    var showsDate = true
     @ViewBuilder var content: Content
 
     private var tint: Color { Identity.tint(for: name) }
@@ -97,6 +102,7 @@ struct CameraShell<Content: View>: View {
                 content
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
+                CameraStyleOverlay(style: cameraStyle, date: timestamp)
                 MomentStampOverlay(
                     momentTitle: momentTitle,
                     day: day,
@@ -105,7 +111,8 @@ struct CameraShell<Content: View>: View {
                     timestamp: timestamp,
                     overlayText: overlayText,
                     clipSeconds: clipSeconds,
-                    showsPrompt: showsPrompt
+                    showsPrompt: showsPrompt,
+                    showsDate: showsDate && cameraStyle == .standard
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -156,6 +163,8 @@ struct MomentStampOverlay: View {
     var overlayText: String?
     var clipSeconds: Double = 2
     var showsPrompt = true
+    /// Off under a camera that prints its own date (`CameraStyle`).
+    var showsDate = true
 
     /// nil when there's no honest indicator to draw — see `MomentProgress`.
     private var progress: MomentProgress? {
@@ -202,11 +211,14 @@ struct MomentStampOverlay: View {
             let edgeInset = max(16, 28 * scale)
 
             ZStack {
+                // There for the white date; under a camera's own frame it only
+                // greyed the frame, which the film doesn't do.
                 LinearGradient(
                     colors: [.black.opacity(0.22), .clear, .black.opacity(0.34)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .opacity(showsDate ? 1 : 0)
 
                 VStack {
                     // Top-right, because that's the corner the film's own
@@ -229,6 +241,7 @@ struct MomentStampOverlay: View {
                         .foregroundStyle(.white)
                     }
                     .padding(edgeInset)
+                    .opacity(showsDate ? 1 : 0)
 
                     Spacer(minLength: 8 * scale)
 
@@ -596,7 +609,7 @@ struct CaptionEditor: View {
         HStack(spacing: 10) {
             Image(systemName: "textformat")
                 .font(.headline.bold())
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
                 .frame(width: 30, height: 30)
                 .background(Color.oneDayBrand.opacity(0.12), in: Circle())
 
@@ -642,3 +655,75 @@ struct CaptionEditor: View {
         .overlay(Capsule().stroke(Color.oneDayBrand.opacity(0.16), lineWidth: 1))
     }
 }
+
+/// The viewfinder in dual-camera mode: one picture full frame, the other in
+/// the top-right box from `PiPComposer.insetRect`, so the preview matches the
+/// composed file. `swapped` trades which camera is which without recreating
+/// either preview view. With `showsInset` off, only the primary is drawn.
+struct DualCameraStage<Primary: View, Secondary: View>: View {
+    var showsInset: Bool
+    var swapped: Bool
+    @ViewBuilder var primary: Primary
+    @ViewBuilder var secondary: Secondary
+
+    var body: some View {
+        GeometryReader { proxy in
+            let full = CGRect(origin: .zero, size: proxy.size)
+            let box = PiPComposer.insetRect(in: proxy.size)
+            ZStack(alignment: .topLeading) {
+                place(primary, in: showsInset && swapped ? box : full)
+                    .zIndex(showsInset && swapped ? 1 : 0)
+                if showsInset {
+                    place(secondary, in: swapped ? full : box)
+                        .zIndex(swapped ? 0 : 1)
+                }
+            }
+        }
+    }
+
+    private func place(_ view: some View, in rect: CGRect) -> some View {
+        view
+            .frame(width: rect.width, height: rect.height)
+            .clipped()
+            .offset(x: rect.minX, y: rect.minY)
+    }
+}
+
+#if DEBUG && targetEnvironment(simulator)
+/// What the viewfinder shows under `-simulatedCamera YES`: a moving scene, so
+/// screenshots of the camera have something in the frame and a still frame is
+/// distinguishable from a frozen one. See `ClipRecorder.isSimulated`.
+struct SimulatedCameraPreview: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            GeometryReader { proxy in
+                let size = proxy.size
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(hue: 0.58 + 0.04 * sin(t / 3), saturation: 0.45, brightness: 0.95),
+                            Color(hue: 0.08, saturation: 0.35, brightness: 0.98),
+                        ],
+                        startPoint: .top, endPoint: .bottom)
+                    Circle()
+                        .fill(Color(hue: 0.12, saturation: 0.6, brightness: 1))
+                        .frame(width: size.width * 0.28)
+                        .position(
+                            x: size.width * (0.5 + 0.3 * sin(t / 2)),
+                            y: size.height * (0.3 + 0.05 * cos(t / 2)))
+                    RoundedRectangle(cornerRadius: 40, style: .continuous)
+                        .fill(Color(hue: 0.35, saturation: 0.35, brightness: 0.7))
+                        .frame(width: size.width * 1.4, height: size.height * 0.45)
+                        .position(x: size.width * 0.5, y: size.height * 0.95)
+                    Text("SIMULATOR")
+                        .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .position(x: size.width * 0.5, y: size.height * 0.62)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+#endif

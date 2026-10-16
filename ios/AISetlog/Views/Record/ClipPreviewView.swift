@@ -482,14 +482,14 @@ struct ClipPreviewView: View {
                     Text("\(badge)")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(.white.opacity(accented ? 0.85 : 0.7))
+                        .foregroundStyle(accented ? OneDay.onBrand.opacity(0.85) : .white.opacity(0.7))
                 }
             }
             // White on both. The quiet one was `OneDay.ink` on a fixed white
             // capsule, and `ink` turns light in dark mode — 1.7:1. This row
             // sits on the clip's dark blurred bed, so dark glass is the quiet
             // version, same as the camera's round buttons (`CameraGlass`).
-            .foregroundStyle(.white)
+            .foregroundStyle(accented ? OneDay.onBrand : .white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background {

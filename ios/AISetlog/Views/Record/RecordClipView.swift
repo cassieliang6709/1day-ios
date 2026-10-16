@@ -28,11 +28,18 @@ struct RecordClipView: View {
     /// The challenge's locked frame. Free-form mode ignores this and uses its
     /// own toggleable orientation instead.
     var orientation: Challenge.Orientation = .portrait
+    /// The story's camera (1.5). Set, everyone in the story films with it and
+    /// the picker is hidden; nil (free-form, older stories) uses your own pick.
+    var lockedCamera: CameraStyle? = nil
     /// Free-form only: lets the shell block a tab switch that would throw an
     /// unfiled clip away.
     var unfiledGuard: UnfiledClipGuard?
     /// Free-form only: "there's nowhere to file this yet — make somewhere".
     var onStartStory: (() -> Void)?
+    /// Free-form only: back to the tab the camera came from. The shell hides
+    /// its bar while the camera is up (1.5), so this is the ✕. The shell's own
+    /// unfiled-clip guard asks before a take in review is lost.
+    var onCloseFreeform: (() -> Void)?
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -89,12 +96,19 @@ struct RecordClipView: View {
     /// actions are brand blue everywhere in the app — an identity-tinted "Use"
     /// made the camera the one screen where the primary button changed colour
     /// with whoever was signed in.
-    private var myTint: Color { Identity.tint(for: myName) }
+    private var myTint: Color { Color.oneDayBrand }
+    @AppStorage(CameraStyle.storageKey) private var cameraStyle: CameraStyle = CameraStyle.defaultCamera
 
     private var clipSeconds: Double { clipLength.seconds }
     private var clipSecondsText: String { clipLength.secondsLabel }
-    /// Extra bottom room so the free-form controls clear the floating pill.
-    private var bottomInset: CGFloat { isFreeform ? 68 : 8 }
+    /// The free-form camera used to leave 68pt here for the floating bar
+    /// under it. The bar is hidden while the camera is up as of 1.5.
+    private var bottomInset: CGFloat { 8 }
+    /// What this take is filmed with: the story's camera when it has one.
+    private var activeCamera: CameraStyle { lockedCamera ?? cameraStyle }
+
+    /// Portrait from 1.5 on: the camera decides the shape now. A story saved
+    /// with landscape or square keeps it.
     private var effectiveOrientation: Challenge.Orientation {
         isFreeform ? freeformOrientation : orientation
     }
@@ -153,6 +167,10 @@ struct RecordClipView: View {
         }
         .task {
             recorder.orientation = effectiveOrientation
+            if !CameraStyle.selectable.contains(cameraStyle) {
+                cameraStyle = CameraStyle.defaultCamera
+            }
+            recorder.cameraStyle = activeCamera
             await recorder.configure()
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -204,6 +222,9 @@ struct RecordClipView: View {
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = newValue
         }
+        .onChange(of: cameraStyle) { _, _ in
+            recorder.cameraStyle = activeCamera
+        }
         .onChange(of: recorder.state) { _, state in
             if state == .recording {
                 ringProgress = 0
@@ -235,9 +256,19 @@ struct RecordClipView: View {
                 overlayText: nil,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: effectiveOrientation.aspectRatio
+                aspectRatio: activeCamera.aspectRatio(for: effectiveOrientation)
+                    ?? effectiveOrientation.aspectRatio,
+                cameraStyle: activeCamera
             ) {
-                CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
+                #if DEBUG && targetEnvironment(simulator)
+                if ClipRecorder.isSimulated {
+                    SimulatedCameraPreview()
+                } else {
+                    livePreview
+                }
+                #else
+                livePreview
+                #endif
             }
             .overlay(alignment: .topLeading) {
                 Button {
@@ -447,7 +478,9 @@ struct RecordClipView: View {
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: effectiveOrientation.aspectRatio
+                aspectRatio: recorder.cameraStyle.aspectRatio(for: effectiveOrientation)
+                    ?? effectiveOrientation.aspectRatio,
+                showsDate: recorder.cameraStyle == .standard
             ) {
                 ZStack {
                     // Immediate review is always the camera truth; grading belongs elsewhere.
@@ -462,23 +495,18 @@ struct RecordClipView: View {
             HStack(spacing: 10) {
                 Button {
                     if isFreeform {
-                        // Both dead ends used to end at a toast, which left
-                        // retake-or-leave as the only moves — and leaving meant
-                        // losing the clip. Now they end at a choice instead.
-                        if filingCandidates.isEmpty {
-                            showNoPlaceExits = true
-                        } else {
-                            showSavePicker = true
-                        }
+                        // 1.5: a free take goes straight into 我的. Filing it
+                        // into a story is still there, from 我的's drafts.
+                        keepAsDraft()
                     } else {
                         onSave(url, trimmedOverlayText)
                         dismiss()
                     }
                 } label: {
-                    Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
+                    Label(isFreeform ? Strings.saveToMine : Strings.useClip,
                           systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(OneDay.onBrand)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
@@ -752,9 +780,17 @@ struct RecordClipView: View {
     private var topBar: some View {
         HStack {
             if isFreeform {
-                // No cover to dismiss in the tab, and nothing else needs the
-                // left slot now that the frame toggle moved down.
-                Color.clear.frame(width: 44, height: 1)
+                if let onCloseFreeform {
+                    Button { onCloseFreeform() } label: {
+                        Image(systemName: "xmark")
+                            .cameraGlass()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Strings.closeCamera)
+                    .accessibilityIdentifier("camera-close")
+                } else {
+                    Color.clear.frame(width: 44, height: 1)
+                }
             } else {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
@@ -829,12 +865,10 @@ struct RecordClipView: View {
     /// short, and the ring it sits under is counting rather than inviting.
     private var shutterRow: some View {
         HStack(spacing: 0) {
-            if isFreeform {
-                orientationButton
-                    .frame(maxWidth: .infinity)
-            } else {
-                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            HStack(spacing: 6) {
+                if recorder.supportsDualCamera { dualCameraButton }
             }
+            .frame(maxWidth: .infinity)
 
             ZStack {
                 if recorder.state == .recording {
@@ -846,8 +880,11 @@ struct RecordClipView: View {
             .contentShape(Rectangle())
             .simultaneousGesture(shutterGesture)
 
-            flipButton
-                .frame(maxWidth: .infinity)
+            HStack(spacing: 6) {
+                flipButton
+                if lockedCamera == nil { cameraStyleButton }
+            }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
@@ -869,6 +906,52 @@ struct RecordClipView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.switchOrientation)
+        .disabled(recorder.state == .recording || recorder.clipURL != nil)
+        .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+    }
+
+    /// The main camera full frame and, in dual mode, the other one in the
+    /// corner — laid out where `PiPComposer` will put it in the file.
+    private var livePreview: some View {
+        DualCameraStage(showsInset: recorder.isDualCamera, swapped: recorder.isSwapped) {
+            CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
+        } secondary: {
+            SecondaryCameraPreview(session: recorder.session) {
+                recorder.attachSecondaryPreview($0)
+            }
+        }
+    }
+
+    private var dualCameraButton: some View {
+        Button { recorder.setDualCamera(!recorder.isDualCamera) } label: {
+            Image(systemName: recorder.isDualCamera
+                ? "rectangle.inset.topright.filled"
+                : "rectangle.inset.topright")
+                .cameraGlass()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.dualCamera)
+        .accessibilityAddTraits(recorder.isDualCamera ? .isSelected : [])
+        .disabled(recorder.state != .ready || recorder.clipURL != nil)
+        .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+    }
+
+    /// Dazz-style: which camera you're holding. Picks the frame, the date and
+    /// the tone baked into the next take — see `CameraStyle`.
+    private var cameraStyleButton: some View {
+        Menu {
+            Picker(Strings.cameraPicker, selection: $cameraStyle) {
+                ForEach(CameraStyle.selectable) { style in
+                    Label(style.displayName, systemImage: style.symbolName).tag(style)
+                }
+            }
+        } label: {
+            Image(systemName: cameraStyle.symbolName)
+                .cameraGlass()
+        }
+        .accessibilityLabel(Strings.cameraPicker)
+        .accessibilityValue(cameraStyle.displayName)
+        .accessibilityIdentifier("camera-style")
         .disabled(recorder.state == .recording || recorder.clipURL != nil)
         .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
     }
