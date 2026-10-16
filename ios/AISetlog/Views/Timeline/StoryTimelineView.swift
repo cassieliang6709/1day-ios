@@ -206,10 +206,18 @@ struct StoryTimelineView: View {
                     cast: cast,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
 
-                StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
+                // A shared room is a feed now (1.5, after Setlog) — no
+                // progress bar of slots, which is the planning view.
+                if !challenge.isShared {
+                    StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
+                }
 
-                // Only once, and only when it's the whole answer.
-                if agenda.isComplete {
+                // A room gets its two actions side by side (1.5): the film on
+                // the left, the chat on the right. A solo story keeps the
+                // film card, once, when it's the whole answer.
+                if challenge.isShared {
+                    roomActions(hasClips: !clips.isEmpty)
+                } else if agenda.isComplete {
                     FilmReadyCard(momentCount: agenda.total) { showFilm = true }
                 }
 
@@ -232,7 +240,35 @@ struct StoryTimelineView: View {
                 // as a page in the day. In a shared room it is the whole moment
                 // with everyone stacked in it, which isn't a page — that's what
                 // `.moment` is for.
-                if challenge.isTimeOnly {
+                if challenge.isShared {
+                    RoomFeed(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                        slotTitle: { slotTitle(for: $0) },
+                        isLiked: { clip in
+                            store.interactions(
+                                for: challengeID, day: clip.day,
+                                targetAuthorID: clip.authorID ?? "")
+                                .reactions.contains { $0.authorID == myID && $0.emoji == "❤️" }
+                        },
+                        onPlay: { day in sheet = .moment(day: day) },
+                        onFilm: { day in sheet = .record(day: day) },
+                        onLike: { clip in
+                            store.toggleReaction(
+                                "❤️", day: clip.day, challengeID: challengeID,
+                                targetAuthorID: clip.authorID ?? "")
+                        },
+                        onReply: { _ in showRoomChat = true },
+                        hasPoked: { id in
+                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                        },
+                        onPoke: { id in
+                            store.poke(challengeID: challengeID, targetAuthorID: id)
+                        })
+                } else if challenge.isTimeOnly {
                     MomentFilmstrip(
                         challenge: challenge,
                         clips: clips,
@@ -336,17 +372,9 @@ struct StoryTimelineView: View {
 
             Spacer()
 
+            // Chat moved down beside 生成 vlog in 1.5 (`roomActions`); invite
+            // stays up here.
             if challenge.isShared, let code = challenge.roomCode {
-                // Chat and Invite are the same kind of thing — a way to the
-                // other people in the room — so they wear the same capsule.
-                // Chat used to be a bare system-blue `Label` beside a glass
-                // pill, which read as a link next to a button.
-                Button {
-                    showRoomChat = true
-                } label: {
-                    roomCapsule(Strings.chatLabel, systemImage: "bubble.left.and.bubble.right")
-                }
-                .buttonStyle(.plain)
                 if previewMedia == nil {
                     ShareLink(item: shareText(code: code, challenge: challenge)) {
                         roomCapsule(Strings.inviteLabel, systemImage: "person.badge.plus")
@@ -368,7 +396,7 @@ struct StoryTimelineView: View {
                 // becomes a menu item. Once the day is full the page shows the
                 // film card itself, and a second entry would be the same
                 // action twice.
-                if clipCount > 0, !agenda.isComplete {
+                if !challenge.isShared, clipCount > 0, !agenda.isComplete {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
                     }
@@ -433,12 +461,48 @@ struct StoryTimelineView: View {
         .padding(.vertical, 10)
     }
 
+    /// 生成 vlog and 聊天, same size, side by side. The film is filled and
+    /// leads; chat is the quieter of the two but just as big, since in a room
+    /// seeing what everyone is up to is half the point.
+    private func roomActions(hasClips: Bool) -> some View {
+        HStack(spacing: 10) {
+            Button { showFilm = true } label: {
+                Label(Strings.makeRoomVlog, systemImage: "film.stack.fill")
+                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.onBrand)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(OneDay.brandHorizontal,
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .oneDayGlow(strength: 0.5)
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasClips)
+            .opacity(hasClips ? 1 : 0.5)
+            .accessibilityIdentifier("room-make-vlog")
+
+            Button { showRoomChat = true } label: {
+                Label(Strings.chatLabel, systemImage: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.brandText)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(OneDay.surface,
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(OneDay.hairline, lineWidth: 1))
+                    .oneDaySoftShadow(strength: 0.5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("room-chat")
+        }
+    }
+
     /// The glass pill both room actions in the bar are drawn in. At least
     /// 44pt tall, so neither is a smaller target than the bubbles beside it.
     private func roomCapsule(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.oneDayBrand)
+            .foregroundStyle(OneDay.brandText)
             .lineLimit(1)
             .padding(.horizontal, 13)
             .padding(.vertical, 9)
@@ -454,7 +518,7 @@ struct StoryTimelineView: View {
             OneDayBuddy(size: 78, isWorking: !reduceMotion)
             Text(Strings.yourFilmIsHere)
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OneDay.brand.opacity(0.96).ignoresSafeArea())
@@ -473,7 +537,8 @@ struct StoryTimelineView: View {
                 momentCount: challenge?.cards.count ?? 0,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
                 showsPrompt: challenge?.isTimeOnly != true,
-                orientation: challenge?.resolvedOrientation ?? .portrait
+                orientation: challenge?.resolvedOrientation ?? .portrait,
+                lockedCamera: challenge?.cameraStyle
             ) { url, overlayText in
                 let wasComplete = dayIsComplete
                 store.saveClip(

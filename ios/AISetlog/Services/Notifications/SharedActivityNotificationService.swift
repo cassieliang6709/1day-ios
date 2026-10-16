@@ -16,19 +16,21 @@ enum SharedActivityNotificationService {
         case clip
         case comment
         case reaction
+        case poke
 
         var recordType: String {
             switch self {
             case .clip: "Clip"
             case .comment: "Comment"
             case .reaction: "Reaction"
+            case .poke: "Poke"
             }
         }
 
         var options: CKQuerySubscription.Options {
             switch self {
             case .clip: [.firesOnRecordCreation, .firesOnRecordUpdate]
-            case .comment, .reaction: [.firesOnRecordCreation]
+            case .comment, .reaction, .poke: [.firesOnRecordCreation]
             }
         }
     }
@@ -72,10 +74,17 @@ enum SharedActivityNotificationService {
         if !authorID.isEmpty, authorID == AccountStore.persistedUserID {
             return .noData
         }
+        // A poke is for one person; everyone else in the room ignores it.
+        let isPoke = context.kind == .poke
+        if isPoke, fields.targetAuthorID != AccountStore.persistedUserID {
+            return .noData
+        }
 
         let now = Date.now
+        // Pokes skip the room's 5-minute activity throttle: they are already
+        // capped at one per sender per day.
         let throttleKey = throttlePrefix + context.roomCode
-        if let last = UserDefaults.standard.object(forKey: throttleKey) as? Date,
+        if !isPoke, let last = UserDefaults.standard.object(forKey: throttleKey) as? Date,
            now.timeIntervalSince(last) < 5 * 60 {
             return .noData
         }
@@ -94,7 +103,9 @@ enum SharedActivityNotificationService {
             NotificationConstants.dayKey: max(fields.day, 1),
         ]
 
-        let identifier = notificationPrefix + context.roomCode
+        let identifier = isPoke
+            ? notificationPrefix + context.roomCode + ".poke." + authorID
+            : notificationPrefix + context.roomCode
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
         let request = UNNotificationRequest(
@@ -103,7 +114,7 @@ enum SharedActivityNotificationService {
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false))
         do {
             try await center.add(request)
-            UserDefaults.standard.set(now, forKey: throttleKey)
+            if !isPoke { UserDefaults.standard.set(now, forKey: throttleKey) }
             return .newData
         } catch {
             return .failed
@@ -121,10 +132,11 @@ enum SharedActivityNotificationService {
 
     private static func activityFields(
         from notification: CKQueryNotification
-    ) async -> (authorID: String, authorName: String, day: Int) {
+    ) async -> (authorID: String, authorName: String, day: Int, targetAuthorID: String) {
         var authorID = notification.recordFields?["authorID"] as? String ?? ""
         var authorName = notification.recordFields?["authorName"] as? String ?? ""
         var day = notification.recordFields?["day"] as? Int ?? 1
+        var targetAuthorID = notification.recordFields?["targetAuthorID"] as? String ?? ""
 
         if (authorID.isEmpty || authorName.isEmpty), let recordID = notification.recordID {
             do {
@@ -133,12 +145,13 @@ enum SharedActivityNotificationService {
                 authorID = record["authorID"] as? String ?? authorID
                 authorName = record["authorName"] as? String ?? authorName
                 day = record["day"] as? Int ?? day
+                targetAuthorID = record["targetAuthorID"] as? String ?? targetAuthorID
             } catch {
                 // The desired keys normally arrive in the push. Generic copy is
                 // still useful if CloudKit trims the payload or the record moved.
             }
         }
-        return (authorID, authorName, max(day, 1))
+        return (authorID, authorName, max(day, 1), targetAuthorID)
     }
 
     private static func activityBody(
@@ -156,6 +169,8 @@ enum SharedActivityNotificationService {
             return Strings.roomCommentActivity(name: visibleName)
         case .reaction:
             return Strings.roomReactionActivity(name: visibleName)
+        case .poke:
+            return Strings.roomPokeActivity(name: visibleName)
         }
     }
 
@@ -202,7 +217,7 @@ enum SharedActivityNotificationService {
                             options: kind.options)
                         let info = CKSubscription.NotificationInfo()
                         info.shouldSendContentAvailable = true
-                        info.desiredKeys = ["roomCode", "day", "authorID", "authorName"]
+                        info.desiredKeys = ["roomCode", "day", "authorID", "authorName", "targetAuthorID"]
                         subscription.notificationInfo = info
                         do {
                             _ = try await database.save(subscription)

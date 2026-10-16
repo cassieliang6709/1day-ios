@@ -49,14 +49,21 @@ final class RoomSyncService {
         syncing.insert(code)
         defer { syncing.remove(code) }
         do {
-            let clips = try await transport.fetchClips(
+            var clips = try await transport.fetchClips(
                 code, fileStore.remoteCacheDir(roomCode: code))
+            #if DEBUG
+            clips += await DebugFakeFriends.clips(for: code)
+            #endif
             remoteClips[code] = clips
             lastError[code] = nil
             return clips
         } catch {
             print("[room] sync failed: \(error)")
             lastError[code] = error.localizedDescription
+            #if DEBUG
+            let fakes = await DebugFakeFriends.clips(for: code)
+            if !fakes.isEmpty { remoteClips[code] = fakes }
+            #endif
             return nil
         }
     }
@@ -108,6 +115,10 @@ final class RoomSyncService {
 
     func deleteComment(id: String) async {
         try? await transport.deleteComment(id)
+    }
+
+    func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async {
+        try? await transport.sendPoke(code, authorID, authorName, targetAuthorID)
     }
 
 }

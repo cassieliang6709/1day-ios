@@ -187,7 +187,7 @@ private struct RoomChatConversation: View {
                         if error == .fetch {
                             Button(Strings.retry) { Task { await session.refresh() } }
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.oneDayBrand)
+                                .foregroundStyle(OneDay.brandText)
                         }
                     }
                     .padding(12)
@@ -350,7 +350,7 @@ private struct RoomChatConversation: View {
                 // messages reads as coming from one side.
                 .padding(.horizontal, 13)
                 .padding(.vertical, 10)
-                .foregroundStyle(mine ? Color.white : OneDay.ink)
+                .foregroundStyle(mine ? OneDay.onBrand : OneDay.ink)
                 .background {
                     let shape = UnevenRoundedRectangle(
                         cornerRadii: .init(
@@ -505,7 +505,7 @@ private struct RoomChatConversation: View {
                     // field's send button looked tappable and did nothing.
                     Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .black))
-                        .foregroundStyle(canSend ? Color.white : OneDay.inkFaint)
+                        .foregroundStyle(canSend ? OneDay.onBrand : OneDay.inkFaint)
                         .frame(width: 44, height: 44)
                         .background {
                             if canSend {
