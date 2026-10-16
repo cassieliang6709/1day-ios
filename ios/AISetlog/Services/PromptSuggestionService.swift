@@ -46,8 +46,9 @@ enum PromptSuggestionError: Error, Equatable {
 /// The API key lives on the server. A key shipped inside the app is a key
 /// somebody else is going to spend.
 struct RemotePromptSuggestionService: PromptSuggesting {
+    /// Own domain, not *.workers.dev: that one is blocked in mainland China.
     static let defaultEndpoint = URL(
-        string: "https://oneday-suggest-prompts.oneday-cassie.workers.dev/api/suggest-prompts")!
+        string: "https://oneday-api.liangyue.site/api/suggest-prompts")!
 
     /// The model answers in about a second; the rest of a slow call is the
     /// network. Past this the connection is stuck, and a fresh one does
