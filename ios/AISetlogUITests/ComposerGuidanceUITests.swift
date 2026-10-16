@@ -29,7 +29,9 @@ final class ComposerGuidanceUITests: XCTestCase {
         // No gear to find: the poster is the way in, and tapping it no longer
         // creates anything by itself.
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
-        app.buttons["more-templates"].tap()
+        // 1.5: no 更多模板 fold — the posters for the chosen length are on
+        // the page, and the name field sits on the same page below them.
+        XCTAssertFalse(app.buttons["more-templates"].exists)
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()

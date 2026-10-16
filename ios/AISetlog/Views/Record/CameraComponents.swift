@@ -656,36 +656,147 @@ struct CaptionEditor: View {
     }
 }
 
+/// The dual-camera button's icon: a big frame with a small one overlapping
+/// its top-right corner — two pictures, one on the other.
+///
+/// Drawn rather than an SF Symbol: `rectangle.inset.topright.filled` is a
+/// solid slab, and white on the dark glass it read as a grey blob with no
+/// shape in it. Outlines keep both rectangles visible; on, the small one fills
+/// with the brand colour so the state reads at a glance.
+struct DualCameraGlyph: View {
+    var isOn: Bool
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                .strokeBorder(.white, lineWidth: 1.8)
+                .frame(width: 15, height: 20)
+                .frame(width: 20, height: 24, alignment: .bottomLeading)
+            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                .fill(isOn ? Color.oneDayBrand : Color.black.opacity(0.55))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .strokeBorder(.white, lineWidth: 1.6))
+                .frame(width: 10, height: 13)
+        }
+        .frame(width: 20, height: 24)
+        .accessibilityHidden(true)
+    }
+}
+
 /// The viewfinder in dual-camera mode: one picture full frame, the other in
-/// the top-right box from `PiPComposer.insetRect`, so the preview matches the
-/// composed file. `swapped` trades which camera is which without recreating
-/// either preview view. With `showsInset` off, only the primary is drawn.
+/// a white-bordered inset at `inset` (normalized, see `PiPInsetLayout`) — the
+/// same box and border `PiPComposer` burns into the file, so the preview
+/// matches the composed clip. `swapped` trades which camera is which without
+/// recreating either preview view. With `showsInset` off, only the primary is
+/// drawn.
+///
+/// The inset can be dragged anywhere and pinched between 22% and 45% of the
+/// frame's width while `isEditable`; a tap on it calls `onTapInset` (the
+/// camera swaps which picture is big). The gesture's running state stays in
+/// here and only the finished rect goes out through `onInsetChange`, so a
+/// drag doesn't write to UserDefaults on every frame.
 struct DualCameraStage<Primary: View, Secondary: View>: View {
     var showsInset: Bool
     var swapped: Bool
+    var inset: CGRect = PiPInsetLayout.defaultRect()
+    var isEditable = true
+    var onInsetChange: (CGRect) -> Void = { _ in }
+    var onTapInset: () -> Void = {}
     @ViewBuilder var primary: Primary
     @ViewBuilder var secondary: Secondary
 
+    /// A drag and a pinch on the inset, in flight. One value for both so the
+    /// pair commits once, when the last finger lifts — committed separately,
+    /// the second to end re-applied the first on top of the rect it had
+    /// already written.
+    struct Adjustment: Equatable {
+        var translation: CGSize = .zero
+        var scale: CGFloat = 1
+    }
+    /// What is drawn mid-gesture; resets on its own if the gesture is
+    /// cancelled.
+    @GestureState private var live = Adjustment()
+    /// The last value seen, for `onEnded` — by then `live` has already reset.
+    @State private var lastAdjustment = Adjustment()
+
     var body: some View {
         GeometryReader { proxy in
-            let full = CGRect(origin: .zero, size: proxy.size)
-            let box = PiPComposer.insetRect(in: proxy.size)
-            ZStack(alignment: .topLeading) {
-                place(primary, in: showsInset && swapped ? box : full)
-                    .zIndex(showsInset && swapped ? 1 : 0)
-                if showsInset {
-                    place(secondary, in: swapped ? full : box)
-                        .zIndex(swapped ? 0 : 1)
-                }
+            stage(in: proxy.size)
+        }
+    }
+
+    private func stage(in size: CGSize) -> some View {
+        let full = CGRect(origin: .zero, size: size)
+        let rect = liveRect(in: size)
+        let box = PiPInsetLayout.pictureBox(rect, in: size)
+        let primaryIsInset = showsInset && swapped
+        return ZStack(alignment: .topLeading) {
+            framed(primary, in: primaryIsInset ? box : full,
+                   isInset: primaryIsInset, canvas: size)
+                .zIndex(primaryIsInset ? 1 : 0)
+            if showsInset {
+                framed(secondary, in: swapped ? full : box,
+                       isInset: !swapped, canvas: size)
+                    .zIndex(swapped ? 0 : 1)
             }
         }
     }
 
-    private func place(_ view: some View, in rect: CGRect) -> some View {
-        view
+    /// The committed rect with the gesture in flight applied on top.
+    private func liveRect(in size: CGSize) -> CGRect {
+        applying(live, in: size)
+    }
+
+    private func applying(_ adjustment: Adjustment, in size: CGSize) -> CGRect {
+        let scaled = PiPInsetLayout.resized(inset, by: adjustment.scale)
+        return PiPInsetLayout.moved(scaled, by: adjustment.translation, in: size)
+    }
+
+    /// The decoration is always applied and only switched by `isInset`, so a
+    /// swap changes values rather than view structure — the camera preview
+    /// layers underneath are never torn down.
+    private func framed(
+        _ view: some View, in rect: CGRect, isInset: Bool, canvas: CGSize
+    ) -> some View {
+        let border = PiPInsetLayout.border(in: canvas)
+        let radius = PiPInsetLayout.cornerRadius(in: canvas)
+        let innerRadius = max(radius - border, 0)
+        return view
             .frame(width: rect.width, height: rect.height)
-            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: isInset ? innerRadius : 0))
+            .background {
+                RoundedRectangle(cornerRadius: radius, style: .circular)
+                    .fill(.white)
+                    .padding(-border)
+                    .shadow(color: .black.opacity(0.28), radius: border * 2, y: border * 0.75)
+                    .opacity(isInset ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+            .gesture(insetGestures(canvas: canvas),
+                     including: isInset && isEditable ? .all : .subviews)
             .offset(x: rect.minX, y: rect.minY)
+    }
+
+    private func insetGestures(canvas: CGSize) -> some Gesture {
+        let adjust = DragGesture(minimumDistance: 6)
+            .simultaneously(with: MagnifyGesture(minimumScaleDelta: 0.01))
+            .updating($live) { value, state, _ in
+                state = Adjustment(
+                    translation: value.first?.translation ?? state.translation,
+                    scale: value.second?.magnification ?? state.scale)
+            }
+            .onChanged { value in
+                lastAdjustment = Adjustment(
+                    translation: value.first?.translation ?? lastAdjustment.translation,
+                    scale: value.second?.magnification ?? lastAdjustment.scale)
+            }
+            .onEnded { _ in
+                onInsetChange(applying(lastAdjustment, in: canvas))
+                lastAdjustment = Adjustment()
+            }
+        let tap = TapGesture().onEnded { onTapInset() }
+        return adjust.exclusively(before: tap)
     }
 }
 

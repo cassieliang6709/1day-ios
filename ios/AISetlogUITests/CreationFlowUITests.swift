@@ -1,7 +1,7 @@
 import XCTest
 
-/// Making a story, as of 1.3: the 计划 tab, a rack of posters, and one page of
-/// settings behind whichever poster you tap.
+/// Making a story, as of 1.5: the home header's 新建 opens one page with
+/// every choice on it and a single 开始拍 at the bottom.
 ///
 /// Two things these tests used to walk are gone and are not coming back, so
 /// they are asserted absent rather than quietly dropped:
@@ -35,8 +35,8 @@ final class CreationFlowUITests: XCTestCase {
         app.launch()
         openComposer()
 
-        // 1.5: 按时间拍 is the composer's first card, not a rack of one
-        // poster, and it opens the settings page directly.
+        // 1.5: 不写，按时间拍 is one of three entry cards; choosing it shows
+        // the prompt-free explanation on the same page, no sheet.
         let byTime = app.buttons["by-time-entry"]
         XCTAssertTrue(byTime.waitForExistence(timeout: 15))
         byTime.tap()
@@ -59,22 +59,28 @@ final class CreationFlowUITests: XCTestCase {
         app.launch()
         openComposer()
 
-        // Three ways in up top; 一日 / 七日 / 自己写 are folded under 更多模板.
-        XCTAssertTrue(app.buttons["by-time-entry"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["write-own-entry"].exists)
+        // 1.5: one page. Three equal ways in, 自己写 first; 拍几天 as two
+        // explained rows; no 更多模板 fold and no second 设置 sheet.
+        XCTAssertTrue(app.buttons["write-own-entry"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["custom-prompts-entry"].exists)
-        XCTAssertFalse(app.buttons["七日"].exists)
-        app.buttons["more-templates"].tap()
-        XCTAssertTrue(app.buttons["一日"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["七日"].exists)
-        // No counter and nothing to submit on this screen: the page behind a
-        // poster is where a story gets made.
+        XCTAssertTrue(app.buttons["by-time-entry"].exists)
+        XCTAssertLessThan(
+            app.buttons["write-own-entry"].frame.minX,
+            app.buttons["by-time-entry"].frame.minX)
+        XCTAssertTrue(app.buttons["plan-one-day"].exists)
+        XCTAssertTrue(app.buttons["plan-seven-day"].exists)
+        XCTAssertFalse(app.buttons["more-templates"].exists)
+        XCTAssertTrue(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
+        // 谁来拍 and the camera are on the same page, with the one button.
+        XCTAssertTrue(app.buttons["company-solo"].exists)
+        XCTAssertTrue(app.buttons["camera-option-film"].exists)
+        XCTAssertTrue(app.buttons["composer-start"].exists)
         XCTAssertFalse(app.buttons["下一步"].exists)
         // The plus in the home header is gone, not moved.
         XCTAssertFalse(app.buttons["新建故事"].exists)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Plan tab composer"
+        attachment.name = "One-page composer"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

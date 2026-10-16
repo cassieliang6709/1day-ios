@@ -1,303 +1,291 @@
 import SwiftUI
 
-/// The two pages of `StoryComposerView`. Stateless — the composer owns every
-/// choice; these just render it.
-
-// MARK: - The poster rack
-
-/// Which shelf of posters the grid is showing.
+/// The pieces of `StoryComposerView`'s one page. Stateless — the composer owns
+/// every choice; these just render it.
 ///
-/// These four replace two stacked `PillSelector`s (按提示拍/按时间拍, then
-/// 一日/七日, with a `SectionLabel` wedged between them) and the 自己写题目 row
-/// that used to sit under the grid. All three were answering the same question
-/// — what kind of story is today — in three different shapes, and the middle
-/// one could silently move the first one's answer.
-///
-/// The rack only filters. It deliberately does *not* write through to
-/// `ComposerSelection`: with a poster tap creating the story outright, the
-/// style and mode are read off the poster you tapped, so there is no second
-/// copy of that state to keep in step.
-enum TemplateRack: Hashable {
-    case oneDay
-    case sevenDay
+/// 1.5 shape, top to bottom: 今天拍什么 (three equal ways in), 拍几天 (one day
+/// or seven, with that length's templates as an optional strip), 之前做过的
+/// (the user's own saved sets), then the story's name, 谁来拍 and 用哪台相机拍,
+/// and a single 开始拍 at the bottom. There used to be a second 设置 sheet
+/// behind every choice; everything it asked is on this page now.
+
+// MARK: - 今天拍什么
+
+/// Where the story's prompts come from.
+enum ComposerEntry: Hashable {
+    /// 自己写 — the guided page, cursor in the first row.
+    case writeOwn
+    /// AI 帮我写 — the guided page, starting on its sentence about today.
+    case aiWrite
+    /// 不写，按时间拍 — no prompts at all.
     case byTime
-    case custom
 }
 
-/// The composer's first screen: one question, one row of filters, one rack of
-/// posters. Tapping a poster opens its settings, and the settings page is where
-/// the story gets made.
-///
-/// Three shapes, for the record, because the current one looks like the first:
-///
-/// 1. **1/2 选拍法 → 2/2 设置故事.** A 下一步 button that only ever applied to
-///    whichever poster happened to be selected by default, so tapping any other
-///    one skipped the second screen entirely.
-/// 2. **The poster is the submit button.** Tapping created the story with
-///    defaults and left for the camera; the gear on a poster's corner was the
-///    only way to the settings. Fast, but 和朋友一起 lived behind a 26pt gear —
-///    the most consequential choice in the app, hidden in a corner, while the
-///    obvious gesture silently chose 自己来.
-/// 3. **Now:** a poster opens the settings page. One page, every decision on
-///    it — who you're filming with included — and the button at the bottom both
-///    creates the story and starts it.
-///
-/// So there is no gear any more (the poster *is* the gear) and no "选一张，就
-/// 建好了" (it no longer does).
+/// Sections 1–3 of the page: how the prompts get written, how many days, and
+/// the sets the user has made before.
 struct MoodStep: View {
-    /// Built-ins only. The user's own sets live on the 自己写 rack, so the two
-    /// lists are passed apart rather than concatenated.
-    let oneDayBuiltins: [ChallengeTemplate]
-    let sevenDayTemplates: [ChallengeTemplate]
+    /// Nil when a poster or a saved set is what's chosen instead.
+    let entry: ComposerEntry?
+    @Binding var days: Challenge.Mode
+    let oneDayPosters: [ChallengeTemplate]
+    let sevenDayPosters: [ChallengeTemplate]
     let customTemplates: [ChallengeTemplate]
-    @Binding var rack: TemplateRack
-    /// 「AI 帮我写」: a sentence about today in, prompts out.
+    let selectedTemplateID: UUID?
+    let onWriteOwn: () -> Void
     let onBuildOwn: () -> Void
-    /// 「自己写」: the same page, starting in the first prompt row.
-    var onWriteOwn: () -> Void = {}
-    /// A poster tap adopts that script and opens the settings page. It used to
-    /// create the story outright; see this type's note.
+    let onByTime: () -> Void
     let onChoose: (ChallengeTemplate) -> Void
     let onEdit: (ChallengeTemplate) -> Void
     let onDelete: (ChallengeTemplate) -> Void
-    /// Where a template's own cover picture lives, asked of the store rather
-    /// than looked up here — this layer doesn't know about Documents.
     var coverURL: (ChallengeTemplate) -> URL? = { _ in nil }
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-    /// 一日 / 七日 / 我写过的 live behind 更多模板 as of 1.5, closed until asked.
-    @State private var showsTemplates = false
-
-    /// The posters on the current shelf.
-    private var shown: [ChallengeTemplate] {
-        switch rack {
-        case .oneDay: oneDayBuiltins.filter { !$0.isTimeOnly }
-        case .sevenDay: sevenDayTemplates
-        case .byTime: oneDayBuiltins.filter(\.isTimeOnly)
-        case .custom: customTemplates
-        }
-    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(Strings.newStoryQuestion)
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .accessibilityIdentifier("composer-question")
-                    .padding(.horizontal, 20)
-
-                // 1.5: three ways in, and templates are the fourth, folded.
-                // 按时间拍 leads because it asks for nothing — no prompts to
-                // think up — which is the point of the camera-first app.
-                byTimeEntry
-
-                HStack(spacing: 10) {
-                    smallEntry(
-                        title: Strings.writeOwnTitle, lead: Strings.writeOwnLead,
-                        symbol: "pencil.line", id: "write-own-entry", action: onWriteOwn)
-                    smallEntry(
-                        title: Strings.aiWriteTitle, lead: Strings.aiWriteLead,
-                        symbol: "sparkles", id: "custom-prompts-entry", action: onBuildOwn)
-                }
-                // Same height whichever lead wraps.
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 24) {
+            EntryCards(
+                entry: entry, onWriteOwn: onWriteOwn,
+                onBuildOwn: onBuildOwn, onByTime: onByTime)
                 .padding(.horizontal, 20)
 
-                moreTemplatesHeader
-                    .padding(.top, 8)
+            DaysSection(
+                days: $days,
+                oneDayPosters: oneDayPosters,
+                sevenDayPosters: sevenDayPosters,
+                selectedTemplateID: selectedTemplateID,
+                onChoose: onChoose,
+                coverURL: coverURL)
 
-                if showsTemplates {
-                    PillSelector(
-                        options: [
-                            .init(value: TemplateRack.oneDay, label: Strings.modeOneDay),
-                            .init(value: TemplateRack.sevenDay, label: Strings.modeSevenDay),
-                            .init(value: TemplateRack.custom, label: Strings.rackCustom),
-                        ],
-                        selection: $rack,
-                        compact: true)
-                        .padding(.horizontal, 20)
-                        .accessibilityIdentifier("composer-rack")
-
-                    grid
-                }
+            if !customTemplates.isEmpty {
+                madeBefore
             }
-            .animation(OneDay.Motion.soft, value: showsTemplates)
-            // Clears the floating capsule. This screen was a `fullScreenCover`
-            // until 1.3, with nothing under it to get out of the way of; as the
-            // 新建 tab the last row of posters scrolled under 计划/新建/拍摄 and
-            // stopped there.
-            .padding(.bottom, OneDay.tabBarClearance + 16)
-            .animation(OneDay.Motion.soft, value: rack)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    /// Every poster the same size. The prompts each one will ask for are the
-    /// tile's second line, which is the only place they appear on this screen.
-    private var grid: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if shown.isEmpty {
-                Text(Strings.noCustomTemplatesYet)
-                    .font(.system(size: 13.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 20)
-            }
-
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())],
-                spacing: 12
-            ) {
-                ForEach(shown) { template in
-                    PromptTemplateTile(
-                        template: template,
-                        isSelected: false,
-                        coverURL: coverURL(template),
-                        onSelect: { onChoose(template) },
-                        onEdit: template.isCustom ? { onEdit(template) } : nil,
-                        onDelete: template.isCustom ? { onDelete(template) } : nil)
-                        // The poster is the only way to the settings page now
-                        // that the gear is gone, so a test needs to be able to
-                        // find one without knowing which rack it is on.
-                        .accessibilityIdentifier("poster-tile")
-                }
-            }
-            .padding(.horizontal, 20)
-
         }
     }
 
-    /// 按时间拍: no prompts, the day filmed as it happens. Opens the same
-    /// settings page a poster does, with the time-only script adopted.
-    private var byTimeEntry: some View {
-        Button {
-            if let byTime = oneDayBuiltins.first(where: \.isTimeOnly) { onChoose(byTime) }
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "clock.fill")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(OneDay.onBrand)
-                    .frame(width: 50, height: 50)
-                    .background(.white.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(Strings.byTimeEntryTitle)
-                        .font(.system(size: 19, weight: .heavy, design: .rounded))
-                    Text(Strings.byTimeEntryLead)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .opacity(0.85)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .foregroundStyle(OneDay.onBrand)
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(OneDay.onBrand.opacity(0.75))
-            }
-            .padding(16)
-            .background(OneDay.brandHorizontal, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .oneDayGlow(.oneDayBrand, strength: 0.7)
+    /// The user's own sets, as a strip. Hidden until there is one.
+    private var madeBefore: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: Strings.composerMadeBefore)
+                .padding(.horizontal, 20)
+            TemplateStrip(
+                templates: customTemplates,
+                selectedTemplateID: selectedTemplateID,
+                tileID: "saved-template-tile",
+                onChoose: onChoose,
+                onEdit: onEdit,
+                onDelete: onDelete,
+                coverURL: coverURL)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("by-time-entry")
-        .padding(.horizontal, 20)
+        .accessibilityIdentifier("made-before")
     }
+}
 
-    private func smallEntry(
-        title: String, lead: String, symbol: String, id: String, action: @escaping () -> Void
-    ) -> some View {
+/// 自己写 / AI 帮我写 / 不写，按时间拍 — three equal cards in one row.
+private struct EntryCards: View {
+    let entry: ComposerEntry?
+    let onWriteOwn: () -> Void
+    let onBuildOwn: () -> Void
+    let onByTime: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: Strings.composerWhatToFilm)
+            HStack(spacing: 10) {
+                EntryCard(
+                    title: Strings.writeOwnTitle, lead: Strings.writeOwnLead,
+                    symbol: "pencil.line", isOn: entry == .writeOwn, action: onWriteOwn)
+                    .accessibilityIdentifier("write-own-entry")
+                EntryCard(
+                    title: Strings.aiWriteTitle, lead: Strings.aiWriteLead,
+                    symbol: "sparkles", isOn: entry == .aiWrite, action: onBuildOwn)
+                    .accessibilityIdentifier("custom-prompts-entry")
+                EntryCard(
+                    title: Strings.composerByTimeTitle, lead: Strings.composerByTimeLead,
+                    symbol: "clock.fill", isOn: entry == .byTime, action: onByTime)
+                    .accessibilityIdentifier("by-time-entry")
+            }
+            // Same height whichever lead wraps.
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct EntryCard: View {
+    let title: String
+    let lead: String
+    let symbol: String
+    let isOn: Bool
+    let action: () -> Void
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 18, style: .continuous) }
+
+    var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(OneDay.brandText)
-                    .frame(width: 38, height: 38)
-                    .background(Color.oneDayBrand.opacity(0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 7) {
+                icon
                 Text(title)
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(.system(size: 14.5, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                Text(lead)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(lead)
+                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(14)
-            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(OneDay.hairline, lineWidth: 1))
-            .oneDaySoftShadow(strength: 0.6)
+            .padding(12)
+            .background(OneDay.surface, in: shape)
+            .overlay(shape.fill(Color.oneDayBrand.opacity(isOn ? 0.1 : 0)))
+            .overlay(shape.strokeBorder(
+                isOn ? Color.oneDayBrand : OneDay.hairline, lineWidth: isOn ? 2.5 : 1))
+            .oneDaySoftShadow(strength: isOn ? 0.8 : 0.5)
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
-        .accessibilityIdentifier(id)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .animation(OneDay.Motion.snap, value: isOn)
     }
 
-    private var moreTemplatesHeader: some View {
-        Button {
-            withAnimation(OneDay.Motion.soft) { showsTemplates.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                Text(Strings.moreTemplates)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .rotationEffect(.degrees(showsTemplates ? 90 : 0))
-                Spacer()
-            }
-            .foregroundStyle(OneDay.inkSoft)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+    private var icon: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(isOn ? OneDay.onBrand : OneDay.brandText)
+            .frame(width: 34, height: 34)
+            .background(
+                isOn ? AnyShapeStyle(Color.oneDayBrand) : AnyShapeStyle(Color.oneDayBrand.opacity(0.18)),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    }
+}
+
+// MARK: - 拍几天
+
+/// Two rows that say what each length means, instead of 一日 / 七日 pills.
+/// The chosen one opens its templates underneath; picking one is optional.
+private struct DaysSection: View {
+    @Binding var days: Challenge.Mode
+    let oneDayPosters: [ChallengeTemplate]
+    let sevenDayPosters: [ChallengeTemplate]
+    let selectedTemplateID: UUID?
+    let onChoose: (ChallengeTemplate) -> Void
+    let coverURL: (ChallengeTemplate) -> URL?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: Strings.composerHowManyDays)
+                .padding(.horizontal, 20)
+            row(.oneDay, title: Strings.composerPlanOneDay,
+                lead: Strings.composerPlanOneDayLead, id: "plan-one-day")
+            if days == .oneDay { strip(oneDayPosters) }
+            row(.sevenDay, title: Strings.composerPlanSevenDay,
+                lead: Strings.composerPlanSevenDayLead, id: "plan-seven-day")
+            if days == .sevenDay { strip(sevenDayPosters) }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("more-templates")
-        .accessibilityAddTraits(showsTemplates ? .isSelected : [])
-        .padding(.horizontal, 20)
+        .animation(OneDay.Motion.soft, value: days)
     }
 
-    /// The way in for a day no poster describes: say what today is for, and
-    /// the prompts come back written.
-    ///
-    /// In the brand gradient rather than white glass, because it has to hold
-    /// its own directly above a wall of poster artwork — and because the
-    /// screen it opens leads with the same ✨ and the same promise. A rounded
-    /// card and not a capsule: this goes somewhere, it doesn't submit.
-    private var writeYourOwn: some View {
-        Button(action: onBuildOwn) {
-            HStack(spacing: 13) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.22), in: RoundedRectangle(
-                        cornerRadius: 15, style: .continuous))
+    private func row(_ mode: Challenge.Mode, title: String, lead: String, id: String) -> some View {
+        DayRow(title: title, lead: lead, isOn: days == mode) { days = mode }
+            .accessibilityIdentifier(id)
+            .padding(.horizontal, 20)
+    }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(Strings.customPromptsTitle)
-                        .font(.system(size: 16.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(OneDay.onBrand)
-                    Text(Strings.customPromptsLead)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.onBrand.opacity(0.88))
-                        .lineLimit(2)
+    private func strip(_ posters: [ChallengeTemplate]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Strings.composerOptionalTemplates)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(OneDay.inkFaint)
+                .padding(.horizontal, 24)
+            TemplateStrip(
+                templates: posters,
+                selectedTemplateID: selectedTemplateID,
+                tileID: "poster-tile",
+                onChoose: onChoose,
+                coverURL: coverURL)
+        }
+        .padding(.bottom, 4)
+        .transition(.opacity)
+    }
+}
+
+private struct DayRow: View {
+    let title: String
+    let lead: String
+    let isOn: Bool
+    let action: () -> Void
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 18, style: .continuous) }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(isOn ? Color.oneDayBrand : OneDay.inkFaint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                    Text(lead)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(OneDay.onBrand.opacity(0.75))
+                Spacer(minLength: 0)
             }
-            .padding(14)
-            .background(
-                OneDay.brandHorizontal,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .oneDayGlow(.oneDayBrand, strength: 0.7)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(OneDay.surface, in: shape)
+            .overlay(shape.strokeBorder(
+                isOn ? Color.oneDayBrand : OneDay.hairline, lineWidth: isOn ? 2 : 1))
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Strings.customPromptsTitle)
-        .accessibilityIdentifier("custom-prompts-entry")
-        .padding(.horizontal, 20)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// A horizontal row of poster tiles.
+private struct TemplateStrip: View {
+    let templates: [ChallengeTemplate]
+    let selectedTemplateID: UUID?
+    let tileID: String
+    let onChoose: (ChallengeTemplate) -> Void
+    var onEdit: ((ChallengeTemplate) -> Void)?
+    var onDelete: ((ChallengeTemplate) -> Void)?
+    let coverURL: (ChallengeTemplate) -> URL?
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: 10) {
+                ForEach(templates) { template in
+                    tile(template)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .contentMargins(.horizontal, 20, for: .scrollContent)
+        .scrollIndicators(.hidden)
+    }
+
+    private func tile(_ template: ChallengeTemplate) -> some View {
+        PromptTemplateTile(
+            template: template,
+            isSelected: template.id == selectedTemplateID,
+            coverURL: coverURL(template),
+            onSelect: { onChoose(template) },
+            onEdit: onEdit.map { edit in { edit(template) } },
+            onDelete: onDelete.map { delete in { delete(template) } })
+            .frame(width: 150)
+            .accessibilityIdentifier(tileID)
     }
 }
 
@@ -395,10 +383,11 @@ private struct PromptTemplateTile: View {
     }
 }
 
-// MARK: - Step 2: set it up
+// MARK: - The story, who's filming, which camera
 
-/// Solo or together, then the two things that actually change the film: how
-/// long each clip runs and which way the frame sits.
+/// The rest of the page: the story's name and moments, then 谁来拍 and
+/// 用哪台相机拍. Not its own screen any more — it sits under `MoodStep` in
+/// the composer's single scroll.
 struct SetupStep: View {
     let template: ChallengeTemplate?
     /// The template's own cover picture, if the user uploaded one.
@@ -410,8 +399,7 @@ struct SetupStep: View {
     /// frame rows: a camera already decides the shape of the picture.
     @Binding var cameraStyle: CameraStyle
     /// The story's moments, as raw display strings once touched. Editable here
-    /// so you can see exactly what you'll be asked to film before committing —
-    /// picking a mood shouldn't mean accepting seven prompts sight unseen.
+    /// so you can see exactly what you'll be asked to film before committing.
     @Binding var moments: [String]
     let isOneDay: Bool
     let isTimeOnly: Bool
@@ -435,27 +423,25 @@ struct SetupStep: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                heading
-                if isTimeOnly {
-                    timeOnlyCard
-                } else {
-                    nameField
-                    momentsCard
-                }
-                companyPicker
-                setupCard
-                // Failures live in the footer next to the button that caused
-                // them — at the end of this scroll they were below the fold,
-                // so "Create room" looked like it did nothing at all.
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
+        VStack(alignment: .leading, spacing: 24) {
+            storySection
+            companyPicker
+            setupCard
         }
-        .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
+        .padding(.horizontal, 20)
         .animation(OneDay.Motion.soft, value: withFriends)
+    }
+
+    private var storySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: Strings.composerThisStory)
+            nameField
+            if isTimeOnly {
+                timeOnlyCard
+            } else {
+                momentsCard
+            }
+        }
     }
 
     private var timeOnlyCard: some View {
@@ -478,17 +464,6 @@ struct SetupStep: View {
         }
         .padding(15)
         .glassSurface(radius: OneDay.Radius.card, tint: .oneDayBrand)
-    }
-
-    private var heading: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Fixed: the company picker below already says who's filming, and
-            // a title that renamed itself on that toggle read as a new screen.
-            Text(Strings.composerSetupStep)
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-        }
-        .padding(.top, 4)
     }
 
     /// The chosen script, restated small, with the story's editable name.
@@ -689,40 +664,20 @@ struct SetupStep: View {
     }
 }
 
-/// One camera on the setup page: the picture's shape, tinted roughly the way
-/// that camera grades, with its name and what it looks like underneath.
+/// One camera on the page: the camera itself as a little mascot, a corner
+/// badge in the shape of its frame, its name and what it looks like.
 private struct CameraOption: View {
     let style: CameraStyle
     let isOn: Bool
     let action: () -> Void
 
     private var shape: CGFloat { style.aspectRatio(for: .portrait) ?? 3 / 4 }
-
-    private var swatch: [Color] {
-        switch style {
-        case .camcorder: [Color(red: 0.42, green: 0.55, blue: 0.68), Color(red: 0.2, green: 0.26, blue: 0.34)]
-        case .film: [Color(red: 0.98, green: 0.72, blue: 0.42), Color(red: 0.6, green: 0.34, blue: 0.2)]
-        case .instant: [Color(red: 0.95, green: 0.88, blue: 0.8), Color(red: 0.74, green: 0.68, blue: 0.62)]
-        case .standard: [.gray, .gray]
-        }
-    }
+    private var card: RoundedRectangle { RoundedRectangle(cornerRadius: 18, style: .continuous) }
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: style == .instant ? 3 : 8, style: .continuous)
-                    .fill(LinearGradient(colors: swatch, startPoint: .top, endPoint: .bottom))
-                    .aspectRatio(shape, contentMode: .fit)
-                    .padding(style == .instant ? 5 : 0)
-                    .padding(.bottom, style == .instant ? 10 : 0)
-                    .background(style == .instant ? Color.white : .clear,
-                                in: RoundedRectangle(cornerRadius: 5))
-                    .overlay {
-                        Image(systemName: style.symbolName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
-                    .frame(height: 96)
+            VStack(spacing: 6) {
+                picture
                 Text(style.displayName)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
@@ -732,18 +687,38 @@ private struct CameraOption: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity)
-            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(isOn ? Color.oneDayBrand : OneDay.hairline, lineWidth: isOn ? 2.5 : 1))
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(OneDay.surface, in: card)
+            .overlay(card.fill(Color.oneDayBrand.opacity(isOn ? 0.08 : 0)))
+            .overlay(card.strokeBorder(
+                isOn ? Color.oneDayBrand : OneDay.hairline, lineWidth: isOn ? 2.5 : 1))
+            .contentShape(card)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    private var picture: some View {
+        Image(style.imageName)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(height: 78)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .bottomTrailing) { frameBadge }
+            .accessibilityHidden(true)
+    }
+
+    /// The frame's shape, drawn small: 3:4 or 2:3, upright.
+    private var frameBadge: some View {
+        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+            .strokeBorder(OneDay.inkSoft, lineWidth: 1.5)
+            .aspectRatio(shape, contentMode: .fit)
+            .frame(height: 18)
+            .padding(.trailing, 4)
     }
 }
 

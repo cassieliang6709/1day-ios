@@ -46,6 +46,16 @@ enum CameraStyle: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// The mascot-style camera picture on the composer's camera cards.
+    var imageName: String {
+        switch self {
+        case .standard: "CameraFilm"
+        case .camcorder: "CameraCamcorder"
+        case .film: "CameraFilm"
+        case .instant: "CameraInstant"
+        }
+    }
+
     var symbolName: String {
         switch self {
         case .standard: "camera"
@@ -281,6 +291,17 @@ enum CameraStyleBaker {
         let asset = AVURLAsset(url: url)
         guard let items = try? await asset.load(.metadata) else { return false }
         return items.contains { $0.identifier == metadataIdentifier }
+    }
+
+    /// The camera a take was baked with, from the same metadata tag. Nil for a
+    /// take no camera baked, or a file that can't be read.
+    static func cameraStyle(of url: URL) async -> CameraStyle? {
+        let asset = AVURLAsset(url: url)
+        guard let items = try? await asset.load(.metadata),
+              let item = items.first(where: { $0.identifier == metadataIdentifier }),
+              let raw = try? await item.load(.stringValue)
+        else { return nil }
+        return CameraStyle(rawValue: raw)
     }
 
     private final class OverlayBox: @unchecked Sendable {

@@ -46,6 +46,13 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     /// In dual mode, true when the secondary camera is the big picture. Flip
     /// toggles this instead of swapping inputs.
     private(set) var isSwapped = false
+    /// Where the inset sits, normalized to the frame (see `PiPInsetLayout`).
+    /// Dragged and pinched on the viewfinder, read by `PiPComposer` when the
+    /// take is folded into one file, and kept across launches — the spot you
+    /// picked is the spot you want next time.
+    var insetRect: CGRect = PiPInsetLayout.load() {
+        didSet { PiPInsetLayout.save(insetRect) }
+    }
     /// Files of the take in flight, collected as each output finishes.
     private var pendingPrimary: URL??
     private var pendingSecondary: URL??
@@ -573,6 +580,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                    primary: primary,
                    secondary: secondary,
                    secondaryIsMain: self.isSwapped,
+                   inset: self.insetRect,
                    square: self.orientation.cropsAfterRecording) {
                 self.clipURL = await CameraStyleBaker.bake(
                     composed, style: self.cameraStyle,
@@ -783,25 +791,25 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 }
 
 /// Folds a dual-camera take — two files, one per camera — into one clip: the
-/// main camera fills the frame, the other sits in the top-right corner.
+/// main camera fills the frame, the other sits in a white-bordered inset
+/// wherever it was placed on the viewfinder (`PiPInsetLayout`).
 ///
 /// Same reasoning as `SquareCrop`: done once, straight after the take, so
 /// every reader of `clipURL` still sees one ordinary file. The audio comes
 /// from the primary file, which is the only one with a microphone connected.
 enum PiPComposer {
-    /// Inset width as a share of the canvas width, and its margin.
-    static let insetShare: CGFloat = 0.3
-    static let marginShare: CGFloat = 0.04
-
     /// The composed clip, or nil on any failure (inputs left in place for
-    /// the caller's fallback). Deletes both inputs on success.
+    /// the caller's fallback). Deletes both inputs on success. `inset` is the
+    /// normalized rect from the viewfinder.
     static func compose(
-        primary: URL, secondary: URL, secondaryIsMain: Bool, square: Bool
+        primary: URL, secondary: URL, secondaryIsMain: Bool,
+        inset: CGRect = PiPInsetLayout.defaultRect(), square: Bool
     ) async -> URL? {
         guard let url = try? await build(
             main: secondaryIsMain ? secondary : primary,
             inset: secondaryIsMain ? primary : secondary,
             audio: primary,
+            insetRect: inset,
             square: square)
         else { return nil }
         try? FileManager.default.removeItem(at: primary)
@@ -822,7 +830,9 @@ enum PiPComposer {
 
     private static func even(_ value: CGFloat) -> CGFloat { (value / 2).rounded(.down) * 2 }
 
-    private static func build(main: URL, inset: URL, audio: URL, square: Bool) async throws -> URL {
+    private static func build(
+        main: URL, inset: URL, audio: URL, insetRect: CGRect, square: Bool
+    ) async throws -> URL {
         let mainAsset = AVURLAsset(url: main)
         let insetAsset = AVURLAsset(url: inset)
         let audioAsset = AVURLAsset(url: audio)
@@ -870,9 +880,10 @@ enum PiPComposer {
                     y: (canvas.height - mainSize.height * mainScale) / 2)),
             at: .zero)
 
-        // Inset: same shape as the canvas, top-right, aspect-filled and
-        // cropped to its box so it does not spill over the main picture.
-        let box = insetRect(in: canvas)
+        // Inset: same shape as the canvas, where it was placed, aspect-filled
+        // and cropped to the picture box inside the white border so it does
+        // not spill over the main picture.
+        let box = pictureBox(insetRect, in: canvas)
         let insetScale = max(box.width / insetSize.width, box.height / insetSize.height)
         let visible = CGRect(
             x: (insetSize.width - box.width / insetScale) / 2,
@@ -898,6 +909,7 @@ enum PiPComposer {
         video.renderSize = canvas
         video.frameDuration = CMTime(value: 1, timescale: 30)
         video.instructions = [instruction]
+        video.animationTool = frameTool(around: insetRect, canvas: canvas)
 
         guard let export = AVAssetExportSession(
             asset: composition, presetName: AVAssetExportPresetHighestQuality)
@@ -918,13 +930,57 @@ enum PiPComposer {
         return output
     }
 
-    /// Where the inset sits on a canvas — shared with the live preview so
-    /// what is framed is what gets filmed.
-    static func insetRect(in canvas: CGSize) -> CGRect {
-        let width = even(canvas.width * insetShare)
-        let height = even(width * canvas.height / canvas.width)
-        let margin = (canvas.width * marginShare).rounded()
-        return CGRect(x: canvas.width - margin - width, y: margin, width: width, height: height)
+    /// The picture box on the file's canvas, snapped to whole even pixels.
+    static func pictureBox(_ rect: CGRect, in canvas: CGSize) -> CGRect {
+        let box = PiPInsetLayout.pictureBox(rect, in: canvas)
+        return CGRect(
+            x: box.minX.rounded(), y: box.minY.rounded(),
+            width: even(box.width), height: even(box.height))
+    }
+
+    /// The white rounded frame burned over the inset, so the file has the
+    /// same snapshot border the viewfinder draws.
+    ///
+    /// A ring — the outer rounded rect minus the inner one, even-odd — laid
+    /// over the video. The picture under it is a plain rectangle; the ring
+    /// covers its square corners because the inner radius is kept small
+    /// enough (see `PiPInsetLayout.cornerShare`). The soft shadow falls
+    /// outward onto the main picture, as the viewfinder's does.
+    private static func frameTool(
+        around rect: CGRect, canvas: CGSize
+    ) -> AVVideoCompositionCoreAnimationTool {
+        let parent = CALayer()
+        parent.frame = CGRect(origin: .zero, size: canvas)
+        // Top-left origin, to match the rect's coordinates.
+        parent.isGeometryFlipped = true
+        let videoLayer = CALayer()
+        videoLayer.frame = parent.frame
+        parent.addSublayer(videoLayer)
+        parent.addSublayer(frameLayer(around: rect, canvas: canvas))
+        return AVVideoCompositionCoreAnimationTool(
+            postProcessingAsVideoLayer: videoLayer, in: parent)
+    }
+
+    private static func frameLayer(around rect: CGRect, canvas: CGSize) -> CALayer {
+        let outer = PiPInsetLayout.box(rect, in: canvas)
+        let border = PiPInsetLayout.border(in: canvas)
+        let radius = PiPInsetLayout.cornerRadius(in: canvas)
+        let path = CGMutablePath()
+        path.addRoundedRect(in: outer, cornerWidth: radius, cornerHeight: radius)
+        let innerRadius = max(radius - border, 0)
+        path.addRoundedRect(
+            in: outer.insetBy(dx: border, dy: border),
+            cornerWidth: innerRadius, cornerHeight: innerRadius)
+        let ring = CAShapeLayer()
+        ring.frame = CGRect(origin: .zero, size: canvas)
+        ring.path = path
+        ring.fillRule = .evenOdd
+        ring.fillColor = CGColor(gray: 1, alpha: 1)
+        ring.shadowColor = CGColor(gray: 0, alpha: 1)
+        ring.shadowOpacity = 0.28
+        ring.shadowRadius = border * 2
+        ring.shadowOffset = CGSize(width: 0, height: border * 0.75)
+        return ring
     }
 }
 

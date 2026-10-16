@@ -16,10 +16,9 @@ struct RecordClipView: View {
     /// about this story rather than decoration. 0 = no story behind this take
     /// (free-form), and then no indicator is drawn at all.
     var momentCount = 0
-    /// The story's length is where this take starts, not where it's stuck: the
-    /// timer chip switches it for this recording only. `@State` so the chip can
-    /// write to it — the value the caller passes seeds the camera the first
-    /// time it opens for a slot and is never written back to the challenge.
+    /// The story's clip length. Kept so callers can still pass it, but no
+    /// longer read by the shutter: every take is `takeSeconds` long since
+    /// tap-to-film, and the timer chip that cycled this is gone.
     @State var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
@@ -48,11 +47,6 @@ struct RecordClipView: View {
     @Environment(AccountStore.self) private var account
     @State private var recorder = ClipRecorder()
     @State private var ringProgress: CGFloat = 0
-    /// When the finger went down on an idle shutter; nil when it isn't down.
-    @State private var pressStartedAt: Date?
-    /// Whether this take is being held. A held take stops on release; a tapped
-    /// one runs to the cap, as every take used to.
-    @State private var isHolding = false
     @State private var overlayText = ""
     @State private var showSavePicker = false
     @State private var showNoPlaceExits = false
@@ -99,8 +93,12 @@ struct RecordClipView: View {
     private var myTint: Color { Color.oneDayBrand }
     @AppStorage(CameraStyle.storageKey) private var cameraStyle: CameraStyle = CameraStyle.defaultCamera
 
-    private var clipSeconds: Double { clipLength.seconds }
-    private var clipSecondsText: String { clipLength.secondsLabel }
+    /// Every take is two seconds: one tap, the camera stops itself. Hold-to-
+    /// record gave clips of every length, which made the stitched film uneven
+    /// and asked people to judge timing while also framing the shot.
+    static let takeSeconds: Double = 2
+    private var clipSeconds: Double { Self.takeSeconds }
+    private var clipSecondsText: String { Challenge.ClipLength.tiny.secondsLabel }
     /// The free-form camera used to leave 68pt here for the floating bar
     /// under it. The bar is hidden while the camera is up as of 1.5.
     private var bottomInset: CGFloat { 8 }
@@ -191,8 +189,8 @@ struct RecordClipView: View {
         }
         .onDisappear { recorder.teardown() }
         .allowsHitTesting(!isLeaving)
-        // Felt rather than seen: with hold-to-record the finger is on the
-        // shutter, covering the ring, at exactly the moments these fire.
+        // Felt rather than seen: the thumb is still on or near the shutter,
+        // covering the ring, at exactly the moments these fire.
         .sensoryFeedback(.impact(weight: .medium), trigger: recorder.state) { _, now in
             now == .recording
         }
@@ -200,8 +198,6 @@ struct RecordClipView: View {
         .sensoryFeedback(.error, trigger: recorder.failureCount)
         .onChange(of: recorder.failureCount) { _, _ in
             ringProgress = 0
-            isHolding = false
-            pressStartedAt = nil
             showToast(Strings.recordingFailed)
         }
         .confirmationDialog(
@@ -284,27 +280,7 @@ struct RecordClipView: View {
                 livePreview
                 #endif
             }
-            .overlay(alignment: .topLeading) {
-                Button {
-                    guard recorder.state != .recording, recorder.clipURL == nil else { return }
-                    clipLength = switch clipLength {
-                    case .tiny: .story
-                    case .story: .scene
-                    case .scene: .tiny
-                    }
-                } label: {
-                    Label(Strings.clipCap(clipSecondsText), systemImage: "timer")
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .cameraGlass(.capsule)
-                }
-                .buttonStyle(.plain)
-                .disabled(recorder.state == .recording || recorder.clipURL != nil)
-                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
-                .padding(12)
-            }
-            // Under the timer chip, inside the frame: a refused microphone
+            // Top-left, inside the frame: a refused microphone
             // films silent clips, and a silent preview looks exactly like a
             // working one. iOS won't ask twice, so the only fix is Settings.
             .overlay(alignment: .topLeading) {
@@ -321,8 +297,7 @@ struct RecordClipView: View {
                             .cameraGlass(.capsule)
                     }
                     .buttonStyle(.plain)
-                    .padding(.leading, 12)
-                    .padding(.top, 48)
+                    .padding(12)
                 }
             }
             // Pinch the picture itself, which is where the hand already is.
@@ -371,23 +346,16 @@ struct RecordClipView: View {
         }
     }
 
-    /// Shorter than this and a release counts as a tap, not a hold.
-    private static let holdThreshold: TimeInterval = 0.35
-    /// The floor on any take. Under a second there's nothing to see, and a
-    /// stop that lands before the movie output has started is ignored by it —
-    /// the take would then run on to the cap instead.
-    static let minimumClipSeconds: TimeInterval = 1
-
-    /// Not a `Button`: a button fires on release, and a hold has to start on
-    /// touch-down. The press itself is read by `shutterGesture`, which sits on
-    /// the row so it survives this view being swapped for the countdown ring
-    /// under the finger. The instruction is back because holding isn't
-    /// guessable from a circle the way tapping is.
+    /// One tap films a two-second take that stops on its own. A `Button`
+    /// again: with nothing to hold, firing on release is what a tap means.
     private var idleRecordingControl: some View {
-        CenteredCaptureControl(instruction: Strings.holdToFilm) {
-            recordButtonVisual
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
+        CenteredCaptureControl(instruction: Strings.tapToFilmTwoSeconds) {
+            Button { startCapture() } label: {
+                recordButtonVisual
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
@@ -395,85 +363,51 @@ struct RecordClipView: View {
             recording: false,
             secondsLabel: clipSecondsText
         ))
-        // VoiceOver can't hold; activating gets a tapped take, which stops on
-        // its own at the cap or on the ring.
+        .accessibilityHint(Strings.tapToFilmTwoSeconds)
         .accessibilityAction { startCapture() }
     }
 
     /// Match the idle shutter's center axis; translated instructions sit below
     /// rather than pushing the countdown sideways.
     private var recordingControls: some View {
-        CenteredCaptureControl(instruction: isHolding ? Strings.releaseToStop : Strings.tapToStop) {
+        CenteredCaptureControl(instruction: Strings.filmingTwoSeconds) {
             countdownRing
         }
     }
 
-    /// Press starts a take at once. Let go quickly and it was a tap — the take
-    /// runs to the cap. Hold, and letting go is the stop.
-    private var shutterGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { _ in
-                guard pressStartedAt == nil, !isLeaving, recorder.state == .ready,
-                      recorder.clipURL == nil
-                else { return }
-                pressStartedAt = .now
-                startCapture()
-            }
-            .onEnded { _ in
-                guard let pressed = pressStartedAt else { return }
-                pressStartedAt = nil
-                if Date.now.timeIntervalSince(pressed) >= Self.holdThreshold {
-                    stopCapture()
-                } else {
-                    isHolding = false
-                }
-            }
-    }
-
     private func startCapture() {
-        isHolding = true
+        guard !isLeaving, recorder.state == .ready, recorder.clipURL == nil else { return }
         recorder.startRecording(seconds: clipSeconds)
     }
 
-    /// Stops now, or at the one-second floor if the take is younger than that.
-    private func stopCapture() {
-        isHolding = false
-        guard recorder.state == .recording, let started = recorder.recordedAt else { return }
-        let wait = Self.minimumClipSeconds - Date.now.timeIntervalSince(started)
-        guard wait > 0 else { return recorder.stopRecording() }
-        Task {
-            try? await Task.sleep(for: .seconds(wait))
-            // Only the take this stop was meant for.
-            guard recorder.recordedAt == started else { return }
-            recorder.stopRecording()
+    /// A countdown, not a control: the take stops itself at two seconds and a
+    /// tap here does nothing. Cutting a two-second take shorter only ever made
+    /// a clip too short to see.
+    private var countdownRing: some View {
+        ZStack {
+            Circle()
+                .stroke(Color(.systemGray5), lineWidth: 4)
+                .frame(width: 68, height: 68)
+            Circle()
+                .trim(from: 0, to: ringProgress)
+                .stroke(myTint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 68, height: 68)
+            countdownNumber
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.captureState(recording: true, secondsLabel: clipSecondsText))
     }
 
-    private var countdownRing: some View {
-        Button {
-            stopCapture()
-        } label: {
-            ZStack {
-                Circle()
-                    .stroke(Color(.systemGray5), lineWidth: 4)
-                    .frame(width: 68, height: 68)
-                Circle()
-                    .trim(from: 0, to: ringProgress)
-                    .stroke(myTint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 68, height: 68)
-                TimelineView(.periodic(from: .now, by: 0.1)) { context in
-                    let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
-                    let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
-                    Text("\(remaining)")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(myTint)
-                        .monospacedDigit()
-                }
-            }
+    private var countdownNumber: some View {
+        TimelineView(.periodic(from: .now, by: 0.1)) { context in
+            let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
+            let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
+            Text("\(remaining)")
+                .font(.system(size: 28, weight: .black, design: .rounded))
+                .foregroundStyle(myTint)
+                .monospacedDigit()
         }
-        .accessibilityLabel(Strings.captureState(recording: true, secondsLabel: clipSecondsText))
-        .accessibilityHint(Strings.tapToStop)
     }
 
     // MARK: - Review (Use / Retake)
@@ -874,9 +808,8 @@ struct RecordClipView: View {
     /// wordmark and the moment's name — the two things you read rather than
     /// press.
     ///
-    /// `recordingControls` keeps its caption: mid-take, 轻点停止 is not
-    /// decoration, it is the only thing on screen that says the take can be cut
-    /// short, and the ring it sits under is counting rather than inviting.
+    /// `recordingControls` keeps a caption: mid-take it says the camera will
+    /// stop itself, since the ring it sits under is counting, not a button.
     private var shutterRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -891,8 +824,6 @@ struct RecordClipView: View {
                     idleRecordingControl
                 }
             }
-            .contentShape(Rectangle())
-            .simultaneousGesture(shutterGesture)
 
             HStack(spacing: 6) {
                 flipButton
@@ -925,9 +856,19 @@ struct RecordClipView: View {
     }
 
     /// The main camera full frame and, in dual mode, the other one in the
-    /// corner — laid out where `PiPComposer` will put it in the file.
+    /// white-bordered inset — laid out where `PiPComposer` will put it in the
+    /// file. The inset moves and resizes only between takes: the file is
+    /// composed from `recorder.insetRect` after the take, so a drag mid-take
+    /// would put the inset somewhere the viewfinder never showed it.
     private var livePreview: some View {
-        DualCameraStage(showsInset: recorder.isDualCamera, swapped: recorder.isSwapped) {
+        DualCameraStage(
+            showsInset: recorder.isDualCamera,
+            swapped: recorder.isSwapped,
+            inset: recorder.insetRect,
+            isEditable: recorder.state == .ready,
+            onInsetChange: { recorder.insetRect = $0 },
+            onTapInset: { recorder.flipCamera() }
+        ) {
             CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
         } secondary: {
             SecondaryCameraPreview(session: recorder.session) {
@@ -938,16 +879,25 @@ struct RecordClipView: View {
 
     private var dualCameraButton: some View {
         Button { recorder.setDualCamera(!recorder.isDualCamera) } label: {
-            Image(systemName: recorder.isDualCamera
-                ? "rectangle.inset.topright.filled"
-                : "rectangle.inset.topright")
+            DualCameraGlyph(isOn: recorder.isDualCamera)
                 .cameraGlass()
+                .overlay(dualCameraOnRing)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.dualCamera)
         .accessibilityAddTraits(recorder.isDualCamera ? .isSelected : [])
         .disabled(recorder.state != .ready || recorder.clipURL != nil)
         .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+    }
+
+    /// A brand ring around the glass when dual mode is on, so on and off
+    /// differ by more than the small rectangle's fill.
+    private var dualCameraOnRing: some View {
+        Circle()
+            .strokeBorder(Color.oneDayBrand, lineWidth: 2)
+            .frame(width: 38, height: 38)
+            .opacity(recorder.isDualCamera ? 1 : 0)
+            .allowsHitTesting(false)
     }
 
     /// Dazz-style: which camera you're holding. Picks the frame, the date and
