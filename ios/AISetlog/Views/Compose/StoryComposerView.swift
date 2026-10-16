@@ -2,9 +2,11 @@ import SwiftUI
 
 /// Making a story, on one page (1.5).
 ///
-/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 拍几天, 模板 (the user's
-/// own first, then that length's built-ins), 名字, 自己拍 / 和朋友一起拍,
-/// 用哪台相机拍, and one pinned 开始拍.
+/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 模板 (the user's own
+/// first, then the built-ins), 名字, 自己拍 / 和朋友一起拍, 用哪台相机拍, and
+/// one pinned 开始拍. No 一日 / 7 日 choice: every new story is one day. A
+/// room with friends has no list either — the room is what holds the day, so
+/// 拍什么 and 模板 hide and it films by time.
 ///
 /// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
 /// drafted by AI from one sentence, in the same page. A template fills the
@@ -27,7 +29,8 @@ struct StoryComposerView: View {
     @State private var entry: ComposerEntry = .byTime
     /// A built-in poster or one of the user's own templates, when one is chosen.
     @State private var templateID: UUID?
-    @State private var days: Challenge.Mode = .oneDay
+    /// No longer asked: 一日 / 7 日 is gone from the page, every new story is one day.
+    private let days: Challenge.Mode = .oneDay
     /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
     /// and the camera you pick already decides the frame's shape.
     private let clipLength: Challenge.ClipLength = .scene
@@ -110,8 +113,11 @@ struct StoryComposerView: View {
         }
         // Switching to solo answers "sign into iCloud" all by itself, so the
         // warning shouldn't outlive the choice that caused it.
-        .onChange(of: withFriends) { _, _ in errorText = nil }
-        .onChange(of: days) { _, newDays in daysChanged(to: newDays) }
+        .onChange(of: withFriends) { _, together in
+            errorText = nil
+            // A room films by time: drop any list or template picked before.
+            if together { chooseByTime() }
+        }
     }
 
     // MARK: - Layout
@@ -134,10 +140,11 @@ struct StoryComposerView: View {
                     .foregroundStyle(OneDay.ink)
                     .accessibilityIdentifier("composer-question")
                     .padding(.horizontal, ComposerLayout.margin)
-                WhatToFilmSection(
-                    entry: entry, onWriteList: openList, onByTime: chooseByTime)
-                DaysSection(days: $days)
-                templates
+                if !withFriends {
+                    WhatToFilmSection(
+                        entry: entry, onWriteList: openList, onByTime: chooseByTime)
+                    templates
+                }
                 setup
             }
             .padding(.bottom, 16)
@@ -149,7 +156,7 @@ struct StoryComposerView: View {
     private var templates: some View {
         TemplatesSection(
             mine: store.customTemplates,
-            builtIns: days == .oneDay ? oneDayPosters : sevenDayPosters,
+            builtIns: oneDayPosters,
             selectedTemplateID: templateID,
             onChoose: choose,
             onEdit: { editingTemplate = $0 },
@@ -260,16 +267,6 @@ struct StoryComposerView: View {
         templateID = nil
         moments = []
         if wasNamedByIt { title = "" }
-    }
-
-    /// A built-in poster belongs to one length; switching away from it drops
-    /// it rather than making a seven-day story from a one-day script.
-    private func daysChanged(to newDays: Challenge.Mode) {
-        let posters = newDays == .oneDay ? oneDayPosters : sevenDayPosters
-        let isOtherLengthPoster = (oneDayPosters + sevenDayPosters)
-            .contains { $0.id == templateID } && !posters.contains { $0.id == templateID }
-        if isOtherLengthPoster { deselectTemplate() }
-        syncTitleToTemplate()
     }
 
     private func deleteTemplate(_ template: ChallengeTemplate) {

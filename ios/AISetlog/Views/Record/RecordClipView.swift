@@ -605,6 +605,12 @@ struct RecordClipView: View {
             dismiss()
             return
         }
+        // A free take goes to 我的 without a question; a moment's take still
+        // asks, since its first answer is to use it for that moment.
+        if isFreeform {
+            keepAsDraft { dismiss() }
+            return
+        }
         askBeforeDiscarding = true
     }
 

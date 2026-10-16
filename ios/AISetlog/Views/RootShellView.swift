@@ -235,8 +235,12 @@ struct RootShellView: View {
                     if next == .friends { friendsTabSelections += 1 }
                     return
                 }
+                // A free take is kept in 我的 (only you see it) rather than
+                // asked about: it can be sent to a room from there later.
                 pendingSurface = next
-                askBeforeLeavingCamera = true
+                unfiledGuard.keep?()
+                justKeptADraft = true
+                leaveCamera()
             })
     }
 

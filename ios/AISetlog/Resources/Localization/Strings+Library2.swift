@@ -5,11 +5,14 @@ import Foundation
 extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
-    static func libraryDraftsChip(_ n: Int) -> String { zh ? "待归档 (\(n))" : "Unfiled (\(n))" }
+    /// A clip in no story or room is no longer "waiting to be filed": it is
+    /// kept in 我的, seen only by you, and can be sent on from there.
+    static func libraryDraftsChip(_ n: Int) -> String { zh ? "只有我 (\(n))" : "Only me (\(n))" }
     /// The corner badge on a draft's tile.
-    static var libraryDraftBadge: String { zh ? "待归档" : "Unfiled" }
-    static var libraryDraftQuestion: String { zh ? "这段还没放进故事" : "This clip isn't in a story yet" }
-    static var libraryFileIntoStory: String { zh ? "放进故事" : "Add to a story" }
+    static var libraryDraftBadge: String { zh ? "只有我" : "Only me" }
+    static var libraryDraftQuestion: String { zh ? "这段只有你看得到" : "Only you can see this clip" }
+    static var libraryFileIntoStory: String { zh ? "发到房间或故事" : "Send to a room or story" }
+    static var libraryOpenStory: String { zh ? "打开故事" : "Open story" }
 
     /// "已选 4 段 · 约 8 秒". Seconds are nil until the files have been read.
     static func librarySelectedSummary(_ count: Int, seconds: Int?) -> String {

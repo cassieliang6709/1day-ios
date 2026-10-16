@@ -74,13 +74,21 @@ struct DraftFilingBlocked: Identifiable {
 
 extension View {
     /// Tapping a draft in 我的: 放进故事 or 删除, the delete confirmed first.
-    func draftActions(for draft: Binding<ClipDraft?>) -> some View {
-        modifier(DraftActionsModifier(active: draft))
+    /// `send` and `delete` skip the question and go straight to that step —
+    /// the day player's own buttons.
+    func draftActions(
+        for draft: Binding<ClipDraft?>,
+        send: Binding<ClipDraft?> = .constant(nil),
+        delete: Binding<ClipDraft?> = .constant(nil)
+    ) -> some View {
+        modifier(DraftActionsModifier(active: draft, send: send, delete: delete))
     }
 }
 
 private struct DraftActionsModifier: ViewModifier {
     @Binding var active: ClipDraft?
+    @Binding var send: ClipDraft?
+    @Binding var delete: ClipDraft?
 
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
@@ -113,6 +121,16 @@ private struct DraftActionsModifier: ViewModifier {
                 Button(Strings.ok, role: .cancel) {}
             } message: { Text($0.message) }
             .overlay(alignment: .top) { toastView }
+            .onChange(of: send) { _, draft in
+                guard let draft else { return }
+                send = nil
+                file(draft)
+            }
+            .onChange(of: delete) { _, draft in
+                guard let draft else { return }
+                delete = nil
+                pendingDelete = draft
+            }
     }
 
     /// On a background view: two confirmation dialogs on one view fight.

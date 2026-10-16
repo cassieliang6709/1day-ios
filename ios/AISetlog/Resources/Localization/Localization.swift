@@ -689,13 +689,13 @@ enum Strings {
     /// somewhere findable or just stays on this screen.
     static var keepClipFootnote: String {
         lang == .chinese
-            ? "「保留」会存进草稿，之后再决定放进哪个故事。「丢弃」之后这段就找不回来了。"
-            : "Keep puts it in drafts to file later. Discard means it's gone."
+            ? "「保留」会存进「我的」，只有你看得到，之后可以发到房间或故事。「丢弃」之后这段就找不回来了。"
+            : "Keep puts it in Mine, seen only by you, to send on later. Discard means it's gone."
     }
     static var draftSaveFailed: String {
         lang == .chinese ? "这段没保住，再试一次？" : "Couldn't keep this clip. Try again?"
     }
-    static var draftKept: String { lang == .chinese ? "已存起来" : "Kept for later" }
+    static var draftKept: String { lang == .chinese ? "已存进我的" : "Kept in Me" }
     /// The way back to what you just kept.
     ///
     /// Confirming "保留" while leaving the camera used to say 已存起来 as a
@@ -706,9 +706,9 @@ enum Strings {
 
     // Drafts: the list they live in until they're filed.
     static func draftsPending(_ count: Int) -> String {
-        lang == .chinese ? "\(count) 段待归档" : "\(count) waiting to be filed"
+        lang == .chinese ? "\(count) 段只有我看得到" : "\(count) only you can see"
     }
-    static var draftsTitle: String { lang == .chinese ? "待归档" : "Waiting to be filed" }
+    static var draftsTitle: String { lang == .chinese ? "只有我" : "Only me" }
     static var draftsEmpty: String {
         lang == .chinese
             ? "没有待归档的片子。录完找不到地方放的时候，会先存到这里。"

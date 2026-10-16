@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// 我的's archive (1.5): every clip — yours, your friends', drafts — with a
@@ -25,6 +26,13 @@ struct LibrarySection: View {
     @State private var month = Calendar.current.startOfMonth(for: .now)
     /// The draft whose 放进故事 / 删除 choice is up. See `draftActions`.
     @State private var activeDraft: ClipDraft?
+    /// The day being played after a tap on one of its clips.
+    @State private var playing: LibraryDayPlayback?
+    /// What the player asked for, run once its sheet is gone: a second sheet
+    /// can't come up while the first is still on screen.
+    @State private var afterPlaying: (() -> Void)?
+    @State private var sendDraft: ClipDraft?
+    @State private var deleteDraft: ClipDraft?
 
     @Environment(MoodStore.self) private var moodStore: MoodStore?
     @Environment(ClipDraftStore.self) private var draftStore
@@ -81,7 +89,17 @@ struct LibrarySection: View {
             if !selecting { picked = [] }
         }
         .onChange(of: draftsRequest) { _, _ in showDrafts() }
-        .draftActions(for: $activeDraft)
+        .draftActions(for: $activeDraft, send: $sendDraft, delete: $deleteDraft)
+        .sheet(item: $playing, onDismiss: {
+            afterPlaying?()
+            afterPlaying = nil
+        }) { playback in
+            LibraryDayPlayer(
+                playback: playback,
+                onOpenStory: { id in finishPlaying { onOpenStory(id) } },
+                onSend: { draft in finishPlaying { sendDraft = draft } },
+                onDelete: { draft in finishPlaying { deleteDraft = draft } })
+        }
         // Reads each clip's camera off the main actor, once; cached app-wide.
         .task(id: library.clips.map(\.cameraKey)) {
             cameraIndex.load(library.clips)
@@ -242,9 +260,10 @@ struct LibrarySection: View {
     // MARK: - Grid
 
     /// A diary: one block per day, newest day first, each headed by its date
-    /// and how many clips it holds. Tiles are 9:16, the shape a phone films
-    /// in, with 3pt gaps the way Photos packs a grid — a 3:4 card with a
-    /// heavy caption read as a wall of boxes rather than a day of footage.
+    /// and how many clips it holds. Tiles are 3:4, the shape of the DV and
+    /// instant cameras, with 3pt gaps the way Photos packs a grid. The whole
+    /// frame shows — border, date and all — since that is what tells the
+    /// cameras apart; a 2:3 film clip sits in its tile on a blurred bed.
     private var grid: some View {
         LazyVStack(alignment: .leading, spacing: 22) {
             ForEach(dayGroups, id: \.day) { group in
@@ -264,6 +283,21 @@ struct LibrarySection: View {
                 }
             }
         }
+    }
+
+    /// The tapped clip's day, oldest first, playing from the tapped one.
+    private func play(from clip: LibraryClip) {
+        let day = Calendar.current.startOfDay(for: clip.recordedAt)
+        let clips = (dayGroups.first { $0.day == day }?.clips ?? [clip])
+            .sorted { $0.recordedAt < $1.recordedAt }
+        playing = LibraryDayPlayback(
+            day: day, clips: clips, start: clips.firstIndex(of: clip) ?? 0,
+            drafts: draftStore.sortedDrafts)
+    }
+
+    private func finishPlaying(_ next: @escaping () -> Void) {
+        afterPlaying = next
+        playing = nil
     }
 
     private var dayGroups: [(day: Date, clips: [LibraryClip])] {
@@ -307,18 +341,18 @@ struct LibrarySection: View {
         return Button {
             if isSelecting {
                 if let order { picked.remove(at: order) } else { picked.append(clip) }
-            } else if let story = clip.storyID {
-                onOpenStory(story)
-            } else if case .draft(let id) = clip.source {
-                activeDraft = draftStore.sortedDrafts.first { $0.id == id }
+            } else {
+                play(from: clip)
             }
         } label: {
-            // A fixed 3:4 box with the thumbnail cropped into it: given the
+            // A fixed 3:4 box with the thumbnail fitted into it: given the
             // thumbnail itself as the sizing view, a portrait clip grew the
             // cell past its column and over the filter row.
             Color.clear
-                .aspectRatio(9 / 16, contentMode: .fit)
-                .overlay { ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt) }
+                .aspectRatio(3 / 4, contentMode: .fit)
+                .overlay {
+                    ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
+                }
                 .clipped()
                 .overlay(alignment: .bottomLeading) { caption(clip) }
                 .overlay(alignment: .bottomTrailing) {
@@ -587,5 +621,198 @@ struct LibraryCalendar: View {
 extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         self.date(from: dateComponents([.year, .month], from: date)) ?? startOfDay(for: date)
+    }
+}
+
+// MARK: - Day player
+
+/// One day of 我的, handed to `LibraryDayPlayer`.
+struct LibraryDayPlayback: Identifiable {
+    let id = UUID()
+    let day: Date
+    /// Oldest first, the order the day happened in.
+    let clips: [LibraryClip]
+    let start: Int
+    /// To turn a draft clip back into the `ClipDraft` its actions need.
+    let drafts: [ClipDraft]
+
+    func draft(for clip: LibraryClip) -> ClipDraft? {
+        guard case .draft(let id) = clip.source else { return nil }
+        return drafts.first { $0.id == id }
+    }
+}
+
+/// Tapping a clip in 我的 plays that day: from the tapped clip to the end of
+/// the day, then round again. Under it, what to do with the clip on screen —
+/// send a clip only you can see to a room or story, or open the story a clip
+/// is already in. Deleting sits in the ⋯ menu.
+struct LibraryDayPlayer: View {
+    let playback: LibraryDayPlayback
+    let onOpenStory: (UUID) -> Void
+    let onSend: (ClipDraft) -> Void
+    let onDelete: (ClipDraft) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var index: Int
+
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    init(
+        playback: LibraryDayPlayback,
+        onOpenStory: @escaping (UUID) -> Void,
+        onSend: @escaping (ClipDraft) -> Void,
+        onDelete: @escaping (ClipDraft) -> Void
+    ) {
+        self.playback = playback
+        self.onOpenStory = onOpenStory
+        self.onSend = onSend
+        self.onDelete = onDelete
+        _index = State(initialValue: playback.start)
+    }
+
+    private var clip: LibraryClip { playback.clips[index] }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            header
+            DayQueuePlayer(urls: playback.clips.map(\.url), start: playback.start, index: $index)
+                .aspectRatio(3 / 4, contentMode: .fit)
+                .background(Color.black)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.horizontal, 20)
+                .accessibilityIdentifier("library-day-player")
+            Spacer(minLength: 0)
+            actions
+        }
+        .padding(.top, 20)
+        .padding(.bottom, 12)
+        .background(OneDay.canvas)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(playback.day.formatted(
+                    .dateTime.month().day().weekday(.abbreviated).locale(AppLanguage.effective.locale)))
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                Text("\(index + 1) / \(playback.clips.count) · \(sourceName)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(OneDay.inkSoft)
+            }
+            Spacer()
+            if let draft = playback.draft(for: clip) {
+                Menu {
+                    Button(Strings.deleteDraft, role: .destructive) { onDelete(draft) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(OneDay.ink)
+                        .frame(width: 38, height: 38)
+                        .background(OneDay.surface, in: Circle())
+                }
+                .accessibilityIdentifier("library-day-more")
+            }
+            IconBubble(systemName: "xmark") { dismiss() }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var sourceName: String {
+        switch clip.source {
+        case .story(_, let title, _): title
+        case .draft: Strings.libraryDraftBadge
+        }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        if let draft = playback.draft(for: clip) {
+            Button(Strings.libraryFileIntoStory) { onSend(draft) }
+                .buttonStyle(.primaryAction)
+                .padding(.horizontal, 20)
+                .accessibilityIdentifier("library-day-send")
+        } else if let story = clip.storyID {
+            Button(Strings.libraryOpenStory) { onOpenStory(story) }
+                .buttonStyle(.primaryAction)
+                .padding(.horizontal, 20)
+                .accessibilityIdentifier("library-day-open-story")
+        }
+    }
+}
+
+/// Plays `urls` back to back from `start`, wrapping to the first after the
+/// last, and reports which one is on screen.
+private struct DayQueuePlayer: UIViewRepresentable {
+    let urls: [URL]
+    let start: Int
+    @Binding var index: Int
+
+    final class PlayerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    }
+
+    final class Coordinator {
+        let player = AVQueuePlayer()
+        var urls: [URL] = []
+        var next = 0
+        var observer: NSObjectProtocol?
+        var onIndex: (Int) -> Void = { _ in }
+        /// Which url each queued item came from.
+        var queued: [ObjectIdentifier: Int] = [:]
+
+        /// Keeps two items ahead in the queue so playback runs straight on.
+        func fill() {
+            guard !urls.isEmpty else { return }
+            while player.items().count < 2 {
+                let item = AVPlayerItem(url: urls[next])
+                queued[ObjectIdentifier(item)] = next
+                player.insert(item, after: nil)
+                next = (next + 1) % urls.count
+            }
+        }
+
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            player.pause()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> PlayerView {
+        let view = PlayerView()
+        view.playerLayer.videoGravity = .resizeAspect
+        let coordinator = context.coordinator
+        coordinator.urls = urls
+        coordinator.next = min(max(start, 0), max(urls.count - 1, 0))
+        coordinator.onIndex = { i in index = i }
+        view.playerLayer.player = coordinator.player
+        coordinator.fill()
+        coordinator.observer = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
+        ) { [weak coordinator] note in
+            guard let coordinator, let ended = note.object as? AVPlayerItem,
+                  coordinator.queued[ObjectIdentifier(ended)] != nil else { return }
+            coordinator.queued[ObjectIdentifier(ended)] = nil
+            DispatchQueue.main.async {
+                coordinator.fill()
+                if let current = coordinator.player.currentItem,
+                   let i = coordinator.queued[ObjectIdentifier(current)] {
+                    coordinator.onIndex(i)
+                }
+            }
+        }
+        coordinator.player.play()
+        return view
+    }
+
+    func updateUIView(_ uiView: PlayerView, context: Context) {}
+
+    static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
+        coordinator.player.pause()
+        coordinator.player.removeAllItems()
     }
 }
