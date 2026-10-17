@@ -340,6 +340,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             orientation: orientation,
             devicePosition: device.position,
             coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelPreview)
+
         if let connection = previewLayer?.connection,
            connection.isVideoRotationAngleSupported(previewAngle) {
             connection.videoRotationAngle = previewAngle
@@ -684,9 +685,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
         // Keep the current lens if it pairs; otherwise step down the back
         // lens list until one does.
+        // From the front camera, the single wide lens first: a virtual back
+        // device (triple / dual) has no one video port to wire into the
+        // inset, so the pair came up empty and dual mode silently failed.
         let backTypes = position == .back
             ? [primary.device.deviceType] + Self.backCameraTypes
-            : Self.backCameraTypes
+            : [.builtInWideAngleCamera] + Self.backCameraTypes
         var chosen: (main: AVCaptureDevice, other: AVCaptureDevice)?
         for type in backTypes {
             guard let back = AVCaptureDevice.default(type, for: .video, position: .back),

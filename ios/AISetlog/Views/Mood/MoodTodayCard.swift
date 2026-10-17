@@ -8,6 +8,12 @@ struct MoodTodayCard: View {
     @Environment(MoodStore.self) private var moods
     @State private var isEditing = false
     @State private var showChat = false
+    /// Bumped when the date rolls over or the app comes back, so a card left
+    /// on screen overnight shows today (empty) rather than yesterday's mood.
+    @State private var dayTick = 0
+    @Environment(\.scenePhase) private var scenePhase
+    /// Read so a renamed mascot renames the chat button straight away.
+    @AppStorage(MascotName.storageKey) private var mascotName = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,10 +25,19 @@ struct MoodTodayCard: View {
         .animation(OneDay.Motion.soft, value: phase)
         .sheet(isPresented: $showChat) { MascotChatSheet() }
         .accessibilityIdentifier("mood-today-card")
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in newDay() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { newDay() } }
     }
 
     private var phase: MoodCardPhase {
-        MoodCardPhase(entry: moods.today, isEditing: isEditing)
+        _ = dayTick
+        _ = mascotName
+        return MoodCardPhase(entry: moods.today, isEditing: isEditing)
+    }
+
+    private func newDay() {
+        dayTick += 1
+        if moods.today == nil { isEditing = false }
     }
 
     @ViewBuilder private var content: some View {
@@ -57,6 +72,8 @@ private struct MoodSavedContent: View {
     let entry: MoodEntry
     let onEdit: () -> Void
     let onChat: () -> Void
+    /// The button says the mascot's name; reading it here re-draws on rename.
+    @AppStorage(MascotName.storageKey) private var mascotName = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -66,12 +83,28 @@ private struct MoodSavedContent: View {
                 Spacer(minLength: 0)
                 editButton
             }
+            // A small chip, not a full-width button: the card is about the
+            // mood; chatting is the extra.
             Button(action: onChat) {
-                Label(Strings.moodChatButton, systemImage: "bubble.left.and.bubble.right.fill")
+                HStack(spacing: 8) {
+                    Image(entry.mood.imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 22, height: 22)
+                    Text(Strings.chatButton(named: mascotName))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+                .padding(.top, 10)
+                .overlay(alignment: .top) { Rectangle().fill(OneDay.hairline).frame(height: 1) }
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.softAction)
+            .buttonStyle(.plain)
             .accessibilityIdentifier("mood-chat")
-            MoodPrivateHint()
         }
     }
 
@@ -141,7 +174,6 @@ private struct MoodEditorContent: View {
                     .buttonStyle(.primaryAction)
                     .accessibilityIdentifier("mood-done")
             }
-            MoodPrivateHint()
         }
     }
 }

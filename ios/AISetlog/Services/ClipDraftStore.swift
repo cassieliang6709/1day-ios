@@ -96,6 +96,12 @@ final class ClipDraftStore {
         drafts.removeAll { $0.id == draft.id }
     }
 
+    /// A draft's caption, edited after the take. Nil clears it.
+    func updateOverlayText(_ text: String?, draftID: UUID) {
+        guard let i = drafts.firstIndex(where: { $0.id == draftID }) else { return }
+        drafts[i].overlayText = text
+    }
+
     /// Total bytes drafts are holding, for the "this is what it costs" line.
     var totalByteSize: Int64 {
         drafts.reduce(0) { $0 + $1.byteSize }

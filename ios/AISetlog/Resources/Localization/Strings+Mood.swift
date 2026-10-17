@@ -37,6 +37,11 @@ extension Strings {
     static var moodChatTitle: String { mascotName }
     /// The name the user gave the mascot, else 小方块.
     static var mascotName: String { MascotName.current ?? mood("小方块", "Little Cube") }
+    /// 「和豆豆聊两句」 for a given stored name; empty means the default.
+    static func chatButton(named name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? moodChatButton : mood("和\(trimmed)聊两句", "Chat with \(trimmed)")
+    }
     static var mascotNameQuestion: String { mood("给它起个名字吧", "Give it a name") }
     static var mascotNameMessage: String {
         mood("它会用这个名字和你聊天。之后点标题可以再改。", "It'll go by this name when you chat. Tap the title to change it later.")

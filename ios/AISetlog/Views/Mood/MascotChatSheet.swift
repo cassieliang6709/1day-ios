@@ -118,11 +118,7 @@ private struct MascotChatList: View {
                     ForEach(messages) { MascotBubble(role: $0.role, text: $0.content, face: face) }
                     if isWaiting { MascotBubble(role: .assistant, text: "…", face: face) }
                     if let fallback { MascotBubble(role: .assistant, text: fallback, face: face) }
-                    Label(Strings.moodChatPrivate, systemImage: "lock.fill")
-                        .font(OneDay.Font.micro)
-                        .foregroundStyle(OneDay.inkFaint)
-                        .frame(maxWidth: .infinity)
-                        .id("bottom")
+                    Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(16)
             }

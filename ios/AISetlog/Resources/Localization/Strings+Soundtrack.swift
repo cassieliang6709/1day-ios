@@ -6,6 +6,9 @@ extension Strings {
         AppLanguage.effective.resolved == .chinese ? zh : en
     }
 
+    /// On the viewfinder while the phone is held sideways.
+    static var filmingSideways: String { sound("横拍", "Landscape") }
+
     static var soundTitle: String { sound("声音", "Sound") }
     static var soundOriginal: String { sound("原声", "Original") }
     static var soundMusic: String { sound("音乐", "Music") }

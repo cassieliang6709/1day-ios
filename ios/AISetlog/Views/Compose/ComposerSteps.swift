@@ -122,9 +122,9 @@ private struct ChoiceRow: View {
 // MARK: - 模板
 
 /// Templates as a two-column grid: the user's own first (badged 我的), then
-/// the built-ins for the chosen length. Four at first; 更多模板 opens the
-/// rest in place. Tapping the chosen one again lets go. No sideways
-/// scrolling on this page.
+/// the built-ins. One row on the page (the chosen one stays in it);
+/// 更多模板 opens every template in a sheet, so the page stays short.
+/// Tapping the chosen one again lets go. No sideways scrolling on this page.
 struct TemplatesSection: View {
     let mine: [ChallengeTemplate]
     let builtIns: [ChallengeTemplate]
@@ -135,15 +135,21 @@ struct TemplatesSection: View {
     let coverURL: (ChallengeTemplate) -> URL?
 
     @State private var showsAll = false
-    private static let firstCount = 4
+    private static let firstCount = 2
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     private var all: [(template: ChallengeTemplate, isMine: Bool)] {
         mine.map { ($0, true) } + builtIns.map { ($0, false) }
     }
 
+    /// The first row, with the chosen template in it even when it came from
+    /// the sheet.
     private var shown: [(template: ChallengeTemplate, isMine: Bool)] {
-        showsAll ? all : Array(all.prefix(Self.firstCount))
+        let head = Array(all.prefix(Self.firstCount))
+        guard let picked = all.first(where: { $0.template.id == selectedTemplateID }),
+              !head.contains(where: { $0.template.id == picked.template.id })
+        else { return head }
+        return [picked] + head.prefix(Self.firstCount - 1)
     }
 
     var body: some View {
@@ -155,16 +161,48 @@ struct TemplatesSection: View {
             if all.count > Self.firstCount { moreButton }
         }
         .padding(.horizontal, ComposerLayout.margin)
-        .animation(OneDay.Motion.soft, value: showsAll)
+        .sheet(isPresented: $showsAll) { allTemplatesSheet }
+    }
+
+    private var allTemplatesSheet: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(all, id: \.template.id) { item in
+                        TemplateTile(
+                            template: item.template,
+                            isMine: item.isMine,
+                            isSelected: item.template.id == selectedTemplateID,
+                            coverURL: coverURL(item.template),
+                            onSelect: {
+                                onChoose(item.template)
+                                showsAll = false
+                            },
+                            onEdit: item.isMine ? { onEdit(item.template) } : nil,
+                            onDelete: item.isMine ? { onDelete(item.template) } : nil)
+                    }
+                }
+                .padding(ComposerLayout.margin)
+            }
+            .background(OneDay.canvas)
+            .navigationTitle(Strings.composerTemplates)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(Strings.cancel) { showsAll = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     private var moreButton: some View {
         Button {
-            showsAll.toggle()
+            showsAll = true
         } label: {
             Label(
-                showsAll ? Strings.composerFewerTemplates : Strings.composerMoreTemplates(all.count - Self.firstCount),
-                systemImage: showsAll ? "chevron.up" : "chevron.down")
+                Strings.composerMoreTemplates(all.count - Self.firstCount),
+                systemImage: "square.grid.2x2")
                 .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.brandText)
                 .frame(maxWidth: .infinity, minHeight: 36)

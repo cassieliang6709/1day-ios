@@ -322,7 +322,7 @@ enum Strings {
 
     static var startToday: String { lang == .chinese ? "开始今天" : "Start today" }
     static var enterInviteCode: String { lang == .chinese ? "输入邀请码" : "Enter invite code" }
-    static var newStory: String { lang == .chinese ? "新建故事" : "New story" }
+    static var newStory: String { lang == .chinese ? "新建选题" : "New topic" }
     /// Home header progress, beside the date: "今天 1/7".
     static func headerDateProgress(_ recorded: Int, _ total: Int) -> String {
         lang == .chinese ? "今天 \(recorded)/\(total)" : "Today \(recorded)/\(total)"
@@ -332,7 +332,7 @@ enum Strings {
     /// "挑战" is a word from an earlier version of the app; everything else on
     /// these screens calls the thing a story, including the confirmation this
     /// button opens.
-    static var deleteChallenge: String { lang == .chinese ? "删除故事" : "Delete story" }
+    static var deleteChallenge: String { lang == .chinese ? "删除选题" : "Delete topic" }
 
     /// Deleting a story and leaving a room are one menu item but two very
     /// different outcomes, and the difference is exactly what someone needs to
@@ -347,7 +347,7 @@ enum Strings {
         if lang == .chinese {
             return clipCount > 0
                 ? "已经拍的 \(clipCount) 段视频会一起删掉，找不回来。"
-                : "这个故事会从这台设备上删掉，找不回来。"
+                : "这个选题会从这台设备上删掉，找不回来。"
         }
         return clipCount > 0
             ? "The \(clipCount) clip\(clipCount == 1 ? "" : "s") you filmed will be deleted too. This can't be undone."
@@ -438,7 +438,7 @@ enum Strings {
     // MARK: New challenge
 
     static func titlePrompt(oneDay: Bool) -> String {
-        if lang == .chinese { return oneDay ? "我的一日故事…" : "我的七日目标…" }
+        if lang == .chinese { return oneDay ? "我的选题…" : "我的七日目标…" }
         return oneDay ? "My 1-day story..." : "My 7-day goal..."
     }
     static var modeOneDay: String { lang == .chinese ? "一日" : "1-Day" }
@@ -522,11 +522,11 @@ enum Strings {
     /// accessibility name.
     static var surfaceCamera: String { lang == .chinese ? "拍摄" : "Camera" }
     static var friendsEmptyTitle: String {
-        lang == .chinese ? "还没有和朋友一起拍的故事" : "No stories with friends yet"
+        lang == .chinese ? "还没有和朋友一起拍的房间" : "No stories with friends yet"
     }
     static var friendsEmptyBody: String {
         lang == .chinese
-            ? "建一个一起拍的故事，把邀请码发给朋友。大家拍的片段会剪进同一支片。"
+            ? "开一个房间，把邀请码发给朋友。大家拍的片段会剪进同一支片。"
             : "Start a story together and send your friends the code. Everyone's clips go into one film."
     }
     static var inviteFriends: String { lang == .chinese ? "邀请朋友一起拍" : "Invite friends" }
@@ -590,7 +590,7 @@ enum Strings {
     static var saveVlogToPhotos: String { lang == .chinese ? "存到相册" : "Save to Photos" }
     static var vlogShape: String { lang == .chinese ? "画幅" : "Shape" }
     static var freeformSlot: String { lang == .chinese ? "自由拍摄" : "Free-form" }
-    static var fileToPlan: String { lang == .chinese ? "放进故事" : "Add to a story" }
+    static var fileToPlan: String { lang == .chinese ? "放进选题" : "Add to a topic" }
     static var fileThisClipTo: String { lang == .chinese ? "把这段视频存入…" : "File this clip to…" }
     /// Filing one clip into several stories at once, new in 1.3.
     ///
@@ -611,13 +611,13 @@ enum Strings {
         lang == .chinese ? "放进「\(moment)」" : "Lands in \(moment)"
     }
     static func filedToCount(_ count: Int) -> String {
-        if lang == .chinese { return "已存进 \(count) 个故事" }
+        if lang == .chinese { return "已存进 \(count) 个选题" }
         return count == 1 ? "Filed to 1 story" : "Filed to \(count) stories"
     }
     static var pickAtLeastOneStory: String {
         lang == .chinese ? "选一个地方放" : "Pick somewhere to put it"
     }
-    static var makePlanFirst: String { lang == .chinese ? "先建一个故事" : "Start a story first" }
+    static var makePlanFirst: String { lang == .chinese ? "先建一个选题" : "Start a topic first" }
     static func filedTo(_ title: String) -> String {
         lang == .chinese ? "已存入「\(title)」" : "Filed to “\(title)”"
     }
@@ -679,7 +679,7 @@ enum Strings {
 
     // Drafts: what a clip does when there's nowhere to file it yet.
     static var saveAsDraft: String { lang == .chinese ? "先存起来" : "Keep it for now" }
-    static var createStoryNow: String { lang == .chinese ? "现在就建个故事" : "Start a story now" }
+    static var createStoryNow: String { lang == .chinese ? "现在就建个选题" : "Start a topic now" }
     static var noPlaceYet: String { lang == .chinese ? "这段还没有地方放" : "Nowhere to put this yet" }
     static var keepClipQuestion: String { lang == .chinese ? "这段还没归档" : "This clip isn't filed yet" }
     static var keepClip: String { lang == .chinese ? "保留" : "Keep" }
@@ -689,7 +689,7 @@ enum Strings {
     /// somewhere findable or just stays on this screen.
     static var keepClipFootnote: String {
         lang == .chinese
-            ? "「保留」会存进「我的」，只有你看得到，之后可以发到房间或故事。「丢弃」之后这段就找不回来了。"
+            ? "「保留」会存进「我的」，只有你看得到，之后可以放进选题或发到房间。「丢弃」之后这段就找不回来了。"
             : "Keep puts it in Mine, seen only by you, to send on later. Discard means it's gone."
     }
     static var draftSaveFailed: String {
@@ -726,14 +726,14 @@ enum Strings {
     /// Every slot in that story already holds a clip. Filing here would have to
     /// overwrite one, so it doesn't.
     static var storyIsFull: String {
-        lang == .chinese ? "这个故事满了，没有空位" : "That story is full — no slot left."
+        lang == .chinese ? "这个选题满了，没有空位" : "That story is full — no slot left."
     }
     /// No matching story for this clip's frame, from inside the drafts list —
     /// where "retake" isn't an option, so it says what would help instead.
     static func noPlaceForDraft(_ orientation: Challenge.Orientation) -> String {
         let kind = orientationName(orientation)
         return lang == .chinese
-            ? "还没有\(kind)的故事能放这段"
+            ? "还没有\(kind)的选题能放这段"
             : "No \(kind) story can take this yet"
     }
     /// The dialog behind that line — see `ClipFiling.Blocker` for why there
@@ -742,13 +742,13 @@ enum Strings {
     static func noStoryOfThisFrameYet(_ orientation: Challenge.Orientation) -> String {
         let kind = orientationName(orientation)
         return lang == .chinese
-            ? "归档是把这段放进一个同画幅的故事里。你还没有\(kind)的故事——在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，这段就能归档了。"
+            ? "归档是把这段放进一个同画幅的选题里。你还没有\(kind)的选题——在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，这段就能归档了。"
             : "Filing puts the clip into a story shot the same way round, and you don't have a \(kind) one yet. Tap + \(surfaceCompose) on \(surfacePlans) to make one, and this clip can go in."
     }
     static func everyStoryOfThisFrameIsFull(_ orientation: Challenge.Orientation) -> String {
         let kind = orientationName(orientation)
         return lang == .chinese
-            ? "你的\(kind)故事每个瞬间都拍满了，再放就会盖掉已有的片段。新建一个\(kind)故事，或者在已有的故事里删掉一段，这段就有位置了。"
+            ? "你的\(kind)选题每个瞬间都拍满了，再放就会盖掉已有的片段。新建一个\(kind)选题，或者在已有的选题里删掉一段，这段就有位置了。"
             : "Every moment in your \(kind) stories is already filmed, and filing here would have to overwrite one. Make another \(kind) story, or clear a moment in one of them, and this clip has somewhere to go."
     }
     /// Rounded file size, so someone can see which drafts are worth deleting.
@@ -824,7 +824,7 @@ enum Strings {
     static var signedInWithApple: String {
         lang == .chinese ? "已用 Apple ID 登录" : "Signed in with Apple"
     }
-    static var statStories: String { lang == .chinese ? "故事" : "Stories" }
+    static var statStories: String { lang == .chinese ? "选题" : "Topics" }
     static var statMoments: String { lang == .chinese ? "瞬间" : "Moments" }
     /// Stories with every moment filmed. Deliberately not "films exported" —
     /// nothing tracks exports, and a number the app can't actually count is
@@ -930,7 +930,7 @@ enum Strings {
     }
     static var saveToTemplateLibraryNote: String {
         lang == .chinese
-            ? "下次开新故事，这套题目还在，直接选就行。"
+            ? "下次开新选题，这套题目还在，直接选就行。"
             : "Next time you start a story, this set of prompts is still there."
     }
     static var templateCoverLabel: String {
@@ -1015,17 +1015,17 @@ enum Strings {
         guard let name, !name.isEmpty else { return part }
         return lang == .chinese ? "\(part)，\(name)" : "\(part), \(name)"
     }
-    static var todaysStory: String { lang == .chinese ? "今天的故事" : "Today's story" }
+    static var todaysStory: String { lang == .chinese ? "我的选题" : "My topics" }
     /// Used instead of `todaysStory` when nothing was started today but
     /// something is still unfinished — saying "today's story" then would be a
     /// lie about what the card is.
     static var resumeStory: String { lang == .chinese ? "接着拍" : "Pick it back up" }
     static var startTodayLabel: String { lang == .chinese ? "今天" : "Today" }
     static var startTodayBody: String {
-        lang == .chinese ? "还没开始今天的故事" : "Today's story hasn't started"
+        lang == .chinese ? "今天还没开始拍" : "Today's story hasn't started"
     }
     static var startTodayCTA: String {
-        lang == .chinese ? "开始今天的故事" : "Start today's story"
+        lang == .chinese ? "今天想拍什么" : "What to film today"
     }
     /// Heads the reverse-chronological list below today's story. Replaces the
     /// old "your other plans" / "finished films" split, which sorted by state
@@ -1035,18 +1035,18 @@ enum Strings {
     /// 「往前翻」 / "Earlier" variant for days holding nothing from today, but
     /// the hero is lifted *out* of the list — so the day you made a story was
     /// exactly the day the list renamed itself away from it. See `HomeStories`.
-    static var yourStories: String { lang == .chinese ? "你的故事" : "Your stories" }
+    static var yourStories: String { lang == .chinese ? "你的选题" : "Your topics" }
     static var todayLabel: String { lang == .chinese ? "今天" : "Today" }
     static var yesterdayLabel: String { lang == .chinese ? "昨天" : "Yesterday" }
     static var continueTodaysStory: String {
-        lang == .chinese ? "继续今天的故事" : "Continue today's story"
+        lang == .chinese ? "继续拍" : "Continue today's story"
     }
     static var watchYourFilm: String { lang == .chinese ? "看看你的影片" : "Watch your film" }
     static var startTodaysStory: String {
-        lang == .chinese ? "开始今天的故事" : "Start today's story"
+        lang == .chinese ? "今天想拍什么" : "What to film today"
     }
     static var noStoryTitle: String {
-        lang == .chinese ? "今天还没有故事" : "No story yet today"
+        lang == .chinese ? "今天还没有选题" : "No story yet today"
     }
     static var noStoryBody: String {
         lang == .chinese
@@ -1090,7 +1090,7 @@ enum Strings {
 
     static var composerSetupStep: String { lang == .chinese ? "设置" : "Setup" }
     static var newStoryQuestion: String {
-        lang == .chinese ? "今天会是什么故事？" : "What will today's story be?"
+        lang == .chinese ? "今天想拍什么？" : "What do you want to film today?"
     }
     /// The one-screen composer: the poster *is* the submit button, so the
     /// label above the grid has to say so — there is no 下一步 left to imply it.
@@ -1199,7 +1199,7 @@ enum Strings {
     /// because it is otherwise identical to a broken switch.
     static var reminderNothingToNudge: String {
         lang == .chinese
-            ? "今天没有要提醒的故事 —— 建一个就会排上"
+            ? "今天没有要提醒的选题 —— 建一个就会排上"
             : "Nothing to remind you about yet — start a story and it'll queue up"
     }
     static var reminderBlocked: String {
@@ -1231,7 +1231,7 @@ enum Strings {
     /// The settings sheet behind a poster's gear, and the button that closes
     /// it by creating the story.
     static var storySettingsTitle: String {
-        lang == .chinese ? "故事设置" : "Story settings"
+        lang == .chinese ? "选题设置" : "Topic settings"
     }
     static var startFilmingCTA: String {
         lang == .chinese ? "开始拍" : "Start filming"
@@ -1281,7 +1281,7 @@ enum Strings {
     }
     /// Beside the room's own count, so "3/5" can mean the day and this can
     /// mean me. Only shown when the two differ.
-    static var storyNameLabel: String { lang == .chinese ? "故事名字" : "Story name" }
+    static var storyNameLabel: String { lang == .chinese ? "选题名字" : "Topic name" }
 
     // MARK: Moments (composer)
 
@@ -1305,7 +1305,7 @@ enum Strings {
     }
     /// Shown on the name card itself, where the fix is.
     static var storyNameNeeded: String {
-        lang == .chinese ? "先给故事起个名字" : "Give the story a name first"
+        lang == .chinese ? "先给选题起个名字" : "Give the topic a name first"
     }
     // MARK: Prompts from one sentence
 
@@ -1518,7 +1518,7 @@ enum Strings {
         lang == .chinese ? "本地演示 · 不会发送给朋友" : "Local demo · Nothing is sent to friends"
     }
     static var chatEmpty: String {
-        lang == .chinese ? "在这里聊聊你们的故事" : "Talk about your story here"
+        lang == .chinese ? "在这里聊聊今天拍的" : "Talk about your story here"
     }
     static var chatTitle: String { lang == .chinese ? "房间聊天" : "Room chat" }
     static var chatDemoTitle: String { lang == .chinese ? "聊天演示" : "Chat demo" }
@@ -1619,7 +1619,7 @@ enum Strings {
     /// somebody has to be called something in a room full of friends.
     static var defaultMemberName: String { lang == .chinese ? "朋友" : "Friend" }
     static var notSignedIn: String {
-        lang == .chinese ? "未登录（只有共享故事需要登录）" : "Not signed in — only shared stories need it"
+        lang == .chinese ? "未登录（只有和朋友一起拍需要登录）" : "Not signed in — only shared stories need it"
     }
     /// The way back in. Until this existed, signing out was one-way from here:
     /// the only other sign-in gate is the one guarding a shared story.
@@ -1632,7 +1632,7 @@ enum Strings {
     }
     static var signOutConfirmMessage: String {
         lang == .chinese
-            ? "退出后，共享房间会在这台设备上隐藏，重新登录就会回来。自己的故事不受影响。"
+            ? "退出后，共享房间会在这台设备上隐藏，重新登录就会回来。自己的选题不受影响。"
             : "Shared rooms will be hidden on this device until you sign back in. Your own stories stay put."
     }
     static var avatarColourLabel: String { lang == .chinese ? "头像颜色" : "Avatar colour" }
@@ -1643,7 +1643,7 @@ enum Strings {
     }
     static var deleteAccountWarning: String {
         lang == .chinese
-            ? "这会永久删除这台设备上的全部故事和片段，以及你在共享房间里上传的片段、回应和评论。朋友们自己的片段会保留，但你的名字会被移除。此操作无法撤销。"
+            ? "这会永久删除这台设备上的全部选题和片段，以及你在共享房间里上传的片段、回应和评论。朋友们自己的片段会保留，但你的名字会被移除。此操作无法撤销。"
             : "This permanently removes every story and clip on this device, plus the clips, reactions and comments you added to shared rooms. Your friends keep their own clips, but your name is removed. This cannot be undone."
     }
     static var deleteAccountConfirm: String {
@@ -1659,7 +1659,7 @@ enum Strings {
     }
     static var deleteAccountFailedMessage: String {
         lang == .chinese
-            ? "网络中断，云端还有一部分没删掉。你的故事和视频都还在这台设备上，没有动。连上网络后再试一次，会从断掉的地方接着删。"
+            ? "网络中断，云端还有一部分没删掉。你的选题和视频都还在这台设备上，没有动。连上网络后再试一次，会从断掉的地方接着删。"
             : "The connection dropped and some of your records are still in the cloud. Nothing on this device has been touched. Try again when you're back online and it will pick up where it stopped."
     }
     /// Replaces a departed creator's name on a room their friends still use.

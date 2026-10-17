@@ -66,6 +66,18 @@ struct RecordClipView: View {
     /// A pinch reports a running multiple of where it began, so where it began
     /// has to be remembered for the length of the gesture. nil = not pinching.
     @State private var pinchStartZoom: CGFloat?
+    /// How far the phone is turned from upright: 0, or ±90 held sideways.
+    /// The screen stays portrait (as the system Camera does); the buttons turn
+    /// by this much so they read upright, and the frame says it's 横拍.
+    /// 横拍, switched on by hand. Only the button turns the camera's layout;
+    /// turning the phone by itself doesn't (not in 1.5).
+    @State private var manualSideways = false
+    /// 「横拍」 is a notice, not a fixture: up for `badgeSeconds` on turning
+    /// sideways, then gone so it doesn't sit on the picture.
+    @State private var showsSidewaysBadge = false
+    private static let badgeSeconds = 1.5
+    private var deviceTurn: Double { manualSideways ? 90 : 0 }
+    private var isSideways: Bool { deviceTurn != 0 }
     /// Set once this screen has decided to go — the toast saying what happened
     /// is on screen and the dismiss is a beat behind it. Blocks the shutter in
     /// that beat, so a take can't start on a camera that's about to close.
@@ -268,7 +280,8 @@ struct RecordClipView: View {
                 showsPrompt: showsPrompt,
                 aspectRatio: activeCamera.aspectRatio(for: effectiveOrientation)
                     ?? effectiveOrientation.aspectRatio,
-                cameraStyle: activeCamera
+                cameraStyle: activeCamera,
+                turn: deviceTurn
             ) {
                 #if DEBUG && targetEnvironment(simulator)
                 if ClipRecorder.isSimulated {
@@ -317,17 +330,61 @@ struct RecordClipView: View {
             // progress bars sit in the bottom ~56pt of the frame and are
             // promises about the export, so the offset is what keeps this
             // legal — see `ZoomControlRow`.
-            .overlay(alignment: .bottom) {
-                zoomControls
-                    .padding(.bottom, Self.burnInHeight)
+            .overlay(alignment: zoomAlignment) {
+                if isSideways {
+                    // Along the edge that is the bottom of the landscape take,
+                    // turned with the phone, clear of the burn-in there.
+                    zoomControls
+                        .fixedSize()
+                        .rotationEffect(.degrees(deviceTurn))
+                        .frame(width: 56)
+                        .padding(deviceTurn > 0 ? .leading : .trailing, Self.burnInHeight - 16)
+                } else {
+                    zoomControls
+                        .padding(.bottom, Self.burnInHeight)
+                }
             }
+            .overlay { if showsSidewaysBadge { sidewaysBadge.transition(.opacity) } }
             .layoutPriority(1)
 
             shutterRow
         }
+        .animation(OneDay.Motion.snap, value: deviceTurn)
+        .onChange(of: isSideways) { _, sideways in flashSidewaysBadge(sideways) }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
+    }
+
+    /// 「横拍」 over the middle of the frame, turned to read upright in the
+    /// hand, so a sideways take never looks like a portrait one.
+    private var sidewaysBadge: some View {
+        Label(Strings.filmingSideways, systemImage: "rectangle.landscape.rotate")
+            .font(.system(size: 13, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.45), in: Capsule())
+            .rotationEffect(.degrees(deviceTurn))
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("camera-sideways")
+    }
+
+    private var zoomAlignment: Alignment {
+        guard isSideways else { return .bottom }
+        return deviceTurn > 0 ? .leading : .trailing
+    }
+
+    private func flashSidewaysBadge(_ sideways: Bool) {
+        guard sideways else {
+            withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = false }
+            return
+        }
+        withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.badgeSeconds))
+            withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = false }
+        }
     }
 
     /// How much of the frame's bottom edge the burn-in block occupies:
@@ -819,7 +876,8 @@ struct RecordClipView: View {
     private var shutterRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
-                if recorder.supportsDualCamera { dualCameraButton }
+                sidewaysButton
+                if recorder.supportsDualCamera { dualCameraButton.rotationEffect(.degrees(deviceTurn)) }
             }
             .frame(maxWidth: .infinity)
 
@@ -832,13 +890,31 @@ struct RecordClipView: View {
             }
 
             HStack(spacing: 6) {
-                flipButton
-                if lockedCamera == nil { cameraStyleButton }
+                flipButton.rotationEffect(.degrees(deviceTurn))
+                if lockedCamera == nil { cameraStyleButton.rotationEffect(.degrees(deviceTurn)) }
             }
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+    }
+
+    /// 横拍: lit when on. Turns the camera's buttons and badge for holding
+    /// the phone sideways; the take itself follows how the phone is held.
+    private var sidewaysButton: some View {
+        Button {
+            withAnimation(OneDay.Motion.snap) { manualSideways.toggle() }
+        } label: {
+            Image(systemName: "rectangle.landscape.rotate")
+                .foregroundStyle(isSideways ? Color.oneDayBrand : .white)
+                .cameraGlass()
+                .rotationEffect(.degrees(deviceTurn))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.filmingSideways)
+        .accessibilityAddTraits(isSideways ? .isSelected : [])
+        .accessibilityIdentifier("camera-sideways-toggle")
+        .disabled(recorder.state == .recording)
     }
 
     private var orientationButton: some View {

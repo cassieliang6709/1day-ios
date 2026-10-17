@@ -50,7 +50,7 @@ extension Strings {
     static var listFromIdeas: String { isChinese ? "从提示库选" : "From ideas" }
     static var listSaveAsTemplate: String { isChinese ? "存为我的模板" : "Save as my template" }
     static var listSaveAsTemplateNote: String {
-        isChinese ? "开始拍时用故事名字存，下次在「模板」里直接选。"
+        isChinese ? "开始拍时用选题名字存，下次在「模板」里直接选。"
             : "Saved under the story's name when you start, ready in Templates next time."
     }
     static func listUseCount(_ count: Int) -> String {

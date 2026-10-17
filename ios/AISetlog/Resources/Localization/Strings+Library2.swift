@@ -11,8 +11,12 @@ extension Strings {
     /// The corner badge on a draft's tile.
     static var libraryDraftBadge: String { zh ? "只有我" : "Only me" }
     static var libraryDraftQuestion: String { zh ? "这段只有你看得到" : "Only you can see this clip" }
-    static var libraryFileIntoStory: String { zh ? "发到房间或故事" : "Send to a room or story" }
-    static var libraryOpenStory: String { zh ? "打开故事" : "Open story" }
+    static var libraryFileIntoStory: String { zh ? "放进选题或发到房间" : "Add to a topic or room" }
+    static var libraryOpenStory: String { zh ? "打开选题" : "Open topic" }
+    static var libraryAddCaption: String { zh ? "加字幕" : "Add caption" }
+    static var libraryEditCaption: String { zh ? "改字幕" : "Edit caption" }
+    static var libraryCaptionPlaceholder: String { zh ? "这一段想说什么" : "Say something about this clip" }
+    static var libraryCaptionSave: String { zh ? "好了" : "Done" }
 
     /// "已选 4 段 · 约 8 秒". Seconds are nil until the files have been read.
     static func librarySelectedSummary(_ count: Int, seconds: Int?) -> String {
@@ -33,13 +37,13 @@ extension Strings {
 
     // Filing a draft, without 竖屏/横屏/正方形: cameras decide the shape now.
     // The matching underneath still checks the frame (old stories need it).
-    static var draftNoPlace: String { zh ? "还没有故事能放这段" : "No story can take this clip yet" }
+    static var draftNoPlace: String { zh ? "还没有选题能放这段" : "No story can take this clip yet" }
     static var draftNoStoryYet: String {
-        zh ? "这段还没有能放进去的故事。在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，就能放进去了。"
+        zh ? "这段还没有能放进去的选题。在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，就能放进去了。"
             : "There's no story this clip can go into yet. Tap + \(surfaceCompose) on \(surfacePlans) to make one, and it can go in."
     }
     static var draftEveryStoryFull: String {
-        zh ? "能放这段的故事都拍满了，再放会盖掉已有的片段。新建一个故事，或者在已有的故事里删掉一段，就有位置了。"
+        zh ? "能放这段的选题都拍满了，再放会盖掉已有的片段。新建一个选题，或者在已有的选题里删掉一段，就有位置了。"
             : "Every story this clip could go into is full, and filing would overwrite a clip. Make a new story, or clear a moment in one, and it has somewhere to go."
     }
 }

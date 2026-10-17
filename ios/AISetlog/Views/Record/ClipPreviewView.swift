@@ -35,7 +35,13 @@ struct ClipPreviewView: View {
     let recordedAt: Date?
     var challengeID: UUID?
     var targetAuthorID: String?
-    let onReRecord: () -> Void
+    /// Nil hides 重拍: replaying a clip from 我的 has no camera to go back to.
+    let onReRecord: (() -> Void)?
+    /// A clip in no story (one only you can see in 我的) has no card to write
+    /// its caption to; this takes the words instead.
+    var onDraftCaption: ((String?) -> Void)? = nil
+    /// The draft's caption as edited here, shown in place of `overlayText`.
+    @State private var draftCaption: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
@@ -143,8 +149,19 @@ struct ClipPreviewView: View {
     /// Only my page may read my live card. A friend's caption belongs to the
     /// displayed clip; a cleared own caption must not revive the deck snapshot.
     private var liveOverlayText: String? {
-        ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
-                                  liveText: card?.overlayText, snapshotText: overlayText)
+        if onDraftCaption != nil { return draftCaption ?? overlayText }
+        return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
+                                         liveText: card?.overlayText, snapshotText: overlayText)
+    }
+
+    /// Where a caption edit goes: the story's card, or the draft.
+    private func writeCaption(_ text: String) {
+        if let onDraftCaption {
+            draftCaption = text
+            onDraftCaption(text.isEmpty ? nil : text)
+        } else if let challengeID {
+            store.updateOverlayText(text, day: day, challengeID: challengeID)
+        }
     }
     private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
 
@@ -462,9 +479,11 @@ struct ClipPreviewView: View {
                     accented: !isShared,
                     identifier: "moment-caption",
                     action: startEditingCaption)
-                actionButton(
-                    "arrow.counterclockwise", Strings.rerecordShort,
-                    accented: false, identifier: "moment-rerecord", action: onReRecord)
+                if let onReRecord {
+                    actionButton(
+                        "arrow.counterclockwise", Strings.rerecordShort,
+                        accented: false, identifier: "moment-rerecord", action: onReRecord)
+                }
             }
             if isShared {
                 // Accented here rather than 加字幕: in a room the thing that
@@ -847,9 +866,9 @@ struct ClipPreviewView: View {
     /// One tap and the words were gone, with nothing to bring them back — so
     /// the toast that follows offers 撤销 for a few seconds.
     private func deleteCaption() {
-        guard let challengeID else { return }
+        guard challengeID != nil || onDraftCaption != nil else { return }
         let removed = liveOverlayText ?? ""
-        store.updateOverlayText("", day: day, challengeID: challengeID)
+        writeCaption("")
         if !removed.isEmpty {
             withAnimation(OneDay.Motion.soft) { deletedCaption = removed }
             Task { @MainActor in
@@ -873,8 +892,8 @@ struct ClipPreviewView: View {
                 Text(Strings.captionDeleted)
                     .font(.subheadline.weight(.semibold))
                 Button(Strings.undo) {
-                    guard let challengeID, let text = deletedCaption else { return }
-                    store.updateOverlayText(text, day: day, challengeID: challengeID)
+                    guard let text = deletedCaption else { return }
+                    writeCaption(text)
                     withAnimation(OneDay.Motion.soft) { deletedCaption = nil }
                 }
                 .font(.subheadline.weight(.heavy))
@@ -1063,12 +1082,12 @@ struct ClipPreviewView: View {
 
     private func saveCaption() {
         editingCaption = false
-        guard let challengeID else { return }
+        guard challengeID != nil || onDraftCaption != nil else { return }
         // A Return pressed at the end leaves a trailing newline; the burned
         // caption shouldn't carry an empty second line.
         let text = captionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         captionDraft = text
-        store.updateOverlayText(text, day: day, challengeID: challengeID)
+        writeCaption(text)
     }
 
     /// The one way out of the editor: the 完成 button, a tap off the caption,

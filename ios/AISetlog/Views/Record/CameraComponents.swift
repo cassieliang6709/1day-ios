@@ -92,6 +92,10 @@ struct CameraShell<Content: View>: View {
     /// Off when a camera prints its own date — on the live picture, or already
     /// baked into the take under review.
     var showsDate = true
+    /// The phone held sideways (±90): the frame's decorations — border, date,
+    /// moment label — are laid out for the landscape take and turned with the
+    /// phone, so they sit where the clip will have them.
+    var turn: Double = 0
     @ViewBuilder var content: Content
 
     private var tint: Color { Identity.tint(for: name) }
@@ -102,18 +106,27 @@ struct CameraShell<Content: View>: View {
                 content
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
-                CameraStyleOverlay(style: cameraStyle, date: timestamp)
-                MomentStampOverlay(
-                    momentTitle: momentTitle,
-                    day: day,
-                    momentCount: momentCount,
-                    mode: mode,
-                    timestamp: timestamp,
-                    overlayText: overlayText,
-                    clipSeconds: clipSeconds,
-                    showsPrompt: showsPrompt,
-                    showsDate: showsDate && cameraStyle == .standard
-                )
+                let sideways = turn != 0
+                ZStack {
+                    CameraStyleOverlay(style: cameraStyle, date: timestamp)
+                    MomentStampOverlay(
+                        momentTitle: momentTitle,
+                        day: day,
+                        momentCount: momentCount,
+                        mode: mode,
+                        timestamp: timestamp,
+                        overlayText: overlayText,
+                        clipSeconds: clipSeconds,
+                        showsPrompt: showsPrompt,
+                        showsDate: showsDate && cameraStyle == .standard
+                    )
+                }
+                .frame(
+                    width: sideways ? proxy.size.height : proxy.size.width,
+                    height: sideways ? proxy.size.width : proxy.size.height)
+                .rotationEffect(.degrees(turn))
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .animation(OneDay.Motion.snap, value: turn)
             }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay {

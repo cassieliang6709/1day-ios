@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 
 /// 我的's archive (1.5): every clip — yours, your friends', drafts — with a
@@ -642,10 +641,11 @@ struct LibraryDayPlayback: Identifiable {
     }
 }
 
-/// Tapping a clip in 我的 plays that day: from the tapped clip to the end of
-/// the day, then round again. Under it, what to do with the clip on screen —
-/// send a clip only you can see to a room or story, or open the story a clip
-/// is already in. Deleting sits in the ⋯ menu.
+/// Tapping a clip in 我的 shows that clip, looping, with the rest of its day a
+/// swipe (or an arrow) away — it doesn't move on by itself. The clip's caption
+/// sits on it and, for your own clips, 改字幕 edits it. Under it, what to do
+/// with the clip on screen: send a clip only you can see to a room or story,
+/// or open the story a clip is already in. Deleting sits in the ⋯ menu.
 struct LibraryDayPlayer: View {
     let playback: LibraryDayPlayback
     let onOpenStory: (UUID) -> Void
@@ -653,7 +653,14 @@ struct LibraryDayPlayer: View {
     let onDelete: (ClipDraft) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ChallengeStore.self) private var store
+    @Environment(ClipDraftStore.self) private var draftStore
     @State private var index: Int
+    /// Captions edited here, by clip id, so the sheet shows the new words
+    /// without waiting for the page behind it to rebuild its snapshot.
+    @State private var editedCaptions: [String: String] = [:]
+    /// The clip open in the room's caption editor (`ClipPreviewView`).
+    @State private var editing: LibraryClip?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -672,21 +679,59 @@ struct LibraryDayPlayer: View {
 
     private var clip: LibraryClip { playback.clips[index] }
 
+    private var caption: String {
+        editedCaptions[clip.id] ?? clip.clip.overlayText ?? ""
+    }
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             header
-            DayQueuePlayer(urls: playback.clips.map(\.url), start: playback.start, index: $index)
-                .aspectRatio(3 / 4, contentMode: .fit)
-                .background(Color.black)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.horizontal, 20)
-                .accessibilityIdentifier("library-day-player")
-            Spacer(minLength: 0)
+            player
+            captionRow
             actions
         }
-        .padding(.top, 20)
+        .padding(.top, 18)
         .padding(.bottom, 12)
         .background(OneDay.canvas)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .fullScreenCover(item: $editing) { clip in captionEditor(clip) }
+    }
+
+    /// The same screen a room opens to caption a moment — type the words,
+    /// change the style, drag them — pointed at this clip. A clip only you can
+    /// see has no story card, so its words go back to the draft.
+    @ViewBuilder
+    private func captionEditor(_ clip: LibraryClip) -> some View {
+        switch clip.source {
+        case .story(let id, _, _):
+            ClipPreviewView(
+                day: clip.clip.day,
+                authorName: clip.authorName,
+                overlayText: clip.clip.overlayText,
+                captionSticker: clip.clip.captionSticker,
+                url: clip.url,
+                recordedAt: clip.recordedAt,
+                challengeID: id,
+                targetAuthorID: clip.clip.authorID,
+                onReRecord: nil)
+                .onDisappear { editedCaptions[clip.id] = storyCaption(clip, in: id) }
+        case .draft(let id):
+            ClipPreviewView(
+                day: 1,
+                overlayText: editedCaptions[clip.id] ?? clip.clip.overlayText,
+                url: clip.url,
+                recordedAt: clip.recordedAt,
+                onReRecord: nil,
+                onDraftCaption: { words in
+                    draftStore.updateOverlayText(words, draftID: id)
+                    editedCaptions[clip.id] = words ?? ""
+                })
+        }
+    }
+
+    private func storyCaption(_ clip: LibraryClip, in story: UUID) -> String {
+        store.challenge(story)?.cards.first { $0.day == clip.clip.day }?.overlayText ?? ""
     }
 
     private var header: some View {
@@ -694,7 +739,7 @@ struct LibraryDayPlayer: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(playback.day.formatted(
                     .dateTime.month().day().weekday(.abbreviated).locale(AppLanguage.effective.locale)))
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                 Text("\(index + 1) / \(playback.clips.count) · \(sourceName)")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -719,6 +764,82 @@ struct LibraryDayPlayer: View {
         .padding(.horizontal, 20)
     }
 
+    /// The clip on screen, looping. Swiping sideways, or the arrows either
+    /// side, moves through the day; nothing advances on its own.
+    private var player: some View {
+        LoopingClipPlayer(url: clip.url, refreshToken: clip.recordedAt)
+            .id(clip.id)
+            .aspectRatio(3 / 4, contentMode: .fit)
+            .frame(maxHeight: 320)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(alignment: .bottom) {
+                if !caption.isEmpty {
+                    Text(caption)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 14)
+                }
+            }
+            .overlay { arrows }
+            .onTapGesture { if clip.isMine { editing = clip } }
+            .gesture(
+                DragGesture(minimumDistance: 24).onEnded { value in
+                    if value.translation.width < -40 { step(1) }
+                    if value.translation.width > 40 { step(-1) }
+                })
+            .padding(.horizontal, 20)
+            .accessibilityIdentifier("library-day-player")
+    }
+
+    @ViewBuilder
+    private var arrows: some View {
+        if playback.clips.count > 1 {
+            HStack {
+                arrow("chevron.left", enabled: index > 0) { step(-1) }
+                Spacer()
+                arrow("chevron.right", enabled: index < playback.clips.count - 1) { step(1) }
+            }
+            .padding(.horizontal, 8)
+        }
+    }
+
+    private func arrow(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.black.opacity(0.35), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .opacity(enabled ? 1 : 0)
+        .disabled(!enabled)
+    }
+
+    private func step(_ delta: Int) {
+        let next = index + delta
+        guard playback.clips.indices.contains(next) else { return }
+        withAnimation(OneDay.Motion.snap) { index = next }
+    }
+
+    /// 加字幕 / 改字幕, on your own clips only: a friend's words are theirs.
+    @ViewBuilder
+    private var captionRow: some View {
+        if clip.isMine {
+            Button { editing = clip } label: {
+                Label(caption.isEmpty ? Strings.libraryAddCaption : Strings.libraryEditCaption,
+                      systemImage: "character.cursor.ibeam")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.brandText)
+            }
+            .accessibilityIdentifier("library-day-caption")
+        }
+    }
+
     private var sourceName: String {
         switch clip.source {
         case .story(_, let title, _): title
@@ -728,91 +849,16 @@ struct LibraryDayPlayer: View {
 
     @ViewBuilder
     private var actions: some View {
-        if let draft = playback.draft(for: clip) {
-            Button(Strings.libraryFileIntoStory) { onSend(draft) }
-                .buttonStyle(.primaryAction)
-                .padding(.horizontal, 20)
-                .accessibilityIdentifier("library-day-send")
-        } else if let story = clip.storyID {
-            Button(Strings.libraryOpenStory) { onOpenStory(story) }
-                .buttonStyle(.primaryAction)
-                .padding(.horizontal, 20)
-                .accessibilityIdentifier("library-day-open-story")
-        }
-    }
-}
-
-/// Plays `urls` back to back from `start`, wrapping to the first after the
-/// last, and reports which one is on screen.
-private struct DayQueuePlayer: UIViewRepresentable {
-    let urls: [URL]
-    let start: Int
-    @Binding var index: Int
-
-    final class PlayerView: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-    }
-
-    final class Coordinator {
-        let player = AVQueuePlayer()
-        var urls: [URL] = []
-        var next = 0
-        var observer: NSObjectProtocol?
-        var onIndex: (Int) -> Void = { _ in }
-        /// Which url each queued item came from.
-        var queued: [ObjectIdentifier: Int] = [:]
-
-        /// Keeps two items ahead in the queue so playback runs straight on.
-        func fill() {
-            guard !urls.isEmpty else { return }
-            while player.items().count < 2 {
-                let item = AVPlayerItem(url: urls[next])
-                queued[ObjectIdentifier(item)] = next
-                player.insert(item, after: nil)
-                next = (next + 1) % urls.count
+        Group {
+            if let draft = playback.draft(for: clip) {
+                Button(Strings.libraryFileIntoStory) { onSend(draft) }
+                    .accessibilityIdentifier("library-day-send")
+            } else if let story = clip.storyID {
+                Button(Strings.libraryOpenStory) { onOpenStory(story) }
+                    .accessibilityIdentifier("library-day-open-story")
             }
         }
-
-        deinit {
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-            player.pause()
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> PlayerView {
-        let view = PlayerView()
-        view.playerLayer.videoGravity = .resizeAspect
-        let coordinator = context.coordinator
-        coordinator.urls = urls
-        coordinator.next = min(max(start, 0), max(urls.count - 1, 0))
-        coordinator.onIndex = { i in index = i }
-        view.playerLayer.player = coordinator.player
-        coordinator.fill()
-        coordinator.observer = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
-        ) { [weak coordinator] note in
-            guard let coordinator, let ended = note.object as? AVPlayerItem,
-                  coordinator.queued[ObjectIdentifier(ended)] != nil else { return }
-            coordinator.queued[ObjectIdentifier(ended)] = nil
-            DispatchQueue.main.async {
-                coordinator.fill()
-                if let current = coordinator.player.currentItem,
-                   let i = coordinator.queued[ObjectIdentifier(current)] {
-                    coordinator.onIndex(i)
-                }
-            }
-        }
-        coordinator.player.play()
-        return view
-    }
-
-    func updateUIView(_ uiView: PlayerView, context: Context) {}
-
-    static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
-        coordinator.player.pause()
-        coordinator.player.removeAllItems()
+        .buttonStyle(.primaryAction)
+        .padding(.horizontal, 20)
     }
 }
