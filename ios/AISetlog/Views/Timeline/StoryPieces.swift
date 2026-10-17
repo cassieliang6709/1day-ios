@@ -24,36 +24,49 @@ struct StoryProgressBar: View {
         return min(Double(filmed) / Double(total), 1)
     }
 
-    /// Just the bar.
+    /// The bar, and one short count under its right end.
     ///
-    /// It used to carry its own caption — `拍了 0/7 个瞬间` on the left, `这一天
+    /// It used to carry a full caption — `拍了 0/7 个瞬间` on the left, `这一天
     /// 拍满了` on the right — which made it the third line in a row to print the
-    /// same three numbers. As of 1.3 it is the *only* progress display on this
-    /// page: the header's date/length/count line is gone entirely, and "the day
-    /// is full" was already said louder by the `FilmReadyCard` that appears
-    /// directly underneath at exactly that moment. What's left is the thing a
-    /// bar is good at: the shape of the progress, read without reading.
+    /// same three numbers, so 1.3 cut it down to the bare bar. That went one
+    /// step too far: a numberless bar reads as "almost there" at 5 of 7 and
+    /// "barely started" at the same 5 of 7, depending on who's looking. What
+    /// came back is the one number that answers "how much is left" — `还差 2 个`
+    /// — small and right-aligned, under the end the bar is filling towards.
     ///
-    /// The numbers stay in the accessibility label, because the shape is the
-    /// one thing VoiceOver can't relay.
+    /// The full count stays in the accessibility label, because the shape is
+    /// the one thing VoiceOver can't relay.
     var body: some View {
-        // A `GeometryReader` rather than a fraction of `maxWidth`: the fill
-        // has to be a real width so the capsule keeps its round ends at 1/7
-        // of the way through a day.
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(OneDay.surfaceSoft.opacity(0.8))
-                Capsule()
-                    .fill(OneDay.brandHorizontal)
-                    .frame(width: max(proxy.size.width * fraction, fraction > 0 ? 8 : 0))
+        VStack(alignment: .trailing, spacing: 5) {
+            // A `GeometryReader` rather than a fraction of `maxWidth`: the fill
+            // has to be a real width so the capsule keeps its round ends at 1/7
+            // of the way through a day.
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(OneDay.surfaceSoft.opacity(0.8))
+                    Capsule()
+                        .fill(OneDay.brandHorizontal)
+                        .frame(width: max(proxy.size.width * fraction, fraction > 0 ? 8 : 0))
+                }
+            }
+            .frame(height: 7)
+            .animation(OneDay.Motion.soft, value: fraction)
+
+            if total > 0 {
+                Text(remaining > 0 ? Strings.momentsToGo(remaining) : Strings.allFilmed)
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(remaining > 0 ? OneDay.inkFaint : Color.oneDayBrand)
+                    .contentTransition(.numericText())
+                    .animation(OneDay.Motion.soft, value: remaining)
             }
         }
-        .frame(height: 7)
-        .animation(OneDay.Motion.soft, value: fraction)
         .accessibilityElement()
         .accessibilityLabel(Strings.momentsFilmed(filmed, total: total))
         .accessibilityValue(total > 0 && filmed >= total ? Strings.dayIsFull : "")
     }
+
+    private var remaining: Int { max(total - filmed, 0) }
 }
 
 /// The film, once every moment holds footage — and the only object on this
@@ -66,14 +79,16 @@ struct StoryProgressBar: View {
 /// button floating at the bottom of this same screen, competing with a card
 /// that wanted you to film instead.
 struct FilmReadyCard: View {
-    let clipCount: Int
+    /// Moments in the story, not clips: a room where three people filmed
+    /// breakfast has three clips of one moment, and the film is cut by moment.
+    let momentCount: Int
     let action: () -> Void
 
     var body: some View {
         Button(action: action) { card }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(Strings.watchTheFilm))
-            .accessibilityHint(Text(Strings.filmFromMoments(clipCount)))
+            .accessibilityHint(Text(Strings.filmFromMoments(momentCount)))
     }
 
     private var card: some View {
@@ -101,9 +116,9 @@ struct FilmReadyCard: View {
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.leading)
 
-                Text(Strings.filmFromMoments(clipCount))
+                Text(Strings.filmFromMoments(momentCount))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
+                    .foregroundStyle(OneDay.onBrand.opacity(0.88))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -112,7 +127,7 @@ struct FilmReadyCard: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(OneDay.onBrand.opacity(0.9))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -153,6 +168,11 @@ struct ClipThumb: View {
     /// own proportions which way the film splits is how the thumbnail ended up
     /// stacking two people the film had put side by side.
     var sourceAspect: CGFloat = 9.0 / 16
+    /// Print the moment's name across the bottom of the still. Off where the
+    /// row already names the moment on the line above — the timeline does —
+    /// because the same words twice in 60 points is a stutter, not a label.
+    /// The reaction keeps its corner either way.
+    var showsCaption = true
     let onTap: () -> Void
 
     private let radius: CGFloat = 16
@@ -164,9 +184,18 @@ struct ClipThumb: View {
     var body: some View {
         Button(action: onTap) { thumb }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text(momentTitle))
+            .accessibilityLabel(Text(accessibilityTitle))
             .accessibilityHint(Text(Strings.watchThisMoment))
             .animation(OneDay.Motion.soft, value: lanes.map(\.id).joined())
+    }
+
+    /// Who's in it, for VoiceOver. Sighted people get that from the faces in
+    /// the corner; without this the faces were read as a row of initials, or
+    /// not at all. Unnamed authors are left out rather than read as blanks.
+    private var accessibilityTitle: String {
+        let named = authorNames.filter { !$0.isEmpty }
+        guard !named.isEmpty else { return momentTitle }
+        return Strings.momentFilmedBy(momentTitle, names: named)
     }
 
     /// A fixed `Color.clear` box with edge-pinned overlays: overlays never
@@ -178,7 +207,16 @@ struct ClipThumb: View {
             .overlay { frames.clipped() }
             .overlay(alignment: .topLeading) { topRow }
             .overlay(alignment: .topTrailing) { playGlyph }
-            .overlay(alignment: .bottom) { caption }
+            .overlay(alignment: .bottom) {
+                if showsCaption {
+                    caption
+                } else if let reaction {
+                    Text(reaction)
+                        .font(.system(size: 10))
+                        .padding(6)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -306,7 +344,7 @@ struct OpenSlotRow: View {
             HStack(spacing: 12) {
                 Image(systemName: momentIcon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
                     .frame(width: 34, height: 34)
                     .background(Color.oneDayMist.opacity(0.55), in: Circle())
 
@@ -320,7 +358,7 @@ struct OpenSlotRow: View {
 
                 Text(trailingLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 

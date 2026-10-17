@@ -35,7 +35,13 @@ struct ClipPreviewView: View {
     let recordedAt: Date?
     var challengeID: UUID?
     var targetAuthorID: String?
-    let onReRecord: () -> Void
+    /// Nil hides 重拍: replaying a clip from 我的 has no camera to go back to.
+    let onReRecord: (() -> Void)?
+    /// A clip in no story (one only you can see in 我的) has no card to write
+    /// its caption to; this takes the words instead.
+    var onDraftCaption: ((String?) -> Void)? = nil
+    /// The draft's caption as edited here, shown in place of `overlayText`.
+    @State private var draftCaption: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
@@ -74,6 +80,9 @@ struct ClipPreviewView: View {
     @State private var showLook = false
     /// Held down in the look panel: play the clip as it was filmed.
     @State private var showingOriginal = false
+    /// The words the ✕ just took off the card, held for the undo toast. nil
+    /// when there's nothing to undo.
+    @State private var deletedCaption: String?
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -140,8 +149,19 @@ struct ClipPreviewView: View {
     /// Only my page may read my live card. A friend's caption belongs to the
     /// displayed clip; a cleared own caption must not revive the deck snapshot.
     private var liveOverlayText: String? {
-        ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
-                                  liveText: card?.overlayText, snapshotText: overlayText)
+        if onDraftCaption != nil { return draftCaption ?? overlayText }
+        return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
+                                         liveText: card?.overlayText, snapshotText: overlayText)
+    }
+
+    /// Where a caption edit goes: the story's card, or the draft.
+    private func writeCaption(_ text: String) {
+        if let onDraftCaption {
+            draftCaption = text
+            onDraftCaption(text.isEmpty ? nil : text)
+        } else if let challengeID {
+            store.updateOverlayText(text, day: day, challengeID: challengeID)
+        }
     }
     private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
 
@@ -177,8 +197,10 @@ struct ClipPreviewView: View {
     var body: some View {
         ZStack {
             backdrop
+            if editingCaption { outsideTapCatcher }
             reviewLayout
             if showLook { lookOverlay }
+            if deletedCaption != nil { undoToast }
         }
         .statusBarHidden()
         // The keyboard is allowed to cover the bottom of this screen rather
@@ -191,7 +213,18 @@ struct ClipPreviewView: View {
         .onChange(of: captionFocused) { _, focused in
             if !focused, editingCaption { saveCaption() }
         }
-        .onSubmit { captionFocused = false }
+        .onSubmit { commitCaption() }
+        .onChange(of: captionDraft) { _, new in limitCaptionLines(new) }
+    }
+
+    /// While typing, a tap anywhere off the picture means "done". The bed
+    /// behind is `allowsHitTesting(false)`, so without this the only taps that
+    /// committed were the ones that landed on the video itself.
+    private var outsideTapCatcher: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .ignoresSafeArea()
+            .onTapGesture { commitCaption() }
     }
 
     // MARK: - The video, and the one thing drawn where the film draws it
@@ -274,9 +307,14 @@ struct ClipPreviewView: View {
     private var videoStage: some View {
         ZStack {
             if isLive {
-                // Review is the truth: show the captured file without the personal look.
-                // The look belongs in the dedicated adjustment/export surface.
-                LoopingClipPlayer(url: url, refreshToken: recordedAt, look: .none)
+                // Review is the truth: show the captured file without the
+                // personal look — except while the look panel is up. That panel
+                // *is* the adjustment surface, and it promises the picture
+                // behind it changes as you drag; with `.none` hardcoded here
+                // its sliders did nothing anyone could see.
+                LoopingClipPlayer(
+                    url: url, refreshToken: recordedAt,
+                    look: showLook ? playedLook : .none)
             } else {
                 Color.black
             }
@@ -346,7 +384,8 @@ struct ClipPreviewView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(tint.rawValue)
+                        .accessibilityLabel(Strings.captionTintName(tint))
+                        .accessibilityAddTraits(tint == sticker.tint ? .isSelected : [])
                     }
                 }
             }
@@ -440,9 +479,11 @@ struct ClipPreviewView: View {
                     accented: !isShared,
                     identifier: "moment-caption",
                     action: startEditingCaption)
-                actionButton(
-                    "arrow.counterclockwise", Strings.rerecordShort,
-                    accented: false, identifier: "moment-rerecord", action: onReRecord)
+                if let onReRecord {
+                    actionButton(
+                        "arrow.counterclockwise", Strings.rerecordShort,
+                        accented: false, identifier: "moment-rerecord", action: onReRecord)
+                }
             }
             if isShared {
                 // Accented here rather than 加字幕: in a room the thing that
@@ -472,17 +513,26 @@ struct ClipPreviewView: View {
                     Text("\(badge)")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(accented ? .white.opacity(0.85) : OneDay.inkSoft)
+                        .foregroundStyle(accented ? OneDay.onBrand.opacity(0.85) : .white.opacity(0.7))
                 }
             }
-            .foregroundStyle(accented ? .white : OneDay.ink)
+            // White on both. The quiet one was `OneDay.ink` on a fixed white
+            // capsule, and `ink` turns light in dark mode — 1.7:1. This row
+            // sits on the clip's dark blurred bed, so dark glass is the quiet
+            // version, same as the camera's round buttons (`CameraGlass`).
+            .foregroundStyle(accented ? OneDay.onBrand : .white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background {
                 if accented {
                     Capsule().fill(OneDay.brandHorizontal)
                 } else {
-                    Capsule().fill(.white.opacity(0.92))
+                    ZStack {
+                        Capsule().fill(.ultraThinMaterial)
+                        Capsule().fill(.white.opacity(0.14))
+                    }
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                    .environment(\.colorScheme, .dark)
                 }
             }
             .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
@@ -615,13 +665,21 @@ struct ClipPreviewView: View {
                 Button(action: deleteCaption) {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .black))
-                        .foregroundStyle(OneDay.ink)
+                        // Fixed dark, not `OneDay.ink`: the disc is fixed white,
+                        // and `ink` goes light in dark mode.
+                        .foregroundStyle(Color(uiColor: UIColor(hex: 0x0F2E6B)))
                         .frame(width: 20, height: 20)
                         .background(.white, in: Circle())
                         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        // Drawn at 20, hit at 44 — the disc is a corner mark,
+                        // the target is a thumb.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .offset(x: -19, y: -19)
+                // 12pt further out than before so the 20pt disc stays exactly
+                // where it was inside its new 44pt frame.
+                .offset(x: -31, y: -31)
                 .accessibilityLabel(Strings.deleteCaptionAction)
                 .accessibilityIdentifier("caption-delete")
             }
@@ -804,12 +862,51 @@ struct ClipPreviewView: View {
     /// The ✕ on the box. Clears the words; the sticker's place, size, angle and
     /// colour stay on the card, so writing a new caption puts it back where
     /// this one was rather than at the default centre.
+    ///
+    /// One tap and the words were gone, with nothing to bring them back — so
+    /// the toast that follows offers 撤销 for a few seconds.
     private func deleteCaption() {
-        guard let challengeID else { return }
-        store.updateOverlayText("", day: day, challengeID: challengeID)
+        guard challengeID != nil || onDraftCaption != nil else { return }
+        let removed = liveOverlayText ?? ""
+        writeCaption("")
+        if !removed.isEmpty {
+            withAnimation(OneDay.Motion.soft) { deletedCaption = removed }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                if deletedCaption == removed {
+                    withAnimation(OneDay.Motion.soft) { deletedCaption = nil }
+                }
+            }
+        }
         captionDraft = ""
         withAnimation(OneDay.Motion.soft) { captionSelected = false }
         gestureHintSeen = true
+    }
+
+    /// The way back from the ✕. Puts the words back on the card; the sticker's
+    /// place and style never left it, so the caption returns where it was.
+    private var undoToast: some View {
+        VStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 14) {
+                Text(Strings.captionDeleted)
+                    .font(.subheadline.weight(.semibold))
+                Button(Strings.undo) {
+                    guard let text = deletedCaption else { return }
+                    writeCaption(text)
+                    withAnimation(OneDay.Motion.soft) { deletedCaption = nil }
+                }
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Color.oneDaySky)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("caption-undo")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .background(.black.opacity(0.75), in: Capsule())
+            .padding(.bottom, 130)
+        }
+        .transition(.opacity)
     }
 
     /// Same fractions, weights and shadow the stitcher uses, so what you read
@@ -853,15 +950,44 @@ struct ClipPreviewView: View {
         ZStack {
             positionChip
             HStack {
+                // Labels here until `IconBubble` takes one itself; without them
+                // VoiceOver read the SF Symbol names.
                 IconBubble(systemName: "xmark") { dismiss() }
+                    .accessibilityLabel(Strings.close)
                 Spacer(minLength: 0)
-                // Up here rather than down with the caption and retake buttons,
-                // because it isn't a thing you do to this clip — it's how you
-                // want to see all of them.
-                IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
-                    withAnimation(OneDay.Motion.soft) { showLook = true }
-                }
+                topTrailing
             }
+        }
+    }
+
+    /// 完成 while a caption is being typed; otherwise the look button, and
+    /// that only on somebody else's clip.
+    ///
+    /// Your own take shows no filter entry: the camera already gave it its
+    /// look, and this screen changes the frame and the words, not the colour.
+    /// `LookPanel` and `lookOverlay` stay, unreachable from here, so the
+    /// stored look and the film export that reads it are untouched.
+    @ViewBuilder
+    private var topTrailing: some View {
+        if editingCaption {
+            Button(action: commitCaption) {
+                Text(Strings.done)
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.onBrand)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(OneDay.brandHorizontal))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("caption-done")
+        } else if !isMine {
+            // Up here rather than down with the caption and retake buttons,
+            // because it isn't a thing you do to this clip — it's how you
+            // want to see all of them.
+            IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
+                withAnimation(OneDay.Motion.soft) { showLook = true }
+            }
+            .accessibilityLabel(Strings.lookTitle)
         }
     }
 
@@ -956,7 +1082,29 @@ struct ClipPreviewView: View {
 
     private func saveCaption() {
         editingCaption = false
-        guard let challengeID else { return }
-        store.updateOverlayText(captionDraft, day: day, challengeID: challengeID)
+        guard challengeID != nil || onDraftCaption != nil else { return }
+        // A Return pressed at the end leaves a trailing newline; the burned
+        // caption shouldn't carry an empty second line.
+        let text = captionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        captionDraft = text
+        writeCaption(text)
+    }
+
+    /// The one way out of the editor: the 完成 button, a tap off the caption,
+    /// the keyboard's Return on the second line, and focus leaving all end here.
+    private func commitCaption() {
+        captionFocused = false
+        if editingCaption { saveCaption() }
+    }
+
+    /// Two lines at most, the same cap the burned caption has. Return on the
+    /// first line starts the second; Return on the second is 完成 — the extra
+    /// line break is dropped and the caption is saved.
+    private func limitCaptionLines(_ text: String) {
+        guard editingCaption else { return }
+        let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard parts.count > 2 else { return }
+        captionDraft = String(parts[0]) + "\n" + parts[1...].joined()
+        commitCaption()
     }
 }

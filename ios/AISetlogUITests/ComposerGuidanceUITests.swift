@@ -15,9 +15,10 @@ final class ComposerGuidanceUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
-        let plan = app.buttons["Plan"]
-        XCTAssertTrue(plan.waitForExistence(timeout: 15), "Plan tab missing")
-        plan.tap()
+        // 1.5: the composer is the header's + New, not a tab.
+        let compose = app.buttons["home-compose"]
+        XCTAssertTrue(compose.waitForExistence(timeout: 15), "New button missing")
+        compose.tap()
 
         XCTAssertTrue(app.staticTexts["composer-question"].waitForExistence(timeout: 15))
         // No progress counter and no bottom button: both only made sense when
@@ -28,9 +29,12 @@ final class ComposerGuidanceUITests: XCTestCase {
         // No gear to find: the poster is the way in, and tapping it no longer
         // creates anything by itself.
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
+        // 1.5: the templates are a grid on the page, and the name field sits
+        // on the same page below them.
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()
+        XCTAssertTrue(poster.isSelected)
 
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
@@ -40,10 +44,13 @@ final class ComposerGuidanceUITests: XCTestCase {
         name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.count))
         let guidance = app.staticTexts["composer-name-needed"]
         XCTAssertTrue(guidance.waitForExistence(timeout: 15))
-        XCTAssertEqual(guidance.label, "A name is needed before saving.")
+        XCTAssertEqual(guidance.label, "Give the topic a name first")
         name.typeText("My edited story")
         XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
+        // Tapping the chosen template again lets it go.
+        poster.tap()
+        XCTAssertFalse(poster.isSelected)
         // Deliberately never create or join a room, or call the AI service.
     }
 }

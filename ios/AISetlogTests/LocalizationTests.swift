@@ -203,7 +203,7 @@ final class LocalizationTests: XCTestCase {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertTrue(date.formatted(style.locale(AppLanguage.effective.locale)).contains("月"))
         XCTAssertEqual(Strings.notificationPrimerTitle, "留住今天的瞬间？")
-        XCTAssertEqual(Strings.startTodaysStory, "开始今天的故事")
+        XCTAssertEqual(Strings.startTodaysStory, "今天想拍什么")
         XCTAssertEqual(Strings.unitName(oneDay: true), "个瞬间")
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
@@ -211,7 +211,7 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(Strings.notificationPrimerTitle, "Keep today’s moment?")
         // Typewriter apostrophe, matching the string as shipped. Most of the
         // English copy uses one; a handful use the curly ’ instead.
-        XCTAssertEqual(Strings.startTodaysStory, "Start today's story")
+        XCTAssertEqual(Strings.startTodaysStory, "What to film today")
         XCTAssertEqual(Strings.surfaceCamera, "Camera")
     }
 

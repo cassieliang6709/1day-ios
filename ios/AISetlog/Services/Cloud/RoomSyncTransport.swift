@@ -12,6 +12,10 @@ struct RoomSyncTransport {
     var setReaction: @MainActor (String, Int, String, String, String, String, Bool) async throws -> Void
     var postComment: @MainActor (String, Int, String, String, String, String, String) async throws -> Void
     var deleteComment: @MainActor (String) async throws -> Void
+    /// 拍一拍: code, authorID, authorName, targetAuthorID.
+    var sendPoke: @MainActor (String, String, String, String) async throws -> Void = { _, _, _, _ in
+        throw CancellationError()
+    }
 
     static var live: RoomSyncTransport {
         RoomSyncTransport(
@@ -21,7 +25,8 @@ struct RoomSyncTransport {
             updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, overlayText: $3) },
             setReaction: { try await CloudKitService.setReaction(code: $0, day: $1, authorID: $2, authorName: $3, targetAuthorID: $4, emoji: $5, on: $6) },
             postComment: { try await CloudKitService.postComment(code: $0, day: $1, id: $2, text: $3, authorID: $4, authorName: $5, targetAuthorID: $6) },
-            deleteComment: { try await CloudKitService.deleteComment(id: $0) })
+            deleteComment: { try await CloudKitService.deleteComment(id: $0) },
+            sendPoke: { try await CloudKitService.sendPoke(code: $0, authorID: $1, authorName: $2, targetAuthorID: $3) })
     }
 }
 
@@ -58,7 +63,8 @@ final class LocalRoomSyncSource {
             deleteComment: { [self] _ in
                 guard !closed else { throw Failure.closed }
                 throw Failure.readOnly
-            })
+            },
+            sendPoke: { [self] code, _, _, _ in try rejectWrite(code) })
     }
 
     /// Local fixture administration only; remote transport writes remain rejected.

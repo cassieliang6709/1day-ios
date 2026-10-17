@@ -19,8 +19,10 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
         TARGETED_DEVICE_FAMILY: "1"
-        MARKETING_VERSION: "1.4"
-        CURRENT_PROJECT_VERSION: "23"
+        MARKETING_VERSION: "1.5"
+        CURRENT_PROJECT_VERSION: "30"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconBlue
       configs:
         Debug:
           APS_ENVIRONMENT: development
@@ -42,9 +44,10 @@ targets:
         CFBundleDisplayName: 1Day
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSCameraUsageDescription: "Record your 2-second daily challenge clip."
-        NSMicrophoneUsageDescription: "Capture audio for your daily clip."
-        NSPhotoLibraryAddUsageDescription: "Save your finished weekly vlog."
+        NSCameraUsageDescription: "To film the moments of your day."
+        NSMicrophoneUsageDescription: "So your clips have sound."
+        NSSpeechRecognitionUsageDescription: "用来把你说的话转成心情日记里的文字。"
+        NSPhotoLibraryAddUsageDescription: "To save your finished film to Photos."
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes: [remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

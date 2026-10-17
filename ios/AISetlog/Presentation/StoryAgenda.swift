@@ -64,7 +64,11 @@ struct StoryAgenda: Equatable {
     var isComplete: Bool { total > 0 && filmed.count >= total }
 
     /// Whether a filmed slot is somebody else's take rather than mine — the
-    /// thumbnail says so, and the slot also keeps its row in the open list.
+    /// thumbnail says so, and the filmed node carries a small 「加上你的」.
+    ///
+    /// Only a filmed node can ask this. `OpenSlotRow` is drawn for slots
+    /// nobody has filmed, where the answer is always false, which is how a
+    /// friend's moment once ended up with no way for me to join it.
     func isAwaitingMine(slot: Int) -> Bool {
         filmed.contains(slot) && openToMe.contains(slot)
     }

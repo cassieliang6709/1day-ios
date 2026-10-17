@@ -2,6 +2,11 @@ name = "oneday-suggest-prompts"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
+# Reachable from mainland China, where *.workers.dev is blocked.
+# workers.dev stays on so builds already installed keep working.
+workers_dev = true
+routes = [{ pattern = "oneday-api.liangyue.site", custom_domain = true }]
+
 # The DeepSeek key is a secret, not a var — set it with:
 #   wrangler secret put DEEPSEEK_API_KEY
 [vars]

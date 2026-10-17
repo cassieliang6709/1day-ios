@@ -31,7 +31,7 @@ struct LookPanel: View {
         .padding(.bottom, 18)
         // Nearly opaque, not a tint. Glass over a bright clip let the picture
         // read straight through the panel and put whatever the video says at
-        // that moment behind "A gentler look".
+        // that moment behind the panel's title.
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.black.opacity(0.94)))
@@ -130,7 +130,9 @@ struct LookPanel: View {
             Text(Strings.lookHoldToCompare)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
         }
-        .foregroundStyle(showingOriginal ? OneDay.ink : .white)
+        // Fixed navy on the white pressed state: `OneDay.ink` goes light in
+        // dark mode, which is light-on-white exactly while you're holding it.
+        .foregroundStyle(showingOriginal ? Color(uiColor: UIColor(hex: 0x0F2E6B)) : .white)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)

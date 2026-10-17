@@ -19,23 +19,37 @@ struct RoomRoster: View {
     let cast: RoomCast
 
     var body: some View {
-        HStack(spacing: 10) {
-            AvatarStack(
-                names: cast.rosterNames,
-                maxShown: 4,
-                size: 30,
-                pending: cast.namesYetToFilm,
-                you: cast.myName)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                AvatarStack(
+                    names: cast.rosterNames,
+                    maxShown: 4,
+                    size: 30,
+                    pending: cast.namesYetToFilm,
+                    you: cast.myName)
 
-            Text(cast.rosterLine)
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                Text(cast.rosterLine)
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+
+            // The hollow faces said "somebody hasn't filmed" but never who,
+            // and a face with an initial is not a name. `RoomCast` had both
+            // sentences written and tested; nothing drew them. Waiting first,
+            // because who we're waiting on is the thing a room can act on —
+            // nudge them — and once nobody is left, who filmed.
+            if let note = cast.waitingNote ?? cast.filmedNote {
+                RoomNote(
+                    note: note,
+                    isPending: cast.waitingNote != nil,
+                    showsFaces: false)
+            }
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -50,10 +64,13 @@ struct RoomNote: View {
     var tint: Color = OneDay.inkFaint
     /// Hollow faces, for the people the sentence is still waiting for.
     var isPending = false
+    /// Off directly under the roster, whose row already draws every one of
+    /// these faces — the sentence is the part it was missing.
+    var showsFaces = true
 
     var body: some View {
         HStack(spacing: 6) {
-            if !note.names.isEmpty {
+            if showsFaces, !note.names.isEmpty {
                 AvatarStack(
                     names: note.names,
                     maxShown: 3,

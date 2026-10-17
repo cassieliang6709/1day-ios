@@ -13,12 +13,25 @@ struct PlansHomeView: View {
     /// entry (`DraftsEntryButton`) and the shell keeps the four-second
     /// confirmation; this is the third and quietest way back to the same list.
     @Environment(ClipDraftStore.self) private var drafts
+    @Environment(MoodStore.self) private var moods: MoodStore?
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
     /// What to lead with and what to list under it, as one decision. See
     /// `HomeStories`.
     let stories: HomeStories
-    /// Switch the shell to its 新建 tab. The composer used to be a
+    /// 故事 shows everything; 朋友 shows only shared stories, with invite and
+    /// join up front. Same screen so the join sheet, sign-in and the story push
+    /// exist once.
+    var scope: Scope = .stories
+    enum Scope { case stories, friends }
+    /// Bumped by the shell each time 朋友 is picked in the tab bar. This
+    /// screen stays mounted behind the bar, so `onAppear` runs once; this is
+    /// what tells it the tab was chosen again.
+    var tabSelections = 0
+    /// Bumped by the shell when the camera's drafts button is tapped: scroll
+    /// to 所有片段 with 待归档 picked. See `LibrarySection.draftsRequest`.
+    var draftsRequest = 0
+    /// Open the composer. The composer used to be a
     /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
     /// every in-page CTA that used to raise the cover asks the shell instead.
     /// One composer, one place it can be.
@@ -42,6 +55,15 @@ struct PlansHomeView: View {
     @State private var notificationRecordRoute: NotificationRecordRoute?
     /// When set, present sign-in and run this once the user finishes.
     @State private var afterSignIn: (() -> Void)?
+    /// 我的's select mode and what's been picked; the bar and the vlog sheet
+    /// sit on this page so they float over the scroll view.
+    @State private var isSelectingClips = false
+    @State private var pickedClips: [LibraryClip] = []
+    @State private var vlogRequest: VlogRequest?
+    /// 邀请朋友一起拍 with at least one room to invite to. See `inviteFriends`.
+    @State private var inviteRequest: InviteRequest?
+    /// The debug test room's own alert, so its failures aren't titled 无法加入.
+    @State private var debugAlert: DebugAlert?
 
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -114,7 +136,9 @@ struct PlansHomeView: View {
                     startJoin(joinCode)
                 }
             )
-            .presentationDetents([.height(430)])
+            // Not a fixed height: with the keyboard up on an SE, 430pt pushed
+            // the join button off screen. The sheet scrolls and pins its button.
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
         .sheet(isPresented: Binding(
@@ -142,23 +166,79 @@ struct PlansHomeView: View {
         } message: {
             Text(errorText ?? "")
         }
+        // Launch routing belongs to the 故事 instance alone. The 朋友 one is
+        // mounted beside it and would otherwise open every notification's
+        // camera a second time.
         .onAppear {
+            guard scope == .stories else { return }
+            if UserDefaults.standard.bool(forKey: AppSkin.reopenSettingsKey) {
+                UserDefaults.standard.removeObject(forKey: AppSkin.reopenSettingsKey)
+                showSettings = true
+            }
             openPendingNotificationRoute()
             consumePendingJoinCode()
             consumeLaunchAction()
+            #if DEBUG
+            createDebugTestRoomIfAsked()
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .oneDayNotificationRoutePending
         )) { _ in
+            guard scope == .stories else { return }
             openPendingNotificationRoute()
         }
         .onChange(of: pendingJoinCode) { _, _ in consumePendingJoinCode() }
         .onChange(of: launchAction) { _, _ in consumeLaunchAction() }
+        .sheet(item: $inviteRequest) { inviteSheet($0) }
+        .alert(debugAlert?.title ?? "", isPresented: Binding(
+            get: { debugAlert != nil }, set: { if !$0 { debugAlert = nil } }
+        )) {
+            Button(Strings.ok, role: .cancel) {}
+        } message: {
+            Text(debugAlert?.message ?? "")
+        }
     }
 
     // MARK: - Content
 
+    @ViewBuilder
     private var content: some View {
+        switch scope {
+        case .stories: storiesContent
+        case .friends: friendsContent
+        }
+    }
+
+    private var storiesContent: some View {
+        ScrollViewReader { proxy in
+            storiesScroll
+                .onChange(of: draftsRequest) { _, _ in
+                    withAnimation(OneDay.Motion.soft) {
+                        proxy.scrollTo(Self.libraryAnchor, anchor: .top)
+                    }
+                }
+        }
+        .overlay(alignment: .bottom) {
+            if isSelectingClips {
+                LibrarySelectionBar(picked: pickedClips) {
+                    vlogRequest = VlogRequest(clips: pickedClips)
+                }
+                .padding(.bottom, OneDay.tabBarClearance + 10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .sheet(item: $vlogRequest) { request in
+            LibraryVlogSheet(clips: request.clips)
+        }
+        #if DEBUG
+        .onAppear { LibraryDebugSeed.runIfAsked(store: store, drafts: drafts, moods: moods) }
+        #endif
+    }
+
+    private static let libraryAnchor = "library-section"
+
+    private var storiesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
@@ -180,22 +260,32 @@ struct PlansHomeView: View {
                 }
                 #endif
 
+                // 我的, top to bottom: today's mood, today's stories, every clip.
+                MoodTodayCard()
+
                 switch stories.hero {
                 case .today(let challenge):
-                    heroSection(challenge, label: Strings.todaysStory)
+                    todaySection(todayStories(leading: challenge), label: Strings.todaysStory)
                 case .resume(let challenge):
-                    heroSection(challenge, label: Strings.resumeStory)
+                    todaySection([challenge], label: Strings.resumeStory)
                 case .startToday:
-                    // First run gets the mascot; someone who already has
-                    // finished films just needs the one button.
-                    if store.challenges.isEmpty { emptyState } else { startTodayCard }
+                    // 1.5: no "start today's story" card. With nothing in
+                    // progress the archive is the page, and the round camera
+                    // button is the way to add to it. Only a first run, with
+                    // no stories and no clips, still gets the mascot.
+                    if store.challenges.isEmpty, library.clips.isEmpty { emptyState }
                 }
 
-                if stories.showsSection {
-                    timelineSection
-                }
-
-                draftsRow
+                // Replaces the date-grouped story list (`timelineSection`):
+                // every clip, filterable by room, with a calendar.
+                LibrarySection(
+                    library: library,
+                    rooms: store.challenges.filter(\.isShared),
+                    onOpenStory: { path.append($0) },
+                    draftsRequest: draftsRequest,
+                    isSelecting: $isSelectingClips,
+                    picked: $pickedClips)
+                    .id(Self.libraryAnchor)
             }
             .padding(.top, 8)
             .padding(.bottom, OneDay.tabBarClearance + 20)
@@ -205,28 +295,215 @@ struct PlansHomeView: View {
             .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
-        .overlay {
-            if joining {
-                VStack(spacing: 14) {
-                    ProgressView(Strings.joining)
-                        .controlSize(.large)
-                    // A full-screen spinner with no way out and no ceiling is
-                    // indistinguishable from a frozen app: a bad code or no
-                    // signal left the person holding a phone that spun until
-                    // they force-quit it. Cancelling does not stop the network
-                    // call — it stops *waiting* for it, which is the part they
-                    // are stuck in.
-                    Button(Strings.cancel) {
-                        joinAttempt += 1
-                        joining = false
-                    }
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+        .overlay { joiningOverlay }
+    }
+
+    /// Every clip on this device, as 我的 lists it.
+    private var library: ClipLibrary {
+        let mine = [account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 }
+        return ClipLibrary(
+            stories: store.challenges.map { ($0, store.recordedClips(for: $0.id)) },
+            drafts: drafts.sortedDrafts.map { ($0, drafts.url(for: $0)) },
+            myIDs: Set(mine))
+    }
+
+    @ViewBuilder
+    private var joiningOverlay: some View {
+        if joining {
+            VStack(spacing: 14) {
+                ProgressView(Strings.joining)
+                    .controlSize(.large)
+                // A full-screen spinner with no way out and no ceiling is
+                // indistinguishable from a frozen app: a bad code or no
+                // signal left the person holding a phone that spun until
+                // they force-quit it. Cancelling does not stop the network
+                // call — it stops *waiting* for it, which is the part they
+                // are stuck in.
+                Button(Strings.cancel) {
+                    joinAttempt += 1
+                    joining = false
                 }
-                .padding(24)
-                .glassSurface()
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.brandText)
+            }
+            .padding(24)
+            .glassSurface()
+        }
+    }
+
+    // MARK: - 朋友
+
+    /// Shared stories, newest first.
+    private var sharedStories: [Challenge] {
+        store.challenges.filter(\.isShared).sorted { $0.startDate > $1.startDate }
+    }
+
+    private var friendsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                friendsHeader
+
+                if sharedStories.isEmpty {
+                    friendsEmptyState
+                } else {
+                    Button(Strings.inviteFriends) { inviteFriends() }
+                        .buttonStyle(.primaryAction)
+                        .padding(.horizontal, 20)
+                        .accessibilityIdentifier("friends-invite")
+
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(sharedStories) { challenge in
+                            storyRow(challenge)
+                        }
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, OneDay.tabBarClearance + 20)
+            .containerRelativeFrame(.horizontal)
+        }
+        .scrollIndicators(.hidden)
+        .overlay { joiningOverlay }
+        .onAppear { openSoleRoom() }
+        .onChange(of: sharedStories.count) { _, _ in openSoleRoom() }
+        .onChange(of: tabSelections) { _, _ in openSoleRoom() }
+    }
+
+    /// 一进朋友页就是房间: with exactly one room, 朋友 opens on it. Pushed
+    /// rather than embedded so the room's back button leads somewhere — the
+    /// list, where 加入 and 邀请朋友一起拍 still are.
+    ///
+    /// Runs when the page is first built, when the room count changes, and
+    /// every time 朋友 is picked in the tab bar — so 朋友 always means the room,
+    /// even after going back to the list. Not on the list's own appearance:
+    /// the room's back button still leads to the list and stays there, which
+    /// is where 加入 and 邀请 are.
+    private func openSoleRoom() {
+        guard scope == .friends, path.isEmpty, sharedStories.count == 1 else { return }
+        path = [sharedStories[0].id]
+    }
+
+    struct DebugAlert {
+        let title: String
+        let message: String
+    }
+
+    struct InviteRequest: Identifiable {
+        let id = UUID()
+        /// The room whose code to show straight away; nil shows the picker.
+        let roomID: UUID?
+    }
+
+    /// 邀请朋友一起拍, by how many rooms there already are.
+    /// - none: the composer, opened by the shell with 和朋友一起 on.
+    /// - one: into that room, with its code up.
+    /// - more: a list to pick the room from, ending in 新建房间.
+    private func inviteFriends() {
+        let rooms = sharedStories
+        switch rooms.count {
+        case 0:
+            onCompose()
+        case 1:
+            showInvite(for: rooms[0])
+        default:
+            inviteRequest = InviteRequest(roomID: nil)
+        }
+    }
+
+    private func showInvite(for room: Challenge) {
+        openRoomForInvite(room)
+        inviteRequest = InviteRequest(roomID: room.id)
+    }
+
+    /// The room page offers its code once on its own (`RoomShareNudge`);
+    /// marked here so it doesn't ask a second time under this sheet.
+    private func openRoomForInvite(_ room: Challenge) {
+        if let code = room.roomCode { RoomShareNudge.markOffered(code: code) }
+        path = [room.id]
+    }
+
+    private func inviteSheet(_ request: InviteRequest) -> some View {
+        FriendsInviteSheet(
+            rooms: sharedStories,
+            initialRoomID: request.roomID,
+            memberCount: { store.members(for: $0.id).count },
+            onPick: { openRoomForInvite($0) },
+            onNewRoom: {
+                inviteRequest = nil
+                onCompose()
+            })
+    }
+
+    #if DEBUG
+    /// `-debugCreateTestRoom YES`: make the test room once at launch, then
+    /// show its code the way 邀请朋友一起拍 would.
+    private func createDebugTestRoomIfAsked() {
+        guard DebugTestRoom.consumeLaunchRequest() else { return }
+        guard account.isSignedIn else {
+            debugAlert = DebugAlert(
+                title: Strings.signInRequiredTitle, message: Strings.debugTestRoomNeedsSignIn)
+            return
+        }
+        Task {
+            do {
+                let room = try await DebugTestRoom.create(in: store)
+                showInvite(for: room)
+            } catch {
+                debugAlert = DebugAlert(
+                    title: Strings.debugTestRoomFailedTitle, message: error.localizedDescription)
             }
         }
+    }
+    #endif
+
+    private var friendsHeader: some View {
+        HStack(spacing: 11) {
+            Text(Strings.surfaceFriends)
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+            Spacer(minLength: 6)
+            joinButton
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var friendsEmptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(OneDay.brandText)
+                .frame(width: 68, height: 68)
+                .background(Color.oneDayBrand.opacity(0.12), in: Circle())
+                .padding(.top, 8)
+
+            VStack(spacing: 7) {
+                Text(Strings.friendsEmptyTitle)
+                    .font(.system(size: 19, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .multilineTextAlignment(.center)
+                Text(Strings.friendsEmptyBody)
+                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button(Strings.inviteFriends) { inviteFriends() }
+                .buttonStyle(.primaryAction)
+                .padding(.top, 4)
+                .accessibilityIdentifier("friends-invite")
+
+            Button(Strings.haveInviteCode) {
+                joinCode = ""
+                showJoin = true
+            }
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(OneDay.brandText)
+            .accessibilityIdentifier("friends-join-room")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(26)
+        .glassSurface(radius: OneDay.Radius.hero)
+        .padding(.horizontal, 20)
     }
 
     /// Who you are, what day it is, how far today has got — then the two
@@ -236,12 +513,8 @@ struct PlansHomeView: View {
     /// Nothing up here is allowed to outshine "continue today's story" in the
     /// card below.
     ///
-    /// Two controls now, not three. The brand-gradient `plus` that used to end
-    /// this row is the shell's middle tab as of 1.3 — a wordless 36pt circle in
-    /// the top-right corner was the app's second-most-used action in the one
-    /// spot a thumb on a 6.9" phone cannot reach, and it is the only entry
-    /// point that moved: 加入 stays here because joining a room is somebody
-    /// else's invitation arriving, not a thing you set out to do.
+    /// One action on the right: 新建. See the comment on the button for its
+    /// history; 加入 lives in the 朋友 header (`joinButton`).
     private var header: some View {
         HStack(spacing: 11) {
             Button { showSettings = true } label: {
@@ -264,38 +537,59 @@ struct PlansHomeView: View {
 
             Spacer(minLength: 6)
 
-            // A 36pt wordless icon was the only permanent way into a room
-            // after onboarding, wedged between the settings avatar and 新建.
-            // Now it says what it is.
-            Button {
-                joinCode = ""
-                showJoin = true
-            } label: {
+            // 新建 is back up here as of 1.5, when the bar's middle slot went
+            // to the camera — labelled and filled, not the wordless 36pt plus
+            // it was before 1.3. 加入 moved to 朋友, where rooms live.
+            Button { onCompose() } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "person.2.badge.plus")
-                        .font(.system(size: 13, weight: .bold))
-                    Text(Strings.joinShort)
-                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .heavy))
+                    Text(Strings.surfaceCompose)
+                        .font(.system(size: 13.5, weight: .heavy, design: .rounded))
                         .lineLimit(1)
                 }
-                // 加入 is two glyphs and Join is four, so the capsule that fits
-                // in Chinese is narrower than the English word and the label
-                // wrapped to "Joi / n". Fixing the label's width makes the
-                // greeting column absorb the squeeze instead — it already
-                // shrinks by design, and the dateline drops its pips first.
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(OneDay.ink)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 8)
-                .background(OneDay.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-                .oneDaySoftShadow(strength: 0.5)
+                .foregroundStyle(OneDay.onBrand)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(OneDay.brandHorizontal, in: Capsule())
+                .oneDayGlow(strength: 0.5)
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Strings.enterInviteCode)
-            .accessibilityIdentifier("home-join-room")
+            .accessibilityIdentifier("home-compose")
         }
         .padding(.horizontal, 20)
+    }
+
+    private var joinButton: some View {
+        Button {
+            joinCode = ""
+            showJoin = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "person.2.badge.plus")
+                    .font(.system(size: 13, weight: .bold))
+                Text(Strings.joinShort)
+                    .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+            }
+            // 加入 is two glyphs and Join is four, so the capsule that fits
+            // in Chinese is narrower than the English word and the label
+            // wrapped to "Joi / n". Fixing the label's width makes the
+            // greeting column absorb the squeeze instead — it already
+            // shrinks by design, and the dateline drops its pips first.
+            .fixedSize(horizontal: true, vertical: false)
+            .foregroundStyle(OneDay.ink)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(OneDay.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+            .oneDaySoftShadow(strength: 0.5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.enterInviteCode)
+        .accessibilityIdentifier("home-join-room")
     }
 
     /// Date, and — when there's a story in progress — how much of it is in.
@@ -352,14 +646,14 @@ struct PlansHomeView: View {
                     // against both.
                     Image(systemName: "tray.full.fill")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                         .frame(width: 34, height: 34)
                         .background(
                             Color.oneDayBrand.opacity(0.12),
                             in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     Text(Strings.draftsPending(drafts.count))
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .bold))
@@ -384,6 +678,43 @@ struct PlansHomeView: View {
             .padding(.horizontal, 20)
             .accessibilityIdentifier("drafts-row")
         }
+    }
+
+    /// 今天的故事 as rows, one per story today is for, stacked. `leading` is
+    /// the one `HomeHeroChoice` picked and goes first.
+    private func todaySection(_ challenges: [Challenge], label: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: label)
+                .padding(.horizontal, 20)
+            ForEach(challenges) { challenge in
+                todayRow(challenge)
+            }
+        }
+    }
+
+    private func todayRow(_ challenge: Challenge) -> some View {
+        let state = cardState(for: challenge)
+        return TodayStoryRow(
+            challenge: challenge,
+            progress: state.progress,
+            coverURL: state.coverURL,
+            refreshToken: state.refreshToken,
+            onContinue: { recordChallenge = challenge },
+            onOpen: { path.append(challenge.id) })
+            .padding(.horizontal, 20)
+    }
+
+    /// The leading story, then every other unfinished one today is for —
+    /// a one-day story started today, or a multi-day one whose week this is.
+    private func todayStories(leading: Challenge) -> [Challenge] {
+        let calendar = Calendar.current
+        let others = store.challenges.filter { challenge in
+            guard challenge.id != leading.id, !challenge.isComplete, !challenge.cards.isEmpty
+            else { return false }
+            if challenge.isOneDay { return calendar.isDateInToday(challenge.startDate) }
+            return (1...max(challenge.cards.count, 1)).contains(challenge.currentDay)
+        }
+        return [leading] + others.sorted { $0.startDate > $1.startDate }
     }
 
     private func heroSection(_ challenge: Challenge, label: String) -> some View {
@@ -455,7 +786,7 @@ struct PlansHomeView: View {
                 showJoin = true
             }
             .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.oneDayBrand)
+            .foregroundStyle(OneDay.brandText)
             .accessibilityIdentifier("empty-join-room")
         }
         .padding(26)
@@ -538,7 +869,8 @@ struct PlansHomeView: View {
             momentCount: challenge.cards.count,
             clipLength: challenge.resolvedClipLength,
             showsPrompt: !challenge.isTimeOnly,
-            orientation: challenge.resolvedOrientation
+            orientation: challenge.resolvedOrientation,
+            lockedCamera: challenge.cameraStyle
         ) { url, overlayText in
             store.saveClip(
                 from: url, day: slot, challengeID: challenge.id, overlayText: overlayText)
@@ -574,6 +906,9 @@ struct PlansHomeView: View {
     private func consumePendingJoinCode() {
         guard let code = pendingJoinCode else { return }
         pendingJoinCode = nil
+        // Kept in the join field too: if sign-in is cancelled, startJoin's
+        // deferred run never fires, and the link's code would be gone.
+        joinCode = code
         startJoin(code)
     }
 

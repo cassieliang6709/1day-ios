@@ -19,6 +19,57 @@ struct CuteCameraBackdrop: View {
     }
 }
 
+/// The camera's round glass buttons — close, flip, frame — and its glass
+/// capsules, all one material.
+///
+/// Dark glass with white glyphs in both appearances. They used to be a 92%
+/// white disc with no foreground set, so in dark mode the glyph inherited the
+/// system's white and sat on a white disc at about 1.3:1. Dark glass reads over
+/// a bright frame and a night shot alike, which is the same reasoning
+/// `ZoomControlRow` already follows. Pinned to `.dark` so the material doesn't
+/// flip to near-white in light mode.
+///
+/// Local to the camera on purpose: a shared over-video style is being added to
+/// the design system, and when it lands these should move onto it rather than
+/// grow a second copy there.
+struct CameraGlass: ViewModifier {
+    enum Shape { case circle, capsule }
+    var shape: Shape = .circle
+    var diameter: CGFloat = 38
+
+    func body(content: Content) -> some View {
+        switch shape {
+        case .circle:
+            content
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: diameter, height: diameter)
+                .background(.black.opacity(0.32), in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                .environment(\.colorScheme, .dark)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                // Drawn at 38, hit at 44: the HIG minimum, without the disc
+                // getting any bigger next to the shutter.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        case .capsule:
+            content
+                .foregroundStyle(.white)
+                .background(.black.opacity(0.32), in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                .environment(\.colorScheme, .dark)
+        }
+    }
+}
+
+extension View {
+    func cameraGlass(_ shape: CameraGlass.Shape = .circle, diameter: CGFloat = 38) -> some View {
+        modifier(CameraGlass(shape: shape, diameter: diameter))
+    }
+}
+
 struct CameraShell<Content: View>: View {
     /// Whose camera this is. Only the frame's tint uses it now — the picture
     /// itself no longer gets labelled with your own name.
@@ -36,6 +87,15 @@ struct CameraShell<Content: View>: View {
     var showsPrompt = true
     /// nil = the classic portrait frame; set for landscape challenges.
     var aspectRatio: CGFloat? = nil
+    /// The camera picked in the viewfinder; draws its frame over the picture.
+    var cameraStyle: CameraStyle = .standard
+    /// Off when a camera prints its own date — on the live picture, or already
+    /// baked into the take under review.
+    var showsDate = true
+    /// The phone held sideways (±90): the frame's decorations — border, date,
+    /// moment label — are laid out for the landscape take and turned with the
+    /// phone, so they sit where the clip will have them.
+    var turn: Double = 0
     @ViewBuilder var content: Content
 
     private var tint: Color { Identity.tint(for: name) }
@@ -46,16 +106,27 @@ struct CameraShell<Content: View>: View {
                 content
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
-                MomentStampOverlay(
-                    momentTitle: momentTitle,
-                    day: day,
-                    momentCount: momentCount,
-                    mode: mode,
-                    timestamp: timestamp,
-                    overlayText: overlayText,
-                    clipSeconds: clipSeconds,
-                    showsPrompt: showsPrompt
-                )
+                let sideways = turn != 0
+                ZStack {
+                    CameraStyleOverlay(style: cameraStyle, date: timestamp)
+                    MomentStampOverlay(
+                        momentTitle: momentTitle,
+                        day: day,
+                        momentCount: momentCount,
+                        mode: mode,
+                        timestamp: timestamp,
+                        overlayText: overlayText,
+                        clipSeconds: clipSeconds,
+                        showsPrompt: showsPrompt,
+                        showsDate: showsDate && cameraStyle == .standard
+                    )
+                }
+                .frame(
+                    width: sideways ? proxy.size.height : proxy.size.width,
+                    height: sideways ? proxy.size.width : proxy.size.height)
+                .rotationEffect(.degrees(turn))
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .animation(OneDay.Motion.snap, value: turn)
             }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay {
@@ -105,6 +176,8 @@ struct MomentStampOverlay: View {
     var overlayText: String?
     var clipSeconds: Double = 2
     var showsPrompt = true
+    /// Off under a camera that prints its own date (`CameraStyle`).
+    var showsDate = true
 
     /// nil when there's no honest indicator to draw — see `MomentProgress`.
     private var progress: MomentProgress? {
@@ -138,9 +211,11 @@ struct MomentStampOverlay: View {
     }
 
     /// Only ever read while recording — a state read-out, not a sticker.
-    private var modeText: String {
-        "REC 00:\(String(format: "%02d", Int(clipSeconds)))"
-    }
+    ///
+    /// Just "REC". It used to print the take's *cap* as "REC 00:02", which
+    /// never moved and so read as a frozen clock; the seconds that matter are
+    /// counting down in the ring under the picture.
+    private var modeText: String { "REC" }
 
     var body: some View {
         GeometryReader { proxy in
@@ -149,11 +224,14 @@ struct MomentStampOverlay: View {
             let edgeInset = max(16, 28 * scale)
 
             ZStack {
+                // There for the white date; under a camera's own frame it only
+                // greyed the frame, which the film doesn't do.
                 LinearGradient(
                     colors: [.black.opacity(0.22), .clear, .black.opacity(0.34)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .opacity(showsDate ? 1 : 0)
 
                 VStack {
                     // Top-right, because that's the corner the film's own
@@ -176,6 +254,7 @@ struct MomentStampOverlay: View {
                         .foregroundStyle(.white)
                     }
                     .padding(edgeInset)
+                    .opacity(showsDate ? 1 : 0)
 
                     Spacer(minLength: 8 * scale)
 
@@ -187,14 +266,26 @@ struct MomentStampOverlay: View {
                     .padding(edgeInset)
                 }
 
+                // Top centre, between the timer chip and the date, rather than
+                // on the middle of the picture: dead centre is where the face
+                // and the caption go, and a red pill there sat on both.
                 if mode == .recording {
-                    Text(modeText)
-                        .font(.system(size: 13 * scale, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12 * scale)
-                        .padding(.vertical, 7 * scale)
-                        .background(.red, in: Capsule())
-                        .position(x: size.width * 0.5, y: size.height * 0.5)
+                    HStack(spacing: 5 * scale) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 8 * scale))
+                            .foregroundStyle(.red)
+                            // The one moving thing in the stamp, so "it is
+                            // filming" doesn't depend on reading anything.
+                            .symbolEffect(.pulse, options: .repeating)
+                        Text(modeText)
+                            .font(.system(size: 12 * scale, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 10 * scale)
+                    .padding(.vertical, 6 * scale)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .position(x: size.width * 0.5, y: edgeInset + 11 * scale)
+                    .accessibilityHidden(true)
                 }
 
                 if let overlayText, !overlayText.isEmpty {
@@ -456,6 +547,10 @@ struct ZoomControlRow: View {
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
                     .background(Circle().fill(.black.opacity(0.35)))
+                    // Hit area to 44 without growing the disc; the row's
+                    // vertical padding gives the extra height back.
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.closeCustomZoom)
@@ -527,17 +622,22 @@ struct CaptionEditor: View {
         HStack(spacing: 10) {
             Image(systemName: "textformat")
                 .font(.headline.bold())
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
                 .frame(width: 30, height: 30)
                 .background(Color.oneDayBrand.opacity(0.12), in: Circle())
 
+            // Fixed dark ink: the capsule behind this is a fixed near-white, so
+            // the system's adaptive `.primary`/`.secondary` turned white-on-
+            // white in dark mode.
             TextField(
                 "",
                 text: $text,
                 prompt: Text(Strings.writeOnMoment)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black.opacity(0.45))
             )
             .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.black.opacity(0.86))
+            .tint(Color.oneDayBrand)
             .textInputAutocapitalization(.sentences)
             .submitLabel(.done)
             .focused(isFocused)
@@ -553,9 +653,13 @@ struct CaptionEditor: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body.bold())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.black.opacity(0.4))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .padding(.vertical, -10)
+                .accessibilityLabel(Strings.deleteCaptionAction)
             }
         }
         .padding(.horizontal, 12)
@@ -564,3 +668,193 @@ struct CaptionEditor: View {
         .overlay(Capsule().stroke(Color.oneDayBrand.opacity(0.16), lineWidth: 1))
     }
 }
+
+/// The dual-camera button's icon: a big frame with a small one overlapping
+/// its top-right corner — two pictures, one on the other.
+///
+/// Drawn rather than an SF Symbol: `rectangle.inset.topright.filled` is a
+/// solid slab, and white on the dark glass it read as a grey blob with no
+/// shape in it. Outlines keep both rectangles visible; on, the small one fills
+/// with the brand colour so the state reads at a glance.
+struct DualCameraGlyph: View {
+    var isOn: Bool
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                .strokeBorder(.white, lineWidth: 1.8)
+                .frame(width: 15, height: 20)
+                .frame(width: 20, height: 24, alignment: .bottomLeading)
+            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                .fill(isOn ? Color.oneDayBrand : Color.black.opacity(0.55))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .strokeBorder(.white, lineWidth: 1.6))
+                .frame(width: 10, height: 13)
+        }
+        .frame(width: 20, height: 24)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The viewfinder in dual-camera mode: one picture full frame, the other in
+/// a white-bordered inset at `inset` (normalized, see `PiPInsetLayout`) — the
+/// same box and border `PiPComposer` burns into the file, so the preview
+/// matches the composed clip. `swapped` trades which camera is which without
+/// recreating either preview view. With `showsInset` off, only the primary is
+/// drawn.
+///
+/// The inset can be dragged anywhere and pinched between 22% and 45% of the
+/// frame's width while `isEditable`; a tap on it calls `onTapInset` (the
+/// camera swaps which picture is big). The gesture's running state stays in
+/// here and only the finished rect goes out through `onInsetChange`, so a
+/// drag doesn't write to UserDefaults on every frame.
+struct DualCameraStage<Primary: View, Secondary: View>: View {
+    var showsInset: Bool
+    var swapped: Bool
+    var inset: CGRect = PiPInsetLayout.defaultRect()
+    var isEditable = true
+    var onInsetChange: (CGRect) -> Void = { _ in }
+    var onTapInset: () -> Void = {}
+    @ViewBuilder var primary: Primary
+    @ViewBuilder var secondary: Secondary
+
+    /// A drag and a pinch on the inset, in flight. One value for both so the
+    /// pair commits once, when the last finger lifts — committed separately,
+    /// the second to end re-applied the first on top of the rect it had
+    /// already written.
+    struct Adjustment: Equatable {
+        var translation: CGSize = .zero
+        var scale: CGFloat = 1
+    }
+    /// What is drawn mid-gesture; resets on its own if the gesture is
+    /// cancelled.
+    @GestureState private var live = Adjustment()
+    /// The last value seen, for `onEnded` — by then `live` has already reset.
+    @State private var lastAdjustment = Adjustment()
+
+    var body: some View {
+        GeometryReader { proxy in
+            stage(in: proxy.size)
+        }
+    }
+
+    private func stage(in size: CGSize) -> some View {
+        let full = CGRect(origin: .zero, size: size)
+        let rect = liveRect(in: size)
+        let box = PiPInsetLayout.pictureBox(rect, in: size)
+        let primaryIsInset = showsInset && swapped
+        return ZStack(alignment: .topLeading) {
+            framed(primary, in: primaryIsInset ? box : full,
+                   isInset: primaryIsInset, canvas: size)
+                .zIndex(primaryIsInset ? 1 : 0)
+            if showsInset {
+                framed(secondary, in: swapped ? full : box,
+                       isInset: !swapped, canvas: size)
+                    .zIndex(swapped ? 0 : 1)
+            }
+        }
+        .coordinateSpace(.named(Self.stageSpace))
+    }
+
+    /// The drag is measured in the stage's space, not the inset's own. The
+    /// inset moves under the finger, so in its local space every move
+    /// shrank the next reading by the same amount: the inset was pulled
+    /// back, the translation grew again, and it shook between the two.
+    private static var stageSpace: String { "DualCameraStage" }
+
+    /// The committed rect with the gesture in flight applied on top.
+    private func liveRect(in size: CGSize) -> CGRect {
+        applying(live, in: size)
+    }
+
+    private func applying(_ adjustment: Adjustment, in size: CGSize) -> CGRect {
+        PiPInsetLayout.adjusted(
+            inset, scale: adjustment.scale, translation: adjustment.translation, in: size)
+    }
+
+    /// The decoration is always applied and only switched by `isInset`, so a
+    /// swap changes values rather than view structure — the camera preview
+    /// layers underneath are never torn down.
+    private func framed(
+        _ view: some View, in rect: CGRect, isInset: Bool, canvas: CGSize
+    ) -> some View {
+        let border = PiPInsetLayout.border(in: canvas)
+        let radius = PiPInsetLayout.cornerRadius(in: canvas)
+        let innerRadius = max(radius - border, 0)
+        return view
+            .frame(width: rect.width, height: rect.height)
+            .clipShape(RoundedRectangle(cornerRadius: isInset ? innerRadius : 0))
+            .background {
+                RoundedRectangle(cornerRadius: radius, style: .circular)
+                    .fill(.white)
+                    .padding(-border)
+                    .shadow(color: .black.opacity(0.28), radius: border * 2, y: border * 0.75)
+                    .opacity(isInset ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+            .gesture(insetGestures(canvas: canvas),
+                     including: isInset && isEditable ? .all : .subviews)
+            .offset(x: rect.minX, y: rect.minY)
+    }
+
+    private func insetGestures(canvas: CGSize) -> some Gesture {
+        let adjust = DragGesture(minimumDistance: 6, coordinateSpace: .named(Self.stageSpace))
+            .simultaneously(with: MagnifyGesture(minimumScaleDelta: 0.01))
+            .updating($live) { value, state, _ in
+                state = Adjustment(
+                    translation: value.first?.translation ?? state.translation,
+                    scale: value.second?.magnification ?? state.scale)
+            }
+            .onChanged { value in
+                lastAdjustment = Adjustment(
+                    translation: value.first?.translation ?? lastAdjustment.translation,
+                    scale: value.second?.magnification ?? lastAdjustment.scale)
+            }
+            .onEnded { _ in
+                onInsetChange(applying(lastAdjustment, in: canvas))
+                lastAdjustment = Adjustment()
+            }
+        let tap = TapGesture().onEnded { onTapInset() }
+        return adjust.exclusively(before: tap)
+    }
+}
+
+#if DEBUG && targetEnvironment(simulator)
+/// What the viewfinder shows under `-simulatedCamera YES`: a moving scene, so
+/// screenshots of the camera have something in the frame and a still frame is
+/// distinguishable from a frozen one. See `ClipRecorder.isSimulated`.
+struct SimulatedCameraPreview: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            GeometryReader { proxy in
+                let size = proxy.size
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(hue: 0.58 + 0.04 * sin(t / 3), saturation: 0.45, brightness: 0.95),
+                            Color(hue: 0.08, saturation: 0.35, brightness: 0.98),
+                        ],
+                        startPoint: .top, endPoint: .bottom)
+                    Circle()
+                        .fill(Color(hue: 0.12, saturation: 0.6, brightness: 1))
+                        .frame(width: size.width * 0.28)
+                        .position(
+                            x: size.width * (0.5 + 0.3 * sin(t / 2)),
+                            y: size.height * (0.3 + 0.05 * cos(t / 2)))
+                    RoundedRectangle(cornerRadius: 40, style: .continuous)
+                        .fill(Color(hue: 0.35, saturation: 0.35, brightness: 0.7))
+                        .frame(width: size.width * 1.4, height: size.height * 0.45)
+                        .position(x: size.width * 0.5, y: size.height * 0.95)
+                    Text("SIMULATOR")
+                        .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .position(x: size.width * 0.5, y: size.height * 0.62)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+#endif

@@ -11,16 +11,25 @@ struct FinalFilmTimeline: View {
     let clips: [DayClip]
     let filmURL: URL
     let isSaving: Bool
+    /// This exact render is already in Photos. The button says so and stops
+    /// taking taps until a new render replaces the file.
+    var isSaved = false
     let saveMessage: String?
     /// Set when the message is a permission refusal, so the line can carry the
     /// way out of it. Nil for "saved" and for an ordinary failure, neither of
     /// which iOS Settings can do anything about.
     var onOpenSettings: (() -> Void)?
-    let onSave: () -> Void
+    /// Saves the film as it sounds now: with its music and voiceover, if any.
+    let onSave: (URL) -> Void
     let onAdjust: () -> Void
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.roomPreviewMediaScope) private var previewMedia
+    @Environment(MoodStore.self) private var moodStore: MoodStore?
+    /// `filmURL` remixed by `FilmSoundtrackPanel`; nil while it's the original.
+    @State private var mixedURL: URL?
+
+    private var shownURL: URL { mixedURL ?? filmURL }
 
     private var schedule: StorySchedule { StorySchedule(challenge) }
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
@@ -33,6 +42,10 @@ struct FinalFilmTimeline: View {
             VStack(spacing: 22) {
                 heading
                 player
+                FilmSoundtrackPanel(
+                    baseURL: filmURL,
+                    mood: moodStore?.mood(on: challenge.startDate)?.mood,
+                    mixedURL: $mixedURL)
                 actions
                 facts
                 timeline
@@ -42,78 +55,112 @@ struct FinalFilmTimeline: View {
             .padding(.bottom, OneDay.tabBarClearance + 24)
         }
         .scrollIndicators(.hidden)
+        // Over the page, above the tab bar, rather than hung under the
+        // buttons with an offset — that version overlapped the facts strip
+        // and needed a padding hack on it to make room.
+        .overlay(alignment: .bottom) {
+            if let saveMessage, onOpenSettings == nil {
+                toast(saveMessage)
+                    .padding(.bottom, OneDay.tabBarClearance + 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(OneDay.Motion.soft, value: saveMessage)
     }
 
+    /// Just the title. The line under it — 「属于你这一天的小影片。」 — said
+    /// nothing the player below doesn't, and the facts strip already gives the
+    /// real numbers.
     private var heading: some View {
-        VStack(spacing: 6) {
-            Text(Strings.filmReadyTitle)
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .multilineTextAlignment(.center)
-            Text(Strings.filmReadyBody)
-                .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-        }
+        Text(Strings.filmReadyTitle)
+            .font(.system(size: 26, weight: .heavy, design: .rounded))
+            .foregroundStyle(OneDay.ink)
+            .multilineTextAlignment(.center)
+    }
+
+    private func toast(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(OneDay.ink)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+            .oneDaySoftShadow()
+            .padding(.horizontal, 20)
+            .accessibilityAddTraits(.isStaticText)
     }
 
     private var player: some View {
         VlogPlayer(
-            url: filmURL,
+            url: shownURL,
             aspectRatio: challenge.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16)
+            // The player reads its URL once; a remix is a new player.
+            .id(shownURL)
             .frame(maxHeight: 460)
     }
 
     /// Save, share, adjust — three equal-weight actions, because at this point
     /// there's no single "correct" next step.
     private var actions: some View {
-        HStack(spacing: 11) {
-            FilmAction(
-                icon: isSaving ? "arrow.down.circle" : "square.and.arrow.down",
-                label: isSaving ? Strings.saving : Strings.saveAction,
-                accent: .oneDayBrand,
-                isBusy: isSaving,
-                action: onSave)
+        VStack(spacing: 8) {
+            HStack(spacing: 11) {
+                FilmAction(
+                    icon: isSaved
+                        ? "checkmark.circle.fill"
+                        : (isSaving ? "arrow.down.circle" : "square.and.arrow.down"),
+                    label: isSaved
+                        ? Strings.savedLabel
+                        : (isSaving ? Strings.saving : Strings.saveAction),
+                    accent: .oneDayBrand,
+                    isBusy: isSaving,
+                    action: { onSave(shownURL) })
+                    .disabled(previewMedia != nil || isSaved)
+
+                ShareLink(item: shownURL) {
+                    FilmActionLabel(
+                        icon: "paperplane.fill",
+                        label: Strings.shareAction,
+                        accent: .oneDayLavender)
+                }
+                .buttonStyle(.plain)
                 .disabled(previewMedia != nil)
 
-            ShareLink(item: filmURL) {
-                FilmActionLabel(
-                    icon: "paperplane.fill",
-                    label: Strings.shareAction,
-                    accent: .oneDayLavender)
+                FilmAction(
+                    icon: "slider.horizontal.3",
+                    label: Strings.adjust,
+                    accent: .oneDayMint,
+                    action: onAdjust)
             }
-            .buttonStyle(.plain)
-            .disabled(previewMedia != nil)
 
-            FilmAction(
-                icon: "slider.horizontal.3",
-                label: Strings.adjust,
-                accent: .oneDayMint,
-                action: onAdjust)
-        }
-        .overlay(alignment: .bottom) {
-            if let saveMessage {
+            // Two greyed-out buttons with no reason given read as broken.
+            if previewMedia != nil {
+                Text(Strings.sampleCantSaveOrShare)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkFaint)
+                    .multilineTextAlignment(.center)
+            }
+
+            // A refusal is not a toast: it stays, in the flow of the page,
+            // because it carries the way out. "需要相册权限才能保存视频。"
+            // used to be the whole of it — a sentence about a switch in
+            // another app, with no way to reach the switch.
+            if let saveMessage, let onOpenSettings {
                 VStack(spacing: 4) {
                     Text(saveMessage)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
                         .multilineTextAlignment(.center)
-                    // "需要相册权限才能保存视频。" used to be the whole of it:
-                    // a sentence about a switch in another app, with no way to
-                    // reach the switch. The camera's refusal already had this
-                    // door; the photo library's didn't.
-                    if let onOpenSettings {
-                        Button(Strings.openSystemSettings, action: onOpenSettings)
-                            .font(.system(size: 12.5, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.oneDayBrand)
-                            .accessibilityIdentifier("film-open-settings")
-                    }
+                    Button(Strings.openSystemSettings, action: onOpenSettings)
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.brandText)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("film-open-settings")
                 }
-                .padding(.top, 6)
-                .offset(y: 22)
                 .transition(.opacity)
             }
         }
-        .animation(OneDay.Motion.soft, value: saveMessage)
     }
 
     /// Duration, moment count, people — the film's stats in one strip.
@@ -124,7 +171,8 @@ struct FinalFilmTimeline: View {
             fact(
                 icon: "circle.grid.2x2.fill",
                 title: Strings.momentsLabel,
-                value: "\(clips.count)")
+                // Moments, not clips — three people on one moment is one.
+                value: "\(Set(clips.map(\.day)).count)")
             divider
             fact(
                 icon: "person.2.fill",
@@ -133,7 +181,6 @@ struct FinalFilmTimeline: View {
         }
         .padding(.vertical, 14)
         .glassSurface(radius: OneDay.Radius.card)
-        .padding(.top, saveMessage == nil ? 0 : 18)
     }
 
     private var divider: some View {

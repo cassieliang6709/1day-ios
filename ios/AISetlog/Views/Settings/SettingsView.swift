@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var deleteFailed = false
     @State private var isDeleting = false
     @State private var showSignIn = false
+    /// Signing out hides every shared room on this device, which nothing on
+    /// the row itself suggests — so it asks first.
+    @State private var showSignOutConfirmation = false
     /// Held locally so a half-typed name never reaches the rooms.
     @State private var draftName = ""
     @FocusState private var nameFocused: Bool
@@ -24,6 +27,7 @@ struct SettingsView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
+    @AppStorage(AppSkin.storageKey) private var appSkin: AppSkin = .cream
 
     /// Who you are, what you've made, then the two things worth changing.
     ///
@@ -49,6 +53,9 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 OneDayCanvas(seed: 5)
+                    .onChange(of: appSkin) { _, _ in
+                        UserDefaults.standard.set(true, forKey: AppSkin.reopenSettingsKey)
+                    }
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -61,6 +68,9 @@ struct SettingsView: View {
                         if account.isSignedIn {
                             group(Strings.account, rows: accountRows)
                         }
+                        #if DEBUG
+                        group(Strings.debugSection, rows: DebugTestRoomRows())
+                        #endif
                         smallPrint
                     }
                     .padding(.horizontal, 20)
@@ -87,6 +97,18 @@ struct SettingsView: View {
             .onChange(of: account.account?.displayName) { _, name in
                 guard !nameFocused else { return }
                 draftName = name ?? ""
+            }
+            .confirmationDialog(
+                Strings.signOutConfirmTitle,
+                isPresented: $showSignOutConfirmation,
+                titleVisibility: .visible
+            ) {
+                // Through the store, not straight at the account: the rooms
+                // hold a cache keyed by who I am.
+                Button(Strings.signOut, role: .destructive) { store.signOut() }
+                Button(Strings.cancel, role: .cancel) {}
+            } message: {
+                Text(Strings.signOutConfirmMessage)
             }
             .confirmationDialog(
                 Strings.deleteAccountTitle,
@@ -144,6 +166,10 @@ struct SettingsView: View {
             // Shown signed out too. The colour is stored against your name, so
             // it used to need one — and gating it meant somebody who films
             // alone and never signs in could never change their own avatar.
+            // Labelled: a row of unexplained dots under your name read as
+            // decoration, not as a choice.
+            SectionLabel(text: Strings.avatarColourLabel)
+                .padding(.top, 4)
             tintPicker
         }
         .padding(.vertical, 4)
@@ -166,12 +192,13 @@ struct SettingsView: View {
         .accessibilityIdentifier("avatar-tints")
     }
 
-    /// Six per row. Twelve in one row is a 24pt dot with 3pt between them —
-    /// the row that used to hold seven was already at its limit.
+    /// Two even rows. The palette is eight now, so six per row left a lonely
+    /// two underneath; half the palette per row stays even if it changes again.
     private var tintRows: [[Int]] {
         let all = Array(Identity.paletteUIColors.indices)
-        return stride(from: 0, to: all.count, by: 6).map {
-            Array(all[$0..<min($0 + 6, all.count)])
+        let perRow = max((all.count + 1) / 2, 1)
+        return stride(from: 0, to: all.count, by: perRow).map {
+            Array(all[$0..<min($0 + perRow, all.count)])
         }
     }
 
@@ -220,14 +247,30 @@ struct SettingsView: View {
                     // The name is editable in place, which is what makes the
                     // caption under it true. It was a right-aligned text field
                     // in a row called "Your name", three groups further down.
-                    TextField(Strings.yourNamePlaceholder, text: $draftName)
-                        .font(.system(size: 20, weight: .heavy, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .tint(Color.oneDayBrand)
-                        .focused($nameFocused)
-                        .submitLabel(.done)
-                        .onSubmit(commitName)
-                        .accessibilityIdentifier("your-name")
+                    // The pencil is the only sign a heavy-weight name is a
+                    // field; without it nobody thought to tap it.
+                    HStack(spacing: 7) {
+                        TextField(Strings.yourNamePlaceholder, text: $draftName)
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                            .tint(Color.oneDayBrand)
+                            .focused($nameFocused)
+                            .submitLabel(.done)
+                            .onSubmit(commitName)
+                            .fixedSize(horizontal: !draftName.isEmpty, vertical: false)
+                            .accessibilityIdentifier("your-name")
+                            .accessibilityHint(Strings.editNameHint)
+                        if !nameFocused {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(OneDay.inkFaint)
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                                .onTapGesture { nameFocused = true }
+                                .accessibilityHidden(true)
+                        }
+                        Spacer(minLength: 0)
+                    }
                 }
                 .onChange(of: nameFocused) { _, focused in
                     if !focused { commitName() }
@@ -243,7 +286,7 @@ struct SettingsView: View {
                     // so getting back in meant starting one.
                     Button(Strings.signIn) { showSignIn = true }
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .foregroundStyle(OneDay.brandText)
                 }
             }
 
@@ -298,7 +341,7 @@ struct SettingsView: View {
         HStack(spacing: 6) {
             Link(Strings.privacyPolicy, destination: Self.privacyPolicyURL)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
             Text("·")
             Text(Self.versionString)
         }
@@ -335,8 +378,19 @@ struct SettingsView: View {
         }
         rowDivider
         SettingsLinkRow(
+            symbol: "paintpalette",
+            accent: OneDay.brandText,
+            title: Strings.skinTitle,
+            value: appSkin.displayName
+        ) {
+            SettingsOptionPage(
+                title: Strings.skinTitle,
+                selection: $appSkin)
+        }
+        rowDivider
+        SettingsLinkRow(
             symbol: "globe",
-            accent: .oneDayBrand,
+            accent: OneDay.brandText,
             title: Strings.language,
             value: appLanguage.displayName
         ) {
@@ -365,14 +419,12 @@ struct SettingsView: View {
                 caption: nil,
                 action: nil)
             rowDivider
-            // Through the store, not straight at the account: the rooms hold a
-            // cache keyed by who I am.
             SettingsButtonRow(
                 symbol: "rectangle.portrait.and.arrow.right",
                 accent: .oneDayNavy,
                 title: Strings.signOut,
                 caption: nil
-            ) { store.signOut() }
+            ) { showSignOutConfirmation = true }
             rowDivider
             // Only an account that exists can be deleted. Offering this while
             // signed out put a button that erases every story on the device
@@ -557,15 +609,57 @@ private struct SettingsButtonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // No chevron: these rows do something on the spot. A chevron
+            // promises another screen, and 退出登录 doesn't have one.
             Spacer(minLength: 8)
-            if action != nil {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(OneDay.inkFaint)
-            }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .contentShape(Rectangle())
     }
 }
+
+#if DEBUG
+/// 创建测试房间: a real room in the CloudKit development database with two
+/// fake friends' clips in it. See `DebugTestRoom`.
+private struct DebugTestRoomRows: View {
+    @Environment(ChallengeStore.self) private var store
+    @Environment(AccountStore.self) private var account
+
+    @State private var creating = false
+    @State private var created: Challenge?
+    @State private var message: String?
+
+    var body: some View {
+        SettingsButtonRow(
+            symbol: "testtube.2",
+            accent: .oneDayNavy,
+            title: creating ? Strings.debugCreatingTestRoom : Strings.debugCreateTestRoom,
+            caption: message ?? Strings.debugTestRoomCaption,
+            isDisabled: creating,
+            action: create)
+            .accessibilityIdentifier("settings-debug-create-test-room")
+        if let created {
+            RoomInviteCodeCard(challenge: created)
+        }
+    }
+
+    private func create() {
+        guard account.isSignedIn else {
+            message = Strings.debugTestRoomNeedsSignIn
+            return
+        }
+        creating = true
+        message = nil
+        Task {
+            defer { creating = false }
+            do {
+                created = try await DebugTestRoom.create(in: store)
+                message = Strings.debugTestRoomCreated
+            } catch {
+                message = error.localizedDescription
+            }
+        }
+    }
+}
+#endif

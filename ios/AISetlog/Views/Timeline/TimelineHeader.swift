@@ -76,7 +76,7 @@ struct TimelineHeader: View {
                 Text(code)
                     .font(.system(size: 15, weight: .heavy, design: .monospaced))
                     .tracking(2)
-                    .foregroundStyle(Color.oneDayBrand)
+                    .foregroundStyle(OneDay.brandText)
 
                 Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 11, weight: .bold))
@@ -135,7 +135,7 @@ struct EditPlanSheet: View {
                         HStack(spacing: 12) {
                             Text("\(index + 1)")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(OneDay.onBrand)
                                 .frame(width: 24, height: 24)
                                 .background(Color.oneDayBrand, in: Circle())
                             TextField(

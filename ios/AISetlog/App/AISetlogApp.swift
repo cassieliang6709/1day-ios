@@ -6,6 +6,7 @@ struct AISetlogApp: App {
     @State private var account: AccountStore
     @State private var store: ChallengeStore
     @State private var drafts = ClipDraftStore()
+    @State private var moods = MoodStore()
     @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
@@ -13,6 +14,12 @@ struct AISetlogApp: App {
     /// your avatar. Bound so `.tint` below is handed the new one the moment it
     /// changes.
     @AppStorage(Identity.myTintKey) private var myTintIndex = -1
+    /// Picking a skin rebuilds the tree (`.id` below). A new `.tint` alone
+    /// only reached views that read the tint; the canvas and the plain-text
+    /// labels kept the old skin. The rebuild closes the Settings sheet it was
+    /// picked in, so Settings sets `AppSkin.reopenSettingsKey` and the home
+    /// screen opens it again.
+    @AppStorage(AppSkin.storageKey) private var appSkin: AppSkin = .cream
 
     init() {
         let account = AccountStore()
@@ -42,17 +49,24 @@ struct AISetlogApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .id(appSkin)
                 .environment(store)
                 .environment(account)
                 .environment(drafts)
+                .environment(moods)
                 .environment(promptMetrics)
                 // `.tint` is enough on its own: it is an environment value, so
                 // changing it invalidates the whole subtree and every screen
                 // re-reads `Color.oneDayBrand`. An `.id(myTintIndex)` here also
                 // worked, and rebuilt the tree so hard that it closed the
                 // Settings sheet you were picking the colour in.
-                .tint(Color.oneDayBrand)
+                // `brandText`, not the fill colour: the system draws plain
+                // buttons and links in the tint, and 奶油黄 can't be text.
+                .tint(OneDay.brandText)
                 .preferredColorScheme(appAppearance.colorScheme)
+                // Runs on launch and on every skin change; outside `.id` so
+                // the rebuild doesn't re-trigger it.
+                .task(id: appSkin) { AppSkin.syncAppIcon(to: appSkin) }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
                     ReminderService.reconcile(for: store.challenges)

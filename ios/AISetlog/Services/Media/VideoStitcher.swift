@@ -121,6 +121,9 @@ enum VideoStitcher {
         let audioRange: CMTimeRange
         let naturalSize: CGSize
         let preferredTransform: CGAffineTransform
+        /// Baked by a camera that prints its own date (`CameraStyle`), so the
+        /// film's date pill stays off this clip.
+        var hasCameraStamp = false
 
         var duration: CMTime { videoRange.duration }
 
@@ -161,6 +164,7 @@ enum VideoStitcher {
         let comments: [String]
         let start: Double
         let end: Double
+        var hasCameraStamp = false
     }
 
     // MARK: - Entry point
@@ -172,6 +176,13 @@ enum VideoStitcher {
         let drawCaptions = options.showDayCaptions
         let titleCard = options.titleCard
         #endif
+
+        // Read before the look pass: its graded copies aren't promised to carry
+        // the original's metadata.
+        var cameraStamped: Set<String> = []
+        for clip in clips where await CameraStyleBaker.hasCameraStamp(clip.url) {
+            cameraStamped.insert(clip.id)
+        }
 
         // ---- The look, one clip at a time, before anything is stitched ------
         let (source, scratch) = try await filteredClips(
@@ -199,7 +210,8 @@ enum VideoStitcher {
                 emoji: clip.emoji, comments: clip.comments,
                 asset: asset, videoRange: videoRange, videoTrack: video,
                 audioTrack: audio, audioRange: audioRange,
-                naturalSize: naturalSize, preferredTransform: transform))
+                naturalSize: naturalSize, preferredTransform: transform,
+                hasCameraStamp: cameraStamped.contains(clip.id)))
         }
         guard !loaded.isEmpty else { throw StitchError.noClips }
 
@@ -482,7 +494,8 @@ enum VideoStitcher {
                 captionSticker: p.clip.captionSticker,
                 recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
-                end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
+                end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds,
+                hasCameraStamp: p.clip.hasCameraStamp))
         }
 
         // Audio tracks are added up front but only filled for clips that have
@@ -1200,6 +1213,8 @@ enum VideoStitcher {
         // Solo diaries: a clean, BeReal-style "date · time" pill — no avatar,
         // no colored ring, just a quiet timestamp for that real-moment feel.
         guard showAuthorMark else {
+            // The camera already printed its own date onto the picture.
+            if caption.hasCameraStamp { return }
             addTimestampPill(
                 for: caption, to: parentLayer, renderSize: renderSize,
                 duration: duration, edge: edge)

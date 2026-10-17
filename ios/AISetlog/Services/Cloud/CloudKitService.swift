@@ -54,6 +54,8 @@ enum CloudKitService {
         case roomNotFound
         case fieldNotQueryable
         case networkUnavailable
+        case roomCreateFailed
+        case roomJoinFailed
 
         var errorDescription: String? {
             switch self {
@@ -65,7 +67,30 @@ enum CloudKitService {
                 return Strings.errorIndexDeploying
             case .networkUnavailable:
                 return Strings.errorNetwork
+            case .roomCreateFailed:
+                return Strings.errorRoomCreateFailed
+            case .roomJoinFailed:
+                return Strings.errorRoomJoinFailed
             }
+        }
+    }
+
+    /// CloudKit's own `localizedDescription` is "未能完成操作。（CKErrorDomain
+    /// 错误 4。）" — a domain name and a number, shown to somebody who was
+    /// trying to record with a friend. Every path that surfaces a CKError to
+    /// the UI maps it here first; `fallback` is what an unrecognised code says
+    /// instead of leaking the domain.
+    static func serviceError(from error: CKError, fallback: CKServiceError) -> Error {
+        switch error.code {
+        case .unknownItem:
+            return CKServiceError.roomNotFound
+        case .notAuthenticated, .managedAccountRestricted:
+            return CKServiceError.notSignedIntoiCloud
+        case .networkFailure, .networkUnavailable, .serviceUnavailable,
+             .requestRateLimited, .zoneBusy:
+            return CKServiceError.networkUnavailable
+        default:
+            return fallback
         }
     }
     static func ensureAccountAvailable() async throws {
@@ -88,6 +113,7 @@ enum CloudKitService {
         let mode: Challenge.Mode
         let clipLength: Challenge.ClipLength
         let orientation: Challenge.Orientation
+        let cameraStyle: CameraStyle?
         let templateName: String?
         let momentTitles: [String]?
     }
@@ -99,6 +125,7 @@ enum CloudKitService {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> RemoteRoom {
@@ -114,6 +141,7 @@ enum CloudKitService {
             record["mode"] = mode.rawValue as CKRecordValue
             record["clipLength"] = clipLength.rawValue as CKRecordValue
             record["orientation"] = orientation.rawValue as CKRecordValue
+            if let cameraStyle { record["cameraStyle"] = cameraStyle.rawValue as CKRecordValue }
             if let templateName { record["templateName"] = templateName as CKRecordValue }
             // Diagnostic (temporary): the code under which the room is saved,
             // so a "no room with that code" report can be matched against it.
@@ -125,12 +153,15 @@ enum CloudKitService {
             } catch let error as CKError where error.code == .serverRecordChanged {
                 print("[room] code \(code) taken, retrying")
                 continue // code taken, try another
+            } catch let error as CKError {
+                print("[room] create room code=\(code) failed: \(error)")
+                throw serviceError(from: error, fallback: .roomCreateFailed)
             } catch {
                 print("[room] create room code=\(code) failed: \(error)")
                 throw error
             }
         }
-        throw CKError(.limitExceeded)
+        throw CKServiceError.roomCreateFailed
     }
 
     static func fetchRoom(code: String) async throws -> RemoteRoom {
@@ -147,16 +178,7 @@ enum CloudKitService {
             // network drop or a signed-out iCloud account failing the fetch
             // must reach the user as what it is, not as a wrong-code hint.
             print("[room] fetch room code=\(code) failed: \(error)")
-            switch error.code {
-            case .unknownItem:
-                throw CKServiceError.roomNotFound
-            case .notAuthenticated:
-                throw CKServiceError.notSignedIntoiCloud
-            case .networkFailure, .networkUnavailable, .serviceUnavailable:
-                throw CKServiceError.networkUnavailable
-            default:
-                throw error
-            }
+            throw serviceError(from: error, fallback: .roomJoinFailed)
         }
     }
 
@@ -170,6 +192,7 @@ enum CloudKitService {
             mode: Challenge.Mode(rawValue: r["mode"] as? String ?? "") ?? .sevenDay,
             clipLength: Challenge.ClipLength(rawValue: r["clipLength"] as? String ?? "") ?? .tiny,
             orientation: Challenge.Orientation(rawValue: r["orientation"] as? String ?? "") ?? .portrait,
+            cameraStyle: (r["cameraStyle"] as? String).flatMap(CameraStyle.init),
             templateName: r["templateName"] as? String,
             momentTitles: (r["momentTitles"] as? String)?
                 .split(separator: "\n", omittingEmptySubsequences: false)

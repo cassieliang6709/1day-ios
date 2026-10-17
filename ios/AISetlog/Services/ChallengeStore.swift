@@ -184,6 +184,7 @@ final class ChallengeStore {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) -> Challenge {
@@ -195,6 +196,7 @@ final class ChallengeStore {
             mode: mode,
             clipLength: clipLength,
             orientation: orientation,
+            cameraStyle: cameraStyle,
             templateName: templateName,
             momentTitles: momentTitles
         )
@@ -205,6 +207,9 @@ final class ChallengeStore {
     /// The first-run story: an immediately filmable personal day. Keeping this
     /// alongside `create` means it has the exact same persistence and reminder
     /// behavior as a story made in the composer.
+    ///
+    /// 按时间 as of 1.5 — no prompts to read before the first take, which is
+    /// what 晨光 / 在路上 / 傍晚的光 asked of someone who had just opened the app.
     @discardableResult
     func createQuickStart() -> Challenge {
         create(
@@ -212,7 +217,8 @@ final class ChallengeStore {
             mode: .oneDay,
             clipLength: .tiny,
             orientation: .portrait,
-            momentTitles: ["morning_light", "on_the_move", "golden_hour"])
+            templateName: ChallengeTemplate.liveWithMeIdentityKey,
+            momentTitles: nil)
     }
 
     // MARK: - Shared rooms (CloudKit)
@@ -233,6 +239,7 @@ final class ChallengeStore {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> Challenge {
@@ -241,12 +248,14 @@ final class ChallengeStore {
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
             mode: mode, clipLength: clipLength, orientation: orientation,
+            cameraStyle: cameraStyle,
             templateName: templateName, momentTitles: momentTitles)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
             orientation: room.orientation,
+            cameraStyle: room.cameraStyle,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
@@ -279,6 +288,7 @@ final class ChallengeStore {
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
             orientation: room.orientation,
+            cameraStyle: room.cameraStyle,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
@@ -599,6 +609,30 @@ final class ChallengeStore {
                     targetAuthorID: targetAuthorID, emoji: emoji, on: nowOn)
             }
         }
+    }
+
+    // MARK: - 拍一拍
+
+    /// Whether I already poked this friend in this room today.
+    func hasPokedToday(challengeID: UUID, targetAuthorID: String) -> Bool {
+        guard let code = challenge(challengeID)?.roomCode else { return false }
+        return PokeLimiter().hasPoked(code: code, targetAuthorID: targetAuthorID)
+    }
+
+    /// Nudge a friend who hasn't filmed today. Once per friend per day; the
+    /// CloudKit write is best-effort like a reaction's.
+    @discardableResult
+    func poke(challengeID: UUID, targetAuthorID: String) -> Bool {
+        guard let code = challenge(challengeID)?.roomCode,
+              let acct = account?.account, targetAuthorID != acct.id,
+              PokeLimiter().claim(code: code, targetAuthorID: targetAuthorID)
+        else { return false }
+        Task { @MainActor in
+            await roomSync.sendPoke(
+                code: code, authorID: acct.id, authorName: acct.displayName,
+                targetAuthorID: targetAuthorID)
+        }
+        return true
     }
 
     /// Append a comment to a day's clip. Empty/whitespace-only text is ignored.

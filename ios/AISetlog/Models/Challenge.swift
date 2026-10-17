@@ -71,6 +71,9 @@ struct Challenge: Codable, Identifiable {
     var clipLength: ClipLength? = nil
     /// nil means an older saved challenge; those are all portrait.
     var orientation: Orientation? = nil
+    /// The camera everyone in this story films with (1.5). Nil means an older
+    /// saved story; those film with whatever camera you last picked.
+    var cameraStyle: CameraStyle? = nil
     var templateName: String? = nil
     var momentTitles: [String]? = nil
 

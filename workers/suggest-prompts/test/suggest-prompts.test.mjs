@@ -46,6 +46,46 @@ test('rejects anything but POST', async () => {
   assert.equal(res.status, 405);
 });
 
+test('answers a HEAD warm-up without touching the model or the key', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{}'));
+
+  const res = await worker.fetch(post(null, { method: 'HEAD' }), { DEEPSEEK_API_KEY: '' });
+
+  assert.equal(res.status, 204);
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
+test('drops prompts long enough to be sentences, keeps near misses', async (t) => {
+  t.mock.method(
+    globalThis,
+    'fetch',
+    upstreamReturning(
+      '{"prompts":["出门前","背包里装好水和零食","关上卧室的灯然后最后拍一下空房间","第一个箱子","新家的灯"]}'
+    )
+  );
+
+  const res = await worker.fetch(post(body()), env());
+
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).prompts, [
+    '出门前', '背包里装好水和零食', '第一个箱子', '新家的灯',
+  ]);
+});
+
+test('counts English length in words', async (t) => {
+  t.mock.method(
+    globalThis,
+    'fetch',
+    upstreamReturning(
+      '{"prompts":["The first box","Turning off every light in the old flat one last time","New keys","Dinner on the floor"]}'
+    )
+  );
+
+  const res = await worker.fetch(post(body({ language: 'en' })), env());
+
+  assert.deepEqual((await res.json()).prompts, ['The first box', 'New keys', 'Dinner on the floor']);
+});
+
 test('ignores paths it does not serve', async () => {
   const res = await worker.fetch(
     post(body(), { url: 'https://example.test/anything-else' }),
