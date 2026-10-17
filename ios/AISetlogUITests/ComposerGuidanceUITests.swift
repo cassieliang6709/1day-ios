@@ -44,7 +44,7 @@ final class ComposerGuidanceUITests: XCTestCase {
         name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.count))
         let guidance = app.staticTexts["composer-name-needed"]
         XCTAssertTrue(guidance.waitForExistence(timeout: 15))
-        XCTAssertEqual(guidance.label, "Give the story a name first")
+        XCTAssertEqual(guidance.label, "Give the topic a name first")
         name.typeText("My edited story")
         XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
