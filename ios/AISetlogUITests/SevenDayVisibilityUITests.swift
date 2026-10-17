@@ -1,55 +1,30 @@
 import XCTest
 
 final class SevenDayVisibilityUITests: XCTestCase {
-    func testSevenDaySwitchShowsTemplates() {
+    /// 1.5 (08f539d): the composer has no 拍几天 step any more — every new
+    /// story is one day — so the 一日 / 7 日 rows must be gone, and picking a
+    /// poster still names the story on the same page.
+    func testPosterNamesTheStoryWithoutADaysStep() {
         let app = XCUIApplication()
         app.launchArguments = [
             "-onboarding.completed.v1", "YES",
             "-appLanguage", "chinese",
-            // The demo entries this suite navigates through are opt-in as of
-            // 1.3 — see `DemoEntries` in the app target. A UI test runs in its
-            // own process, so the flag is spelled out rather than referenced.
-            // Without it the home screen has no 房间演示 button and the camera
-            // has no 示例片段, and on a runner with no camera there is then no
-            // way to get footage anywhere.
             "-demoEntries", "YES",
         ]
         app.launch()
-        // The composer is the header's ＋ 新建 as of 1.5.
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
         compose.tap()
-        // One page as of 1.5: two rows say how many days, and the 模板 grid
-        // below shows that length's posters.
-        let oneDayRow = app.buttons["plan-one-day"]
-        let sevenDayRow = app.buttons["plan-seven-day"]
-        XCTAssertTrue(sevenDayRow.waitForExistence(timeout: 15), "7-day row missing")
-        sevenDayRow.tap()
-        XCTAssertTrue(sevenDayRow.isSelected)
-        let moving = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "动起来的一周")).firstMatch
-        XCTAssertTrue(moving.waitForExistence(timeout: 15))
-        // The grid sits under the two rows; on a small phone it starts below
-        // the fold.
-        reveal(moving, in: app)
-        XCTAssertTrue(moving.isHittable)
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "Seven day after switch"
-        shot.lifetime = .keepAlways
-        add(shot)
-        reveal(oneDayRow, in: app, upward: false)
-        oneDayRow.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch.waitForExistence(timeout: 15))
-        sevenDayRow.tap()
-        XCTAssertTrue(moving.waitForExistence(timeout: 15))
-        let early = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "早起的人")).firstMatch
-        reveal(early, in: app)
-        // Picking a seven-day poster names the story after it, in the field
-        // on the same page — the first chance anybody gets to change it.
-        early.tap()
+        XCTAssertTrue(app.buttons["by-time-entry"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["plan-one-day"].exists)
+        XCTAssertFalse(app.buttons["plan-seven-day"].exists)
+        let perfect = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch
+        XCTAssertTrue(perfect.waitForExistence(timeout: 15))
+        reveal(perfect, in: app)
+        perfect.tap()
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
-        XCTAssertEqual(name.value as? String, "7 天早起的人")
-        // And the page asks who you are filming with before anything exists.
+        XCTAssertTrue((name.value as? String ?? "").contains("完美的一天"))
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
     }

@@ -64,8 +64,9 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(byTime.exists)
         XCTAssertLessThan(list.frame.minY, byTime.frame.minY)
         XCTAssertFalse(app.buttons["custom-prompts-entry"].exists)
-        XCTAssertTrue(app.buttons["plan-one-day"].exists)
-        XCTAssertTrue(app.buttons["plan-seven-day"].exists)
+        // No 拍几天 step since 08f539d: every new story is one day.
+        XCTAssertFalse(app.buttons["plan-one-day"].exists)
+        XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         XCTAssertFalse(app.buttons["made-before"].exists)
         XCTAssertTrue(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
         // Who's filming and the camera are on the same page, with the one button.

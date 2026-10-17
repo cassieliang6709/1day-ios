@@ -59,6 +59,12 @@ struct MoodSync: MoodSyncing {
     // MARK: MoodSyncing
 
     func isAvailable() async -> Bool {
+        // Checked before CloudKit is touched at all: a build without the iCloud
+        // entitlement (CI's unsigned simulator build) throws an Objective-C
+        // exception the moment a container is created, which no `do`/`catch`
+        // can stop — the app died at launch and every UI test lost its screen.
+        // No token also simply means no iCloud account, so it's local-only.
+        guard FileManager.default.ubiquityIdentityToken != nil else { return false }
         do {
             return try await container.accountStatus() == .available
         } catch {
