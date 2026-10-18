@@ -31,15 +31,17 @@ final class RoomSyncIsolationTests: XCTestCase {
                 return []
             },
             fetchInteractions: { calls.append("interactions:\($0)"); return ([], []) },
-            uploadClip: { code, day, author, name, file, caption, recordedAt in
+            uploadClip: { code, day, author, name, file, caption, recordedAt, takeID in
                 XCTAssertEqual([code, author, name, caption ?? ""], ["ROOM", "me", "Me", "mine"])
                 XCTAssertEqual(day, 2); XCTAssertEqual(file, url)
                 XCTAssertEqual(recordedAt, filmedAt)
+                XCTAssertNil(takeID)
                 calls.append("upload")
             },
-            updateClipCaption: { code, day, author, caption in
+            updateClipCaption: { code, day, author, caption, takeID in
                 XCTAssertEqual([code, author, caption ?? ""], ["ROOM", "me", "edited"])
                 XCTAssertEqual(day, 2)
+                XCTAssertNil(takeID)
                 calls.append("caption")
             },
             setReaction: { code, day, author, name, target, emoji, on in

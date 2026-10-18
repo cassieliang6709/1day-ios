@@ -6,8 +6,10 @@ import CloudKit
 /// Design:
 /// - `Room` record: recordName IS the 6-char join code, so joining is a direct
 ///   fetch (no query, no index needed).
-/// - `Clip` record: recordName is deterministic (`code_author_dayN`) so a
-///   re-record overwrites the same record. Video travels as a CKAsset.
+/// - `Clip` record: recordName is deterministic (`code_author_dayN`) for a
+///   person's first take of a moment; every later take gets its own record,
+///   `code_author_dayN_<takeID>`, so filming again adds instead of overwriting.
+///   Video travels as a CKAsset.
 ///
 /// Public DB requires the device be signed into iCloud (checked up front).
 enum CloudKitService {
@@ -232,8 +234,23 @@ enum CloudKitService {
     /// network: "writing this again is harmless" is only true while the same
     /// clip keeps deriving the same name, and that is a property of this
     /// string, not of CloudKit.
-    static func clipRecordName(code: String, authorID: String, day: Int) -> String {
-        "\(code)_\(authorID)_day\(day)"
+    ///
+    /// `takeID` nil is take 1, whose name is the one every version has used.
+    /// A later take appends its id. An older phone lists a room's clips by
+    /// query and reads `day`/`authorID` off the record, never off the name, so
+    /// it shows the extra takes too without knowing what they are.
+    static func clipRecordName(code: String, authorID: String, day: Int, takeID: UUID? = nil) -> String {
+        let first = "\(code)_\(authorID)_day\(day)"
+        guard let takeID else { return first }
+        return "\(first)_\(takeID.uuidString)"
+    }
+
+    /// Which take a clip record holds, read back off its name: nil for take 1
+    /// (or a name this app didn't write).
+    static func takeID(fromClipRecordName name: String, code: String, authorID: String, day: Int) -> UUID? {
+        let prefix = clipRecordName(code: code, authorID: authorID, day: day) + "_"
+        guard name.hasPrefix(prefix) else { return nil }
+        return UUID(uuidString: String(name.dropFirst(prefix.count)))
     }
 
     /// Upload (or overwrite) my clip for a given day.
@@ -244,10 +261,11 @@ enum CloudKitService {
     /// of the same take. A clip that isn't up yet is not an error — the next
     /// upload carries whatever the caption says by then.
     static func updateClipCaption(
-        code: String, day: Int, authorID: String, overlayText: String?
+        code: String, day: Int, authorID: String, overlayText: String?, takeID: UUID? = nil
     ) async throws {
         try await ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
+        let id = CKRecord.ID(recordName: clipRecordName(
+            code: code, authorID: authorID, day: day, takeID: takeID))
         guard let record = try? await db.record(for: id) else { return }
         if let overlayText, !overlayText.isEmpty {
             record["overlayText"] = overlayText as CKRecordValue
@@ -264,11 +282,15 @@ enum CloudKitService {
         authorName: String,
         fileURL: URL,
         overlayText: String? = nil,
-        recordedAt: Date
+        recordedAt: Date,
+        takeID: UUID? = nil
     ) async throws {
         try await ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
-        // Fetch-and-update if it exists so a re-record replaces the same record.
+        let id = CKRecord.ID(recordName: clipRecordName(
+            code: code, authorID: authorID, day: day, takeID: takeID))
+        // Fetch-and-update if it exists, so a retried upload of the same take
+        // lands on the same record. A new take has a new name and never finds
+        // one.
         let record: CKRecord
         if let existing = try? await db.record(for: id) {
             record = existing
@@ -296,7 +318,7 @@ enum CloudKitService {
         // Diagnostic: the success half of `[room] upload failed`, so a clip a
         // friend says they can't see can be matched against what this phone
         // actually put up, and when it says the take was filmed.
-        print("[room] uploaded clip code=\(code) day=\(day) recordedAt=\(recordedAt)")
+        print("[room] uploaded clip code=\(code) day=\(day) recordedAt=\(recordedAt) take=\(takeID?.uuidString ?? "1")")
     }
 
     /// All clips in a room, downloaded to a local cache directory.
@@ -477,11 +499,15 @@ enum CloudKitService {
         clips: [(code: String, day: Int)],
         reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)],
         commentIDs: [String],
-        roomCodes: [String]
+        roomCodes: [String],
+        // Records addressed by name rather than rebuilt here: a moment's extra
+        // takes (`clipRecordName(…, takeID:)`), and anything else whose name
+        // only the caller knows.
+        otherRecordNames: [String] = []
     ) async throws {
         try await ensureAccountAvailable()
 
-        var ids: [CKRecord.ID] = []
+        var ids: [CKRecord.ID] = otherRecordNames.map { CKRecord.ID(recordName: $0) }
         for clip in clips {
             ids.append(.init(recordName: clipRecordName(
                 code: clip.code, authorID: authorID, day: clip.day)))

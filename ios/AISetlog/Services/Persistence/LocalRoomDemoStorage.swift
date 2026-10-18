@@ -33,6 +33,12 @@ final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore, TemplateCo
         } catch { return nil }
     }
 
+    /// Every name here is already unique and nothing is ever replaced, so a
+    /// second take is just another clip.
+    func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
+        storeClip(from: tempURL, day: day, challengeID: challengeID)
+    }
+
     func clipURL(fileName: String, challengeID: UUID) -> URL {
         // AVFoundation needs a recognizable media extension on some decoding
         // paths. Encode the entire untrusted name, then append only a whitelisted

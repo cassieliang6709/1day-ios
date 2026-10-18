@@ -80,6 +80,7 @@ struct ClipDeckReview: View {
             recordedAt: clip.recordedAt,
             challengeID: challengeID,
             targetAuthorID: clip.authorID,
+            takeID: clip.takeID,
             onReRecord: { onReRecord(clip.day) })
     }
 }

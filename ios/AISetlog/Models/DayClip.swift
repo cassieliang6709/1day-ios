@@ -15,6 +15,9 @@ struct DayClip: Identifiable {
     /// at `CaptionSticker.default`, which is where every caption used to go.
     var captionSticker: CaptionSticker?
     var recordedAt: Date?
+    /// Which take of this person's moment this is. Nil is take 1 — the card's
+    /// own fields, and the only take a clip from before takes existed has.
+    var takeID: UUID?
     /// Emoji to float onto this clip in the final film (from its reactions).
     var emoji: [String]
     /// "name: text" comments to bubble up in the final film.
@@ -31,7 +34,8 @@ struct DayClip: Identifiable {
         recordedAt: Date? = nil,
         emoji: [String] = [],
         comments: [String] = [],
-        key: String? = nil
+        key: String? = nil,
+        takeID: UUID? = nil
     ) {
         self.day = day
         self.url = url
@@ -43,6 +47,7 @@ struct DayClip: Identifiable {
         self.recordedAt = recordedAt
         self.emoji = emoji
         self.comments = comments
+        self.takeID = takeID
         self.id = key ?? "day\(day)"
     }
 
@@ -55,6 +60,6 @@ struct DayClip: Identifiable {
             day: day, url: url, authorName: authorName, authorID: authorID,
             label: label, overlayText: overlayText, captionSticker: captionSticker,
             recordedAt: recordedAt,
-            emoji: emoji, comments: comments, key: id)
+            emoji: emoji, comments: comments, key: id, takeID: takeID)
     }
 }

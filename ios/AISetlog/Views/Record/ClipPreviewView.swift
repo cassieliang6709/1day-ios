@@ -35,6 +35,10 @@ struct ClipPreviewView: View {
     let recordedAt: Date?
     var challengeID: UUID?
     var targetAuthorID: String?
+    /// Which of my takes of this moment this is; nil is take 1. Caption edits
+    /// go to that take, and its words are read from it — not from the card's
+    /// own fields, which are take 1's.
+    var takeID: UUID? = nil
     /// Nil hides 重拍: replaying a clip from 我的 has no camera to go back to.
     let onReRecord: (() -> Void)?
     /// A clip in no story (one only you can see in 我的) has no card to write
@@ -104,6 +108,12 @@ struct ClipPreviewView: View {
         return store.challenge(challengeID)?.cards.first { $0.day == day }
     }
 
+    /// The live take this page shows, when it is one of the extra ones.
+    private var extraTake: ClipTake? {
+        guard let takeID else { return nil }
+        return card?.moreTakes.first { $0.id == takeID }
+    }
+
     private var interactions: (reactions: [ClipReaction], comments: [ClipComment]) {
         guard let challengeID else { return ([], []) }
         return store.interactions(for: challengeID, day: day, targetAuthorID: targetAuthorID ?? myID)
@@ -150,6 +160,10 @@ struct ClipPreviewView: View {
     /// displayed clip; a cleared own caption must not revive the deck snapshot.
     private var liveOverlayText: String? {
         if onDraftCaption != nil { return draftCaption ?? overlayText }
+        if takeID != nil {
+            return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: extraTake != nil,
+                                             liveText: extraTake?.overlayText, snapshotText: overlayText)
+        }
         return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
                                          liveText: card?.overlayText, snapshotText: overlayText)
     }
@@ -160,7 +174,7 @@ struct ClipPreviewView: View {
             draftCaption = text
             onDraftCaption(text.isEmpty ? nil : text)
         } else if let challengeID {
-            store.updateOverlayText(text, day: day, challengeID: challengeID)
+            store.updateOverlayText(text, day: day, challengeID: challengeID, takeID: takeID)
         }
     }
     private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
@@ -173,13 +187,17 @@ struct ClipPreviewView: View {
     /// one, the place and style every caption used to be burned at, so nothing
     /// moves under somebody opening an old story.
     private var sticker: CaptionSticker {
+        if takeID != nil {
+            let live = isMine && extraTake != nil
+            return (live ? extraTake?.captionSticker : captionSticker) ?? .default
+        }
         let live = isMine && card != nil
         return (live ? card?.captionSticker : captionSticker) ?? .default
     }
 
     private func saveSticker(_ new: CaptionSticker) {
         guard let challengeID else { return }
-        store.updateCaptionSticker(new, day: day, challengeID: challengeID)
+        store.updateCaptionSticker(new, day: day, challengeID: challengeID, takeID: takeID)
     }
 
     private var localizedMomentTitle: String {

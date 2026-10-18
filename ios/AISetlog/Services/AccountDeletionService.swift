@@ -157,6 +157,8 @@ final class AccountDeletionService {
                     names.insert(comment.id.uuidString)
                 }
             }
+            // A moment's second and later takes, which a day alone can't name.
+            names.formUnion(store.extraTakeRecordNames(in: challenge, authorID: authorID))
             for reaction in store.roomSync.remoteReactions[code] ?? []
             where reaction.authorID == authorID {
                 names.insert(CloudKitService.reactionRecordName(

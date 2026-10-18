@@ -9,6 +9,11 @@ protocol ClipFileStore {
     /// Returns the stored file name, or nil if the copy failed.
     @discardableResult
     func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String?
+    /// Copy another take of a moment that already has one. Never deletes
+    /// anything: the name carries the take's id, so it cannot collide with
+    /// take 1's `dayN.ext` or with another take.
+    @discardableResult
+    func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String?
     func clipURL(fileName: String, challengeID: UUID) -> URL
     func deleteClips(challengeID: UUID)
     /// Where downloaded remote (friends') clips for a room are cached.
@@ -16,6 +21,15 @@ protocol ClipFileStore {
     func deleteRemoteCache(roomCode: String)
     /// Move v1's loose clips/ files into a migrated challenge's directory.
     func migrateLegacyClips(_ fileNames: [String], into challengeID: UUID)
+}
+
+extension ClipFileStore {
+    /// Fails closed. A store that hasn't said how to keep a second take keeps
+    /// none, which `saveClip` reads as "nothing saved" — never as permission to
+    /// overwrite take 1.
+    func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
+        nil
+    }
 }
 
 final class DiskClipFileStore: ClipFileStore {
@@ -36,6 +50,20 @@ final class DiskClipFileStore: ClipFileStore {
             try? FileManager.default.removeItem(at: dir.appendingPathComponent("day\(day).\(ext)"))
         }
         let dest = dir.appendingPathComponent("day\(day).\(tempURL.pathExtension)")
+        do {
+            try FileManager.default.copyItem(at: tempURL, to: dest)
+            return dest.lastPathComponent
+        } catch {
+            return nil
+        }
+    }
+
+    @discardableResult
+    func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
+        let dir = clipsDirectory(for: challengeID)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appendingPathComponent(
+            "day\(day)_\(takeID.uuidString).\(tempURL.pathExtension)")
         do {
             try FileManager.default.copyItem(at: tempURL, to: dest)
             return dest.lastPathComponent

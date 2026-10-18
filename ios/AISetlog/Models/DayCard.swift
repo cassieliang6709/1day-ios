@@ -214,8 +214,27 @@ struct CaptionSticker: Codable, Equatable {
     }
 }
 
+/// A second (third, …) take of the same moment by the same person.
+///
+/// The first take still lives in `DayCard`'s own fields, exactly where it
+/// always has — same file name, same room record — so a card saved before
+/// takes existed needs no migration, and an App Store 1.5 phone in the same
+/// room keeps reading take 1 the way it always did. Every take after that is
+/// one of these: its own file (`dayN_<id>.ext`) and its own record
+/// (`code_author_dayN_<id>`), so filming the moment again adds to it instead of
+/// overwriting what was there.
+struct ClipTake: Codable, Identifiable, Equatable {
+    let id: UUID
+    var fileName: String
+    var recordedAt: Date
+    var overlayText: String?
+    var captionSticker: CaptionSticker?
+}
+
 struct DayCard: Codable, Identifiable {
     let day: Int
+    /// Take 1. `clipFileName != nil` still means "this moment has a clip" —
+    /// a moment only ever gains extra takes after it has a first one.
     var clipFileName: String?
     var recordedAt: Date?
     var overlayText: String?
@@ -224,6 +243,9 @@ struct DayCard: Codable, Identifiable {
     var captionSticker: CaptionSticker?
     var reactions: [ClipReaction] = []
     var comments: [ClipComment] = []
+    /// Takes 2…n, oldest first. Reactions and comments stay on the card: they
+    /// are addressed to a person's moment, not to one take of it.
+    var moreTakes: [ClipTake] = []
 
     var id: Int { day }
 
@@ -234,7 +256,8 @@ struct DayCard: Codable, Identifiable {
         overlayText: String? = nil,
         captionSticker: CaptionSticker? = nil,
         reactions: [ClipReaction] = [],
-        comments: [ClipComment] = []
+        comments: [ClipComment] = [],
+        moreTakes: [ClipTake] = []
     ) {
         self.day = day
         self.clipFileName = clipFileName
@@ -243,10 +266,12 @@ struct DayCard: Codable, Identifiable {
         self.captionSticker = captionSticker
         self.reactions = reactions
         self.comments = comments
+        self.moreTakes = moreTakes
     }
 
     enum CodingKeys: String, CodingKey {
         case day, clipFileName, recordedAt, overlayText, captionSticker, reactions, comments
+        case moreTakes
     }
 
     // Custom decode: synthesized Codable would throw on the reactions/comments
@@ -261,6 +286,9 @@ struct DayCard: Codable, Identifiable {
         captionSticker = try c.decodeIfPresent(CaptionSticker.self, forKey: .captionSticker)
         reactions = try c.decodeIfPresent([ClipReaction].self, forKey: .reactions) ?? []
         comments = try c.decodeIfPresent([ClipComment].self, forKey: .comments) ?? []
+        // Absent on every card saved before a moment could hold more than one
+        // take — which is every card that exists today.
+        moreTakes = try c.decodeIfPresent([ClipTake].self, forKey: .moreTakes) ?? []
     }
 
     enum Status: Equatable {

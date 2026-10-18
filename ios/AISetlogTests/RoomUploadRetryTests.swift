@@ -192,6 +192,188 @@ final class RoomUploadRetryTests: XCTestCase {
 
         XCTAssertTrue(server.uploads.isEmpty)
     }
+
+    // MARK: - Multiple takes of one moment
+
+    /// Waits out the upload `saveClip` starts in a Task.
+    private func waitForUploads(_ count: Int) async {
+        for _ in 0..<200 where server.uploads.count < count { await Task.yield() }
+    }
+
+    private func newTakeFile(_ name: String = "again.mov") throws -> URL {
+        let source = dir.appendingPathComponent(name)
+        try Data("again".utf8).write(to: source)
+        return source
+    }
+
+    /// A card written before takes existed has no `moreTakes` key at all.
+    func testACardSavedBeforeTakesExistedStillDecodes() throws {
+        let json = #"{"day":1,"clipFileName":"day1.mov","overlayText":"hi","reactions":[],"comments":[]}"#
+        let card = try JSONDecoder().decode(DayCard.self, from: Data(json.utf8))
+        XCTAssertEqual(card.clipFileName, "day1.mov")
+        XCTAssertEqual(card.overlayText, "hi")
+        XCTAssertTrue(card.moreTakes.isEmpty)
+        // And a card with takes round-trips them.
+        var withTake = card
+        withTake.moreTakes = [ClipTake(
+            id: UUID(), fileName: "day1_x.mov", recordedAt: filmedAt,
+            overlayText: "two", captionSticker: nil)]
+        let back = try JSONDecoder().decode(DayCard.self, from: JSONEncoder().encode(withTake))
+        XCTAssertEqual(back.moreTakes, withTake.moreTakes)
+    }
+
+    /// Filming a moment again adds a take; take 1 is exactly where it was.
+    func testASecondTakeIsAppendedAndTheFirstIsKept() async throws {
+        let room = try roomWithMyTake()
+        let second = filmedAt.addingTimeInterval(600)
+
+        store.saveClip(
+            from: try newTakeFile(), day: 1, challengeID: room.id,
+            overlayText: "again", recordedAt: second)
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 })
+        XCTAssertEqual(card.clipFileName, "day1.mov")
+        XCTAssertEqual(card.recordedAt, filmedAt)
+        XCTAssertEqual(card.overlayText, "hi")
+        XCTAssertEqual(card.moreTakes.count, 1)
+        let take = try XCTUnwrap(card.moreTakes.first)
+        XCTAssertEqual(take.fileName, "day1_\(take.id.uuidString).mov")
+        XCTAssertEqual(take.recordedAt, second)
+        XCTAssertEqual(take.overlayText, "again")
+        // Take 1's file was not touched.
+        let takeOne = dir.appendingPathComponent(room.id.uuidString).appendingPathComponent("day1.mov")
+        XCTAssertEqual(try Data(contentsOf: takeOne), Data("take".utf8))
+
+        // A third take appends again rather than replacing the second.
+        store.saveClip(from: try newTakeFile("third.mov"), day: 1, challengeID: room.id)
+        XCTAssertEqual(store.challenge(room.id)?.cards.first { $0.day == 1 }?.moreTakes.count, 2)
+    }
+
+    /// The extra take goes up under its own record, never take 1's.
+    func testAnExtraTakeUploadsUnderItsOwnRecordName() async throws {
+        let room = try roomWithMyTake()
+        server.clips = [myRoomCopy(day: 1, at: filmedAt)]
+
+        store.saveClip(from: try newTakeFile(), day: 1, challengeID: room.id)
+        await waitForUploads(1)
+
+        let take = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 }?.moreTakes.first)
+        XCTAssertEqual(server.uploads.map(\.takeID), [take.id])
+        let name = CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1, takeID: take.id)
+        XCTAssertEqual(name, "\(code)_\(me.id)_day1_\(take.id.uuidString)")
+        XCTAssertEqual(
+            CloudKitService.takeID(fromClipRecordName: name, code: code, authorID: me.id, day: 1),
+            take.id)
+        XCTAssertNil(CloudKitService.takeID(
+            fromClipRecordName: CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1),
+            code: code, authorID: me.id, day: 1))
+        // Both takes are in the room now, take 1 untouched.
+        let ids = Set(server.clips.map(\.id))
+        XCTAssertTrue(ids.contains(CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1)))
+        XCTAssertTrue(ids.contains(name))
+    }
+
+    /// The room has take 1; take 2 is still only here. Both show, once each.
+    func testAPendingExtraTakeShowsBesideTheRoomsTakeOne() throws {
+        var room = try roomWithMyTake()
+        let takeID = UUID()
+        room.cards[0].moreTakes = [ClipTake(
+            id: takeID, fileName: "day1_\(takeID.uuidString).mov",
+            recordedAt: filmedAt.addingTimeInterval(60), overlayText: "two", captionSticker: nil)]
+        store.challenges = [room]
+        store.roomSync.remoteClips[code] = [myRoomCopy(day: 1, at: filmedAt)]
+
+        let clips = store.recordedClips(for: room.id)
+
+        XCTAssertEqual(clips.count, 2)
+        XCTAssertEqual(clips.map(\.takeID), [nil, takeID])
+        XCTAssertEqual(Set(clips.map(\.id)).count, 2)
+        XCTAssertEqual(clips.last?.overlayText, "two")
+
+        // Once the room has take 2 as well, it is the room's copy that shows.
+        store.roomSync.remoteClips[code]?.append(CloudKitService.RemoteClip(
+            id: CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1, takeID: takeID),
+            day: 1, authorID: me.id, authorName: "Me", recordedAt: filmedAt.addingTimeInterval(60),
+            localURL: dir.appendingPathComponent("remote-take2.mov"), overlayText: "two"))
+        let synced = store.recordedClips(for: room.id)
+        XCTAssertEqual(synced.count, 2)
+        XCTAssertEqual(synced.last?.takeID, takeID)
+        XCTAssertEqual(synced.last?.url, dir.appendingPathComponent("remote-take2.mov"))
+    }
+
+    /// An extra take whose upload failed is retried, and take 1 is left alone.
+    func testARetryUploadsAMissingExtraTake() async throws {
+        var room = try roomWithMyTake()
+        let takeID = UUID()
+        let fileName = "day1_\(takeID.uuidString).mov"
+        try Data("two".utf8).write(to: dir.appendingPathComponent(room.id.uuidString)
+            .appendingPathComponent(fileName))
+        let second = filmedAt.addingTimeInterval(60)
+        room.cards[0].moreTakes = [ClipTake(
+            id: takeID, fileName: fileName, recordedAt: second,
+            overlayText: "two", captionSticker: nil)]
+        store.challenges = [room]
+        server.clips = [myRoomCopy(day: 1, at: filmedAt)]
+
+        await store.syncRoom(room.id)
+
+        XCTAssertEqual(server.uploads.count, 1)
+        XCTAssertEqual(server.uploads.first?.takeID, takeID)
+        XCTAssertEqual(server.uploads.first?.recordedAt, second)
+        XCTAssertEqual(server.uploads.first?.overlayText, "two")
+
+        // And not again once it is there.
+        await store.syncRoom(room.id)
+        XCTAssertEqual(server.uploads.count, 1)
+    }
+
+    /// Editing an extra take's caption changes that take, not take 1.
+    func testACaptionEditOnAnExtraTakeStaysOnThatTake() throws {
+        var room = try roomWithMyTake()
+        let takeID = UUID()
+        room.cards[0].moreTakes = [ClipTake(
+            id: takeID, fileName: "day1_x.mov", recordedAt: filmedAt,
+            overlayText: "two", captionSticker: nil)]
+        store.challenges = [room]
+
+        store.updateOverlayText("edited", day: 1, challengeID: room.id, takeID: takeID)
+        store.updateCaptionSticker(.default, day: 1, challengeID: room.id, takeID: takeID)
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first)
+        XCTAssertEqual(card.overlayText, "hi")
+        XCTAssertNil(card.captionSticker)
+        XCTAssertEqual(card.moreTakes.first?.overlayText, "edited")
+        XCTAssertEqual(card.moreTakes.first?.captionSticker, .default)
+    }
+
+    /// Deleting the account names every extra take, the ones on this phone and
+    /// the ones only the room has.
+    func testAccountDeletionInventoryIncludesExtraTakes() throws {
+        var room = try roomWithMyTake()
+        let local = UUID()
+        let elsewhere = UUID()
+        room.cards[0].moreTakes = [ClipTake(
+            id: local, fileName: "day1_x.mov", recordedAt: filmedAt,
+            overlayText: nil, captionSticker: nil)]
+        store.challenges = [room]
+        let remoteOnly = CloudKitService.clipRecordName(
+            code: code, authorID: me.id, day: 2, takeID: elsewhere)
+        store.roomSync.remoteClips[code] = [CloudKitService.RemoteClip(
+            id: remoteOnly, day: 2, authorID: me.id, authorName: "Me", recordedAt: filmedAt,
+            localURL: dir.appendingPathComponent("r.mov"), overlayText: nil)]
+
+        let inventory = AccountDeletionService.inventory(of: store, authorID: me.id)
+
+        XCTAssertTrue(inventory.contains(
+            CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1)))
+        XCTAssertTrue(inventory.contains(
+            CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1, takeID: local)))
+        XCTAssertTrue(inventory.contains(remoteOnly))
+        XCTAssertEqual(
+            store.extraTakeRecordNames(in: room, authorID: me.id).sorted(),
+            [CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1, takeID: local),
+             remoteOnly].sorted())
+    }
 }
 
 // MARK: - Doubles
@@ -199,7 +381,10 @@ final class RoomUploadRetryTests: XCTestCase {
 /// A room that remembers what was uploaded to it and serves it back.
 @MainActor
 private final class FakeRoomServer {
-    struct Upload { let day: Int; let authorID: String; let overlayText: String?; let recordedAt: Date }
+    struct Upload {
+        let day: Int; let authorID: String; let overlayText: String?; let recordedAt: Date
+        var takeID: UUID? = nil
+    }
 
     var clips: [CloudKitService.RemoteClip] = []
     var fetchFails = false
@@ -214,17 +399,22 @@ private final class FakeRoomServer {
                 return clips
             },
             fetchInteractions: { _ in ([], []) },
-            uploadClip: { [self] code, day, authorID, authorName, file, caption, recordedAt in
+            uploadClip: { [self] code, day, authorID, authorName, file, caption, recordedAt, takeID in
                 uploads.append(Upload(
-                    day: day, authorID: authorID, overlayText: caption, recordedAt: recordedAt))
-                clips.removeAll { $0.authorID == authorID && $0.day == day }
+                    day: day, authorID: authorID, overlayText: caption, recordedAt: recordedAt,
+                    takeID: takeID))
+                // One record per name, like CloudKit: a take overwrites only
+                // itself.
+                let name = CloudKitService.clipRecordName(
+                    code: code, authorID: authorID, day: day, takeID: takeID)
+                clips.removeAll { $0.id == name }
                 // Stores what it was told, like the real record does now.
                 clips.append(CloudKitService.RemoteClip(
-                    id: CloudKitService.clipRecordName(code: code, authorID: authorID, day: day),
+                    id: name,
                     day: day, authorID: authorID, authorName: authorName, recordedAt: recordedAt,
                     localURL: file, overlayText: caption))
             },
-            updateClipCaption: { _, _, _, _ in },
+            updateClipCaption: { _, _, _, _, _ in },
             setReaction: { _, _, _, _, _, _, _ in },
             postComment: { _, _, _, _, _, _, _ in },
             deleteComment: { _ in })
@@ -236,6 +426,13 @@ private final class TempClipFileStore: ClipFileStore {
     init(root: URL) { self.root = root }
 
     func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String? { "day\(day).mov" }
+    func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
+        let name = "day\(day)_\(takeID.uuidString).mov"
+        let dest = clipURL(fileName: name, challengeID: challengeID)
+        try? FileManager.default.createDirectory(
+            at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+        return (try? FileManager.default.copyItem(at: tempURL, to: dest)) == nil ? nil : name
+    }
     func clipURL(fileName: String, challengeID: UUID) -> URL {
         root.appendingPathComponent(challengeID.uuidString).appendingPathComponent(fileName)
     }
