@@ -51,38 +51,38 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.staticTexts["local-room-notice"].exists)
         capture(app, "Formal two-member StoryTimelineView")
-        app.buttons["聊天"].tap()
+        app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["本地演示 · 不会发送给朋友"].exists)
-        let input = app.textFields["发消息…"]
+        XCTAssertTrue(app.staticTexts["chat-local-demo-banner"].exists)
+        let input = app.textFields["chat-input"]
         XCTAssertTrue(input.exists)
         input.tap()
         input.typeText("local UI message")
-        app.buttons["发送"].tap()
+        app.buttons["chat-send"].tap()
         XCTAssertTrue(app.staticTexts["local UI message"].waitForExistence(timeout: 15))
-        app.buttons["完成"].tap()
+        app.buttons["chat-done"].tap()
 
         // The shell's member selector remains outside the navigation stack;
         // changing it replaces only this local session and its navigation state.
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: 15))
-        app.buttons["三人"].tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
-        app.buttons["聊天"].tap()
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
+        app.segmentedControls["local-room-members"].buttons.element(boundBy: 1).tap()
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         // The three-member session is a different room: the message typed into
         // the two-member one must not be in it.
         XCTAssertFalse(app.staticTexts["local UI message"].exists)
-        app.buttons["完成"].tap()
+        app.buttons["chat-done"].tap()
         capture(app, "Formal three-member StoryTimelineView")
         app.buttons["room-back"].tap()
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         XCTAssertTrue(demo.isHittable)
         demo.tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertTrue(app.buttons["两人"].isSelected)
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.segmentedControls["local-room-members"].buttons.element(boundBy: 0).isSelected)
     }
 
     /// The film actually assembling, from the production `FilmView` over a
@@ -101,12 +101,12 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        let film = app.buttons["生成 vlog"]
+        let film = app.buttons["room-make-vlog"]
         XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
         film.tap()
-        XCTAssertTrue(app.buttons["调整"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertFalse(app.buttons["保存"].isEnabled)
-        XCTAssertFalse(app.buttons["分享"].isEnabled)
+        XCTAssertTrue(app.buttons["film-adjust"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertFalse(app.buttons["film-save"].isEnabled)
+        XCTAssertFalse(app.buttons["film-share"].isEnabled)
         capture(app, "Production FilmView with local real synthesis")
     }
 

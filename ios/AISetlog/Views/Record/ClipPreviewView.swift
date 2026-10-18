@@ -954,6 +954,7 @@ struct ClipPreviewView: View {
                 // VoiceOver read the SF Symbol names.
                 IconBubble(systemName: "xmark") { dismiss() }
                     .accessibilityLabel(Strings.close)
+                    .accessibilityIdentifier("moment-close")
                 Spacer(minLength: 0)
                 topTrailing
             }

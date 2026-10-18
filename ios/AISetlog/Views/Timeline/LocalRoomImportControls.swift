@@ -67,6 +67,7 @@ struct LocalRoomImportControls: View {
             if failed {
                 Text(chinese ? "导入失败，原视频未改动。请重新选择。" : "Import failed. Clips unchanged. Choose again.")
                     .font(.caption).foregroundStyle(.red)
+                    .accessibilityIdentifier("local-room-import-error")
             }
         }
         .padding(6)

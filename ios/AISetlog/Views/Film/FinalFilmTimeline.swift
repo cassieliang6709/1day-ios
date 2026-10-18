@@ -117,6 +117,7 @@ struct FinalFilmTimeline: View {
                     isBusy: isSaving,
                     action: { onSave(shownURL) })
                     .disabled(previewMedia != nil || isSaved)
+                    .accessibilityIdentifier("film-save")
 
                 ShareLink(item: shownURL) {
                     FilmActionLabel(
@@ -126,12 +127,14 @@ struct FinalFilmTimeline: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(previewMedia != nil)
+                .accessibilityIdentifier("film-share")
 
                 FilmAction(
                     icon: "slider.horizontal.3",
                     label: Strings.adjust,
                     accent: .oneDayMint,
                     action: onAdjust)
+                    .accessibilityIdentifier("film-adjust")
             }
 
             // Two greyed-out buttons with no reason given read as broken.

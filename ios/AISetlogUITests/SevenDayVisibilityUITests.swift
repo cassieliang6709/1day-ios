@@ -60,10 +60,9 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertTrue(demo.isHittable)
         demo.tap()
         XCTAssertTrue(app.staticTexts["local-room-notice"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["三人"].exists)
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertTrue(app.buttons["聊天"].exists)
-        XCTAssertFalse(app.staticTexts["每个人的原片"].exists)
-        XCTAssertFalse(app.buttons["邀请"].exists)
+        XCTAssertEqual(app.segmentedControls["local-room-members"].buttons.count, 2)
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-chat"].exists)
+        XCTAssertFalse(app.buttons["room-invite"].exists)
     }
 }

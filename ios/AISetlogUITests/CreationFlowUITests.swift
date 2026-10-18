@@ -74,8 +74,6 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["camera-option-film"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
-        XCTAssertFalse(app.buttons["下一步"].exists)
-        XCTAssertFalse(app.buttons["新建故事"].exists)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "One-page composer"

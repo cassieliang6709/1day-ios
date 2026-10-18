@@ -18,7 +18,7 @@ final class LocalRoomImportUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
         let importer = app.buttons["local-room-import"]
         XCTAssertTrue(importer.exists)
         importer.tap()
@@ -28,12 +28,12 @@ final class LocalRoomImportUITests: XCTestCase {
         let cancel = app.buttons.matching(NSPredicate(format: "label == 'Cancel' OR label == '取消'")).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 15))
         cancel.tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
         XCTAssertTrue(importer.isEnabled)
-        XCTAssertFalse(app.staticTexts["导入失败，原视频未改动。请重新选择。"].exists)
-        app.buttons["聊天"].tap()
+        XCTAssertFalse(app.staticTexts["local-room-import-error"].exists)
+        app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        app.buttons["完成"].tap()
-        XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: 15))
+        app.buttons["chat-done"].tap()
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
     }
 }

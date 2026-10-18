@@ -374,6 +374,7 @@ struct StoryTimelineView: View {
                     ShareLink(item: shareText(code: code, challenge: challenge)) {
                         roomCapsule(Strings.inviteLabel, systemImage: "person.badge.plus")
                     }
+                    .accessibilityIdentifier("room-invite")
                 }
             }
 

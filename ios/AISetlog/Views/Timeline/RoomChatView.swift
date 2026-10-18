@@ -175,6 +175,7 @@ private struct RoomChatConversation: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .background(Color.oneDayLavender.opacity(0.14))
+                        .accessibilityIdentifier("chat-local-demo-banner")
                 }
                 if let error = session.error {
                     HStack {
@@ -249,6 +250,7 @@ private struct RoomChatConversation: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.done) { dismiss() }
+                        .accessibilityIdentifier("chat-done")
                 }
             }
             .fullScreenCover(item: $playing) { event in
@@ -550,6 +552,7 @@ private struct RoomChatConversation: View {
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.oneDayNavy)
                         .lineLimit(1)
+                        .accessibilityIdentifier("chat-moment-about")
                     Spacer(minLength: 4)
                     Button {
                         moment = nil
@@ -589,6 +592,7 @@ private struct RoomChatConversation: View {
                     }
                     .oneDayGlow(.oneDayBrand, strength: 0.45)
                     .disabled(session.state == nil)
+                    .accessibilityIdentifier("chat-input")
                 Button {
                     followsLatest = true
                     Task { await session.send(authorName: authorName, moment: moment) }
@@ -612,6 +616,7 @@ private struct RoomChatConversation: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(Strings.chatSend))
+                .accessibilityIdentifier("chat-send")
                 .disabled(!canSend)
             }
             if let count = session.state?.draft.count, count > 1_800 {
