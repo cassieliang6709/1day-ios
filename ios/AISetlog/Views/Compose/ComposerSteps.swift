@@ -3,10 +3,11 @@ import SwiftUI
 /// The pieces of `StoryComposerView`'s one page. Stateless — the composer owns
 /// every choice; these just render it.
 ///
-/// 1.5 shape, top to bottom: 拍什么 (写今天的清单 / 按时间拍), 拍几天, 模板
-/// (a two-column grid, the user's own first), 名字, 自己拍 / 和朋友
-/// 一起拍, 用哪台相机拍, and a single pinned 开始拍. Every section uses the
-/// same 16pt side margin; `ComposerLayout.margin` is that number.
+/// 1.5 shape, top to bottom: 拍什么 (写今天的清单 / 从模板开始 / 按时间拍),
+/// 名字, 自己拍 / 和朋友一起拍, 用哪台相机拍, and a single pinned 开始拍.
+/// The templates themselves live on `TemplatesPage`, pushed from 从模板开始.
+/// Every section uses the same 16pt side margin; `ComposerLayout.margin` is
+/// that number.
 
 enum ComposerLayout {
     static let margin: CGFloat = 16
@@ -24,9 +25,23 @@ enum ComposerEntry: Hashable {
     case byTime
 }
 
+/// The three ways in, as three rows. 从模板开始 sits between the other two
+/// because a template *is* a written list — just one somebody wrote earlier —
+/// so it belongs next to 写今天的清单 rather than under the page as its own
+/// section. It's a row like the others, not a grid: the grid used to be here
+/// and pushed the name and camera off the first screen.
+///
+/// Only one row is checked at a time, even though a template also fills the
+/// list behind 写今天的清单: the check says where the list came from, and the
+/// 清单 · N 项 row under the name is the way into the list either way.
 struct WhatToFilmSection: View {
     let entry: ComposerEntry
+    /// The chosen template's name, or nil when none is chosen.
+    let templateName: String?
+    /// How many templates the page behind 从模板开始 holds.
+    let templateCount: Int
     let onWriteList: () -> Void
+    let onTemplates: () -> Void
     let onByTime: () -> Void
 
     var body: some View {
@@ -34,8 +49,16 @@ struct WhatToFilmSection: View {
             SectionLabel(text: Strings.composerWhatToFilm)
             ChoiceRow(
                 title: Strings.composerWriteList, lead: Strings.composerWriteListLead,
-                isOn: entry == .writeList, opensPage: true, icon: "checklist", action: onWriteList)
+                isOn: entry == .writeList && templateName == nil,
+                opensPage: true, icon: "checklist", action: onWriteList)
                 .accessibilityIdentifier("write-own-entry")
+            ChoiceRow(
+                title: Strings.listFromTemplate,
+                lead: templateName.map(Strings.composerTemplateChosen)
+                    ?? Strings.composerTemplateEntryLead(templateCount),
+                isOn: templateName != nil,
+                opensPage: true, icon: "square.grid.2x2.fill", action: onTemplates)
+                .accessibilityIdentifier("templates-entry")
             ChoiceRow(
                 title: Strings.composerByTimeTitle, lead: Strings.composerByTimeLead,
                 isOn: entry == .byTime, icon: "alarm.fill", action: onByTime)
@@ -131,11 +154,23 @@ private struct ChoiceRow: View {
 
 // MARK: - 模板
 
-/// Templates as a two-column grid: the user's own first (badged 我的), then
-/// the built-ins. One row on the page (the chosen one stays in it);
-/// 更多模板 opens every template in a sheet, so the page stays short.
-/// Tapping the chosen one again lets go. No sideways scrolling on this page.
-struct TemplatesSection: View {
+/// Every template on a page of its own, pushed from 从模板开始: the user's own
+/// first (badged 我的), then the built-ins, two to a row.
+///
+/// Why a pushed page and not the grid that used to sit on 今天想拍什么 with a
+/// 更多模板 sheet behind it: the inline row only ever had room for two cards,
+/// so the grid was mostly a teaser for the sheet, and the sheet was a second
+/// copy of the same grid with its own close button. Two places to pick a
+/// template, one of them half a page long, on a page whose job is to answer
+/// three short questions. Now the page keeps a single row that says what was
+/// picked, and the picking happens here, with the system back button as the
+/// way out when nothing is picked.
+///
+/// Choosing is the composer's `choose` unchanged — tapping the chosen one again
+/// still lets go — and either way the page pops straight back, which is what
+/// the sheet did on a tap too: the next thing to do (the name, 开始拍) is on
+/// the page underneath.
+struct TemplatesPage: View {
     let mine: [ChallengeTemplate]
     let builtIns: [ChallengeTemplate]
     let selectedTemplateID: UUID?
@@ -144,82 +179,26 @@ struct TemplatesSection: View {
     let onDelete: (ChallengeTemplate) -> Void
     let coverURL: (ChallengeTemplate) -> URL?
 
-    @State private var showsAll = false
-    private static let firstCount = 2
+    @Environment(\.dismiss) private var dismiss
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     private var all: [(template: ChallengeTemplate, isMine: Bool)] {
         mine.map { ($0, true) } + builtIns.map { ($0, false) }
     }
 
-    /// The first row, with the chosen template in it even when it came from
-    /// the sheet.
-    private var shown: [(template: ChallengeTemplate, isMine: Bool)] {
-        let head = Array(all.prefix(Self.firstCount))
-        guard let picked = all.first(where: { $0.template.id == selectedTemplateID }),
-              !head.contains(where: { $0.template.id == picked.template.id })
-        else { return head }
-        return [picked] + head.prefix(Self.firstCount - 1)
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: Strings.composerTemplates)
+        ScrollView {
             LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(shown, id: \.template.id) { tile($0.template, isMine: $0.isMine) }
+                ForEach(all, id: \.template.id) { tile($0.template, isMine: $0.isMine) }
             }
-            if all.count > Self.firstCount { moreButton }
+            .padding(ComposerLayout.margin)
         }
-        .padding(.horizontal, ComposerLayout.margin)
-        .sheet(isPresented: $showsAll) { allTemplatesSheet }
-    }
-
-    private var allTemplatesSheet: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 10) {
-                    ForEach(all, id: \.template.id) { item in
-                        TemplateTile(
-                            template: item.template,
-                            isMine: item.isMine,
-                            isSelected: item.template.id == selectedTemplateID,
-                            coverURL: coverURL(item.template),
-                            onSelect: {
-                                onChoose(item.template)
-                                showsAll = false
-                            },
-                            onEdit: item.isMine ? { onEdit(item.template) } : nil,
-                            onDelete: item.isMine ? { onDelete(item.template) } : nil)
-                    }
-                }
-                .padding(ComposerLayout.margin)
-            }
-            .background(OneDay.canvas)
-            .navigationTitle(Strings.composerTemplates)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.cancel) { showsAll = false }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private var moreButton: some View {
-        Button {
-            showsAll = true
-        } label: {
-            Label(
-                Strings.composerMoreTemplates(all.count - Self.firstCount),
-                systemImage: "square.grid.2x2")
-                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.brandText)
-                .frame(maxWidth: .infinity, minHeight: 36)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("templates-more")
+        .background(OneDay.canvas)
+        .navigationTitle(Strings.composerTemplates)
+        .navigationBarTitleDisplayMode(.inline)
+        // The composer hides its bar (its own 关闭 bubble is the top row); this
+        // page needs one for the back button and the title.
+        .toolbar(.visible, for: .navigationBar)
     }
 
     private func tile(_ template: ChallengeTemplate, isMine: Bool) -> some View {
@@ -228,7 +207,12 @@ struct TemplatesSection: View {
             isMine: isMine,
             isSelected: template.id == selectedTemplateID,
             coverURL: coverURL(template),
-            onSelect: { onChoose(template) },
+            onSelect: {
+                onChoose(template)
+                dismiss()
+            },
+            // Edit and delete stay on the page: they're about the template, not
+            // about this story, so neither one sends you back.
             onEdit: isMine ? { onEdit(template) } : nil,
             onDelete: isMine ? { onDelete(template) } : nil)
             .accessibilityIdentifier(isMine ? "saved-template-tile" : "poster-tile")

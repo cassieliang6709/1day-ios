@@ -2,11 +2,14 @@ import SwiftUI
 
 /// Making a story, on one page (1.5).
 ///
-/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 模板 (the user's own
-/// first, then the built-ins), 名字, 自己拍 / 和朋友一起拍, 用哪台相机拍, and
-/// one pinned 开始拍. No 一日 / 7 日 choice: every new story is one day. A
-/// room with friends has no list either — the room is what holds the day, so
-/// 拍什么 and 模板 hide and it films by time.
+/// Top to bottom: 拍什么 (写今天的清单 / 从模板开始 / 按时间拍), 名字, 自己拍 /
+/// 和朋友一起拍, 用哪台相机拍, and one pinned 开始拍. No 一日 / 7 日 choice:
+/// every new story is one day. A room with friends has no list either — the
+/// room is what holds the day, so 拍什么 hides and it films by time.
+///
+/// 从模板开始 pushes `TemplatesPage` (the user's own first, then the
+/// built-ins). That push is the only reason this view has a `NavigationStack`;
+/// its bar stays hidden on this page, where the 关闭 bubble is the top row.
 ///
 /// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
 /// drafted by AI from one sentence, in the same page. A template fills the
@@ -48,6 +51,7 @@ struct StoryComposerView: View {
     /// wholesale by whatever the list editor hands back.
     @State private var moments: [String] = []
     @State private var showGuided = false
+    @State private var showTemplates = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
@@ -79,15 +83,22 @@ struct StoryComposerView: View {
     private var isTimeOnly: Bool { selected?.isTimeOnly == true }
 
     var body: some View {
-        ZStack {
-            OneDayCanvas(seed: 1)
+        NavigationStack {
+            ZStack {
+                OneDayCanvas(seed: 1)
 
-            VStack(spacing: 0) {
-                topBar
-                page
-                footer
+                VStack(spacing: 0) {
+                    topBar
+                    page
+                    footer
+                }
             }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showTemplates) { templatesPage }
         }
+        // The sheets hang on the stack rather than on the page: 编辑模板 is
+        // opened from the pushed templates page, and a sheet hung on a view
+        // that's been pushed over isn't reliably presented.
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView(
                 initialMoments: moments,
@@ -146,10 +157,12 @@ struct StoryComposerView: View {
                     .padding(.horizontal, ComposerLayout.margin)
                 if !withFriends {
                     WhatToFilmSection(
-                        entry: entry, onWriteList: openList, onByTime: chooseByTime)
-                    // Templates are ready-made lists, so they only belong to
-                    // 写今天的清单; 按时间拍 has no list to fill.
-                    if entry == .writeList { templates }
+                        entry: entry,
+                        templateName: templateID == nil ? nil : selected?.displayName,
+                        templateCount: store.customTemplates.count + oneDayPosters.count,
+                        onWriteList: openList,
+                        onTemplates: { showTemplates = true },
+                        onByTime: chooseByTime)
                 }
                 setup
             }
@@ -159,8 +172,8 @@ struct StoryComposerView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var templates: some View {
-        TemplatesSection(
+    private var templatesPage: some View {
+        TemplatesPage(
             mine: store.customTemplates,
             builtIns: oneDayPosters,
             selectedTemplateID: templateID,

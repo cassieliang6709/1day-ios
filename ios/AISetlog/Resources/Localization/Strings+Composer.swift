@@ -26,10 +26,15 @@ extension Strings {
         isChinese ? "每天拍一段，七天连成一支片" : "One a day, seven days, one film"
     }
     static var composerTemplates: String { isChinese ? "模板" : "Templates" }
-    static func composerMoreTemplates(_ count: Int) -> String {
-        isChinese ? "更多模板（\(count)）" : "More templates (\(count))"
+    /// 从模板开始's line before anything is picked: how many there are to see.
+    static func composerTemplateEntryLead(_ count: Int) -> String {
+        isChinese ? "\(count) 个现成的清单，挑一个改改" : "\(count) ready-made lists to start from"
     }
-    static var composerFewerTemplates: String { isChinese ? "收起" : "Show fewer" }
+    /// 从模板开始's line once one is picked, so the page says what it is
+    /// without the grid that used to show it.
+    static func composerTemplateChosen(_ name: String) -> String {
+        isChinese ? "已选：\(name)" : "Chosen: \(name)"
+    }
     static var composerMineBadge: String { isChinese ? "我的" : "Mine" }
     static var composerName: String { isChinese ? "名字" : "Name" }
     static func composerListSummary(_ count: Int) -> String {

@@ -57,7 +57,8 @@ final class CreationFlowUITests: XCTestCase {
         openComposer()
 
         // 1.5: one page. Two ways in (写今天的清单 above 按时间拍), 拍几天 as
-        // two rows, templates in a grid with 更多模板, no second 设置 sheet.
+        // two rows, no second 设置 sheet. Templates are one 从模板开始 row
+        // that pushes their own page — no cards on this one any more.
         let list = app.buttons["write-own-entry"]
         let byTime = app.buttons["by-time-entry"]
         XCTAssertTrue(list.waitForExistence(timeout: 15))
@@ -68,8 +69,9 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         XCTAssertFalse(app.buttons["made-before"].exists)
-        // Templates belong to 写今天的清单; the default 按时间拍 shows none.
+        XCTAssertTrue(app.buttons["templates-entry"].exists)
         XCTAssertFalse(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
+        XCTAssertFalse(app.buttons["templates-more"].exists)
         // Who's filming and the camera are on the same page, with the one button.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["camera-option-film"].exists)

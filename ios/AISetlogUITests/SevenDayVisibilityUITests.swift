@@ -18,7 +18,10 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertTrue(app.buttons["by-time-entry"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
-        ComposerUITest.writeShortList(in: app)
+        // Templates are their own page, pushed from the 从模板开始 row.
+        let templates = app.buttons["templates-entry"]
+        XCTAssertTrue(templates.waitForExistence(timeout: 15))
+        templates.tap()
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         reveal(poster, in: app)

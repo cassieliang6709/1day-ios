@@ -29,13 +29,17 @@ final class ComposerGuidanceUITests: XCTestCase {
         // No gear to find: the poster is the way in, and tapping it no longer
         // creates anything by itself.
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
-        // 1.5: the templates are a grid on the page, and the name field sits
-        // on the same page below them.
-        ComposerUITest.writeShortList(in: app)
+        // The templates are their own page now, pushed from one 从模板开始
+        // row; picking one comes straight back to the name field.
+        let entry = app.buttons["templates-entry"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 15))
+        XCTAssertFalse(entry.isSelected)
+        entry.tap()
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()
-        XCTAssertTrue(poster.isSelected)
+        XCTAssertTrue(entry.waitForExistence(timeout: 15))
+        XCTAssertTrue(entry.isSelected)
 
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
@@ -49,9 +53,13 @@ final class ComposerGuidanceUITests: XCTestCase {
         name.typeText("My edited story")
         XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
-        // Tapping the chosen template again lets it go.
+        // Tapping the chosen template again lets it go, and comes back too.
+        entry.tap()
+        XCTAssertTrue(poster.waitForExistence(timeout: 15))
+        XCTAssertTrue(poster.isSelected)
         poster.tap()
-        XCTAssertFalse(poster.isSelected)
+        XCTAssertTrue(entry.waitForExistence(timeout: 15))
+        XCTAssertFalse(entry.isSelected)
         // Deliberately never create or join a room, or call the AI service.
     }
 }

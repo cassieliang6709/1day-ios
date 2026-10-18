@@ -1,4 +1,3 @@
-import XCTest
 import Foundation
 
 /// Wait budgets shared by the UI test suite.
@@ -47,23 +46,4 @@ import Foundation
 enum UITestWait {
     /// Ceiling for an element that cannot exist until a real render finishes.
     static let media: TimeInterval = 240
-}
-
-enum ComposerUITest {
-    /// Templates only show once 写今天的清单 is the chosen way in (bb72a26-era
-    /// composer); a fresh composer starts on 按时间拍, so write a short list
-    /// first to bring the 模板 grid onto the page.
-    static func writeShortList(in app: XCUIApplication) {
-        let list = app.buttons["write-own-entry"]
-        XCTAssertTrue(list.waitForExistence(timeout: 15))
-        list.tap()
-        let first = app.textFields["custom-prompt-1"]
-        XCTAssertTrue(first.waitForExistence(timeout: 15))
-        first.tap()
-        first.typeText("A")
-        app.textFields["custom-prompt-2"].tap()
-        app.textFields["custom-prompt-2"].typeText("B")
-        app.buttons["use-these-moments"].tap()
-        XCTAssertTrue(app.buttons["composer-list-summary"].waitForExistence(timeout: 15))
-    }
 }
