@@ -93,7 +93,11 @@ struct StoryComposerView: View {
                 initialMoments: moments,
                 allowsSaving: templateID == nil,
                 savesToLibrary: savesList,
-                onDone: applyCustomDraft)
+                onDone: applyCustomDraft,
+                templates: store.customTemplates.map { ($0, true) } + oneDayPosters.map { ($0, false) },
+                onTemplate: { template in
+                    if templateID != template.id { choose(template) }
+                })
         }
         .sheet(isPresented: $showSignIn) {
             SignInView { createSharedRoom() }
@@ -143,7 +147,9 @@ struct StoryComposerView: View {
                 if !withFriends {
                     WhatToFilmSection(
                         entry: entry, onWriteList: openList, onByTime: chooseByTime)
-                    templates
+                    // Templates are ready-made lists, so they only belong to
+                    // 写今天的清单; 按时间拍 has no list to fill.
+                    if entry == .writeList { templates }
                 }
                 setup
             }
@@ -291,6 +297,7 @@ struct StoryComposerView: View {
     private var isTitleFromByTime: Bool {
         let byTime = ChallengeTemplate.liveWithMe.displayName
         return title == byTime || title == Strings.fullTitle7Days(byTime)
+            || title == Strings.byTimeTitle(.now)
     }
 
     /// 存为我的模板: a hand-written list becomes one of the user's templates,
@@ -368,6 +375,12 @@ struct StoryComposerView: View {
     /// takes the name over.
     private func syncTitleToTemplate() {
         guard let selected else { return }
+        if selected.isTimeOnly {
+            // 按时间拍 (and a room) is a day, not a list: it's named for the date.
+            if !titleEdited { title = Strings.byTimeTitle(.now) }
+            moments = []
+            return
+        }
         if !titleEdited {
             title = days == .sevenDay
                 ? Strings.fullTitle7Days(selected.displayName)

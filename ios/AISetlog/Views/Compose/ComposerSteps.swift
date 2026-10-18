@@ -34,11 +34,11 @@ struct WhatToFilmSection: View {
             SectionLabel(text: Strings.composerWhatToFilm)
             ChoiceRow(
                 title: Strings.composerWriteList, lead: Strings.composerWriteListLead,
-                isOn: entry == .writeList, opensPage: true, action: onWriteList)
+                isOn: entry == .writeList, opensPage: true, icon: "checklist", action: onWriteList)
                 .accessibilityIdentifier("write-own-entry")
             ChoiceRow(
                 title: Strings.composerByTimeTitle, lead: Strings.composerByTimeLead,
-                isOn: entry == .byTime, action: onByTime)
+                isOn: entry == .byTime, icon: "alarm.fill", action: onByTime)
                 .accessibilityIdentifier("by-time-entry")
         }
         .padding(.horizontal, ComposerLayout.margin)
@@ -73,6 +73,8 @@ private struct ChoiceRow: View {
     let isOn: Bool
     /// A chevron on the end: tapping opens a page, not just a selection.
     var opensPage = false
+    /// A small picture for the choice: a checklist, a cute alarm clock.
+    var icon: String? = nil
     let action: () -> Void
 
     private var shape: RoundedRectangle {
@@ -94,6 +96,14 @@ private struct ChoiceRow: View {
             Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(isOn ? Color.oneDayBrand : OneDay.inkFaint)
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.oneDayBrand)
+                    .symbolEffect(.bounce, value: isOn)
+                    .frame(width: 36, height: 36)
+                    .background(Color.oneDayBrand.opacity(0.12), in: Circle())
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15.5, weight: .bold, design: .rounded))

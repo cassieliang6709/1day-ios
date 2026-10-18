@@ -21,6 +21,11 @@ struct GuidedMomentsView: View {
     var allowsSaving = true
     var savesToLibrary = true
     let onDone: (CustomStoryDraft) -> Void
+    /// Saved templates first, then the built-ins: a list to start from.
+    var templates: [(template: ChallengeTemplate, isMine: Bool)] = []
+    /// A template picked here; the composer applies it (list, name) and this
+    /// sheet closes.
+    var onTemplate: ((ChallengeTemplate) -> Void)? = nil
     /// Injectable so previews and tests don't reach the network.
     var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
 
@@ -70,6 +75,9 @@ struct GuidedMomentsView: View {
 
     private var list: some View {
         List {
+            if !templates.isEmpty, onTemplate != nil {
+                Section { templateStrip } header: { SectionLabel(text: Strings.listFromTemplate) }
+            }
             Section { intentRow } footer: { noteFooter }
             Section { listRows; addRow } header: { SectionLabel(text: Strings.listSection) }
             if allowsSaving {
@@ -84,6 +92,41 @@ struct GuidedMomentsView: View {
         // Always reorderable: the handles are the only edit-mode chrome,
         // because every row opts out of swipe-to-delete below.
         .environment(\.editMode, .constant(.active))
+    }
+
+    /// One row of chips, sideways: 我的 templates first.
+    private var templateStrip: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(templates, id: \.template.id) { item in
+                    Button {
+                        onTemplate?(item.template)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            if item.isMine {
+                                Text(Strings.composerMineBadge)
+                                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(OneDay.onBrand)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.oneDayBrand, in: Capsule())
+                            }
+                            Text(item.template.displayName)
+                                .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(OneDay.ink)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(OneDay.surfaceSoft, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityIdentifier("list-templates")
     }
 
     private var intentRow: some View {

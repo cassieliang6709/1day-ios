@@ -825,7 +825,22 @@ struct DualCameraStage<Primary: View, Secondary: View>: View {
 /// screenshots of the camera have something in the frame and a still frame is
 /// distinguishable from a frozen one. See `ClipRecorder.isSimulated`.
 struct SimulatedCameraPreview: View {
+    /// `-storeShots YES`: the onboarding sample footage instead of the drawn
+    /// scene, so App Store screenshots show a real picture with no label.
+    private var sampleFootage: URL? {
+        guard UserDefaults.standard.bool(forKey: "storeShots") else { return nil }
+        return Bundle.main.url(forResource: "sample-film", withExtension: "mp4")
+    }
+
     var body: some View {
+        if let sampleFootage {
+            LoopingClipPlayer(url: sampleFootage, muted: true)
+        } else {
+            drawnScene
+        }
+    }
+
+    private var drawnScene: some View {
         TimelineView(.animation) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             GeometryReader { proxy in

@@ -57,4 +57,10 @@ extension Strings {
         isChinese ? "用这 \(count) 项" : "Use these \(count)"
     }
     static var listUse: String { isChinese ? "至少写两项" : "Write at least two" }
+
+    /// 按时间拍's default name: the day it's filmed, 「10月17日」 / 「Oct 17」.
+    static func byTimeTitle(_ date: Date) -> String {
+        date.formatted(.dateTime.month().day().locale(AppLanguage.effective.locale))
+    }
+    static var listFromTemplate: String { isChinese ? "从模板开始" : "Start from a template" }
 }

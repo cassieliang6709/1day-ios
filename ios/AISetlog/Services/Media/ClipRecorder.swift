@@ -69,12 +69,25 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     var orientation: Challenge.Orientation = .portrait {
         didSet { applyOrientation() }
     }
+    /// 横拍: film as if the phone is held sideways (top to the left), whatever
+    /// the tilt reads. The rotation coordinator is ignored while this is on —
+    /// with Rotation Lock, or a phone not quite level, it kept answering
+    /// portrait, and the take came out as a portrait crop.
+    var forcedLandscape = false {
+        didSet { applyAngles() }
+    }
     /// The camera picked in the viewfinder. Baked into each take as it lands —
     /// see `CameraStyleBaker`.
     var cameraStyle: CameraStyle = .standard
 
     private(set) var state: State = .idle
-    private(set) var clipURL: URL?
+    private(set) var clipURL: URL? {
+        didSet {
+            #if DEBUG
+            if let clipURL { Self.logTakeGeometry(clipURL, sideways: forcedLandscape) }
+            #endif
+        }
+    }
     private(set) var recordedAt: Date?
 
     /// Bumped each time a take fails to reach a file. A counter rather than a
@@ -326,20 +339,31 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         guard let device = videoInput?.device,
               let coordinator = rotationCoordinator else { return }
 
-        let captureAngle = Self.rotationAngle(
-            orientation: orientation,
-            devicePosition: device.position,
-            coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
+        let captureAngle = forcedLandscape
+            ? Self.sidewaysAngle(for: device.position)
+            : Self.rotationAngle(
+                orientation: orientation,
+                devicePosition: device.position,
+                coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
+        #if DEBUG
+        print("[横拍] forced=\(forcedLandscape) camera=\(device.position == .front ? "front" : "back")",
+              "capture=\(captureAngle) coordinator=\(coordinator.videoRotationAngleForHorizonLevelCapture)")
+        #endif
         let captureConnection = movieOutput.connection(with: .video)
         if let connection = captureConnection,
            connection.isVideoRotationAngleSupported(captureAngle) {
             connection.videoRotationAngle = captureAngle
         }
 
-        let previewAngle = Self.rotationAngle(
-            orientation: orientation,
-            devicePosition: device.position,
-            coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelPreview)
+        // The viewfinder stays on the portrait-locked screen's angle even in
+        // 横拍: the phone itself is turned, so the live picture already reads
+        // upright in the hand. Only the file is filmed sideways.
+        let previewAngle = forcedLandscape
+            ? Self.uprightPreviewAngle
+            : Self.rotationAngle(
+                orientation: orientation,
+                devicePosition: device.position,
+                coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelPreview)
 
         if let connection = previewLayer?.connection,
            connection.isVideoRotationAngleSupported(previewAngle) {
@@ -347,8 +371,13 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
 
         guard let secondaryCoordinator else { return }
-        let secondaryCapture = secondaryCoordinator.videoRotationAngleForHorizonLevelCapture
-        let secondaryPreview = secondaryCoordinator.videoRotationAngleForHorizonLevelPreview
+        let otherSide: AVCaptureDevice.Position = device.position == .front ? .back : .front
+        let secondaryCapture = forcedLandscape
+            ? Self.sidewaysAngle(for: otherSide)
+            : secondaryCoordinator.videoRotationAngleForHorizonLevelCapture
+        let secondaryPreview = forcedLandscape
+            ? Self.uprightPreviewAngle
+            : secondaryCoordinator.videoRotationAngleForHorizonLevelPreview
         for connection in secondaryConnections {
             let angle = connection.videoPreviewLayer == nil ? secondaryCapture : secondaryPreview
             if connection.isVideoRotationAngleSupported(angle) {
@@ -370,6 +399,30 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     ) -> CGFloat {
         coordinatedAngle
     }
+
+    /// The connection angle for a phone held sideways with its top to the
+    /// left (landscape right, in capture terms). `videoRotationAngle` is
+    /// defined per device orientation, not per sensor, so the front camera
+    /// takes the same angle; its mirroring is applied after the rotation.
+    static func sidewaysAngle(for position: AVCaptureDevice.Position) -> CGFloat {
+        0
+    }
+    #if DEBUG
+    /// Prints what a take actually is on disk, to check 横拍 lands landscape.
+    nonisolated static func logTakeGeometry(_ url: URL, sideways: Bool) {
+        Task.detached {
+            guard let track = try? await AVURLAsset(url: url).loadTracks(withMediaType: .video).first,
+                  let natural = try? await track.load(.naturalSize),
+                  let transform = try? await track.load(.preferredTransform)
+            else { return }
+            let shown = natural.applying(transform)
+            print("[横拍] take sideways=\(sideways) natural=\(natural) transform=\(transform)",
+                  "shown=\(abs(shown.width))x\(abs(shown.height))")
+        }
+    }
+    #endif
+    /// Portrait: the angle the viewfinder keeps on the portrait-locked screen.
+    static let uprightPreviewAngle: CGFloat = 90
 
     func flipCamera() {
         guard state == .ready else { return }

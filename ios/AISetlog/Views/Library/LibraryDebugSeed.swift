@@ -18,7 +18,8 @@ enum LibraryDebugSeed {
 
         let day = store.createQuickStart()
         for slot in 1...3 { store.saveClip(from: copy(sample), day: slot, challengeID: day.id) }
-        let week = store.create(title: "7 天早起", mode: .sevenDay)
+        let week = store.create(
+            title: AppLanguage.effective.resolved == .chinese ? "7 天早起" : "Early mornings", mode: .sevenDay)
         store.saveClip(from: copy(sample), day: 1, challengeID: week.id)
 
         for daysAgo in [1, 1, 3] {

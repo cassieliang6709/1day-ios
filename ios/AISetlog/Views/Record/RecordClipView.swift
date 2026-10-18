@@ -77,6 +77,14 @@ struct RecordClipView: View {
     @State private var showsSidewaysBadge = false
     private static let badgeSeconds = 1.5
     private var deviceTurn: Double { manualSideways ? 90 : 0 }
+    /// What the file is filmed as: 横拍 makes it landscape. The viewfinder
+    /// keeps its upright box — held sideways, that box is the landscape frame.
+    private var captureOrientation: Challenge.Orientation {
+        manualSideways ? .landscape : effectiveOrientation
+    }
+    /// The take under review was filmed with 横拍 on; it's shown turned the
+    /// same way, so it reads the right way up in the sideways hand.
+    @State private var reviewTurn: Double = 0
     private var isSideways: Bool { deviceTurn != 0 }
     /// Set once this screen has decided to go — the toast saying what happened
     /// is on screen and the dismiss is a beat behind it. Blocks the shutter in
@@ -186,7 +194,7 @@ struct RecordClipView: View {
     private func withCaptureLifecycle(_ content: some View) -> some View {
         content
         .task {
-            recorder.orientation = effectiveOrientation
+            recorder.orientation = captureOrientation
             if !CameraStyle.selectable.contains(cameraStyle) {
                 cameraStyle = CameraStyle.defaultCamera
             }
@@ -242,7 +250,7 @@ struct RecordClipView: View {
     private func observingTake(_ content: some View) -> some View {
         content
         .onChange(of: effectiveOrientation) { _, newValue in
-            recorder.orientation = newValue
+            recorder.orientation = manualSideways ? .landscape : newValue
         }
         .onChange(of: cameraStyle) { _, _ in
             recorder.cameraStyle = activeCamera
@@ -351,6 +359,11 @@ struct RecordClipView: View {
         }
         .animation(OneDay.Motion.snap, value: deviceTurn)
         .onChange(of: isSideways) { _, sideways in flashSidewaysBadge(sideways) }
+        .onChange(of: manualSideways) { _, on in
+            recorder.forcedLandscape = on
+            recorder.orientation = captureOrientation
+        }
+        .onChange(of: recorder.clipURL) { _, url in if url != nil { reviewTurn = deviceTurn } }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
@@ -485,14 +498,25 @@ struct RecordClipView: View {
                 showsPrompt: showsPrompt,
                 aspectRatio: recorder.cameraStyle.aspectRatio(for: effectiveOrientation)
                     ?? effectiveOrientation.aspectRatio,
-                showsDate: recorder.cameraStyle == .standard
+                showsDate: recorder.cameraStyle == .standard,
+                turn: reviewTurn
             ) {
-                ZStack {
-                    // Immediate review is always the camera truth; grading belongs elsewhere.
-                    LoopingClipPlayer(url: url, look: .none)
-                    // The caption is typed right where it lands in the film —
-                    // center of the frame, not in a bar below the video.
-                    CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
+                GeometryReader { proxy in
+                    let sideways = reviewTurn != 0
+                    ZStack {
+                        // Immediate review is always the camera truth; grading belongs elsewhere.
+                        LoopingClipPlayer(url: url, look: .none)
+                        // The caption is typed right where it lands in the film —
+                        // center of the frame, not in a bar below the video.
+                        CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
+                    }
+                    // A 横拍 take is landscape: laid out wide, then turned
+                    // into the upright box, the way it was framed.
+                    .frame(
+                        width: sideways ? proxy.size.height : proxy.size.width,
+                        height: sideways ? proxy.size.width : proxy.size.height)
+                    .rotationEffect(.degrees(reviewTurn))
+                    .frame(width: proxy.size.width, height: proxy.size.height)
                 }
             }
             .layoutPriority(1)
