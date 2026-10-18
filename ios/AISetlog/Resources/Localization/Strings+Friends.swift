@@ -26,13 +26,17 @@ extension Strings {
     static var debugCreateTestRoom: String { zh ? "创建测试房间" : "Create test room" }
     static var debugCreatingTestRoom: String { zh ? "正在创建测试房间…" : "Creating test room…" }
     static var debugTestRoomCaption: String {
-        zh ? "在 CloudKit 开发环境建一个真房间，放进小红和小明的假视频"
-            : "Real room in the CloudKit development database, with fake clips from two friends"
+        zh ? "在 CloudKit 开发环境建一个真房间（连正式库时不可用），放进小红和小明的假视频"
+            : "Real room in the CloudKit development database, with fake clips from two friends (not on Production)"
     }
     static var debugTestRoomTitle: String { zh ? "测试房间" : "Test room" }
     static var debugTestRoomCreated: String { zh ? "测试房间已创建，在「朋友」里" : "Test room created — see Friends" }
     static var debugTestRoomNeedsSignIn: String {
         zh ? "需要先登录（上方头像处），才能创建测试房间。" : "Sign in first (at the top) to create a test room."
+    }
+    static var debugTestRoomNeedsDevelopment: String {
+        zh ? "现在连的是正式库，不写假视频。要用这个按钮，先把 project.yml 里 Debug 的 CLOUDKIT_ENVIRONMENT 改成 Development。"
+            : "This build uses the Production database, so no fake clips. Set Debug's CLOUDKIT_ENVIRONMENT to Development in project.yml first."
     }
     #endif
 }

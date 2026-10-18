@@ -6,9 +6,10 @@ import Foundation
 /// friends' clips in it.
 ///
 /// Unlike `DebugFakeFriends`, which pastes clips into the local copy and never
-/// touches the server, this one writes real `Room` and `Clip` records. Debug
-/// builds are signed against CloudKit's Development environment, so the room
-/// lives there and nowhere near production. The room itself goes through
+/// touches the server, this one writes real `Room` and `Clip` records, so it
+/// only runs when the build is signed against CloudKit Development
+/// (`CLOUDKIT_ENVIRONMENT` in project.yml) and refuses against Production.
+/// The room itself goes through
 /// `ChallengeStore.createSharedRoom` exactly as the composer's does; only the
 /// friends' clips need their own writer, because `CloudKitService.uploadClip`
 /// stamps every clip `recordedAt = now` and the point is to have one from
@@ -41,10 +42,16 @@ enum DebugTestRoom {
         FakeClip(authorID: "debug-friend-xiaohong", authorName: "小红", day: 3, daysAgo: 1, caption: nil),
     ]
 
+    struct ProductionDatabaseError: LocalizedError {
+        var errorDescription: String? { Strings.debugTestRoomNeedsDevelopment }
+    }
+
     /// Creates the room, uploads the fake clips, syncs. Throws
+    /// `ProductionDatabaseError` when the build talks to CloudKit Production,
     /// `ChallengeStore.RoomError.notSignedIn` when nobody is signed in.
     @discardableResult
     static func create(in store: ChallengeStore) async throws -> Challenge {
+        guard !CloudKitService.isProduction else { throw ProductionDatabaseError() }
         guard store.account?.account != nil else { throw ChallengeStore.RoomError.notSignedIn }
         let challenge = try await store.createSharedRoom(title: Strings.debugTestRoomTitle)
         guard let code = challenge.roomCode else { return challenge }

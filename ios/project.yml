@@ -24,10 +24,20 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconBlue
       configs:
+        # Debug installs beside the App Store build as "1Day Dev" and reads the
+        # same Production CloudKit database, so rooms made in either app open in
+        # both. Switch Debug's CLOUDKIT_ENVIRONMENT to Development while changing
+        # the CloudKit schema — Production rejects fields it hasn't been deployed.
         Debug:
           APS_ENVIRONMENT: development
+          PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog.dev
+          APP_DISPLAY_NAME: 1Day Dev
+          CLOUDKIT_ENVIRONMENT: Production
         Release:
           APS_ENVIRONMENT: production
+          PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog
+          APP_DISPLAY_NAME: 1Day
+          CLOUDKIT_ENVIRONMENT: Production
     entitlements:
       path: AISetlog/AISetlog.entitlements
       properties:
@@ -37,11 +47,13 @@ targets:
           - iCloud.com.cassie.AISetlog
         com.apple.developer.icloud-services:
           - CloudKit
+        com.apple.developer.icloud-container-environment: $(CLOUDKIT_ENVIRONMENT)
     info:
       path: AISetlog/Info.plist
       properties:
         UILaunchScreen: {}
-        CFBundleDisplayName: 1Day
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        OneDayCloudKitEnvironment: $(CLOUDKIT_ENVIRONMENT)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSCameraUsageDescription: "To film the moments of your day."

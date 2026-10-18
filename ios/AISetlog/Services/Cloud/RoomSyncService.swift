@@ -18,6 +18,10 @@ final class RoomSyncService {
     var remoteComments: [String: [CloudKitService.RemoteComment]] = [:]
     /// Room codes currently being synced (drives a spinner in the board).
     private(set) var syncing: Set<String> = []
+    /// Clips on their way up, as "code#authorID#day". Recording, the board's
+    /// poll and coming back to the app can all reach `uploadClip` for the same
+    /// take at once; one upload is enough.
+    @ObservationIgnored private var uploading: Set<String> = []
     /// Last CloudKit failure per room. Kept visible instead of silently
     /// presenting an empty room when the production schema is unavailable.
     private(set) var lastError: [String: String] = [:]
@@ -79,6 +83,11 @@ final class RoomSyncService {
     @MainActor
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
                     fileURL: URL, overlayText: String?) async -> Bool {
+        // A skipped duplicate reports false: it put nothing up itself, and a
+        // take it shadowed is picked up by the next sync's retry.
+        let key = "\(code)#\(authorID)#\(day)"
+        guard uploading.insert(key).inserted else { return false }
+        defer { uploading.remove(key) }
         do {
             try await transport.uploadClip(
                 code, day, authorID, authorName, fileURL, overlayText)

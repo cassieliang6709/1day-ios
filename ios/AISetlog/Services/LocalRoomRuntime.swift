@@ -66,7 +66,7 @@ struct DemoRoomNaming {
 /// with generated colour cards.
 ///
 /// ```
-/// xcrun simctl launch booted com.cassie.AISetlog --args \
+/// xcrun simctl launch booted com.cassie.AISetlog.dev --args \
 ///     -demoEntries YES -demoRoomClips demo-clips -demoRoomChrome NO
 /// ```
 struct DemoRoomStaging {

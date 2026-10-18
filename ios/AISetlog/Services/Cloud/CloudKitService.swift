@@ -12,6 +12,12 @@ import CloudKit
 /// Public DB requires the device be signed into iCloud (checked up front).
 enum CloudKitService {
     static let containerID = "iCloud.com.cassie.AISetlog"
+    /// Whether this build is signed against CloudKit Production. Mirrors the
+    /// `icloud-container-environment` entitlement through Info.plist, since
+    /// an app can't read its own entitlements at runtime.
+    static var isProduction: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "OneDayCloudKitEnvironment") as? String != "Development"
+    }
     private static var db: CKDatabase {
         CKContainer(identifier: containerID).publicCloudDatabase
     }

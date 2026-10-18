@@ -297,17 +297,60 @@ final class ChallengeStore {
         return challenge
     }
 
-    /// Pull every member's clips for a room into the local cache, then fold
-    /// remote reactions/comments into the local cards.
+    /// Pull every member's clips for a room into the local cache, send up any
+    /// of mine the room is missing, then fold remote reactions/comments into
+    /// the local cards.
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
-        _ = await roomSync.syncClips(code: code)
+        if let remote = await roomSync.syncClips(code: code),
+           await uploadMissingClips(in: challenge, code: code, remote: remote) {
+            _ = await roomSync.syncClips(code: code)
+        }
         if let interactions = await roomSync.fetchInteractions(code: code) {
             roomSync.remoteReactions[code] = interactions.reactions
             roomSync.remoteComments[code] = interactions.comments
             mergeInteractions(interactions, into: id)
         }
+    }
+
+    /// Re-sends my takes the room doesn't have.
+    ///
+    /// `saveClip` uploads once, at record time. A take whose upload failed — no
+    /// network, iCloud refusing the app — used to stay on this phone for good:
+    /// shown to me as pending, to nobody else, and "retry sync" only pulled.
+    /// Runs only after a fetch succeeded, so "missing" means missing rather
+    /// than unreachable.
+    ///
+    /// - Returns: whether anything went up, so the caller can pull it back.
+    @MainActor
+    private func uploadMissingClips(
+        in challenge: Challenge, code: String, remote: [CloudKitService.RemoteClip]
+    ) async -> Bool {
+        guard effects.allowsCloudRoomManagement, let me = account?.account else { return false }
+        let roomCopies = Dictionary(
+            remote.filter { $0.authorID == me.id }.map { ($0.day, $0.recordedAt) },
+            uniquingKeysWith: max)
+        var uploadedAny = false
+        for card in challenge.cards {
+            guard let fileName = card.clipFileName else { continue }
+            // The room's copy is stamped when it went up, so it is older than
+            // this take only if this take never made it — a re-record whose
+            // upload failed leaves the previous one standing.
+            if let roomCopy = roomCopies[card.day], roomCopy >= (card.recordedAt ?? .distantPast) {
+                continue
+            }
+            let file = fileStore.clipURL(fileName: fileName, challengeID: challenge.id)
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            if await roomSync.uploadClip(
+                code: code, day: card.day, authorID: me.id,
+                authorName: me.displayName, fileURL: file,
+                overlayText: card.overlayText
+            ) {
+                uploadedAny = true
+            }
+        }
+        return uploadedAny
     }
 
     /// Refreshes every locally joined room when the app becomes active.

@@ -978,9 +978,10 @@ enum Strings {
             ? "没有这个邀请码的房间，请和朋友确认一下。"
             : "No room with that code. Double-check it with your friend."
         #if DEBUG
-        // Xcode builds talk to CloudKit Development; TestFlight/App Store talk
-        // to Production. A room made on one is invisible from the other and
-        // comes back as the same `.unknownItem`, so say which side this is.
+        // A Debug build switched to CloudKit Development can't see rooms made
+        // in Production (TestFlight/App Store) — they come back as the same
+        // `.unknownItem` — so say which side this is.
+        guard !CloudKitService.isProduction else { return base }
         return base + (lang == .chinese
             ? "\n（Debug 版连的是 CloudKit Development 环境，查不到 TestFlight 版建的房间。）"
             : "\n(Debug build uses CloudKit Development and can't see rooms made in TestFlight.)")

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>1Day</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -41,6 +41,8 @@
 	<string>To save your finished film to Photos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>用来把你说的话转成心情日记里的文字。</string>
+	<key>OneDayCloudKitEnvironment</key>
+	<string>$(CLOUDKIT_ENVIRONMENT)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
