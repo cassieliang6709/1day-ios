@@ -1,9 +1,18 @@
 import SwiftUI
 
-/// 我的's archive (1.5): every clip — yours, your friends', drafts — with a
-/// camera filter row, a people menu, a grid or a month calendar, and a select mode that turns any
-/// set of clips into a vlog. Lives inside `PlansHomeView`'s scroll view, which
-/// keeps the header, the in-progress story card and all launch routing.
+/// 我的's archive (1.5): your clips — from every story and room, plus your
+/// drafts — with a camera filter row, a people menu, a grid or a month
+/// calendar, and a select mode that turns any set of clips into a vlog. Lives
+/// inside `PlansHomeView`'s scroll view, which keeps the header, the
+/// in-progress story card and all launch routing.
+///
+/// Friends' clips are left out by default: 我的 is *my* area, and finding a
+/// friend's clip in it read as "did I film this?". The 含朋友的 chip at the
+/// head of the chip row brings them back (the 1.5 behaviour), and is
+/// remembered per viewer. Everything the page computes — the grid, the day
+/// counts, the calendar covers, the camera chips, the 待归档 count, what can
+/// be picked for a vlog — goes through the same scope, `scope` plus
+/// `activeFilter`, so no number on the page counts a clip the grid hides.
 struct LibrarySection: View {
     let library: ClipLibrary
     /// Shared stories. No longer drawn as chips (the row filters by camera
@@ -19,7 +28,12 @@ struct LibrarySection: View {
 
     enum Mode: Hashable { case grid, calendar }
 
-    @State private var filter: LibraryFilter = .all
+    /// The chip row and people menu. `includesFriends` here is ignored —
+    /// `activeFilter` overlays the remembered 含朋友的 choice on it.
+    @State private var filter: LibraryFilter = .archive
+    /// 含朋友的. `@AppStorage` so it survives relaunches: someone who wants
+    /// their friends' clips in 我的 shouldn't have to ask every time.
+    @AppStorage("library.includesFriends.v1") private var includesFriends = false
     @State private var mode: Mode = .grid
     @State private var day: Date?
     @State private var month = Calendar.current.startOfMonth(for: .now)
@@ -39,9 +53,18 @@ struct LibrarySection: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var cameraIndex: ClipCameraIndex { .shared }
-    private var shown: [LibraryClip] {
-        library.filtered(filter, cameras: cameraIndex.cameras, on: day)
+    /// The library this page draws from: friends' clips only with 含朋友的 on.
+    private var scope: ClipLibrary { library.scoped(includingFriends: includesFriends) }
+    private var activeFilter: LibraryFilter {
+        var active = filter
+        active.includesFriends = includesFriends
+        return active
     }
+    private var shown: [LibraryClip] {
+        scope.filtered(activeFilter, cameras: cameraIndex.cameras, on: day)
+    }
+    /// Whether the 含朋友的 chip is worth drawing: only if a friend has a clip.
+    private var hasFriendsClips: Bool { library.clips.contains { !$0.isMine } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -54,8 +77,8 @@ struct LibrarySection: View {
                 if mode == .calendar {
                     LibraryCalendar(
                         month: $month,
-                        covers: library.coverByDay(
-                            library.filtered(filter, cameras: cameraIndex.cameras)),
+                        covers: scope.coverByDay(
+                            scope.filtered(activeFilter, cameras: cameraIndex.cameras)),
                         selectedDay: $day,
                         showsMoods: true)
                         .padding(.horizontal, 20)
@@ -150,7 +173,7 @@ struct LibrarySection: View {
     /// used of the two filters, and the chip row belongs to the cameras.
     private var peopleMenu: some View {
         Menu {
-            Picker(Strings.filterWhoFilmed, selection: $filter.people) {
+            Picker(Strings.filterWhoFilmed, selection: peopleSelection) {
                 ForEach(LibraryFilter.People.allCases, id: \.self) { people in
                     Text(peopleName(people)).tag(people)
                 }
@@ -172,6 +195,21 @@ struct LibrarySection: View {
         .accessibilityIdentifier("library-people")
     }
 
+    /// Picking 朋友拍的 turns 含朋友的 on rather than showing friends while
+    /// the chip says they're excluded. The other reading — the chip wins and
+    /// the grid comes up empty — punishes an explicit request; and showing
+    /// them while the chip stays off would leave a chip that lies. Turning it
+    /// on keeps the menu and the chip telling the same story, and it sticks,
+    /// which matches what the person just asked for.
+    private var peopleSelection: Binding<LibraryFilter.People> {
+        Binding(
+            get: { filter.people },
+            set: { people in
+                if people == .friends { includesFriends = true }
+                filter.people = people
+            })
+    }
+
     private func peopleName(_ people: LibraryFilter.People) -> String {
         switch people {
         case .everyone: Strings.filterEveryone
@@ -180,15 +218,29 @@ struct LibrarySection: View {
         }
     }
 
-    /// 全部, 待归档 (N) when there are drafts, then one chip per camera that
-    /// has at least one clip. With nothing but 全部 the row isn't drawn.
+    /// 含朋友的 when a friend has any clip, then 全部, 待归档 (N) when there
+    /// are drafts, then one chip per camera that has at least one clip in
+    /// scope. With nothing but 全部 the row isn't drawn.
+    ///
+    /// 含朋友的 goes first, set off by a hairline: it is a switch that combines
+    /// with the others, not one more choice among them, and at the far end of
+    /// a row of cameras it would scroll out of sight.
     @ViewBuilder
     private var filterRow: some View {
-        let cameras = library.cameras(in: cameraIndex.cameras)
-        let draftCount = library.draftCount
-        if !cameras.isEmpty || draftCount > 0 {
+        let cameras = scope.cameras(in: cameraIndex.cameras)
+        let draftCount = scope.draftCount
+        if !cameras.isEmpty || draftCount > 0 || hasFriendsClips {
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
+                    if hasFriendsClips {
+                        chip(Strings.libraryIncludeFriendsChip, isOn: includesFriends) {
+                            setIncludesFriends(!includesFriends)
+                        }
+                        .accessibilityIdentifier("library-filter-friends")
+                        Rectangle()
+                            .fill(OneDay.hairline)
+                            .frame(width: 1, height: 20)
+                    }
                     chip(Strings.filterAll, isOn: filter.camera == nil && !filter.draftsOnly) {
                         filter.camera = nil
                         filter.draftsOnly = false
@@ -212,6 +264,22 @@ struct LibrarySection: View {
             }
             .scrollIndicators(.hidden)
         }
+    }
+
+    /// Turning 含朋友的 off takes friends back out of everything that could
+    /// still hold them: a 朋友拍的 pick goes back to 全部人 (which now means
+    /// yours), a camera chip only friends' clips earned goes away with its
+    /// selection, and a friend's clip already picked for a vlog is unpicked —
+    /// the selection bar must not count clips the grid no longer shows.
+    private func setIncludesFriends(_ on: Bool) {
+        includesFriends = on
+        guard !on else { return }
+        if filter.people == .friends { filter.people = .everyone }
+        if let camera = filter.camera,
+           !library.scoped(includingFriends: false).cameras(in: cameraIndex.cameras).contains(camera) {
+            filter.camera = nil
+        }
+        picked.removeAll { !$0.isMine }
     }
 
     /// 待归档 from the camera's drafts button: the grid, every date, drafts only.

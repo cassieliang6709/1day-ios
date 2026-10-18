@@ -8,6 +8,8 @@ extension Strings {
     /// A clip in no story or room is no longer "waiting to be filed": it is
     /// kept in 我的, seen only by you, and can be sent on from there.
     static func libraryDraftsChip(_ n: Int) -> String { zh ? "只有我 (\(n))" : "Only me (\(n))" }
+    /// The chip that brings friends' clips into 我的; off by default.
+    static var libraryIncludeFriendsChip: String { zh ? "含朋友的" : "Incl. friends" }
     /// The corner badge on a draft's tile.
     static var libraryDraftBadge: String { zh ? "只有我" : "Only me" }
     static var libraryDraftQuestion: String { zh ? "这段只有你看得到" : "Only you can see this clip" }
