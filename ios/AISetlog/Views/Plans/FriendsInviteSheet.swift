@@ -120,6 +120,10 @@ struct RoomInviteCodeCard: View {
     var members: Int? = nil
 
     @State private var copied = false
+    /// Optional because this card is also shown from places (Settings' debug
+    /// test room, previews) that may not inject the account; the invite card
+    /// then simply says "来 1Day 一起拍" instead of naming you.
+    @Environment(AccountStore.self) private var account: AccountStore?
 
     private var code: String { challenge.roomCode ?? "" }
 
@@ -159,7 +163,13 @@ struct RoomInviteCodeCard: View {
 
     private var buttons: some View {
         VStack(spacing: 10) {
-            ShareLink(item: shareText) { Text(Strings.shareCode) }
+            // The card image, not the text: WeChat refuses a text share
+            // outright. See `RoomInviteCard.swift`.
+            RoomInviteShareLink(
+                content: RoomInviteCardContent(
+                    challenge: challenge, inviter: account?.account?.displayName),
+                message: shareText
+            ) { Text(Strings.shareCode) }
                 .buttonStyle(.primaryAction)
                 .accessibilityIdentifier("invite-share")
             Button(copied ? Strings.codeCopied : Strings.copyCode) {

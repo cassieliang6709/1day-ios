@@ -327,8 +327,16 @@ struct StoryTimelineView: View {
             if let code = nudgeShareCode {
                 // A `ShareLink` inside the dialog rather than a button that
                 // opens a second sheet: one tap from "yes" to the share sheet.
+                // A bare `ShareLink`, not `RoomInviteShareLink`: a dialog's
+                // actions are matched by type, and a wrapper view risks being
+                // dropped. Same card, same message.
+                let card = RoomInviteCardImage(content: RoomInviteCardContent(
+                    challenge: challenge, inviter: account.account?.displayName))
                 ShareLink(
-                    item: shareText(code: code, challenge: challenge),
+                    item: card,
+                    subject: Text(card.content.headline),
+                    message: Text(shareText(code: code, challenge: challenge)),
+                    preview: SharePreview(card.content.headline, image: card),
                     label: { Text(Strings.sendTheCodeNow) })
             }
             Button(Strings.sendTheCodeLater, role: .cancel) {}
@@ -371,7 +379,11 @@ struct StoryTimelineView: View {
             // stays up here.
             if challenge.isShared, let code = challenge.roomCode {
                 if previewMedia == nil {
-                    ShareLink(item: shareText(code: code, challenge: challenge)) {
+                    RoomInviteShareLink(
+                        content: RoomInviteCardContent(
+                            challenge: challenge, inviter: account.account?.displayName),
+                        message: shareText(code: code, challenge: challenge)
+                    ) {
                         roomCapsule(Strings.inviteLabel, systemImage: "person.badge.plus")
                     }
                     .accessibilityIdentifier("room-invite")

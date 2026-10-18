@@ -18,6 +18,27 @@ extension Strings {
     static func memberCount(_ n: Int) -> String { zh ? "\(n) 人" : (n == 1 ? "1 person" : "\(n) people") }
     static func inviteCodeLine(_ code: String) -> String { zh ? "邀请码 \(code)" : "Code \(code)" }
 
+    // The invite card — the image "发给朋友" sends. An image because WeChat's
+    // share extension refuses plain text ("暂不支持的文件类型"); see
+    // `RoomInviteCard.swift`. The card has to stand on its own in a chat with
+    // no link to tap, so it spells out where the code goes.
+    static func inviteCardHeadline(inviter: String?) -> String {
+        guard let inviter else { return zh ? "来 1Day 一起拍" : "Come film with me on 1Day" }
+        return zh ? "\(inviter) 邀请你一起拍" : "\(inviter) invited you to film together"
+    }
+    static var inviteCardCodeLabel: String { zh ? "邀请码" : "INVITE CODE" }
+    static var inviteCardSteps: String {
+        zh ? "打开 1Day → 加入房间 → 输入邀请码" : "Open 1Day → Join a room → Enter the code"
+    }
+    static var inviteCardFooter: String { zh ? "一天，拍成一部小片" : "One day, one little film" }
+    static func inviteCardAccessibility(title: String, code: String, inviter: String?) -> String {
+        let spelled = code.map(String.init).joined(separator: " ")
+        let head = inviteCardHeadline(inviter: inviter)
+        return zh
+            ? "\(head)。房间「\(title)」，邀请码 \(spelled)"
+            : "\(head). Room “\(title)”, code \(spelled)"
+    }
+
     static var signInRequiredTitle: String { zh ? "需要先登录" : "Sign in first" }
 
     #if DEBUG
