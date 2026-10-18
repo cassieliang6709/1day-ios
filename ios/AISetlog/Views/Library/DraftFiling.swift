@@ -45,7 +45,10 @@ enum DraftFiler {
             guard let day = ClipFiling.targetDay(in: challenge) else { continue }
             store.saveClip(
                 from: drafts.url(for: draft), day: day,
-                challengeID: challenge.id, overlayText: draft.overlayText)
+                challengeID: challenge.id, overlayText: draft.overlayText,
+                // The draft's own time. Filing is not filming: a take kept as a
+                // draft at 2:06 and filed at 3:21 happened at 2:06.
+                recordedAt: draft.recordedAt)
             if store.challenge(challenge.id)?.cards
                 .first(where: { $0.day == day })?.clipFileName != nil {
                 landed.append(challenge)

@@ -5,7 +5,9 @@ import Foundation
 struct RoomSyncTransport {
     var fetchClips: @MainActor (String, URL) async throws -> [CloudKitService.RemoteClip]
     var fetchInteractions: @MainActor (String) async throws -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
-    var uploadClip: @MainActor (String, Int, String, String, URL, String?) async throws -> Void
+    /// code, day, authorID, authorName, file, caption, and when the take was
+    /// filmed — which is not when this runs (see `CloudKitService.uploadClip`).
+    var uploadClip: @MainActor (String, Int, String, String, URL, String?, Date) async throws -> Void
     /// Caption-only rewrite on a clip already in the room: code, day, authorID,
     /// words.
     var updateClipCaption: @MainActor (String, Int, String, String?) async throws -> Void
@@ -21,7 +23,7 @@ struct RoomSyncTransport {
         RoomSyncTransport(
             fetchClips: { try await CloudKitService.fetchClips(code: $0, into: $1) },
             fetchInteractions: { try await CloudKitService.fetchInteractions(code: $0) },
-            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, overlayText: $5) },
+            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, overlayText: $5, recordedAt: $6) },
             updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, overlayText: $3) },
             setReaction: { try await CloudKitService.setReaction(code: $0, day: $1, authorID: $2, authorName: $3, targetAuthorID: $4, emoji: $5, on: $6) },
             postComment: { try await CloudKitService.postComment(code: $0, day: $1, id: $2, text: $3, authorID: $4, authorName: $5, targetAuthorID: $6) },
@@ -56,7 +58,7 @@ final class LocalRoomSyncSource {
                 try check(code)
                 return ([], [])
             },
-            uploadClip: { [self] code, _, _, _, _, _ in try rejectWrite(code) },
+            uploadClip: { [self] code, _, _, _, _, _, _ in try rejectWrite(code) },
             updateClipCaption: { [self] code, _, _, _ in try rejectWrite(code) },
             setReaction: { [self] code, _, _, _, _, _, _ in try rejectWrite(code) },
             postComment: { [self] code, _, _, _, _, _, _ in try rejectWrite(code) },

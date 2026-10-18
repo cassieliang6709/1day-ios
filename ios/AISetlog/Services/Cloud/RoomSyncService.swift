@@ -82,7 +82,7 @@ final class RoomSyncService {
     /// state after a successful upload so clips and interactions stay in sync.
     @MainActor
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
-                    fileURL: URL, overlayText: String?) async -> Bool {
+                    fileURL: URL, overlayText: String?, recordedAt: Date) async -> Bool {
         // A skipped duplicate reports false: it put nothing up itself, and a
         // take it shadowed is picked up by the next sync's retry.
         let key = "\(code)#\(authorID)#\(day)"
@@ -90,7 +90,7 @@ final class RoomSyncService {
         defer { uploading.remove(key) }
         do {
             try await transport.uploadClip(
-                code, day, authorID, authorName, fileURL, overlayText)
+                code, day, authorID, authorName, fileURL, overlayText, recordedAt)
             lastError[code] = nil
             return true
         } catch {

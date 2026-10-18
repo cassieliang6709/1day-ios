@@ -123,6 +123,49 @@ final class RoomUploadRetryTests: XCTestCase {
         XCTAssertEqual(server.uploads.map(\.day), [1])
     }
 
+    /// A retried upload says when the take was filmed, not when the retry ran.
+    ///
+    /// The bug this pins: a clip filmed at 2:06 whose first upload failed went
+    /// up on a later sync stamped with that sync's time, and friends saw 3:21.
+    func testARetriedUploadCarriesWhenTheTakeWasFilmed() async throws {
+        let room = try roomWithMyTake()
+
+        await store.syncRoom(room.id)
+
+        XCTAssertEqual(server.uploads.first?.recordedAt, filmedAt)
+        XCTAssertEqual(store.roomSync.remoteClips[code]?.first?.recordedAt, filmedAt)
+    }
+
+    /// And once it is up with the take's own time, the next sync sees the same
+    /// take rather than an older one and leaves it alone.
+    func testATakeRetriedOnceIsNotRetriedAgain() async throws {
+        let room = try roomWithMyTake()
+
+        await store.syncRoom(room.id)
+        await store.syncRoom(room.id)
+
+        XCTAssertEqual(server.uploads.count, 1)
+    }
+
+    /// A take saved with an explicit time — a filed draft — keeps it on the
+    /// card and on the way up.
+    func testSavingAClipWithItsOwnTimeStampsTheCardAndTheUpload() async throws {
+        let room = try roomWithMyTake()
+        let draftTime = filmedAt.addingTimeInterval(-3_600)
+        let source = dir.appendingPathComponent("draft.mov")
+        try Data("draft".utf8).write(to: source)
+
+        store.saveClip(from: source, day: 2, challengeID: room.id, recordedAt: draftTime)
+
+        XCTAssertEqual(
+            store.challenge(room.id)?.cards.first { $0.day == 2 }?.recordedAt, draftTime)
+        // The upload runs in a Task; give it the turn it needs.
+        for _ in 0..<50 where !server.uploads.contains(where: { $0.day == 2 }) {
+            await Task.yield()
+        }
+        XCTAssertEqual(server.uploads.first { $0.day == 2 }?.recordedAt, draftTime)
+    }
+
     /// A failed fetch says nothing about what the room has, so nothing goes up.
     func testNothingIsUploadedWhenTheRoomCannotBeRead() async throws {
         let room = try roomWithMyTake()
@@ -156,7 +199,7 @@ final class RoomUploadRetryTests: XCTestCase {
 /// A room that remembers what was uploaded to it and serves it back.
 @MainActor
 private final class FakeRoomServer {
-    struct Upload { let day: Int; let authorID: String; let overlayText: String? }
+    struct Upload { let day: Int; let authorID: String; let overlayText: String?; let recordedAt: Date }
 
     var clips: [CloudKitService.RemoteClip] = []
     var fetchFails = false
@@ -171,12 +214,14 @@ private final class FakeRoomServer {
                 return clips
             },
             fetchInteractions: { _ in ([], []) },
-            uploadClip: { [self] code, day, authorID, authorName, file, caption in
-                uploads.append(Upload(day: day, authorID: authorID, overlayText: caption))
+            uploadClip: { [self] code, day, authorID, authorName, file, caption, recordedAt in
+                uploads.append(Upload(
+                    day: day, authorID: authorID, overlayText: caption, recordedAt: recordedAt))
                 clips.removeAll { $0.authorID == authorID && $0.day == day }
+                // Stores what it was told, like the real record does now.
                 clips.append(CloudKitService.RemoteClip(
                     id: CloudKitService.clipRecordName(code: code, authorID: authorID, day: day),
-                    day: day, authorID: authorID, authorName: authorName, recordedAt: .now,
+                    day: day, authorID: authorID, authorName: authorName, recordedAt: recordedAt,
                     localURL: file, overlayText: caption))
             },
             updateClipCaption: { _, _, _, _ in },

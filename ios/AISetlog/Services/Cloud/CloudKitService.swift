@@ -263,7 +263,8 @@ enum CloudKitService {
         authorID: String,
         authorName: String,
         fileURL: URL,
-        overlayText: String? = nil
+        overlayText: String? = nil,
+        recordedAt: Date
     ) async throws {
         try await ensureAccountAvailable()
         let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
@@ -278,7 +279,13 @@ enum CloudKitService {
         record["day"] = day as CKRecordValue
         record["authorID"] = authorID as CKRecordValue
         record["authorName"] = authorName as CKRecordValue
-        record["recordedAt"] = Date.now as CKRecordValue
+        // When the take was filmed, not when it reached the room. This used to
+        // be `Date.now`, and an upload is not always the moment after the
+        // take: a failed one is retried on a later sync, and a draft can sit
+        // for an hour before it is filed. Either way friends saw 3:21 on a clip
+        // filmed at 2:06 — the time the network came back, not the time of the
+        // moment the card is about.
+        record["recordedAt"] = recordedAt as CKRecordValue
         record["video"] = CKAsset(fileURL: fileURL)
         if let overlayText, !overlayText.isEmpty {
             record["overlayText"] = overlayText as CKRecordValue
@@ -286,6 +293,10 @@ enum CloudKitService {
             record["overlayText"] = nil
         }
         _ = try await db.save(record)
+        // Diagnostic: the success half of `[room] upload failed`, so a clip a
+        // friend says they can't see can be matched against what this phone
+        // actually put up, and when it says the take was filmed.
+        print("[room] uploaded clip code=\(code) day=\(day) recordedAt=\(recordedAt)")
     }
 
     /// All clips in a room, downloaded to a local cache directory.

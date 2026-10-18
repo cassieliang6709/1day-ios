@@ -334,9 +334,12 @@ final class ChallengeStore {
         var uploadedAny = false
         for card in challenge.cards {
             guard let fileName = card.clipFileName else { continue }
-            // The room's copy is stamped when it went up, so it is older than
-            // this take only if this take never made it — a re-record whose
-            // upload failed leaves the previous one standing.
+            // The room's copy carries the time its take was filmed (it used to
+            // carry the time it went up). Same take: equal stamps, nothing to
+            // do. A re-record whose upload failed: the card's take is later
+            // than the one the room still holds, so it goes up. A copy written
+            // by an older client is stamped at upload, which is after the take
+            // it holds, so it still reads as "already there".
             if let roomCopy = roomCopies[card.day], roomCopy >= (card.recordedAt ?? .distantPast) {
                 continue
             }
@@ -345,7 +348,10 @@ final class ChallengeStore {
             if await roomSync.uploadClip(
                 code: code, day: card.day, authorID: me.id,
                 authorName: me.displayName, fileURL: file,
-                overlayText: card.overlayText
+                overlayText: card.overlayText,
+                // A card from before `recordedAt` existed has no better answer
+                // than now; every card saved since has one.
+                recordedAt: card.recordedAt ?? .now
             ) {
                 uploadedAny = true
             }
@@ -522,17 +528,23 @@ final class ChallengeStore {
     }
 
     /// Moves a freshly recorded clip into permanent storage and marks the card done.
+    ///
+    /// `recordedAt` is when the take was filmed. Straight from the camera that
+    /// is now; a draft filed later has its own time and passes it, otherwise
+    /// the card — and every friend's copy of it — says the moment happened
+    /// when somebody tidied their drafts.
     func saveClip(
         from tempURL: URL,
         day: Int,
         challengeID: UUID,
-        overlayText: String? = nil
+        overlayText: String? = nil,
+        recordedAt: Date = .now
     ) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
         guard let fileName = fileStore.storeClip(from: tempURL, day: day, challengeID: challengeID) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
         challenges[ci].cards[idx].clipFileName = fileName
-        challenges[ci].cards[idx].recordedAt = .now
+        challenges[ci].cards[idx].recordedAt = recordedAt
         challenges[ci].cards[idx].overlayText = overlayText
 
         // Shared room: also push this clip to CloudKit for friends to see.
@@ -542,7 +554,7 @@ final class ChallengeStore {
                 if await roomSync.uploadClip(
                     code: code, day: day, authorID: me.id,
                     authorName: me.displayName, fileURL: dest,
-                    overlayText: overlayText
+                    overlayText: overlayText, recordedAt: recordedAt
                 ) {
                     await syncRoom(challengeID)
                 }
