@@ -144,6 +144,10 @@ struct StoryCard: View {
     /// row in the list already said so.
     private var ctaTitle: String {
         if isDone { return Strings.watchYourFilm }
+        // A room doesn't number its days on screen (1.5), so 「接着拍 · 第 3
+        // 天」 can't be what its button says; and in a room the answer to
+        // "what now" is the same every time somebody opens it — film one.
+        if challenge.isShared { return Strings.roomFeedFilm }
         if progress.filled == 0 { return Strings.startTodaysStory }
         guard todaySlot != nil else { return Strings.continueTodaysStory }
         return Strings.continueDayLabel(offeredSlot)
@@ -153,10 +157,19 @@ struct StoryCard: View {
     /// `StoryRowCard.subtitle`), so moving a story between hero and list
     /// doesn't change what it claims is next.
     private var caption: String {
+        if challenge.isShared, !progress.isComplete { return roomCaption }
         if progress.isComplete || challenge.isTimeOnly || progress.offeringToday(today: todaySlot) {
             return Strings.storyCardCaption(open: openMoment, isComplete: progress.isComplete)
         }
         return Strings.catchUpDayLabel(day: offeredSlot, moment: openMoment)
+    }
+
+    /// A room's line on the card: the open moment when it has a name, and
+    /// otherwise just the act — never 「补第 2 天」 or a 「第 2 天」 standing in
+    /// for a name. See `ChallengePresenter.momentName(forSlot:)`.
+    private var roomCaption: String {
+        presenter.momentName(forSlot: offeredSlot).map { Strings.openMomentLabel($0) }
+            ?? Strings.timeOnlyMoment
     }
 }
 
@@ -260,6 +273,12 @@ struct StoryRowCard: View {
                 duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }
         if challenge.isTimeOnly { return Strings.timeOnlyMoment }
+        // Same rule as the hero card's `roomCaption`: a room names a moment or
+        // says nothing about which one, and never counts days.
+        if challenge.isShared {
+            return presenter.momentName(forSlot: offeredSlot).map { Strings.openMomentLabel($0) }
+                ?? Strings.timeOnlyMoment
+        }
         let moment = presenter.title(forSlot: offeredSlot)
         // Says which day when it isn't today's. A seven-day story where
         // Tuesday was missed now offers Tuesday explicitly rather than

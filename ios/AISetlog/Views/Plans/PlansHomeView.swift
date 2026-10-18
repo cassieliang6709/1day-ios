@@ -861,14 +861,16 @@ struct PlansHomeView: View {
     @ViewBuilder
     private func recorder(for challenge: Challenge, preferredDay: Int? = nil) -> some View {
         let slot = slotToRecord(in: challenge, preferred: preferredDay)
+        // A room's camera never says which day it is (1.5): its slot's name
+        // when it has one, and otherwise no name and no 3/7 bars — the same
+        // rule `StoryTimelineView.sheetContent` opens the camera by.
+        let label = ChallengePresenter(challenge: challenge).slotLabel(forSlot: slot)
         RecordClipView(
             day: slot,
-            slotTitle: challenge.isTimeOnly
-                ? nil
-                : ChallengePresenter(challenge: challenge).title(forSlot: slot),
-            momentCount: challenge.cards.count,
+            slotTitle: challenge.isTimeOnly ? nil : label,
+            momentCount: challenge.isShared ? 0 : challenge.cards.count,
             clipLength: challenge.resolvedClipLength,
-            showsPrompt: !challenge.isTimeOnly,
+            showsPrompt: !challenge.isTimeOnly && label != nil,
             orientation: challenge.resolvedOrientation,
             lockedCamera: challenge.cameraStyle
         ) { url, overlayText in

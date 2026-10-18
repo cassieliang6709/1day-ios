@@ -33,7 +33,7 @@ final class LocalRoomImportUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["导入失败，原视频未改动。请重新选择。"].exists)
         app.buttons["聊天"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        app.buttons["退出演示"].tap()
+        app.buttons["完成"].tap()
         XCTAssertTrue(app.buttons["生成 vlog"].waitForExistence(timeout: 15))
     }
 }

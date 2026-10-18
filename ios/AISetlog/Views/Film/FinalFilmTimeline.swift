@@ -228,7 +228,12 @@ struct FinalFilmTimeline: View {
                         isFilled: true
                     ) {
                         TimelineClip(
-                            momentTitle: clip.label ?? presenter.title(forSlot: clip.day),
+                            // `clip.label` is 「第 N 天」 for a room slot
+                            // with no name (it is built for the solo story's
+                            // wording); a room says the name or nothing.
+                            momentTitle: challenge.isShared
+                                ? (presenter.momentName(forSlot: clip.day) ?? "")
+                                : (clip.label ?? presenter.title(forSlot: clip.day)),
                             momentIcon: MomentCatalog.icon(
                                 for: challenge.momentValue(forSlot: clip.day)),
                             state: .filmed(url: clip.url, recordedAt: clip.recordedAt),
@@ -236,7 +241,9 @@ struct FinalFilmTimeline: View {
                             durationLabel: challenge.resolvedClipLength.secondsLabel,
                             reactions: clip.emoji,
                             mediaHeight: challenge.resolvedOrientation == .landscape ? 130 : 180,
-                            showsMomentTitle: !challenge.isTimeOnly)
+                            showsMomentTitle: !challenge.isTimeOnly
+                                && (!challenge.isShared
+                                    || presenter.momentName(forSlot: clip.day) != nil))
                     }
                 }
             }

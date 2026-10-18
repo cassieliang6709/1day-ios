@@ -63,7 +63,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         input.typeText("local UI message")
         app.buttons["发送"].tap()
         XCTAssertTrue(app.staticTexts["local UI message"].waitForExistence(timeout: 15))
-        app.buttons["退出演示"].tap()
+        app.buttons["完成"].tap()
 
         // The shell's member selector remains outside the navigation stack;
         // changing it replaces only this local session and its navigation state.
@@ -75,7 +75,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         // The three-member session is a different room: the message typed into
         // the two-member one must not be in it.
         XCTAssertFalse(app.staticTexts["local UI message"].exists)
-        app.buttons["退出演示"].tap()
+        app.buttons["完成"].tap()
         capture(app, "Formal three-member StoryTimelineView")
         app.buttons["room-back"].tap()
         XCTAssertTrue(demo.waitForExistence(timeout: 15))

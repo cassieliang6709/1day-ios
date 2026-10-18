@@ -91,10 +91,11 @@ enum SharedActivityNotificationService {
 
         let content = UNMutableNotificationContent()
         content.title = ChallengePresenter(challenge: challenge).displayTitle
+        // `fields.day` still routes the tap (`dayKey` below); it just isn't
+        // read out any more — see `Strings.roomClipActivity`.
         content.body = activityBody(
             kind: context.kind,
-            authorName: fields.authorName,
-            day: fields.day)
+            authorName: fields.authorName)
         content.sound = .default
         content.categoryIdentifier = NotificationConstants.activityCategory
         content.threadIdentifier = context.roomCode
@@ -156,15 +157,14 @@ enum SharedActivityNotificationService {
 
     private static func activityBody(
         kind: ActivityKind,
-        authorName: String,
-        day: Int
+        authorName: String
     ) -> String {
         let visibleName = NotificationPreferences.showFriendNames && !authorName.isEmpty
             ? authorName
             : nil
         switch kind {
         case .clip:
-            return Strings.roomClipActivity(name: visibleName, day: day)
+            return Strings.roomClipActivity(name: visibleName)
         case .comment:
             return Strings.roomCommentActivity(name: visibleName)
         case .reaction:

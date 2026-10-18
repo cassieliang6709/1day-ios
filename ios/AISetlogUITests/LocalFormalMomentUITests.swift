@@ -39,14 +39,11 @@ final class LocalFormalMomentUITests: XCTestCase {
         XCTAssertTrue(chat.isHittable)
         chat.tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        // The composer says what the next message will be tagged with. It now
-        // carries the moment's own prompt after the number, so match the part
-        // that is the contract — the moment this chat was opened from.
-        XCTAssertTrue(
-            app.staticTexts
-                .matching(NSPredicate(format: "label CONTAINS %@", "第 1 个瞬间"))
-                .firstMatch.exists)
-        app.buttons["退出演示"].tap()
+        // The composer says what the next message will be tagged with: the
+        // moment's own name. It led with 「第 1 个瞬间」 until rooms stopped
+        // numbering their moments on screen (1.5).
+        XCTAssertTrue(app.staticTexts["在说：一起出发"].firstMatch.exists)
+        app.buttons["完成"].tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))
         let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "关闭", "xmark"])).firstMatch
         XCTAssertTrue(close.exists, app.debugDescription)

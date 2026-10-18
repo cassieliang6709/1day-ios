@@ -251,13 +251,17 @@ enum Strings {
     // "朋友" was wrong twice over: it asserts a relationship the app never
     // established, and a room member with no name is not necessarily anyone's
     // friend. "有人" / "Someone" says only what is known.
-    static func roomClipActivity(name: String?, day: Int) -> String {
+    //
+    // No day in it. A room stopped numbering its days (1.5): the page is one
+    // column of clips per person, stamped with the time each was filmed, so a
+    // push saying 「第 3 天」 named a thing the room no longer shows anywhere.
+    // A record still carries `day` — that is the data model, untouched — the
+    // notification just stopped reading it out.
+    static func roomClipActivity(name: String?) -> String {
         if lang == .chinese {
-            return named(name).map { "\($0) 刚上传了第 \(day) 天的片段。" }
-                ?? "有人刚上传了第 \(day) 天的片段。"
+            return named(name).map { "\($0) 刚拍了一段" } ?? "有人刚拍了一段"
         }
-        return named(name).map { "\($0) just added their Day \(day) clip." }
-            ?? "Someone just added their Day \(day) clip."
+        return named(name).map { "\($0) just filmed a clip" } ?? "Someone just filmed a clip"
     }
     static func roomCommentActivity(name: String?) -> String {
         if lang == .chinese {
@@ -1467,6 +1471,34 @@ enum Strings {
         return lang == .chinese ? "\(count) 人在这个房间" : "\(count) people in this room"
     }
 
+    /// The room page's whole header line under the title: 「2 人 · 邀请码
+    /// KPADC7」. It replaced a row of faces, 「2 人在这个房间」 and a second
+    /// sentence about who had filmed — three lines saying what the columns
+    /// right below now show by having one per person, with that person's
+    /// clips in it.
+    static func roomPeopleCount(_ count: Int) -> String {
+        if lang == .chinese { return "\(count) 人" }
+        return count == 1 ? "1 person" : "\(count) people"
+    }
+    /// How many clips one person has in the room, at the top of their column.
+    static func roomColumnClipCount(_ count: Int) -> String {
+        if lang == .chinese { return "\(count) 段" }
+        return count == 1 ? "1 clip" : "\(count) clips"
+    }
+    /// Somebody else's column before they've filmed anything.
+    static var roomColumnEmpty: String {
+        lang == .chinese ? "还没拍过" : "Nothing yet"
+    }
+    /// A shared room's evening reminder. 「第 3 天到了」 is the solo wording; a
+    /// room doesn't number its days any more, so it says what to do and, when
+    /// the moment has a name, which one.
+    static func roomReminderBody(prompt: String?) -> String {
+        guard let prompt, !prompt.isEmpty else {
+            return lang == .chinese ? "房间在等你拍一段" : "Your room is waiting for a clip"
+        }
+        return lang == .chinese ? "\(prompt) — 来拍一段" : "\(prompt) — film a clip"
+    }
+
     /// Whether anyone else showed up. Four sentences rather than a count,
     /// because "2 filmed" answers none of the four things a room is actually
     /// being asked: who's here, whether they've filmed, whether I have, and
@@ -1522,9 +1554,6 @@ enum Strings {
     static var chatSignInToJoin: String {
         lang == .chinese ? "登录并加入房间后才能聊天。" : "Sign in and join the room to chat."
     }
-    static func chatMomentNumbered(_ day: Int) -> String {
-        lang == .chinese ? "第 \(day) 个瞬间" : "Moment \(day)"
-    }
     static var chatLocalDemoBanner: String {
         lang == .chinese ? "本地演示 · 不会发送给朋友" : "Local demo · Nothing is sent to friends"
     }
@@ -1532,9 +1561,15 @@ enum Strings {
         lang == .chinese ? "在这里聊聊今天拍的" : "Talk about your story here"
     }
     static var chatTitle: String { lang == .chinese ? "房间聊天" : "Room chat" }
-    static var chatDemoTitle: String { lang == .chinese ? "聊天演示" : "Chat demo" }
-    static var chatDemoButton: String { lang == .chinese ? "演示" : "Demo" }
-    static var chatExitDemo: String { lang == .chinese ? "退出演示" : "Exit demo" }
+    /// A clip somebody put in the room, as a line in the chat. The chat used
+    /// to be words only, so the one thing a room exists for — somebody filmed
+    /// something — never appeared in the place people talk about it. Built on
+    /// the phone from the room's clips (`RoomChatTimeline`), not sent.
+    static func chatClipEvent(name: String, moment: String?) -> String {
+        let base = lang == .chinese ? "\(name) 拍了一段" : "\(name) filmed a clip"
+        guard let moment, !moment.isEmpty else { return base }
+        return "\(base) · \(moment)"
+    }
     static var chatDeleteTitle: String { lang == .chinese ? "删除这条消息？" : "Delete this message?" }
     static var chatDeleteMessage: String { lang == .chinese ? "删除消息" : "Delete message" }
     static var chatDeleteForEveryone: String {

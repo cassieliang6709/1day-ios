@@ -33,13 +33,14 @@ struct RoomChatView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppLanguage.storageKey) private var language: AppLanguage = .system
 
-    /// The moment's own prompt, so a quote can say 「第 2 个瞬间 · 咖啡」 rather
-    /// than just a number. Nil for a record-by-time story, which has no prompts.
+    /// The moment's own name, so a quote can say 「咖啡」. Nil when it has
+    /// none — a record-by-time story, or a room whose moments were never
+    /// named. Chat only exists in a room, and a room doesn't number its days
+    /// or moments on screen any more (1.5), so there is no 「第 2 个瞬间」 to
+    /// fall back to.
     private func momentTitle(_ day: Int) -> String? {
-        guard let challenge = store.challenge(challengeID), !challenge.isTimeOnly else {
-            return nil
-        }
-        return ChallengePresenter(challenge: challenge).title(forSlot: day)
+        guard let challenge = store.challenge(challengeID) else { return nil }
+        return ChallengePresenter(challenge: challenge).momentName(forSlot: day)
     }
 
     /// The moment's reactions, above the thread.
@@ -68,6 +69,10 @@ struct RoomChatView: View {
                     authorName: me.displayName,
                     moment: moment,
                     source: sessionSource,
+                    clips: RoomChatTimeline.clipEvents(
+                        from: store.recordedClips(for: challengeID),
+                        myID: me.id,
+                        momentTitle: momentTitle),
                     momentTitle: momentTitle,
                     onOpenMoment: onOpenMoment)
                     .id("\(sessionSource.identity):\(me.id):\(code)")
@@ -81,22 +86,15 @@ struct RoomChatView: View {
     }
 }
 
-#if DEBUG || LOCAL_ROOM_CHAT_DEMO
-@MainActor
-struct RoomChatDemoView: View {
-    let chinese: Bool
-
-    var body: some View {
-        LocalRoomDemoView(chinese: chinese)
-    }
-}
-#endif
-
 private struct RoomChatConversation: View {
     @StateObject private var session: RoomChatSession
     private let authorName: String
     private let preview: RoomChatDemoTransport?
-    @State private var showDemo = false
+    /// The room's clips, threaded between the messages by time.
+    private let clips: [RoomChatClipEvent]
+    /// A clip being watched from here, when the host gave no way to open its
+    /// moment (the chat opened from a clip's own player).
+    @State private var playing: RoomChatClipEvent?
     @State private var moment: Int?
     @State private var followsLatest = true
     @State private var deletionCandidate: UUID?
@@ -112,60 +110,59 @@ private struct RoomChatConversation: View {
         authorName: String,
         moment: Int?,
         source: RoomChatSessionSource,
+        clips: [RoomChatClipEvent] = [],
         momentTitle: @escaping (Int) -> String?,
         onOpenMoment: ((Int) -> Void)?
     ) {
         self.authorName = authorName
         self.preview = source.preview
+        self.clips = clips
         self.momentTitle = momentTitle
         self.onOpenMoment = onOpenMoment
         _moment = State(initialValue: moment)
         _session = StateObject(wrappedValue: source.makeSession(scope: scope))
     }
 
-    /// 「第 2 个瞬间 · 咖啡」, or just the number for a story without prompts.
-    /// The composer's band, where which moment a message gets *filed* under
-    /// is the point, so the number stays.
+    /// The composer's band and the quote inside a bubble both say the
+    /// moment's own name — 「咖啡」. They used to lead with 「第 2 个瞬间」,
+    /// and the quote fell back to it when there was no name; a room doesn't
+    /// number its moments on screen any more (1.5), so without a name it is
+    /// just 「这个瞬间」.
     private func momentLabel(_ day: Int) -> String {
-        let numbered = Strings.chatMomentNumbered(day)
-        guard let title = momentTitle(day), !title.isEmpty else { return numbered }
-        return "\(numbered) · \(MomentCatalog.localize(title))"
-    }
-
-    /// The quote inside a bubble: the moment's own name — 「咖啡」 — and the
-    /// number only when there is no name. In a thread, "第 3 个瞬间" made you
-    /// count down the timeline to find out what somebody meant.
-    private func quoteLabel(_ day: Int) -> String {
-        guard let title = momentTitle(day), !title.isEmpty else {
-            return Strings.chatMomentNumbered(day)
-        }
+        guard let title = momentTitle(day), !title.isEmpty else { return Strings.thisMoment }
         return MomentCatalog.localize(title)
     }
 
+    private func quoteLabel(_ day: Int) -> String { momentLabel(day) }
+
     private var entries: [RoomChatEntry] { session.state?.orderedEntries ?? [] }
+
+    /// What the thread shows: the messages, with the room's clips threaded in
+    /// by when they were filmed. See `RoomChatTimeline`.
+    private var items: [RoomChatItem] { RoomChatTimeline.merge(entries: entries, clips: clips) }
+
+    private var myAccountID: String { session.state?.scope.accountID ?? "" }
 
     /// My newest message — the only one whose "sending…" is worth a line.
     /// Every bubble used to end in 已发送 or 发送中, which in a normal thread
     /// is the same word under every message I wrote.
     private var myLatestID: UUID? { entries.last(where: isMine)?.id }
 
-    /// Whether to print the time above this message: the first one, and any
-    /// that comes after five minutes of quiet. A timestamp under every bubble
-    /// was the loudest thing in the thread and said the same minute ten
-    /// times.
-    private func startsNewTimeBlock(at index: Int) -> Bool {
+    /// Whether to print the time above this row: the first one, and any that
+    /// comes after five minutes of quiet. A timestamp under every bubble was
+    /// the loudest thing in the thread and said the same minute ten times.
+    private func startsNewTimeBlock(at index: Int, in items: [RoomChatItem]) -> Bool {
         guard index > 0 else { return true }
-        let gap = entries[index].message.createdAt
-            .timeIntervalSince(entries[index - 1].message.createdAt)
-        return gap > 5 * 60
+        return items[index].date.timeIntervalSince(items[index - 1].date) > 5 * 60
     }
 
-    /// The first of a run of messages from one other person — where their
-    /// face goes. Later bubbles in the run leave the space empty so the run
-    /// still lines up.
-    private func startsRun(at index: Int) -> Bool {
-        guard index > 0, !startsNewTimeBlock(at: index) else { return true }
-        return entries[index - 1].message.authorID != entries[index].message.authorID
+    /// The first of a run of rows from one other person — where their face
+    /// goes. Later bubbles in the run leave the space empty so the run still
+    /// lines up.
+    private func startsRun(at index: Int, in items: [RoomChatItem]) -> Bool {
+        guard index > 0, !startsNewTimeBlock(at: index, in: items) else { return true }
+        return items[index - 1].authorKey(myID: myAccountID)
+            != items[index].authorKey(myID: myAccountID)
     }
 
     var body: some View {
@@ -195,25 +192,33 @@ private struct RoomChatConversation: View {
                     .background(Color.oneDayAmber.opacity(0.16))
                 }
                 ScrollViewReader { proxy in
+                    let rows = items
+                    let entryIndex = Dictionary(
+                        uniqueKeysWithValues: entries.enumerated().map { ($1.id, $0) })
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            if entries.isEmpty {
+                            if rows.isEmpty {
                                 Text(Strings.chatEmpty)
                                     .font(.system(size: 14.5, weight: .medium, design: .rounded))
                                     .foregroundStyle(OneDay.inkSoft)
                                     .padding(.top, 48)
                             }
-                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                                 VStack(spacing: 10) {
-                                    if startsNewTimeBlock(at: index) {
-                                        timeSeparator(entry.message.createdAt)
+                                    if startsNewTimeBlock(at: index, in: rows) {
+                                        timeSeparator(item.date)
                                     }
-                                    bubble(
-                                        entry,
-                                        namesAuthor: namesAuthor(at: index),
-                                        startsRun: startsRun(at: index))
+                                    switch item {
+                                    case .message(let entry):
+                                        bubble(
+                                            entry,
+                                            namesAuthor: entryIndex[entry.id].map { namesAuthor(at: $0) } ?? false,
+                                            startsRun: startsRun(at: index, in: rows))
+                                    case .clip(let event):
+                                        clipRow(event)
+                                    }
                                 }
-                                .id(entry.id)
+                                .id(item.id)
                             }
                             Color.clear.frame(height: 1).id("latest")
                                 .onAppear { followsLatest = true }
@@ -222,7 +227,7 @@ private struct RoomChatConversation: View {
                     }
                     .defaultScrollAnchor(.bottom)
                     .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: entries.count) { _, _ in
+                    .onChange(of: items.count) { _, _ in
                         if followsLatest { proxy.scrollTo("latest", anchor: .bottom) }
                     }
                 }
@@ -233,24 +238,21 @@ private struct RoomChatConversation: View {
             // grey, which is why the one input on the page was the hardest
             // thing on it to find.
             .background(OneDayCanvas(seed: 4))
-            .navigationTitle(preview == nil ? Strings.chatTitle : Strings.chatDemoTitle)
+            // No 演示 button and no 聊天演示 title any more. The demo was a
+            // second, local sample room opened from inside a real room's chat
+            // — in a Debug build that is every build the owner runs, so it sat
+            // in the top-left of every real conversation. The local sample
+            // still exists (home screen, behind `-demoEntries`), and inside it
+            // this screen is the real one with a banner, not a different mode.
+            .navigationTitle(Strings.chatTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                if preview == nil {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(Strings.chatDemoButton) { showDemo = true }
-                    }
-                }
-                #endif
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(preview == nil ? Strings.done : Strings.chatExitDemo) { dismiss() }
+                    Button(Strings.done) { dismiss() }
                 }
             }
-            .sheet(isPresented: $showDemo) {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                RoomChatDemoView(chinese: language.resolved == .chinese)
-                #endif
+            .fullScreenCover(item: $playing) { event in
+                clipPlayer(event)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { composer }
             .confirmationDialog(Strings.chatDeleteTitle, isPresented: Binding(
@@ -377,6 +379,97 @@ private struct RoomChatConversation: View {
                 if mine { deliveryLine(entry) }
             }
             if !mine { Spacer(minLength: 40) }
+        }
+    }
+
+    private static let clipThumbSize = CGSize(width: 116, height: 154)
+
+    /// A clip in the thread: who filmed it (and the moment, when it has a
+    /// name) over a still of it with the time it was filmed. Mine on the
+    /// right and others on the left, like a message — it is the room's other
+    /// way of saying something. Every clip row carries its author's face,
+    /// because the line names them anyway and a clip is never a reply in a
+    /// run of chatter.
+    ///
+    /// Tapping plays it through the host's moment player when the chat was
+    /// opened from the room page (`onOpenMoment`), which is the same path a
+    /// tile on that page takes; opened from a clip's own player there is no
+    /// page to go back to, so it plays here.
+    private func clipRow(_ event: RoomChatClipEvent) -> some View {
+        let mine = event.isMine
+        return HStack(alignment: .top, spacing: 8) {
+            if mine {
+                Spacer(minLength: 40)
+            } else {
+                AvatarDot(name: event.authorName, size: Self.avatarSize)
+                    .frame(width: Self.avatarSize, height: Self.avatarSize)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: mine ? .trailing : .leading, spacing: 6) {
+                Text(Strings.chatClipEvent(name: event.authorName, moment: event.momentTitle))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(mine ? OneDay.inkSoft : Identity.tint(for: event.authorName))
+                    .lineLimit(2)
+                    .multilineTextAlignment(mine ? .trailing : .leading)
+                Button {
+                    if let onOpenMoment { onOpenMoment(event.day) } else { playing = event }
+                } label: {
+                    ClipThumbnail(url: event.url, refreshToken: event.recordedAt)
+                        .frame(width: Self.clipThumbSize.width, height: Self.clipThumbSize.height)
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, .clear, .black.opacity(0.5)],
+                                startPoint: .top, endPoint: .bottom)
+                        }
+                        .overlay {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        }
+                        .overlay(alignment: .bottomLeading) {
+                            Text(event.recordedAt.formatted(
+                                .dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                                .padding(9)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(OneDay.hairline, lineWidth: 1)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "\(Strings.chatClipEvent(name: event.authorName, moment: event.momentTitle)), "
+                        + event.recordedAt.formatted(date: .omitted, time: .shortened))
+                .accessibilityIdentifier("chat-clip")
+            }
+            if !mine { Spacer(minLength: 40) }
+        }
+    }
+
+    /// The clip on its own, full screen, with sound — the same looping player
+    /// the room page's tiles use.
+    private func clipPlayer(_ event: RoomChatClipEvent) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            LoopingClipPlayer(url: event.url, refreshToken: event.recordedAt)
+                .aspectRatio(9 / 16, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Button { playing = nil } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel(Strings.done)
+            .padding(16)
         }
     }
 

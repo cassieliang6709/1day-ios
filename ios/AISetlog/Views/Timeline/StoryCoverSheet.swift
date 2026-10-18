@@ -130,7 +130,11 @@ struct StoryCoverSheet: View {
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 13, style: .continuous))
                                 .overlay(alignment: .bottom) {
-                                    Text(presenter.title(forSlot: clip.day))
+                                    // A room's slots have no day number on
+                                    // screen (1.5): its name, or the time.
+                                    Text(presenter.slotLabel(forSlot: clip.day)
+                                        ?? clip.recordedAt?.formatted(date: .omitted, time: .shortened)
+                                        ?? "")
                                         .font(.system(
                                             size: 9, weight: .bold, design: .rounded))
                                         .foregroundStyle(.white)

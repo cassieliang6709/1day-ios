@@ -34,7 +34,6 @@ struct StoryTimelineView: View {
     /// The room whose code is being offered for sharing, once, right after it
     /// was made. See `RoomShareNudge`.
     @State private var nudgeShareCode: String?
-    @State private var showRoomDemo = false
     /// The beat between the last moment landing and the film assembling.
     @State private var celebrate = false
 
@@ -87,11 +86,6 @@ struct StoryTimelineView: View {
                     sheet = .moment(day: day)
                 }
             }
-        }
-        .sheet(isPresented: $showRoomDemo) {
-            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-            RoomChatDemoView(chinese: appLanguage.resolved == .chinese)
-            #endif
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
@@ -383,14 +377,11 @@ struct StoryTimelineView: View {
                 }
             }
 
+            // The 房间演示 item that used to open this menu is gone with the
+            // chat's 演示 button: both were a second door into the same local
+            // sample room, from inside a real one. The sample is still on the
+            // home screen behind `-demoEntries` (`PlansHomeView`).
             Menu {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                if challenge.isShared, previewMedia == nil {
-                    Button(appLanguage.resolved == .chinese ? "房间演示" : "Room demo", systemImage: "person.3.sequence") {
-                        showRoomDemo = true
-                    }
-                }
-                #endif
                 // Watching an unfinished day is a real thing to want — a friend
                 // who joins late can see it before filming — but it isn't the
                 // page's answer to "what now", so it stops being a button and
@@ -535,9 +526,9 @@ struct StoryTimelineView: View {
             RecordClipView(
                 day: day,
                 slotTitle: slotTitle(for: day),
-                momentCount: challenge?.cards.count ?? 0,
+                momentCount: momentCountOnScreen,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
-                showsPrompt: challenge?.isTimeOnly != true,
+                showsPrompt: showsPrompt(for: day),
                 orientation: challenge?.resolvedOrientation ?? .portrait,
                 lockedCamera: challenge?.cameraStyle
             ) { url, overlayText in
@@ -553,10 +544,10 @@ struct StoryTimelineView: View {
                 clips: slotClips,
                 day: day,
                 slotTitle: slotTitle(for: day),
-                momentCount: challenge?.cards.count ?? 0,
+                momentCount: momentCountOnScreen,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
                 challengeID: challengeID,
-                showsPrompt: challenge?.isTimeOnly != true,
+                showsPrompt: showsPrompt(for: day),
                 myID: account.account?.id ?? "local"
             ) {
                 sheet = nil
@@ -591,9 +582,28 @@ struct StoryTimelineView: View {
         }
     }
 
+    /// The slot's name as the camera and the player print it. In a shared
+    /// room that is a real name or nothing — a room doesn't number its days on
+    /// screen (1.5), and every one of these used to fall back to 「第 N 天」.
     private func slotTitle(for day: Int) -> String? {
         guard let challenge, !challenge.isTimeOnly else { return nil }
-        return ChallengePresenter(challenge: challenge).title(forSlot: day)
+        return ChallengePresenter(challenge: challenge).slotLabel(forSlot: day)
+    }
+
+    /// Whether the camera and the player put the moment's name on the frame.
+    /// A room slot with no name has nothing to print; without this the camera
+    /// stamped its fallback, 「这个瞬间」, over the picture.
+    private func showsPrompt(for day: Int) -> Bool {
+        guard let challenge, !challenge.isTimeOnly else { return false }
+        return !challenge.isShared || slotTitle(for: day) != nil
+    }
+
+    /// How many slots the camera's bars and the player's 「3 / 7」 chip count
+    /// out of. Zero in a room, which hides both: "3 of 7" is a day number by
+    /// another name.
+    private var momentCountOnScreen: Int {
+        guard let challenge else { return 0 }
+        return challenge.isShared ? 0 : challenge.cards.count
     }
 
     private func shareText(code: String, challenge: Challenge) -> String {

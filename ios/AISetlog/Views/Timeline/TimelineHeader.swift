@@ -20,13 +20,31 @@ struct TimelineHeader: View {
         VStack(alignment: .leading, spacing: 14) {
             title
 
-            if let cast, !cast.members.isEmpty {
-                RoomRoster(cast: cast)
+            if challenge.isShared, let cast {
+                roomLine(cast)
             }
+        }
+    }
 
-            if previewMedia == nil, challenge.isShared, let code = challenge.roomCode {
-                inviteCode(code)
-            }
+    /// 「2 人 · 邀请码 KPADC7」, one line, tap to copy the code.
+    ///
+    /// This was three: a row of faces with 「2 人在这个房间」, a sentence
+    /// about who had filmed and who the room was waiting on (`RoomRoster`),
+    /// and the invite code in its own capsule. The page under it is now a
+    /// column per person (`RoomFeed`) with their face, their name and how
+    /// many clips they have at the top — which says who's here and who has
+    /// filmed by showing it — so all the header still owes is the count and
+    /// the code. The local sample room has no real code to give out, so it
+    /// shows the count alone.
+    @ViewBuilder
+    private func roomLine(_ cast: RoomCast) -> some View {
+        let count = Text(Strings.roomPeopleCount(cast.members.count))
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(OneDay.inkSoft)
+        if previewMedia == nil, let code = challenge.roomCode {
+            inviteCode(code, leading: count)
+        } else {
+            count
         }
     }
 
@@ -62,13 +80,17 @@ struct TimelineHeader: View {
     /// Sharing used to mean opening a share sheet and pulling six characters
     /// out of a sentence — fine for iMessage, useless when you just want to
     /// read the code aloud. Tapping copies the bare code, not the blurb.
-    private func inviteCode(_ code: String) -> some View {
+    private func inviteCode(_ code: String, leading: Text) -> some View {
         Button {
             UIPasteboard.general.string = code
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(.easeOut(duration: 0.15)) { didCopyCode = true }
         } label: {
             HStack(spacing: 8) {
+                leading
+                Text("·")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.inkFaint)
                 Text(Strings.inviteCodeLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
@@ -77,6 +99,8 @@ struct TimelineHeader: View {
                     .font(.system(size: 15, weight: .heavy, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(OneDay.brandText)
+                    .lineLimit(1)
+                    .fixedSize()
 
                 Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 11, weight: .bold))
@@ -95,6 +119,7 @@ struct TimelineHeader: View {
             .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("room-header-code")
         .task(id: didCopyCode) {
             guard didCopyCode else { return }
             try? await Task.sleep(for: .seconds(1.6))

@@ -126,7 +126,15 @@ struct GeneratingFilm: View {
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(challenge.isTimeOnly
+                        // A room names the moment or, with no name, says
+                        // when it was filmed — never the 「第 N 天」 that
+                        // `clip.label` falls back to (see `StorySchedule`).
+                        Text(challenge.isShared && !challenge.isTimeOnly
+                            ? (presenter.momentName(forSlot: clip.day)
+                                ?? schedule.railCaption(forSlot: clip.day, recordedAt: clip.recordedAt)
+                                ?? schedule.railLabel(forSlot: clip.day, recordedAt: clip.recordedAt)
+                                ?? "")
+                            : challenge.isTimeOnly
                             ? (schedule.railLabel(
                                 forSlot: clip.day,
                                 recordedAt: clip.recordedAt) ?? Strings.timeOnlyMoment)
