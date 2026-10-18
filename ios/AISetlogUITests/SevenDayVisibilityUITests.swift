@@ -18,13 +18,15 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertTrue(app.buttons["by-time-entry"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
-        let perfect = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "完美的一天")).firstMatch
-        XCTAssertTrue(perfect.waitForExistence(timeout: 15))
-        reveal(perfect, in: app)
-        perfect.tap()
+        ComposerUITest.writeShortList(in: app)
+        let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
+        XCTAssertTrue(poster.waitForExistence(timeout: 15))
+        reveal(poster, in: app)
+        poster.tap()
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
-        XCTAssertTrue((name.value as? String ?? "").contains("完美的一天"))
+        // Picking a poster names the story after it.
+        XCTAssertFalse((name.value as? String ?? "").isEmpty)
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
     }

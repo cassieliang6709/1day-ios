@@ -68,7 +68,8 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         XCTAssertFalse(app.buttons["made-before"].exists)
-        XCTAssertTrue(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
+        // Templates belong to 写今天的清单; the default 按时间拍 shows none.
+        XCTAssertFalse(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
         // Who's filming and the camera are on the same page, with the one button.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["camera-option-film"].exists)

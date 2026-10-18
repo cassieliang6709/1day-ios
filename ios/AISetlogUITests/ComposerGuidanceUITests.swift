@@ -31,6 +31,7 @@ final class ComposerGuidanceUITests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
         // 1.5: the templates are a grid on the page, and the name field sits
         // on the same page below them.
+        ComposerUITest.writeShortList(in: app)
         let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
         XCTAssertTrue(poster.waitForExistence(timeout: 15))
         poster.tap()
