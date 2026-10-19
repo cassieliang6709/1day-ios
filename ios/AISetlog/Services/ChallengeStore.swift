@@ -268,7 +268,7 @@ final class ChallengeStore {
     @discardableResult
     func joinRoom(code: String) async throws -> Challenge {
         guard effects.allowsCloudRoomManagement else { throw IsolationError.cloudRoomManagementDisabled }
-        guard account?.account != nil else { throw RoomError.notSignedIn }
+        guard let me = account?.account else { throw RoomError.notSignedIn }
         let normalized = InviteCode.normalize(code)
         // Already joined? Jump to it.
         if let existing = challenges.first(where: { $0.roomCode == normalized }) {
@@ -282,7 +282,7 @@ final class ChallengeStore {
         guard InviteCode.isValid(normalized) else {
             throw CloudKitService.CKServiceError.roomNotFound
         }
-        let room = try await CloudKitService.fetchRoom(code: normalized)
+        let room = try await roomSync.fetchRoom(code: normalized)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
@@ -293,6 +293,10 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
+        // Only once the room is really here: a code that found nothing never
+        // reaches this line, so it leaves no record behind.
+        await roomSync.recordMembership(
+            code: room.code, authorID: me.id, displayName: me.displayName)
         await syncRoom(challenge.id)
         return challenge
     }

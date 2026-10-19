@@ -32,7 +32,8 @@ final class JoinedRoomTests: XCTestCase {
                 try? await CloudKitService.deleteMyRoomData(
                     authorID: id,
                     clips: (1...3).map { (code: code, day: $0) },
-                    reactions: [], commentIDs: [], roomCodes: [code])
+                    reactions: [], commentIDs: [], roomCodes: [code],
+                    otherRecordNames: [CloudKitService.memberRecordName(code: code, authorID: id)])
             }
         }
         UserDefaults.standard.removeObject(forKey: "account.v1")

@@ -150,6 +150,24 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertEqual(names, names.sorted())
     }
 
+    /// Joining a room leaves a `Member` record under my name. It is mine, so
+    /// deleting the account deletes it — and it goes to CloudKit with the rest.
+    func testDeletingMyAccountDeletesMyMemberRecord() async throws {
+        let store = try makeStore()
+        let me = try XCTUnwrap(store.account?.account?.id)
+        let member = CloudKitService.memberRecordName(code: "ROOM01", authorID: me)
+        XCTAssertTrue(AccountDeletionService.inventory(of: store, authorID: me).contains(member))
+
+        var deleted: Set<String> = []
+        let service = AccountDeletionService(
+            store: store, journalURL: journalURL,
+            deleteRecords: { batch in deleted.formUnion(batch); return batch })
+        let gone = await service.run()
+
+        XCTAssertTrue(gone)
+        XCTAssertTrue(deleted.contains(member), "my Member record was left in the room: \(deleted)")
+    }
+
     // MARK: - Fixtures
 
     private func makeStore(

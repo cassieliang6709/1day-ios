@@ -128,6 +128,25 @@ final class RoomSyncService {
         try? await transport.deleteComment(id)
     }
 
+    /// The room behind a join code. Errors pass through untouched: they are
+    /// what the join sheet shows.
+    @MainActor
+    func fetchRoom(code: String) async throws -> CloudKitService.RemoteRoom {
+        try await transport.fetchRoom(code)
+    }
+
+    /// Leave a `Member` record saying I joined. Failure is logged and
+    /// swallowed: the room is already mine on this device, and the record is
+    /// bookkeeping, not what lets me in.
+    @MainActor
+    func recordMembership(code: String, authorID: String, displayName: String, joinedAt: Date = .now) async {
+        do {
+            try await transport.saveMember(code, authorID, displayName, joinedAt)
+        } catch {
+            print("[room] member record failed: \(error)")
+        }
+    }
+
     func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async {
         try? await transport.sendPoke(code, authorID, authorName, targetAuthorID)
     }

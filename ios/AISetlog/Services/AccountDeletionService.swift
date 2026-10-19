@@ -150,6 +150,9 @@ final class AccountDeletionService {
         var names: Set<String> = []
         for challenge in store.challenges {
             guard let code = challenge.roomCode else { continue }
+            // Written on join. A room I created has none, and deleting a
+            // record that isn't there counts as done.
+            names.insert(CloudKitService.memberRecordName(code: code, authorID: authorID))
             for card in challenge.cards {
                 names.insert(CloudKitService.clipRecordName(
                     code: code, authorID: authorID, day: card.day))

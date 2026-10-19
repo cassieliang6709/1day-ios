@@ -10,6 +10,8 @@ import CloudKit
 ///   person's first take of a moment; every later take gets its own record,
 ///   `code_author_dayN_<takeID>`, so filming again adds instead of overwriting.
 ///   Video travels as a CKAsset.
+/// - `Member` record: recordName is `code_authorID`, written when someone
+///   joins by code; joining again rewrites the same record.
 ///
 /// Public DB requires the device be signed into iCloud (checked up front).
 enum CloudKitService {
@@ -205,6 +207,35 @@ enum CloudKitService {
             momentTitles: (r["momentTitles"] as? String)?
                 .split(separator: "\n", omittingEmptySubsequences: false)
                 .map(String.init))
+    }
+
+    // MARK: - Members
+
+    /// One person's place in a room, written when they join by code.
+    ///
+    /// Deterministic (`code_authorID`) for the same reason clip names are:
+    /// joining again — a second device, a reinstall, a retry — rewrites the
+    /// one record instead of adding another, and account deletion can name
+    /// it without a query.
+    static func memberRecordName(code: String, authorID: String) -> String {
+        "\(code)_\(authorID)"
+    }
+
+    /// Upsert my `Member` record for a room. `joinedAt` is the latest join:
+    /// joining again overwrites it.
+    static func saveMember(
+        code: String, authorID: String, displayName: String, joinedAt: Date
+    ) async throws {
+        try await ensureAccountAvailable()
+        let record = CKRecord(
+            recordType: "Member",
+            recordID: .init(recordName: memberRecordName(code: code, authorID: authorID)))
+        record["roomCode"] = code as CKRecordValue
+        record["userID"] = authorID as CKRecordValue
+        record["displayName"] = displayName as CKRecordValue
+        record["joinedAt"] = joinedAt as CKRecordValue
+        try await upsert(record)
+        print("[room] saved member code=\(code)")
     }
 
     // MARK: - Clips
