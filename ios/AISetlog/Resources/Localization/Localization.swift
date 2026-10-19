@@ -1020,13 +1020,17 @@ enum Strings {
     static var startTodaysStory: String {
         lang == .chinese ? "今天想拍什么" : "What to film today"
     }
-    static var noStoryTitle: String {
-        lang == .chinese ? "今天还没有选题" : "No story yet today"
-    }
-    static var noStoryBody: String {
+    /// 我的 before anything is filmed: three plain lines on how the app
+    /// works, in place of the 今天还没有选题 card and its buttons (1.5).
+    static var guideTitle: String { lang == .chinese ? "怎么用 1Day" : "How 1Day works" }
+    static var guideSteps: [String] {
         lang == .chinese
-            ? "选一种心情，拍下几个小瞬间，1Day 会把它们变成一部影片。"
-            : "Pick a mood, film a few tiny moments, and 1Day turns them into one film."
+            ? ["点下面的相机，随手拍几秒。",
+               "拍的都在「我的」，可以挑几段做成一支 vlog。",
+               "想和朋友一起拍，去「朋友」建一个房间，把邀请码发给他们。"]
+            : ["Tap the camera below and film a few seconds.",
+               "Everything you film lands in Mine — pick a few clips to make a vlog.",
+               "To film with friends, open a room in Friends and send them the code."]
     }
     static var sharedLabel: String { lang == .chinese ? "共享" : "Shared" }
     /// Chip-length moment count. `momentCount` is a full sentence and blows a

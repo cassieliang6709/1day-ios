@@ -743,39 +743,31 @@ struct PlansHomeView: View {
     }
 
     /// No active story: the mascot, one line of why, one button.
+    /// A first run: nothing filmed, no story. Plain text on how the app
+    /// works (1.5) — the old card with the mascot, 今天想拍什么 and 我有邀请码
+    /// was a second way to do what the camera and 朋友 already do.
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            OneDayBuddy(size: 76)
-                .padding(.top, 12)
-
-            VStack(spacing: 7) {
-                Text(Strings.noStoryTitle)
-                    .font(.system(size: 21, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                Text(Strings.noStoryBody)
-                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: Strings.guideTitle)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(Strings.guideSteps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.system(size: 14, weight: .heavy, design: .rounded))
+                            .foregroundStyle(OneDay.brandText)
+                            .monospacedDigit()
+                        Text(step)
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
-
-            Button(Strings.startTodaysStory) { onCompose() }
-                .buttonStyle(.primaryAction)
-                .padding(.top, 4)
-
-            // The empty state used to offer one door. Somebody whose first
-            // contact with 1Day is a friend's six-digit code had to find the
-            // icon in the header instead.
-            Button(Strings.haveInviteCode) {
-                joinCode = ""
-                showJoin = true
-            }
-            .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(OneDay.brandText)
-            .accessibilityIdentifier("empty-join-room")
         }
-        .padding(26)
-        .glassSurface(radius: OneDay.Radius.hero)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home-guide")
     }
 
     /// Everything that isn't today, newest day first. One label per day, then
