@@ -204,6 +204,11 @@ struct StoryRowCard: View {
     let coverURL: URL?
     var refreshToken: Date?
     var memberNames: [String] = []
+    /// 朋友's room list (1.5): everyone's faces, stacked, stand in for the
+    /// cover picture. A room is the people in it more than any one frame.
+    var showsMembersAsCover = false
+    /// Which of `memberNames` is me, so the stack can ring my own face.
+    var myName: String?
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     /// Same rule as the hero card: the row names today's moment, and says
@@ -213,7 +218,15 @@ struct StoryRowCard: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            thumbnail
+            if showsMembersAsCover {
+                // Nobody known yet (before the first sync): one blank face,
+                // which `AvatarDot` draws as the mascot.
+                AvatarStack(names: memberNames.isEmpty ? [""] : memberNames,
+                            maxShown: 4, size: 38, you: myName)
+                    .frame(minWidth: 58, minHeight: 66)
+            } else {
+                thumbnail
+            }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(presenter.displayTitle)
@@ -241,7 +254,7 @@ struct StoryRowCard: View {
 
             Spacer(minLength: 4)
 
-            if memberNames.count > 1 {
+            if !showsMembersAsCover, memberNames.count > 1 {
                 AvatarStack(names: memberNames, maxShown: 3, size: 24)
             }
 

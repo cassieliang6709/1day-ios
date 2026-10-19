@@ -352,7 +352,7 @@ struct PlansHomeView: View {
                     // gets made.
                     LazyVStack(alignment: .leading, spacing: 9) {
                         ForEach(sharedStories) { challenge in
-                            storyRow(challenge)
+                            storyRow(challenge, membersAsCover: true)
                         }
                     }
                 }
@@ -823,7 +823,9 @@ struct PlansHomeView: View {
         }
     }
 
-    private func storyRow(_ challenge: Challenge) -> some View {
+    /// `membersAsCover`: 朋友's room list shows the room's faces instead of
+    /// a cover picture (1.5).
+    private func storyRow(_ challenge: Challenge, membersAsCover: Bool = false) -> some View {
         let state = cardState(for: challenge)
         return Button {
             path.append(challenge.id)
@@ -833,7 +835,9 @@ struct PlansHomeView: View {
                 progress: state.progress,
                 coverURL: state.coverURL,
                 refreshToken: state.refreshToken,
-                memberNames: store.members(for: challenge.id).map(\.name))
+                memberNames: store.members(for: challenge.id).map(\.name),
+                showsMembersAsCover: membersAsCover,
+                myName: account.account?.displayName)
         }
         .buttonStyle(.plain)
         .contextMenu {

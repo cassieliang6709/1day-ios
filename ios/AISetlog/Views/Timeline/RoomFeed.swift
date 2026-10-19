@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// Not on screen for now: the room page draws `RoomFrames` (one big frame per
+/// person, stacked) instead. Kept, not deleted — the column layout may come
+/// back, and `RoomFeed.columns` is still the rule `RoomFrames` orders people by.
+///
 /// A shared room as one column per person (1.5) — me first, then everyone
 /// else — each column holding *all* of that person's clips, newest at the top.
 ///

@@ -31,6 +31,8 @@ struct StoryTimelineView: View {
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
+    /// The person whose page is open, from the face on their frame.
+    @State private var personPage: String?
     /// The room whose code is being offered for sharing, once, right after it
     /// was made. See `RoomShareNudge`.
     @State private var nudgeShareCode: String?
@@ -186,24 +188,119 @@ struct StoryTimelineView: View {
         let myID = account.account?.id ?? RoomProgress.soloAuthorID
         let agenda = StoryAgenda(momentCount: challenge.cards.count, clips: clips, myID: myID)
 
-        return ScrollView {
+        return Group {
+            if challenge.isShared {
+                roomPage(challenge, clips: clips, members: members, myID: myID, agenda: agenda)
+            } else {
+                storyPage(challenge, clips: clips, members: members, myID: myID, agenda: agenda)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            navBar(challenge, agenda: agenda, clipCount: clips.count)
+        }
+        // The floating tab bar is drawn over the whole stack, so the page
+        // reserves its own clearance rather than inheriting one.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: OneDay.tabBarClearance)
+        }
+        .sensoryFeedback(.success, trigger: challenge.recordedCount)
+        .refreshable {
+            if challenge.isShared { await store.syncRoom(challengeID) }
+        }
+        .task(id: challengeID) {
+            offerShareIfRoomIsStillEmpty()
+            guard challenge.isShared else { return }
+            while !Task.isCancelled {
+                await store.syncRoom(challengeID)
+                do { try await Task.sleep(for: .seconds(10)) } catch { break }
+            }
+        }
+        .navigationDestination(item: $personPage) { id in
+            if let column = RoomFeed.columns(clips: clips, members: members, myID: myID)
+                .first(where: { $0.id == id }) {
+                RoomPersonPage(
+                    column: column,
+                    slotTitle: { slotTitle(for: $0) },
+                    onPlay: { clip in sheet = .moment(day: clip.day) })
+            }
+        }
+        .confirmationDialog(
+            Strings.sendTheCodeTitle,
+            isPresented: Binding(
+                get: { nudgeShareCode != nil },
+                set: { if !$0 { nudgeShareCode = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let code = nudgeShareCode {
+                // A `ShareLink` inside the dialog rather than a button that
+                // opens a second sheet: one tap from "yes" to the share sheet.
+                // A bare `ShareLink`, not `RoomInviteShareLink`: a dialog's
+                // actions are matched by type, and a wrapper view risks being
+                // dropped. Same card, same message.
+                let card = RoomInviteCardImage(content: RoomInviteCardContent(
+                    challenge: challenge, inviter: account.account?.displayName))
+                ShareLink(
+                    item: card,
+                    subject: Text(card.content.headline),
+                    message: Text(shareText(code: code, challenge: challenge)),
+                    preview: SharePreview(card.content.headline, image: card),
+                    label: { Text(Strings.sendTheCodeNow) })
+            }
+            Button(Strings.sendTheCodeLater, role: .cancel) {}
+        }
+    }
+
+    /// A shared room (1.5): the name, then one big frame per person filling
+    /// the rest of the screen — see `RoomFrames`. The column layout,
+    /// `RoomFeed`, is kept but not drawn. 生成 vlog and 聊天 are icons in the
+    /// nav bar now, so the frames get the height.
+    private func roomPage(
+        _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
+        myID: String, agenda: StoryAgenda
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            TimelineHeader(
+                challenge: challenge,
+                isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
+
+            RoomFrames(
+                clips: clips,
+                members: members,
+                myID: myID,
+                nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                slotTitle: { slotTitle(for: $0) },
+                // Opens the moment, as the columns did. The tapped clip is
+                // passed whole so the player can be changed to open it alone.
+                onPlay: { clip in sheet = .moment(day: clip.day) },
+                onFilm: { day in sheet = .record(day: day) },
+                onOpenPerson: { column in personPage = column.id },
+                hasPoked: { id in
+                    store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                },
+                onPoke: { id in
+                    store.poke(challengeID: challengeID, targetAuthorID: id)
+                })
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 12)
+    }
+
+    private func storyPage(
+        _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
+        myID: String, agenda: StoryAgenda
+    ) -> some View {
+        ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 TimelineHeader(
                     challenge: challenge,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
 
-                // A shared room is a feed now (1.5, after Setlog) — no
-                // progress bar of slots, which is the planning view.
-                if !challenge.isShared {
-                    StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
-                }
+                StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
 
-                // A room gets its two actions side by side (1.5): the film on
-                // the left, the chat on the right. A solo story keeps the
-                // film card, once, when it's the whole answer.
-                if challenge.isShared {
-                    roomActions(hasClips: !clips.isEmpty)
-                } else if agenda.isComplete {
+                // A solo story keeps the film card, once, when it's the whole
+                // answer.
+                if agenda.isComplete {
                     FilmReadyCard(momentCount: agenda.total) { showFilm = true }
                 }
 
@@ -227,35 +324,7 @@ struct StoryTimelineView: View {
                 // as a page in the day. In a shared room it is the whole moment
                 // with everyone stacked in it, which isn't a page — that's what
                 // `.moment` is for.
-                if challenge.isShared {
-                    RoomFeed(
-                        challenge: challenge,
-                        clips: clips,
-                        members: members,
-                        myID: myID,
-                        nextToFilm: agenda.suggested ?? agenda.openToMe.first,
-                        slotTitle: { slotTitle(for: $0) },
-                        isLiked: { clip in
-                            store.interactions(
-                                for: challengeID, day: clip.day,
-                                targetAuthorID: clip.authorID ?? "")
-                                .reactions.contains { $0.authorID == myID && $0.emoji == "❤️" }
-                        },
-                        onPlay: { day in sheet = .moment(day: day) },
-                        onFilm: { day in sheet = .record(day: day) },
-                        onLike: { clip in
-                            store.toggleReaction(
-                                "❤️", day: clip.day, challengeID: challengeID,
-                                targetAuthorID: clip.authorID ?? "")
-                        },
-                        onReply: { _ in showRoomChat = true },
-                        hasPoked: { id in
-                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                        },
-                        onPoke: { id in
-                            store.poke(challengeID: challengeID, targetAuthorID: id)
-                        })
-                } else if challenge.isTimeOnly {
+                if challenge.isTimeOnly {
                     MomentFilmstrip(
                         challenge: challenge,
                         clips: clips,
@@ -289,50 +358,6 @@ struct StoryTimelineView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            navBar(challenge, agenda: agenda, clipCount: clips.count)
-        }
-        // The floating tab bar is drawn over the whole stack, so the scroll
-        // view reserves its own clearance rather than inheriting one.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: OneDay.tabBarClearance)
-        }
-        .sensoryFeedback(.success, trigger: challenge.recordedCount)
-        .refreshable {
-            if challenge.isShared { await store.syncRoom(challengeID) }
-        }
-        .task(id: challengeID) {
-            offerShareIfRoomIsStillEmpty()
-            guard challenge.isShared else { return }
-            while !Task.isCancelled {
-                await store.syncRoom(challengeID)
-                do { try await Task.sleep(for: .seconds(10)) } catch { break }
-            }
-        }
-        .confirmationDialog(
-            Strings.sendTheCodeTitle,
-            isPresented: Binding(
-                get: { nudgeShareCode != nil },
-                set: { if !$0 { nudgeShareCode = nil } }),
-            titleVisibility: .visible
-        ) {
-            if let code = nudgeShareCode {
-                // A `ShareLink` inside the dialog rather than a button that
-                // opens a second sheet: one tap from "yes" to the share sheet.
-                // A bare `ShareLink`, not `RoomInviteShareLink`: a dialog's
-                // actions are matched by type, and a wrapper view risks being
-                // dropped. Same card, same message.
-                let card = RoomInviteCardImage(content: RoomInviteCardContent(
-                    challenge: challenge, inviter: account.account?.displayName))
-                ShareLink(
-                    item: card,
-                    subject: Text(card.content.headline),
-                    message: Text(shareText(code: code, challenge: challenge)),
-                    preview: SharePreview(card.content.headline, image: card),
-                    label: { Text(Strings.sendTheCodeNow) })
-            }
-            Button(Strings.sendTheCodeLater, role: .cancel) {}
-        }
     }
 
     /// Offer the code once, the first time you land on a room you own that
@@ -367,8 +392,24 @@ struct StoryTimelineView: View {
 
             Spacer()
 
-            // Chat moved down beside 生成 vlog in 1.5 (`roomActions`); invite
-            // stays up here.
+            // A room's two actions are icons up here (1.5), beside 邀请, so
+            // the frames below get the whole screen. Their identifiers are
+            // what the UI tests find them by.
+            if challenge.isShared {
+                IconBubble(systemName: "film.stack.fill", label: Strings.makeRoomVlog) {
+                    showFilm = true
+                }
+                .disabled(clipCount == 0)
+                .opacity(clipCount == 0 ? 0.5 : 1)
+                .accessibilityIdentifier("room-make-vlog")
+
+                IconBubble(systemName: "bubble.left.and.bubble.right.fill",
+                           label: Strings.chatLabel) {
+                    showRoomChat = true
+                }
+                .accessibilityIdentifier("room-chat")
+            }
+
             if challenge.isShared, let code = challenge.roomCode {
                 if previewMedia == nil {
                     RoomInviteShareLink(
@@ -458,44 +499,8 @@ struct StoryTimelineView: View {
         .padding(.vertical, 10)
     }
 
-    /// 生成 vlog and 聊天, same size, side by side. The film is filled and
-    /// leads; chat is the quieter of the two but just as big, since in a room
-    /// seeing what everyone is up to is half the point.
-    private func roomActions(hasClips: Bool) -> some View {
-        HStack(spacing: 10) {
-            Button { showFilm = true } label: {
-                Label(Strings.makeRoomVlog, systemImage: "film.stack.fill")
-                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.onBrand)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(OneDay.brandHorizontal,
-                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .oneDayGlow(strength: 0.5)
-            }
-            .buttonStyle(.plain)
-            .disabled(!hasClips)
-            .opacity(hasClips ? 1 : 0.5)
-            .accessibilityIdentifier("room-make-vlog")
-
-            Button { showRoomChat = true } label: {
-                Label(Strings.chatLabel, systemImage: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.brandText)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(OneDay.surface,
-                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(OneDay.hairline, lineWidth: 1))
-                    .oneDaySoftShadow(strength: 0.5)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("room-chat")
-        }
-    }
-
-    /// The glass pill both room actions in the bar are drawn in. At least
-    /// 44pt tall, so neither is a smaller target than the bubbles beside it.
+    /// The glass pill 邀请 is drawn in. At least 44pt tall, so it isn't a
+    /// smaller target than the bubbles beside it.
     private func roomCapsule(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.system(size: 13.5, weight: .bold, design: .rounded))
