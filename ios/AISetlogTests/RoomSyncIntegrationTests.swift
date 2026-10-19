@@ -67,7 +67,7 @@ final class RoomSyncIntegrationTests: XCTestCase {
             timeIntervalSince1970: (Date.now.timeIntervalSince1970 - 3_600).rounded(.down))
         try await CloudKitService.uploadClip(
             code: room.code, day: 1, authorID: hostID, authorName: "Test Host",
-            fileURL: hostClip, overlayText: "from the host", recordedAt: hostFilmedAt)
+            fileURL: hostClip, captions: .single("from the host"), recordedAt: hostFilmedAt)
         try await CloudKitService.uploadClip(
             code: room.code, day: 2, authorID: guestID, authorName: "Test Guest",
             fileURL: guestClip, recordedAt: .now)
@@ -121,7 +121,7 @@ final class RoomSyncIntegrationTests: XCTestCase {
             let clip = try XCTUnwrap(made)
             try await CloudKitService.uploadClip(
                 code: room.code, day: 1, authorID: hostID, authorName: "Test Host",
-                fileURL: clip, overlayText: "take \(take)", recordedAt: .now)
+                fileURL: clip, captions: .single("take \(take)"), recordedAt: .now)
         }
 
         let pulled = try await waitForClips(in: room.code, count: 1)

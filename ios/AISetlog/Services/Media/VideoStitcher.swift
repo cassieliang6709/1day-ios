@@ -106,8 +106,8 @@ enum VideoStitcher {
         let day: Int
         let label: String?
         let authorName: String?
-        let overlayText: String?
-        let captionSticker: CaptionSticker?
+        /// The clip's own words, every one of them, each burned where it was put.
+        let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
@@ -157,8 +157,8 @@ enum VideoStitcher {
         let day: Int
         let label: String?
         let authorName: String?
-        let overlayText: String?
-        let captionSticker: CaptionSticker?
+        /// The clip's own words, every one of them, each burned where it was put.
+        let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
@@ -204,8 +204,7 @@ enum VideoStitcher {
             let audioRange = audio == nil ? CMTimeRange.zero : try await audio!.load(.timeRange)
             loaded.append(LoadedClip(
                 day: clip.day, label: clip.label, authorName: clip.authorName,
-                overlayText: clip.overlayText,
-                captionSticker: clip.captionSticker,
+                captions: clip.captions,
                 recordedAt: clip.recordedAt,
                 emoji: clip.emoji, comments: clip.comments,
                 asset: asset, videoRange: videoRange, videoTrack: video,
@@ -490,8 +489,7 @@ enum VideoStitcher {
             let fadeSeconds = CMTimeGetSeconds(fade)
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
-                overlayText: p.clip.overlayText,
-                captionSticker: p.clip.captionSticker,
+                captions: p.clip.captions,
                 recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds,
@@ -607,10 +605,10 @@ enum VideoStitcher {
                     orientation: FriendsTogetherPlacement.orientation(
                         for: clip.preferredTransform)))
 
-                if let words = clip.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !words.isEmpty {
+                for caption in clip.captions {
+                    guard let words = caption.trimmedText else { continue }
                     authorCaptions.append(AuthorCaptionWindow(
-                        text: words, sticker: clip.captionSticker ?? .default, cell: cell,
+                        text: words, sticker: caption.placed, cell: cell,
                         start: CMTimeGetSeconds(cursor), end: CMTimeGetSeconds(end)))
                 }
 
@@ -643,8 +641,7 @@ enum VideoStitcher {
                 day: day,
                 label: clips.first?.label,
                 authorName: nil,
-                overlayText: nil,
-                captionSticker: nil,
+                captions: [],
                 recordedAt: clips.compactMap(\.recordedAt).max(),
                 emoji: clips.flatMap(\.emoji),
                 comments: clips.flatMap(\.comments),
@@ -1182,13 +1179,24 @@ enum VideoStitcher {
         duration: Double,
         edge: Double
     ) {
-        guard let rawText = caption.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !rawText.isEmpty else { return }
+        // Every caption on the clip, each where it was put, all over the same
+        // window: they were placed together on one frame, so they come and go
+        // together.
+        for line in caption.captions {
+            guard let rawText = line.trimmedText else { continue }
 
-        let text = captionLayer(
-            text: rawText, sticker: caption.captionSticker ?? .default,
-            in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
+            let text = captionLayer(
+                text: rawText, sticker: line.placed,
+                in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
 
+            addCaptionFade(text, for: caption, duration: duration, edge: edge)
+            parentLayer.addSublayer(text)
+        }
+    }
+
+    private static func addCaptionFade(
+        _ text: CALayer, for caption: CaptionWindow, duration: Double, edge: Double
+    ) {
         text.opacity = 0
         let anim = CAKeyframeAnimation(keyPath: "opacity")
         anim.values = [0, 1, 1, 0]
@@ -1198,8 +1206,6 @@ enum VideoStitcher {
         anim.isRemovedOnCompletion = false
         anim.fillMode = .both
         text.add(anim, forKey: "overlayTextWindow")
-
-        parentLayer.addSublayer(text)
     }
 
     private static func addStampDecor(

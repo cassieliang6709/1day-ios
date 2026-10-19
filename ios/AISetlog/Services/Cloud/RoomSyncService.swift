@@ -84,6 +84,17 @@ final class RoomSyncService {
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
                     fileURL: URL, overlayText: String?, recordedAt: Date,
                     takeID: UUID? = nil) async -> Bool {
+        await uploadClip(
+            code: code, day: day, authorID: authorID, authorName: authorName,
+            fileURL: fileURL, captions: .single(overlayText), recordedAt: recordedAt,
+            takeID: takeID)
+    }
+
+    /// Same, with every caption on the take.
+    @MainActor
+    func uploadClip(code: String, day: Int, authorID: String, authorName: String,
+                    fileURL: URL, captions: [Caption], recordedAt: Date,
+                    takeID: UUID? = nil) async -> Bool {
         // A skipped duplicate reports false: it put nothing up itself, and a
         // take it shadowed is picked up by the next sync's retry. Keyed by take
         // as well as moment: two takes of one moment are two uploads.
@@ -92,7 +103,7 @@ final class RoomSyncService {
         defer { uploading.remove(key) }
         do {
             try await transport.uploadClip(
-                code, day, authorID, authorName, fileURL, overlayText, recordedAt, takeID)
+                code, day, authorID, authorName, fileURL, captions, recordedAt, takeID)
             lastError[code] = nil
             return true
         } catch {
@@ -109,7 +120,21 @@ final class RoomSyncService {
     func updateClipCaption(
         code: String, day: Int, authorID: String, overlayText: String?, takeID: UUID? = nil
     ) async {
-        try? await transport.updateClipCaption(code, day, authorID, overlayText, takeID)
+        await updateClipCaption(
+            code: code, day: day, authorID: authorID, captions: .single(overlayText),
+            takeID: takeID)
+    }
+
+    /// Same, with every caption on the take.
+    @MainActor
+    func updateClipCaption(
+        code: String, day: Int, authorID: String, captions: [Caption], takeID: UUID? = nil
+    ) async {
+        do {
+            try await transport.updateClipCaption(code, day, authorID, captions, takeID)
+        } catch {
+            print("[room] caption update failed: \(error)")
+        }
     }
 
     func setReaction(code: String, day: Int, authorID: String, authorName: String,

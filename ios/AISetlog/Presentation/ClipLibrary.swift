@@ -100,7 +100,7 @@ struct ClipLibrary {
                 source: .draft(id: draft.id),
                 orientation: draft.orientation,
                 clip: DayClip(
-                    day: 1, url: url, overlayText: draft.overlayText,
+                    day: 1, url: url, captions: draft.captions,
                     recordedAt: draft.recordedAt, key: draft.id.uuidString)))
         }
         self.init(clips: all)
@@ -175,8 +175,8 @@ struct ClipLibrary {
                 let c = item.clip
                 return DayClip(
                     day: index + 1, url: c.url, authorName: c.authorName,
-                    authorID: c.authorID, label: nil, overlayText: c.overlayText,
-                    captionSticker: c.captionSticker, recordedAt: c.recordedAt,
+                    authorID: c.authorID, label: nil, captions: c.captions,
+                    recordedAt: c.recordedAt,
                     key: item.id)
             }
     }

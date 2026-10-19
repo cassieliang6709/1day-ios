@@ -47,16 +47,23 @@ struct StoryTimelineView: View {
         /// (`.replace`, the default) or 再拍一段 (`.append`).
         case record(day: Int, take: TakeTarget = .replace(nil))
         case preview(day: Int, authorID: String?)
-        /// The whole moment rather than one person's take — everyone who
-        /// filmed it, stacked. The grid opens this: a tile stands for the
-        /// moment, so it should show what the moment ends up looking like.
-        case moment(day: Int)
+        /// One person's one take, full screen, where its captions are edited.
+        /// Every tap on a clip in a room opens this. It replaced `.moment`,
+        /// which opened everybody's takes stitched together — a preview of
+        /// the film, where nothing could be changed.
+        case clip(day: Int, authorID: String?, takeID: UUID?)
+
+        /// The take a tile stands for.
+        static func open(_ clip: DayClip) -> TimelineSheet {
+            .clip(day: clip.day, authorID: clip.authorID, takeID: clip.takeID)
+        }
 
         var id: String {
             switch self {
             case .record(let day, _): "record-\(day)"
             case .preview(let day, let authorID): "preview-\(day)-\(authorID ?? "local")"
-            case .moment(let day): "moment-\(day)"
+            case .clip(let day, let authorID, let takeID):
+                "clip-\(day)-\(authorID ?? "local")-\(takeID?.uuidString ?? "1")"
             }
         }
     }
@@ -86,7 +93,7 @@ struct StoryTimelineView: View {
             RoomChatView(challengeID: challengeID) { day in
                 showRoomChat = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    sheet = .moment(day: day)
+                    sheet = .clip(day: day, authorID: nil, takeID: nil)
                 }
             }
         }
@@ -202,7 +209,7 @@ struct StoryTimelineView: View {
                 RoomPersonPage(
                     column: column,
                     slotTitle: { slotTitle(for: $0) },
-                    onPlay: { clip in sheet = .moment(day: clip.day) })
+                    onPlay: { clip in sheet = .open(clip) })
             }
         }
         .confirmationDialog(
@@ -250,9 +257,9 @@ struct StoryTimelineView: View {
                 myID: myID,
                 nextToFilm: agenda.suggested ?? agenda.openToMe.first,
                 slotTitle: { slotTitle(for: $0) },
-                // Opens the moment, as the columns did. The tapped clip is
-                // passed whole so the player can be changed to open it alone.
-                onPlay: { clip in sheet = .moment(day: clip.day) },
+                // Opens the tapped take alone, full screen, where its
+                // captions are edited.
+                onPlay: { clip in sheet = .open(clip) },
                 onFilm: { day in sheet = .record(day: day) },
                 onOpenPerson: { column in personPage = column.id },
                 hasPoked: { id in
@@ -300,9 +307,7 @@ struct StoryTimelineView: View {
                 // See `MomentTimeline` and `MomentFilmstrip`.
                 //
                 // A moment in a story only you filmed is one clip, so it opens
-                // as a page in the day. In a shared room it is the whole moment
-                // with everyone stacked in it, which isn't a page — that's what
-                // `.moment` is for.
+                // as a page in the day.
                 if challenge.isTimeOnly {
                     MomentFilmstrip(
                         challenge: challenge,
@@ -312,7 +317,7 @@ struct StoryTimelineView: View {
                         agenda: agenda,
                         onPlay: { day in
                             sheet = challenge.isShared
-                                ? .moment(day: day)
+                                ? .clip(day: day, authorID: nil, takeID: nil)
                                 : .preview(day: day, authorID: nil)
                         },
                         onFilm: { day in sheet = .record(day: day) })
@@ -325,7 +330,7 @@ struct StoryTimelineView: View {
                         agenda: agenda,
                         onPlay: { day in
                             sheet = challenge.isShared
-                                ? .moment(day: day)
+                                ? .clip(day: day, authorID: nil, takeID: nil)
                                 : .preview(day: day, authorID: nil)
                         },
                         onFilm: { day in sheet = .record(day: day) })
@@ -522,23 +527,8 @@ struct StoryTimelineView: View {
                 if !wasComplete, dayIsComplete { celebrateMyFinish() }
             }
 
-        case .moment(let day):
-            let slotClips = store.recordedClips(for: challengeID).filter { $0.day == day }
-            StitchedMomentPreview(
-                clips: slotClips,
-                day: day,
-                slotTitle: slotTitle(for: day),
-                momentCount: momentCountOnScreen,
-                clipLength: challenge?.resolvedClipLength ?? .tiny,
-                challengeID: challengeID,
-                showsPrompt: showsPrompt(for: day),
-                myID: account.account?.id ?? "local"
-            ) { take in
-                sheet = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    sheet = .record(day: day, take: take)
-                }
-            }
+        case .clip(let day, let targetAuthorID, let takeID):
+            clipReview(day: day, authorID: targetAuthorID, takeID: takeID)
 
         case .preview(let day, let targetAuthorID):
             // The tapped clip, on its own. The swipe that used to reach the
@@ -563,6 +553,35 @@ struct StoryTimelineView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// The full-screen editor on one take, with 重拍 and 再拍一段 wired back
+    /// to the camera.
+    @ViewBuilder
+    private func clipReview(day: Int, authorID: String?, takeID: UUID?) -> some View {
+        let deck = ClipDeck(
+            clips: store.recordedClips(for: challengeID),
+            momentCount: challenge?.cards.count ?? 0,
+            myID: account.account?.id ?? RoomProgress.soloAuthorID)
+        if let start = deck.index(ofDay: day, authorID: authorID, takeID: takeID) {
+            ClipDeckReview(
+                deck: deck,
+                challengeID: challengeID,
+                momentCount: momentCountOnScreen,
+                clipLength: challenge?.resolvedClipLength ?? .tiny,
+                showsPrompt: showsPrompt(for: day),
+                startIndex: start
+            ) { retakeDay, take in
+                sheet = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    sheet = .record(day: retakeDay, take: take)
+                }
+            }
+        } else {
+            // The take went away between the tap and the sheet (a sync, a
+            // delete). Something has to be on screen to close.
+            Color.black.ignoresSafeArea().onTapGesture { sheet = nil }
         }
     }
 

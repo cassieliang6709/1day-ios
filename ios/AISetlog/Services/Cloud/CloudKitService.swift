@@ -259,7 +259,22 @@ enum CloudKitService {
         /// Defaulted, so a fixture or a test that doesn't care about captions
         /// doesn't have to say so.
         var captionSticker: CaptionSticker? = nil
+        /// Every caption, as the newer phones write it (`Caption.cloudJSON`).
+        /// Nil on a record from 1.5 (31) or earlier, or one whose second save
+        /// didn't land — see `saveCaptionsJSON`.
+        var captionsJSON: String? = nil
+
+        /// What to draw: the full list when the record has one that still
+        /// agrees with `overlayText`, otherwise the one caption older phones
+        /// wrote. See `Caption.fromCloud`.
+        var captions: [Caption] {
+            Caption.fromCloud(json: captionsJSON, overlayText: overlayText, sticker: captionSticker)
+        }
     }
+
+    /// The `Clip` field that holds every caption as JSON. Added after 1.5 (31);
+    /// see docs/cloudkit-clip-captions-deploy.md.
+    static let captionsJSONField = "captionsJSON"
 
     /// Internal rather than private so the naming rule can be checked without a
     /// network: "writing this again is harmless" is only true while the same
@@ -292,18 +307,15 @@ enum CloudKitService {
     /// of the same take. A clip that isn't up yet is not an error — the next
     /// upload carries whatever the caption says by then.
     static func updateClipCaption(
-        code: String, day: Int, authorID: String, overlayText: String?, takeID: UUID? = nil
+        code: String, day: Int, authorID: String, captions: [Caption], takeID: UUID? = nil
     ) async throws {
         try await ensureAccountAvailable()
         let id = CKRecord.ID(recordName: clipRecordName(
             code: code, authorID: authorID, day: day, takeID: takeID))
         guard let record = try? await db.record(for: id) else { return }
-        if let overlayText, !overlayText.isEmpty {
-            record["overlayText"] = overlayText as CKRecordValue
-        } else {
-            record["overlayText"] = nil
-        }
-        _ = try await db.save(record)
+        writeFirstCaption(captions, to: record)
+        let saved = try await db.save(record)
+        await saveCaptionsJSON(captions, on: saved)
     }
 
     static func uploadClip(
@@ -312,7 +324,7 @@ enum CloudKitService {
         authorID: String,
         authorName: String,
         fileURL: URL,
-        overlayText: String? = nil,
+        captions: [Caption] = [],
         recordedAt: Date,
         takeID: UUID? = nil
     ) async throws {
@@ -340,16 +352,50 @@ enum CloudKitService {
         // moment the card is about.
         record["recordedAt"] = recordedAt as CKRecordValue
         record["video"] = CKAsset(fileURL: fileURL)
-        if let overlayText, !overlayText.isEmpty {
-            record["overlayText"] = overlayText as CKRecordValue
-        } else {
-            record["overlayText"] = nil
-        }
-        _ = try await db.save(record)
+        writeFirstCaption(captions, to: record)
+        let saved = try await db.save(record)
+        // After the clip is safely up, never as part of it: until the field is
+        // deployed to Production this save fails, and that must cost the
+        // extra captions, not the take.
+        await saveCaptionsJSON(captions, on: saved)
         // Diagnostic: the success half of `[room] upload failed`, so a clip a
         // friend says they can't see can be matched against what this phone
         // actually put up, and when it says the take was filmed.
         print("[room] uploaded clip code=\(code) day=\(day) recordedAt=\(recordedAt) take=\(takeID?.uuidString ?? "1")")
+    }
+
+    /// The part of a caption every version reads: the first caption's words in
+    /// `overlayText`, so 1.5 (31) keeps showing them.
+    ///
+    /// A `captionsJSON` already on the record is cleared here rather than in
+    /// the second save — the record has the field, so the schema has it, so
+    /// this can't fail for the reason the second save can. Left alone, an old
+    /// list would outlive the words it was written with.
+    private static func writeFirstCaption(_ captions: [Caption], to record: CKRecord) {
+        if let first = captions.firstText {
+            record["overlayText"] = first as CKRecordValue
+        } else {
+            record["overlayText"] = nil
+        }
+        if record[captionsJSONField] != nil {
+            record[captionsJSONField] = nil
+        }
+    }
+
+    /// Every caption, written as its own save after the clip's.
+    ///
+    /// Separate because `captionsJSON` is new: Debug and Release both talk to
+    /// Production, and until the field is deployed there CloudKit rejects any
+    /// save that sets it. Failing here only logs — the clip and its first
+    /// caption are already up, and readers fall back to `overlayText`.
+    private static func saveCaptionsJSON(_ captions: [Caption], on record: CKRecord) async {
+        guard let json = Caption.cloudJSON(captions) else { return }
+        record[captionsJSONField] = json as CKRecordValue
+        do {
+            _ = try await db.save(record)
+        } catch {
+            print("[room] captionsJSON save failed (field not deployed?): \(error)")
+        }
     }
 
     /// All clips in a room, downloaded to a local cache directory.
@@ -387,7 +433,8 @@ enum CloudKitService {
                 localURL: dest,
                 overlayText: record["overlayText"] as? String,
                 captionSticker: (record["captionSticker"] as? String)
-                    .flatMap(CaptionSticker.init(cloudValue:))))
+                    .flatMap(CaptionSticker.init(cloudValue:)),
+                captionsJSON: record[captionsJSONField] as? String))
         }
         return clips
     }

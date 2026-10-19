@@ -235,8 +235,59 @@ struct ClipTake: Codable, Identifiable, Equatable {
     let id: UUID
     var fileName: String
     var recordedAt: Date
-    var overlayText: String?
-    var captionSticker: CaptionSticker?
+    /// This take's words, in the order they were added. See `Caption`.
+    var captions: [Caption] = []
+
+    /// The first caption's words — what a take had before it could hold more
+    /// than one, and still what the room's `overlayText` field carries.
+    var overlayText: String? {
+        get { captions.firstText }
+        set { captions.setFirstText(newValue) }
+    }
+
+    /// The first caption's sticker.
+    var captionSticker: CaptionSticker? {
+        get { captions.first?.sticker }
+        set { captions.setFirstSticker(newValue) }
+    }
+
+    init(id: UUID, fileName: String, recordedAt: Date, captions: [Caption]) {
+        self.id = id
+        self.fileName = fileName
+        self.recordedAt = recordedAt
+        self.captions = captions
+    }
+
+    init(
+        id: UUID, fileName: String, recordedAt: Date,
+        overlayText: String?, captionSticker: CaptionSticker?
+    ) {
+        self.init(
+            id: id, fileName: fileName, recordedAt: recordedAt,
+            captions: .single(overlayText, sticker: captionSticker))
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, fileName, recordedAt, captions, overlayText, captionSticker
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        fileName = try c.decode(String.self, forKey: .fileName)
+        recordedAt = try c.decode(Date.self, forKey: .recordedAt)
+        captions = try Caption.decodeList(
+            c, list: .captions, text: .overlayText, sticker: .captionSticker)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(fileName, forKey: .fileName)
+        try c.encode(recordedAt, forKey: .recordedAt)
+        try Caption.encodeList(
+            captions, into: &c, list: .captions, text: .overlayText, sticker: .captionSticker)
+    }
 }
 
 struct DayCard: Codable, Identifiable {
@@ -245,10 +296,8 @@ struct DayCard: Codable, Identifiable {
     /// a moment only ever gains extra takes after it has a first one.
     var clipFileName: String?
     var recordedAt: Date?
-    var overlayText: String?
-    /// Where `overlayText` sits. Nil means nobody has moved it, which draws it
-    /// at `CaptionSticker.default`.
-    var captionSticker: CaptionSticker?
+    /// Take 1's words, in the order they were added. See `Caption`.
+    var captions: [Caption] = []
     var reactions: [ClipReaction] = []
     var comments: [ClipComment] = []
     /// Takes 2…n, oldest first. Reactions and comments stay on the card: they
@@ -257,12 +306,27 @@ struct DayCard: Codable, Identifiable {
 
     var id: Int { day }
 
+    /// The first caption's words — what a card held before it could hold more
+    /// than one, and still what the room's `overlayText` field carries.
+    var overlayText: String? {
+        get { captions.firstText }
+        set { captions.setFirstText(newValue) }
+    }
+
+    /// Where the first caption sits. Nil means nobody has moved it, which
+    /// draws it at `CaptionSticker.default`.
+    var captionSticker: CaptionSticker? {
+        get { captions.first?.sticker }
+        set { captions.setFirstSticker(newValue) }
+    }
+
     init(
         day: Int,
         clipFileName: String? = nil,
         recordedAt: Date? = nil,
         overlayText: String? = nil,
         captionSticker: CaptionSticker? = nil,
+        captions: [Caption]? = nil,
         reactions: [ClipReaction] = [],
         comments: [ClipComment] = [],
         moreTakes: [ClipTake] = []
@@ -270,8 +334,7 @@ struct DayCard: Codable, Identifiable {
         self.day = day
         self.clipFileName = clipFileName
         self.recordedAt = recordedAt
-        self.overlayText = overlayText
-        self.captionSticker = captionSticker
+        self.captions = captions ?? .single(overlayText, sticker: captionSticker)
         self.reactions = reactions
         self.comments = comments
         self.moreTakes = moreTakes
@@ -279,7 +342,7 @@ struct DayCard: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case day, clipFileName, recordedAt, overlayText, captionSticker, reactions, comments
-        case moreTakes
+        case moreTakes, captions
     }
 
     // Custom decode: synthesized Codable would throw on the reactions/comments
@@ -290,13 +353,28 @@ struct DayCard: Codable, Identifiable {
         day = try c.decode(Int.self, forKey: .day)
         clipFileName = try c.decodeIfPresent(String.self, forKey: .clipFileName)
         recordedAt = try c.decodeIfPresent(Date.self, forKey: .recordedAt)
-        overlayText = try c.decodeIfPresent(String.self, forKey: .overlayText)
-        captionSticker = try c.decodeIfPresent(CaptionSticker.self, forKey: .captionSticker)
+        // A card saved before a clip could hold more than one caption has
+        // `overlayText` + `captionSticker` and no `captions`: that is a list of
+        // one.
+        captions = try Caption.decodeList(
+            c, list: .captions, text: .overlayText, sticker: .captionSticker)
         reactions = try c.decodeIfPresent([ClipReaction].self, forKey: .reactions) ?? []
         comments = try c.decodeIfPresent([ClipComment].self, forKey: .comments) ?? []
         // Absent on every card saved before a moment could hold more than one
         // take — which is every card that exists today.
         moreTakes = try c.decodeIfPresent([ClipTake].self, forKey: .moreTakes) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(day, forKey: .day)
+        try c.encodeIfPresent(clipFileName, forKey: .clipFileName)
+        try c.encodeIfPresent(recordedAt, forKey: .recordedAt)
+        try Caption.encodeList(
+            captions, into: &c, list: .captions, text: .overlayText, sticker: .captionSticker)
+        try c.encode(reactions, forKey: .reactions)
+        try c.encode(comments, forKey: .comments)
+        try c.encode(moreTakes, forKey: .moreTakes)
     }
 
     enum Status: Equatable {

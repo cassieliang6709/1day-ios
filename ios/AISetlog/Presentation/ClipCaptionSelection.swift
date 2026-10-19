@@ -8,3 +8,14 @@ enum ClipCaptionSelection {
         return snapshotText
     }
 }
+
+extension ClipCaptionSelection {
+    /// The same rule for the whole list: my own live card wins on my own page,
+    /// and an empty list there means I deleted them, not that it's unknown.
+    static func captions(
+        isMine: Bool, hasLiveCard: Bool, live: [Caption], snapshot: [Caption]
+    ) -> [Caption] {
+        if isMine && hasLiveCard { return live }
+        return snapshot
+    }
+}

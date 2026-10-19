@@ -30,8 +30,8 @@ struct LibrarySection: View {
     @State private var month = Calendar.current.startOfMonth(for: .now)
     /// The draft whose 放进故事 / 删除 choice is up. See `draftActions`.
     @State private var activeDraft: ClipDraft?
-    /// The day being played after a tap on one of its clips.
-    @State private var playing: LibraryDayPlayback?
+    /// The clip open full screen after a tap on it.
+    @State private var playing: LibraryClip?
     /// What the player asked for, run once its sheet is gone: a second sheet
     /// can't come up while the first is still on screen.
     @State private var afterPlaying: (() -> Void)?
@@ -95,12 +95,13 @@ struct LibrarySection: View {
         }
         .onChange(of: draftsRequest) { _, _ in showDrafts() }
         .draftActions(for: $activeDraft, send: $sendDraft, delete: $deleteDraft)
-        .sheet(item: $playing, onDismiss: {
+        .fullScreenCover(item: $playing, onDismiss: {
             afterPlaying?()
             afterPlaying = nil
-        }) { playback in
-            LibraryDayPlayer(
-                playback: playback,
+        }) { clip in
+            LibraryClipEditor(
+                clip: clip,
+                draft: draft(for: clip),
                 onOpenStory: { id in finishPlaying { onOpenStory(id) } },
                 onSend: { draft in finishPlaying { sendDraft = draft } },
                 onDelete: { draft in finishPlaying { deleteDraft = draft } })
@@ -196,14 +197,16 @@ struct LibrarySection: View {
         }
     }
 
-    /// The tapped clip's day, oldest first, playing from the tapped one.
+    /// The tapped clip, on its own, full screen. It used to play the clip's
+    /// whole day in a row; what people tapped a clip for was that clip.
     private func play(from clip: LibraryClip) {
-        let day = Calendar.current.startOfDay(for: clip.recordedAt)
-        let clips = (dayGroups.first { $0.day == day }?.clips ?? [clip])
-            .sorted { $0.recordedAt < $1.recordedAt }
-        playing = LibraryDayPlayback(
-            day: day, clips: clips, start: clips.firstIndex(of: clip) ?? 0,
-            drafts: draftStore.sortedDrafts)
+        playing = clip
+    }
+
+    /// The `ClipDraft` behind a clip in no story.
+    private func draft(for clip: LibraryClip) -> ClipDraft? {
+        guard case .draft(let id) = clip.source else { return nil }
+        return draftStore.sortedDrafts.first { $0.id == id }
     }
 
     private func finishPlaying(_ next: @escaping () -> Void) {
@@ -514,244 +517,61 @@ extension Calendar {
     }
 }
 
-// MARK: - Day player
+// MARK: - One clip
 
-/// One day of 我的, handed to `LibraryDayPlayer`.
-struct LibraryDayPlayback: Identifiable {
-    let id = UUID()
-    let day: Date
-    /// Oldest first, the order the day happened in.
-    let clips: [LibraryClip]
-    let start: Int
-    /// To turn a draft clip back into the `ClipDraft` its actions need.
-    let drafts: [ClipDraft]
-
-    func draft(for clip: LibraryClip) -> ClipDraft? {
-        guard case .draft(let id) = clip.source else { return nil }
-        return drafts.first { $0.id == id }
-    }
-}
-
-/// Tapping a clip in 我的 shows that clip, looping, with the rest of its day a
-/// swipe (or an arrow) away — it doesn't move on by itself. The clip's caption
-/// sits on it and, for your own clips, 改字幕 edits it. Under it, what to do
-/// with the clip on screen: send a clip only you can see to a room or story,
-/// or open the story a clip is already in. Deleting sits in the ⋯ menu.
-struct LibraryDayPlayer: View {
-    let playback: LibraryDayPlayback
+/// A clip from 我的, in the same full-screen editor a room opens: the video
+/// edge to edge, its captions on it, and what to do with it underneath — send
+/// a clip only you can see to a story, or open the story a clip is already in.
+/// Deleting a draft sits in the ⋯ menu.
+struct LibraryClipEditor: View {
+    let clip: LibraryClip
+    let draft: ClipDraft?
     let onOpenStory: (UUID) -> Void
     let onSend: (ClipDraft) -> Void
     let onDelete: (ClipDraft) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var draftStore
-    @State private var index: Int
-    /// Captions edited here, by clip id, so the sheet shows the new words
-    /// without waiting for the page behind it to rebuild its snapshot.
-    @State private var editedCaptions: [String: String] = [:]
-    /// The clip open in the room's caption editor (`ClipPreviewView`).
-    @State private var editing: LibraryClip?
-
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-
-    init(
-        playback: LibraryDayPlayback,
-        onOpenStory: @escaping (UUID) -> Void,
-        onSend: @escaping (ClipDraft) -> Void,
-        onDelete: @escaping (ClipDraft) -> Void
-    ) {
-        self.playback = playback
-        self.onOpenStory = onOpenStory
-        self.onSend = onSend
-        self.onDelete = onDelete
-        _index = State(initialValue: playback.start)
-    }
-
-    private var clip: LibraryClip { playback.clips[index] }
-
-    private var caption: String {
-        editedCaptions[clip.id] ?? clip.clip.overlayText ?? ""
-    }
 
     var body: some View {
-        VStack(spacing: 12) {
-            header
-            player
-            captionRow
-            actions
-        }
-        .padding(.top, 18)
-        .padding(.bottom, 12)
-        .background(OneDay.canvas)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .fullScreenCover(item: $editing) { clip in captionEditor(clip) }
-    }
-
-    /// The same screen a room opens to caption a moment — type the words,
-    /// change the style, drag them — pointed at this clip. A clip only you can
-    /// see has no story card, so its words go back to the draft.
-    @ViewBuilder
-    private func captionEditor(_ clip: LibraryClip) -> some View {
         switch clip.source {
         case .story(let id, _, _):
             ClipPreviewView(
                 day: clip.clip.day,
+                slotTitle: clip.clip.label,
                 authorName: clip.authorName,
-                overlayText: clip.clip.overlayText,
-                captionSticker: clip.clip.captionSticker,
+                captions: clip.clip.captions,
+                showsPrompt: clip.clip.label != nil,
                 url: clip.url,
                 recordedAt: clip.recordedAt,
                 challengeID: id,
                 targetAuthorID: clip.clip.authorID,
-                onReRecord: nil)
-                .onDisappear { editedCaptions[clip.id] = storyCaption(clip, in: id) }
+                takeID: clip.clip.takeID,
+                onReRecord: nil,
+                extraActions: [.init(
+                    id: "library-day-open-story", symbol: "rectangle.stack",
+                    title: Strings.libraryOpenStory) { onOpenStory(id) }])
         case .draft(let id):
             ClipPreviewView(
                 day: 1,
-                overlayText: editedCaptions[clip.id] ?? clip.clip.overlayText,
+                captions: draft?.captions ?? clip.clip.captions,
+                showsPrompt: false,
                 url: clip.url,
                 recordedAt: clip.recordedAt,
                 onReRecord: nil,
-                onDraftCaption: { words in
-                    draftStore.updateOverlayText(words, draftID: id)
-                    editedCaptions[clip.id] = words ?? ""
-                })
+                onDraftCaptions: { draftStore.updateCaptions($0, draftID: id) },
+                extraActions: draftActions)
         }
     }
 
-    private func storyCaption(_ clip: LibraryClip, in story: UUID) -> String {
-        store.challenge(story)?.cards.first { $0.day == clip.clip.day }?.overlayText ?? ""
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(playback.day.formatted(
-                    .dateTime.month().day().weekday(.abbreviated).locale(AppLanguage.effective.locale)))
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                Text(["\(index + 1) / \(playback.clips.count)", sourceName]
-                    .compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(OneDay.inkSoft)
-            }
-            Spacer()
-            if let draft = playback.draft(for: clip) {
-                Menu {
-                    Button(Strings.deleteDraft, role: .destructive) { onDelete(draft) }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(OneDay.ink)
-                        .frame(width: 38, height: 38)
-                        .background(OneDay.surface, in: Circle())
-                }
-                .accessibilityIdentifier("library-day-more")
-            }
-            IconBubble(systemName: "xmark") { dismiss() }
-        }
-        .padding(.horizontal, 20)
-    }
-
-    /// The clip on screen, looping. Swiping sideways, or the arrows either
-    /// side, moves through the day; nothing advances on its own.
-    private var player: some View {
-        LoopingClipPlayer(url: clip.url, refreshToken: clip.recordedAt)
-            .id(clip.id)
-            .aspectRatio(3 / 4, contentMode: .fit)
-            .frame(maxHeight: 320)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(alignment: .bottom) {
-                if !caption.isEmpty {
-                    Text(caption)
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 14)
-                }
-            }
-            .overlay { arrows }
-            .onTapGesture { if clip.isMine { editing = clip } }
-            .gesture(
-                DragGesture(minimumDistance: 24).onEnded { value in
-                    if value.translation.width < -40 { step(1) }
-                    if value.translation.width > 40 { step(-1) }
-                })
-            .padding(.horizontal, 20)
-            .accessibilityIdentifier("library-day-player")
-    }
-
-    @ViewBuilder
-    private var arrows: some View {
-        if playback.clips.count > 1 {
-            HStack {
-                arrow("chevron.left", enabled: index > 0) { step(-1) }
-                Spacer()
-                arrow("chevron.right", enabled: index < playback.clips.count - 1) { step(1) }
-            }
-            .padding(.horizontal, 8)
-        }
-    }
-
-    private func arrow(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(.black.opacity(0.35), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .opacity(enabled ? 1 : 0)
-        .disabled(!enabled)
-    }
-
-    private func step(_ delta: Int) {
-        let next = index + delta
-        guard playback.clips.indices.contains(next) else { return }
-        withAnimation(OneDay.Motion.snap) { index = next }
-    }
-
-    /// 加字幕 / 改字幕, on your own clips only: a friend's words are theirs.
-    @ViewBuilder
-    private var captionRow: some View {
-        if clip.isMine {
-            Button { editing = clip } label: {
-                Label(caption.isEmpty ? Strings.libraryAddCaption : Strings.libraryEditCaption,
-                      systemImage: "character.cursor.ibeam")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.brandText)
-            }
-            .accessibilityIdentifier("library-day-caption")
-        }
-    }
-
-    /// The story the clip is in; nil for a draft, which is in none.
-    private var sourceName: String? {
-        switch clip.source {
-        case .story(_, let title, _): title
-        case .draft: nil
-        }
-    }
-
-    @ViewBuilder
-    private var actions: some View {
-        Group {
-            if let draft = playback.draft(for: clip) {
-                Button(Strings.libraryFileIntoStory) { onSend(draft) }
-                    .accessibilityIdentifier("library-day-send")
-            } else if let story = clip.storyID {
-                Button(Strings.libraryOpenStory) { onOpenStory(story) }
-                    .accessibilityIdentifier("library-day-open-story")
-            }
-        }
-        .buttonStyle(.primaryAction)
-        .padding(.horizontal, 20)
+    private var draftActions: [ClipPreviewView.ExtraAction] {
+        guard let draft else { return [] }
+        return [
+            .init(
+                id: "library-day-send", symbol: "tray.and.arrow.down",
+                title: Strings.libraryFileIntoStory) { onSend(draft) },
+            .init(
+                id: "library-day-delete", symbol: "trash",
+                title: Strings.deleteDraft, isDestructive: true) { onDelete(draft) },
+        ]
     }
 }

@@ -448,6 +448,55 @@ final class RoomUploadRetryTests: XCTestCase {
             [CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1, takeID: local),
              remoteOnly].sorted())
     }
+
+    // MARK: - Several captions
+
+    private var twoCaptions: [Caption] {
+        [Caption(text: "hi", sticker: CaptionSticker(x: 0.5, y: 0.2, style: .band)),
+         Caption(text: "second", sticker: CaptionSticker(x: 0.3, y: 0.8, style: .solid))]
+    }
+
+    /// The retry on a later sync carries every caption, not only the first.
+    func testTheRetriedUploadCarriesEveryCaption() async throws {
+        var room = try roomWithMyTake()
+        room.cards[0].captions = twoCaptions
+        store.challenges = [room]
+
+        await store.syncRoom(room.id)
+
+        XCTAssertEqual(server.uploads.first?.captions.map(\.text), ["hi", "second"])
+        XCTAssertEqual(server.uploads.first?.overlayText, "hi")
+    }
+
+    /// Saving the editor's captions sends the whole list to the room.
+    func testUpdatingCaptionsPushesTheWholeList() async throws {
+        let room = try roomWithMyTake()
+
+        store.updateCaptions(twoCaptions, day: 1, challengeID: room.id)
+        // The push is a detached main-actor task.
+        for _ in 0..<20 where server.captionUpdates.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(store.challenge(room.id)?.cards.first?.captions.count, 2)
+        XCTAssertEqual(store.challenge(room.id)?.cards.first?.overlayText, "hi")
+        XCTAssertEqual(server.captionUpdates.last?.map(\.text), ["hi", "second"])
+    }
+
+    /// My own clip in the room shows this phone's captions, even when the
+    /// room's copy only has the first one (`captionsJSON` not deployed).
+    func testMyRoomClipShowsLocalCaptionsOverTheRoomsSingleOne() throws {
+        var room = try roomWithMyTake()
+        room.cards[0].captions = twoCaptions
+        store.challenges = [room]
+        var copy = myRoomCopy(day: 1, at: filmedAt)
+        copy = CloudKitService.RemoteClip(
+            id: copy.id, day: 1, authorID: me.id, authorName: "Me", recordedAt: filmedAt,
+            localURL: copy.localURL, overlayText: "hi")
+        store.roomSync.remoteClips[code] = [copy]
+
+        let clips = store.recordedClips(for: room.id)
+
+        XCTAssertEqual(clips.first?.captions.map(\.text), ["hi", "second"])
+    }
 }
 
 // MARK: - Doubles
@@ -456,13 +505,15 @@ final class RoomUploadRetryTests: XCTestCase {
 @MainActor
 private final class FakeRoomServer {
     struct Upload {
-        let day: Int; let authorID: String; let overlayText: String?; let recordedAt: Date
+        let day: Int; let authorID: String; let captions: [Caption]; let recordedAt: Date
         var takeID: UUID? = nil
+        var overlayText: String? { captions.firstText }
     }
 
     var clips: [CloudKitService.RemoteClip] = []
     var fetchFails = false
     private(set) var uploads: [Upload] = []
+    private(set) var captionUpdates: [[Caption]] = []
     private(set) var fetches = 0
 
     var transport: RoomSyncTransport {
@@ -475,7 +526,7 @@ private final class FakeRoomServer {
             fetchInteractions: { _ in ([], []) },
             uploadClip: { [self] code, day, authorID, authorName, file, caption, recordedAt, takeID in
                 uploads.append(Upload(
-                    day: day, authorID: authorID, overlayText: caption, recordedAt: recordedAt,
+                    day: day, authorID: authorID, captions: caption, recordedAt: recordedAt,
                     takeID: takeID))
                 // One record per name, like CloudKit: a take overwrites only
                 // itself.
@@ -486,9 +537,11 @@ private final class FakeRoomServer {
                 clips.append(CloudKitService.RemoteClip(
                     id: name,
                     day: day, authorID: authorID, authorName: authorName, recordedAt: recordedAt,
-                    localURL: file, overlayText: caption))
+                    localURL: file, overlayText: caption.firstText,
+                    captionSticker: caption.first?.sticker,
+                    captionsJSON: Caption.cloudJSON(caption)))
             },
-            updateClipCaption: { _, _, _, _, _ in },
+            updateClipCaption: { [self] _, _, _, captions, _ in captionUpdates.append(captions) },
             setReaction: { _, _, _, _, _, _, _ in },
             postComment: { _, _, _, _, _, _, _ in },
             deleteComment: { _ in })

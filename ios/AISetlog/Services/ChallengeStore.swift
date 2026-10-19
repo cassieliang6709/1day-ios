@@ -232,7 +232,7 @@ final class ChallengeStore {
                 if await roomSync.uploadClip(
                     code: code, day: card.day, authorID: me.id,
                     authorName: me.displayName, fileURL: file,
-                    overlayText: take.overlayText,
+                    captions: take.captions,
                     recordedAt: take.recordedAt,
                     takeID: take.id
                 ) {
@@ -253,7 +253,7 @@ final class ChallengeStore {
             if await roomSync.uploadClip(
                 code: code, day: card.day, authorID: me.id,
                 authorName: me.displayName, fileURL: file,
-                overlayText: card.overlayText,
+                captions: card.captions,
                 // A card from before `recordedAt` existed has no better answer
                 // than now; every card saved since has one.
                 recordedAt: card.recordedAt ?? .now
@@ -470,9 +470,13 @@ final class ChallengeStore {
         day: Int,
         challengeID: UUID,
         overlayText: String? = nil,
+        captions: [Caption]? = nil,
         recordedAt: Date = .now,
         take: TakeTarget = .replace(nil)
     ) {
+        // A draft filed into a story brings every caption it had; the camera
+        // hands over the one line typed while filming.
+        let captions = (captions ?? .single(overlayText)).drawable
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
 
@@ -495,7 +499,7 @@ final class ChallengeStore {
             takeID = nil
             challenges[ci].cards[idx].clipFileName = fileName
             challenges[ci].cards[idx].recordedAt = recordedAt
-            challenges[ci].cards[idx].overlayText = overlayText
+            challenges[ci].cards[idx].captions = captions
         } else if let t = extraIndex {
             // Same take id, so the same file name and the same room record.
             let id = card.moreTakes[t].id
@@ -505,7 +509,7 @@ final class ChallengeStore {
             takeID = id
             challenges[ci].cards[idx].moreTakes[t].fileName = stored
             challenges[ci].cards[idx].moreTakes[t].recordedAt = recordedAt
-            challenges[ci].cards[idx].moreTakes[t].overlayText = overlayText
+            challenges[ci].cards[idx].moreTakes[t].captions = captions
         } else {
             // 再拍一段 — or 重拍 on a take that was gone by the time the camera
             // handed back, where keeping the footage beats dropping it.
@@ -519,7 +523,7 @@ final class ChallengeStore {
             takeID = id
             challenges[ci].cards[idx].moreTakes.append(ClipTake(
                 id: id, fileName: stored, recordedAt: recordedAt,
-                overlayText: overlayText, captionSticker: nil))
+                captions: captions))
         }
 
         // Shared room: also push this clip to CloudKit for friends to see.
@@ -529,7 +533,7 @@ final class ChallengeStore {
                 if await roomSync.uploadClip(
                     code: code, day: day, authorID: me.id,
                     authorName: me.displayName, fileURL: dest,
-                    overlayText: overlayText, recordedAt: recordedAt,
+                    captions: captions, recordedAt: recordedAt,
                     takeID: takeID
                 ) {
                     await syncRoom(challengeID)
@@ -573,7 +577,27 @@ final class ChallengeStore {
             // threw away.
             if words == nil { challenges[ci].cards[idx].captionSticker = nil }
         }
-        pushCaptionToRoom(words, day: day, takeID: takeID, challengeIndex: ci)
+        pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
+    }
+
+    /// Every caption on one take at once — what the full-screen editor saves
+    /// after each change. Blank ones are dropped. `takeID` as in
+    /// `updateOverlayText`; pushed to the room the same way.
+    func updateCaptions(_ captions: [Caption], day: Int, challengeID: UUID, takeID: UUID? = nil) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
+        else { return }
+        let kept = captions.drawable
+        if let takeID {
+            guard let t = challenges[ci].cards[idx].moreTakes.firstIndex(where: { $0.id == takeID })
+            else { return }
+            guard challenges[ci].cards[idx].moreTakes[t].captions != kept else { return }
+            challenges[ci].cards[idx].moreTakes[t].captions = kept
+        } else {
+            guard challenges[ci].cards[idx].captions != kept else { return }
+            challenges[ci].cards[idx].captions = kept
+        }
+        pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
     }
 
     /// Where the caption sits on the clip, and how it's drawn.
@@ -594,18 +618,21 @@ final class ChallengeStore {
         }
     }
 
-    /// Sends an edited caption to the room, when there is one to send to.
+    /// Sends a take's captions to the room, when there is one to send to.
     ///
-    /// Words only. Where the caption sits is `CaptionSticker`, which rides the
-    /// clip record's own field and is rewritten by the next upload — moving
-    /// that to its own round trip is a bigger change than this, and a friend
-    /// reading the wrong *position* is a much smaller wrong than a friend
-    /// reading words you deleted.
-    private func pushCaptionToRoom(_ words: String?, day: Int, takeID: UUID?, challengeIndex ci: Int) {
-        guard let code = challenges[ci].roomCode, let me = account?.account else { return }
+    /// Every caption, position and look included — `captionsJSON` carries
+    /// them, `overlayText` carries the first one's words for 1.5 (31). Read
+    /// off the card when the push is made, so it sends what is saved now.
+    private func pushCaptionsToRoom(day: Int, takeID: UUID?, challengeIndex ci: Int) {
+        guard let code = challenges[ci].roomCode, let me = account?.account,
+              let card = challenges[ci].cards.first(where: { $0.day == day })
+        else { return }
+        let captions = takeID.map { id in
+            card.moreTakes.first { $0.id == id }?.captions ?? []
+        } ?? card.captions
         Task { @MainActor in
             await roomSync.updateClipCaption(
-                code: code, day: day, authorID: me.id, overlayText: words, takeID: takeID)
+                code: code, day: day, authorID: me.id, captions: captions, takeID: takeID)
         }
     }
 
@@ -768,6 +795,17 @@ final class ChallengeStore {
                     // moment, not to one take of it, so they ride take 1 only —
                     // on every take, the film would float the same 🔥 twice.
                     let carriesInteractions = take == nil
+                    // My own words come off this phone's card: it is where
+                    // they were edited, and until `captionsJSON` is deployed
+                    // the room's copy only knows the first one.
+                    let localCaptions: [Caption]?
+                    if !isMe {
+                        localCaptions = nil
+                    } else if let take {
+                        localCaptions = card?.moreTakes.first { $0.id == take }?.captions
+                    } else {
+                        localCaptions = card?.captions
+                    }
 
                     let emojis = !carriesInteractions ? [] : isMe
                         ? (card?.reactions.map(\.emoji) ?? [])
@@ -784,8 +822,7 @@ final class ChallengeStore {
                         day: clip.day, url: clip.localURL, authorName: clip.authorName,
                         authorID: clip.authorID,
                         label: challenge.isTimeOnly ? nil : presenter.title(forSlot: clip.day),
-                        overlayText: clip.overlayText,
-                        captionSticker: clip.captionSticker,
+                        captions: localCaptions ?? clip.captions,
                         recordedAt: clip.recordedAt,
                         emoji: emojis,
                         comments: commentLines,
@@ -833,8 +870,7 @@ final class ChallengeStore {
                 authorName: authorName,
                 authorID: authorID,
                 label: label,
-                overlayText: card.overlayText,
-                captionSticker: card.captionSticker,
+                captions: card.captions,
                 recordedAt: card.recordedAt,
                 emoji: card.reactions.map(\.emoji),
                 comments: Self.commentLines(for: card))
@@ -848,8 +884,7 @@ final class ChallengeStore {
                     authorName: authorName,
                     authorID: authorID,
                     label: label,
-                    overlayText: take.overlayText,
-                    captionSticker: take.captionSticker,
+                    captions: take.captions,
                     recordedAt: take.recordedAt,
                     key: "day\(card.day)_\(take.id.uuidString)",
                     takeID: take.id)

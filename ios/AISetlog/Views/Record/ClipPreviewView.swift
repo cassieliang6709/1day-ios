@@ -1,35 +1,53 @@
 import SwiftUI
 
-/// Looking back at one clip.
+/// One person's one take, full screen, and the place its captions are written.
 ///
-/// The video is the screen. Everything else floats on top of it.
+/// Tapping any clip — a tile in a room, a clip in 我的 — opens this: the video
+/// edge to edge, the captions on the video itself where the film burns them,
+/// and the buttons floating over the bottom of the picture.
 ///
-/// It used to be a `ScrollView`: a 340pt-wide card in a `NavigationStack`,
-/// which for a 9:16 clip is 604pt tall — so on a 667pt screen the video's
-/// bottom edge landed at 708pt and the comment bar's top edge at 704pt, and the
-/// reactions, the timestamp, the comment thread and the re-record button were
-/// all below the fold of a screen showing a two-second clip. Nobody scrolls to
-/// find out what happens under a video that's already playing.
+/// It replaces two screens. A room's tile used to open the whole moment with
+/// everyone stitched together (`StitchedMomentPreview`), where nothing could be
+/// edited, and 我的 opened a half-height sheet that played the day in a row
+/// (`LibraryDayPlayer`) with a separate editor one more tap away. Both answered
+/// "what does this moment look like"; what people tapped a clip for was to do
+/// something to it.
 ///
-/// Social UI lives in `ClipPreviewComponents.swift`; this file owns state and
-/// store calls.
+/// A take can carry several captions (`Caption`). Each is its own sticker:
+/// tap once to select it (the handles and the ✕ appear, and the colour and
+/// backing rows under the picture apply to it), tap again to type, drag to
+/// move, pinch or use the corner to size and turn. 加字幕 always adds another.
+///
+/// The picture is fitted, not filled. A caption is placed as a fraction of the
+/// exported frame, so cropping the video to fill the screen would mean aiming
+/// at a picture that is not the one the film is made of — a caption put near
+/// the edge would land somewhere nobody could see while placing it. A 9:16
+/// take on a phone fills the width and nearly all the height anyway.
 struct ClipPreviewView: View {
+    /// Something this screen can offer for the clip on it that isn't about the
+    /// clip's captions — 放进故事 or 打开故事 from 我的, say. Destructive ones go
+    /// in the ⋯ menu, the rest sit in the button row.
+    struct ExtraAction: Identifiable {
+        /// Doubles as the accessibility identifier.
+        let id: String
+        let symbol: String
+        let title: String
+        var isDestructive = false
+        let action: () -> Void
+    }
+
     let day: Int
     var slotTitle: String?
     /// How many moments the story has, for the "4 / 5" chip. 0 hides the count
     /// — a clip opened without its story behind it has no denominator.
     var momentCount = 0
     var authorName: String?
-    var overlayText: String?
-    /// The caption's sticker as it was handed in, for a clip this screen can't
-    /// read a live card for — a friend's take, or a page of the deck.
-    var captionSticker: CaptionSticker?
+    /// The clip's captions as they were handed in, for a clip this screen
+    /// can't read a live card for — a friend's take, or a draft.
+    var captions: [Caption] = []
     var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
-    /// Whether this page should hold a player at all. `ClipDeckReview` sets it
-    /// false for pages you aren't looking at: a paged `TabView` keeps every
-    /// page it has built, and a story with fifteen clips in it would otherwise
-    /// mean fifteen looping `AVPlayer`s alive at once.
+    /// Whether this page should hold a player at all.
     var isLive = true
     let url: URL
     let recordedAt: Date?
@@ -46,63 +64,53 @@ struct ClipPreviewView: View {
     /// same reason as 重拍.
     var onAddTake: (() -> Void)? = nil
     /// A clip in no story (one only you can see in 我的) has no card to write
-    /// its caption to; this takes the words instead.
-    var onDraftCaption: ((String?) -> Void)? = nil
-    /// The draft's caption as edited here, shown in place of `overlayText`.
-    @State private var draftCaption: String?
+    /// its captions to; this takes them instead.
+    var onDraftCaptions: (([Caption]) -> Void)? = nil
+    var extraActions: [ExtraAction] = []
+
+    /// The draft's captions as edited here, shown in place of `captions`.
+    @State private var draftCaptions: [Caption]?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
 
-    /// Center caption editing, right on the video — same gesture as at
-    /// record time. Saved to the card on submit/focus-out.
-    @State private var captionDraft = ""
-    @State private var editingCaption = false
-    /// The finger's translation while a sticker is being dragged, in points.
-    /// Only ever this — the card stores fractions, so nothing outlives the
-    /// gesture that would have to be converted back.
-    @State private var captionDrag: CGSize = .zero
-    /// Live pinch and twist, for the duration of the gesture only — same rule
-    /// as `captionDrag`: the card stores the committed value, never a delta.
-    @State private var pinch: CGFloat = 1
-    @State private var twist: Double = 0
-    /// Tapped once: the caption is selected, not being typed into.
+    /// The caption that is selected: handles drawn, the style rows aimed at it.
     ///
-    /// Two taps rather than one because one tap has to keep meaning "let me
-    /// see the handles". Dragging, pinching and twisting a caption all worked
-    /// before this and nothing on screen said so, so the only people who found
-    /// them were the ones who tried by accident.
-    @State private var captionSelected = false
-    /// A one-finger corner drag, live. Same rule as `pinch` and `twist`: the
-    /// card keeps the committed value, these keep the gesture.
-    @State private var handleScale: CGFloat = 1
-    @State private var handleTwist: Double = 0
-    /// Whether the drag is currently held on the frame's middle.
+    /// Two taps rather than one to type, because one tap has to keep meaning
+    /// "let me see the handles". Dragging, pinching and twisting a caption all
+    /// worked before selection existed and nothing on screen said so.
+    @State private var selectedID: UUID?
+    /// Typing, right on the video — same gesture as at record time.
+    @State private var editingCaption = false
+    /// Which caption is being typed into. A new one isn't in the list yet.
+    @State private var editingID: UUID?
+    @State private var editingIsNew = false
+    @State private var captionDraft = ""
+    /// Whether a drag is currently held on the frame's middle.
     @State private var snappedToCentre = false
-    /// Shown under the caption the first time it is selected, then never again
-    /// — the same way every app that has these gestures teaches them.
+    /// Shown under the caption the first time one is selected, then never again.
     @AppStorage("caption.gestureHintSeen.v1") private var gestureHintSeen = false
     @FocusState private var captionFocused: Bool
     @State private var showComments = false
     @State private var showLook = false
     /// Held down in the look panel: play the clip as it was filmed.
     @State private var showingOriginal = false
-    /// The words the ✕ just took off the card, held for the undo toast. nil
-    /// when there's nothing to undo.
-    @State private var deletedCaption: String?
+    /// The caption the ✕ just took off, and where it was, for the undo toast.
+    @State private var deleted: DeletedCaption?
+
+    private struct DeletedCaption: Equatable {
+        let caption: Caption
+        let index: Int
+    }
 
     /// Bound only so a language change re-renders the view.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// How soft you want to look. Read here rather than passed in, because it's
-    /// a setting about you and not about this clip — every clip you look back
-    /// at gets the same one, and the film you save gets it too.
+    /// How soft you want to look. A setting about you, not about this clip.
     @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
     @AppStorage(PersonalEffectParameters.stickyKey) private var lookIsSticky = false
 
-    /// What the player should actually show. Holding the compare chip down puts
-    /// the original back without touching what you've chosen.
     private var playedLook: PersonalEffectParameters { showingOriginal ? .none : look }
 
     private var myID: String { account.account?.id ?? "local" }
@@ -118,34 +126,21 @@ struct ClipPreviewView: View {
         return card?.moreTakes.first { $0.id == takeID }
     }
 
-    private var interactions: (reactions: [ClipReaction], comments: [ClipComment]) {
-        guard let challengeID else { return ([], []) }
-        return store.interactions(for: challengeID, day: day, targetAuthorID: targetAuthorID ?? myID)
+    private var comments: [ClipComment] {
+        guard let challengeID else { return [] }
+        return store.interactions(
+            for: challengeID, day: day, targetAuthorID: targetAuthorID ?? myID).comments
     }
 
-    private var reactions: [ClipReaction] { interactions.reactions }
-    private var comments: [ClipComment] { interactions.comments }
-
-    /// Whether anyone else can see this clip.
-    ///
-    /// The gate used to be `challengeID != nil` — which is true of every story,
-    /// shared or not. So filming a day by yourself and looking back at it put an
-    /// empty "Add a comment…" box under your own face, waiting for you to talk
-    /// to yourself, and a row of emoji nobody would ever see.
+    /// Whether anyone else can see this clip. A story you film alone has no
+    /// thread to open.
     private var isShared: Bool {
         guard let challengeID else { return false }
         return store.challenge(challengeID)?.isShared ?? false
     }
 
-    /// The shape of the file, measured once it's readable.
-    ///
-    /// The story's own orientation only says how it was *filmed*, and a
-    /// stitched moment isn't the shape of the takes inside it: two portrait
-    /// takes side by side come out 9:8. Playing that edge to edge — which is
-    /// right for one portrait take, and what this screen used to do to
-    /// everything a portrait story contained — scaled it up until only the
-    /// middle quarter of its width was on screen, so what you saw of two
-    /// friends was the seam between them.
+    /// The shape of the file, measured once it's readable — a stitched or
+    /// landscape take isn't the shape its story was filmed in.
     @State private var measuredAspect: CGFloat?
 
     private var isLandscape: Bool {
@@ -160,48 +155,51 @@ struct ClipPreviewView: View {
         targetAuthorID == nil || targetAuthorID == "local" || targetAuthorID == myID
     }
 
-    /// Only my page may read my live card. A friend's caption belongs to the
-    /// displayed clip; a cleared own caption must not revive the deck snapshot.
-    private var liveOverlayText: String? {
-        if onDraftCaption != nil { return draftCaption ?? overlayText }
-        if takeID != nil {
-            return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: extraTake != nil,
-                                             liveText: extraTake?.overlayText, snapshotText: overlayText)
-        }
-        return ClipCaptionSelection.text(isMine: isMine, hasLiveCard: card != nil,
-                                         liveText: card?.overlayText, snapshotText: overlayText)
-    }
+    /// Somewhere for an edit to go.
+    private var canWrite: Bool { challengeID != nil || onDraftCaptions != nil }
 
-    /// Where a caption edit goes: the story's card, or the draft.
-    private func writeCaption(_ text: String) {
-        if let onDraftCaption {
-            draftCaption = text
-            onDraftCaption(text.isEmpty ? nil : text)
-        } else if let challengeID {
-            store.updateOverlayText(text, day: day, challengeID: challengeID, takeID: takeID)
-        }
-    }
-    private var hasCaption: Bool { !(liveOverlayText ?? "").isEmpty }
-
-    /// Where the caption sits and how it's drawn.
+    /// Every caption on this take, as it stands now.
     ///
-    /// Read by the same rule as the words themselves: my own live card wins on
-    /// my own page, a friend's belongs to the clip that was handed in, and a
-    /// card nobody has dragged has no sticker at all — which is the default
-    /// one, the place and style every caption used to be burned at, so nothing
-    /// moves under somebody opening an old story.
-    private var sticker: CaptionSticker {
+    /// Only my page reads my live card. A friend's captions belong to the clip
+    /// that was handed in, and an own card whose captions were all deleted
+    /// must not bring the handed-in snapshot back.
+    private var liveCaptions: [Caption] {
+        if onDraftCaptions != nil { return draftCaptions ?? captions }
         if takeID != nil {
-            let live = isMine && extraTake != nil
-            return (live ? extraTake?.captionSticker : captionSticker) ?? .default
+            return ClipCaptionSelection.captions(
+                isMine: isMine, hasLiveCard: extraTake != nil,
+                live: extraTake?.captions ?? [], snapshot: captions)
         }
-        let live = isMine && card != nil
-        return (live ? card?.captionSticker : captionSticker) ?? .default
+        return ClipCaptionSelection.captions(
+            isMine: isMine, hasLiveCard: card != nil,
+            live: card?.captions ?? [], snapshot: captions)
     }
 
-    private func saveSticker(_ new: CaptionSticker) {
-        guard let challengeID else { return }
-        store.updateCaptionSticker(new, day: day, challengeID: challengeID, takeID: takeID)
+    /// Where an edit goes: the story's card (and from there the room), or the
+    /// draft.
+    private func writeCaptions(_ list: [Caption]) {
+        let kept = list.drawable
+        if let onDraftCaptions {
+            draftCaptions = kept
+            onDraftCaptions(kept)
+        } else if let challengeID {
+            store.updateCaptions(kept, day: day, challengeID: challengeID, takeID: takeID)
+        }
+    }
+
+    /// What the colour and backing rows change: the selected caption, or the
+    /// only one when there is only one.
+    private var target: Caption? {
+        let list = liveCaptions.drawable
+        if let selectedID, let hit = list.first(where: { $0.id == selectedID }) { return hit }
+        return list.count == 1 ? list.first : nil
+    }
+
+    private func saveSticker(_ sticker: CaptionSticker, for id: UUID) {
+        var list = liveCaptions
+        guard let i = list.firstIndex(where: { $0.id == id }) else { return }
+        list[i].sticker = sticker
+        writeCaptions(list)
     }
 
     private var localizedMomentTitle: String {
@@ -218,17 +216,19 @@ struct ClipPreviewView: View {
 
     var body: some View {
         ZStack {
+            Color.black.ignoresSafeArea()
             backdrop
+            stage
+            scrims
             if editingCaption { outsideTapCatcher }
-            reviewLayout
+            chrome
             if showLook { lookOverlay }
-            if deletedCaption != nil { undoToast }
+            if deleted != nil { undoToast }
         }
         .statusBarHidden()
-        // The keyboard is allowed to cover the bottom of this screen rather
-        // than to resize it. Letting it push made the picture jump to a
-        // different size the moment you started typing, and the whole point of
-        // placing a caption here is that what you see is what gets exported.
+        // The keyboard covers the bottom of this screen rather than resizing
+        // it: the picture must not jump to a different size the moment you
+        // start typing on it.
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
         .sheet(isPresented: $showComments) { commentsSheet }
@@ -239,9 +239,7 @@ struct ClipPreviewView: View {
         .onChange(of: captionDraft) { _, new in limitCaptionLines(new) }
     }
 
-    /// While typing, a tap anywhere off the picture means "done". The bed
-    /// behind is `allowsHitTesting(false)`, so without this the only taps that
-    /// committed were the ones that landed on the video itself.
+    /// While typing, a tap anywhere off the picture means "done".
     private var outsideTapCatcher: some View {
         Color.clear
             .contentShape(Rectangle())
@@ -249,91 +247,29 @@ struct ClipPreviewView: View {
             .onTapGesture { commitCaption() }
     }
 
-    // MARK: - The video, and the one thing drawn where the film draws it
+    // MARK: - The video
 
-    /// One screen. The picture is big and inset; everything you can do to it is
-    /// a row under it.
+    /// The take, as big as the screen allows at its own shape, with the
+    /// captions drawn inside it.
     ///
-    /// This replaces two layouts and the button between them. Edge to edge was
-    /// what a tap on a grid tile used to do — no border, no ✕ in the picture —
-    /// and the fix for that had been a small card with a list of rows beneath
-    /// it plus a 全屏看 button to get the big version back. So the screen had
-    /// two sizes, a caption could only be placed accurately in one of them,
-    /// and the list read like a settings page: 加字幕, 聊聊这个瞬间 and 重拍
-    /// stacked as three identical rows, when one of the three is what you came
-    /// to do and another only exists in a room.
-    ///
-    /// Now: the picture keeps its own shape on its blurred bed, inset with a
-    /// rounded edge so there is somewhere for the ✕ to live, and the three
-    /// things sit side by side underneath. Captions are written and placed
-    /// right here, at the size the film exports at.
-    private var reviewLayout: some View {
-        VStack(spacing: 10) {
-            top
-            // Centred in what's left under the title bar, not top-aligned: a
-            // 9:8 stitched moment is only about 40% of the height, and pinning
-            // it up top left the bottom third of the screen empty.
-            Spacer(minLength: 0)
-            Color.clear
-                // `Color.clear` rather than the player: an aspect-filling
-                // player reports the size it filled to, and a ZStack/VStack
-                // lays siblings out in the widest child. A 9:8 stitched moment
-                // measured 1.125 screens wide that way and pushed 重拍 and
-                // 聊天 clean off the display. Clear takes the offered size and
-                // an overlay can't feed back into it.
-                .aspectRatio(aspectRatio, contentMode: .fit)
-                .overlay { videoStage }
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.14), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.38), radius: 18, y: 8)
-            Spacer(minLength: 0)
-            bottomControls
-        }
-        // 13pt rather than 16: the picture is the point, and this is the
-        // narrowest margin that still leaves the ✕ somewhere to sit.
-        .padding(.horizontal, 13)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+    /// `Color.clear` sized by the aspect ratio rather than the player itself:
+    /// a player reports the size it filled to, and an overlay can't feed back
+    /// into the layout around it.
+    private var stage: some View {
+        Color.clear
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .overlay { videoStage }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
+            .accessibilityIdentifier("moment-stage")
     }
 
-    /// Under the picture: who and when, the reactions, the caption's colour and
-    /// backing, then the three buttons.
-    ///
-    /// Hidden while the keyboard is up rather than removed. The keyboard covers
-    /// this strip anyway, but taking it out of the layout let the two `Spacer`s
-    /// re-centre the picture — so starting to type slid the whole frame down
-    /// the screen, which is the one thing this screen must not do while you are
-    /// placing a caption on it.
-    private var bottomControls: some View {
-        VStack(spacing: 9) {
-            byline
-            // The reaction strip used to be here, between the byline and the
-            // buttons. It lives in the moment's chat now — the other place
-            // people say something about a take — so this screen is the
-            // picture and three things you can do to it.
-            if isMine, hasCaption {
-                tintRows
-                plateRow
-            }
-            buttonRow
-        }
-        .opacity(editingCaption ? 0 : 1)
-        .allowsHitTesting(!editingCaption)
-        .animation(OneDay.Motion.soft, value: editingCaption)
-    }
-
-    /// The player plus the caption layer, sized by whoever hosts it.
+    /// The player plus the caption layer.
     private var videoStage: some View {
         ZStack {
             if isLive {
-                // Review is the truth: show the captured file without the
-                // personal look — except while the look panel is up. That panel
-                // *is* the adjustment surface, and it promises the picture
-                // behind it changes as you drag; with `.none` hardcoded here
-                // its sliders did nothing anyone could see.
+                // Review is the truth: no personal look, except while the look
+                // panel is up — that panel promises the picture changes.
                 LoopingClipPlayer(
                     url: url, refreshToken: recordedAt,
                     look: showLook ? playedLook : .none)
@@ -342,6 +278,146 @@ struct ClipPreviewView: View {
             }
             captionLayer
         }
+    }
+
+    /// Behind a take that doesn't fill the screen: itself, out of focus.
+    private var backdrop: some View {
+        Color.clear
+            .overlay { ClipThumbnail(url: url, refreshToken: recordedAt) }
+            .clipped()
+            .blur(radius: 44)
+            .overlay(Color.black.opacity(0.5))
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+    }
+
+    /// Dark at the top and bottom edges, so white buttons read over a bright
+    /// picture. Only there: the middle is the picture.
+    private var scrims: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [.black.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 150)
+            Spacer(minLength: 0)
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 300)
+                .opacity(editingCaption ? 0 : 1)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    /// Every caption, wherever it was put.
+    ///
+    /// Inside `videoStage` because it's part of the picture, not part of the
+    /// interface: `VideoStitcher.captionLayer` burns each one at the same
+    /// fractions of the frame, in the same styles, at the same size relative to
+    /// the frame.
+    @ViewBuilder
+    private var captionLayer: some View {
+        if editingCaption {
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { captionFocused = false }
+                CaptionOverlayEditor(text: $captionDraft, isFocused: $captionFocused)
+            }
+        } else {
+            let list = liveCaptions.drawable
+            if !list.isEmpty {
+                GeometryReader { proxy in
+                    ZStack {
+                        // Tapping the picture puts the handles away. Only while
+                        // something is selected: the rest of the time this layer
+                        // must not eat taps meant for the video underneath.
+                        if selectedID != nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { deselectCaption() }
+                            if snappedToCentre { centreGuide }
+                        }
+
+                        ForEach(list) { caption in
+                            CaptionStickerView(
+                                caption: caption,
+                                stageSize: proxy.size,
+                                isSelected: selectedID == caption.id,
+                                isMine: isMine,
+                                snappedToCentre: $snappedToCentre,
+                                onTap: { tapCaption(caption.id) },
+                                onChange: { saveSticker($0, for: caption.id) },
+                                onDelete: { deleteCaption(caption.id) })
+                        }
+
+                        if selectedID != nil, isMine, !gestureHintSeen { gestureHint }
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .coordinateSpace(name: CaptionStickerView.stageSpace)
+                    .sensoryFeedback(.alignment, trigger: snappedToCentre) { _, now in now }
+                }
+            }
+        }
+    }
+
+    /// The middle of the frame, drawn only while a sticker is held on it.
+    private var centreGuide: some View {
+        Rectangle()
+            .fill(.white.opacity(0.85))
+            .frame(width: 1)
+            .padding(.vertical, 12)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+    }
+
+    private var gestureHint: some View {
+        VStack {
+            Spacer(minLength: 0)
+            Text(Strings.captionGestureHint)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.45), in: Capsule())
+                .padding(.bottom, 12)
+        }
+        .allowsHitTesting(false)
+        .accessibilityIdentifier("caption-gesture-hint")
+    }
+
+    // MARK: - Chrome
+
+    /// The top bar and the bottom controls, floating over the picture. The
+    /// `Spacer` between them takes no taps, so the captions underneath it stay
+    /// reachable.
+    private var chrome: some View {
+        VStack(spacing: 0) {
+            top
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+            Spacer(minLength: 0)
+            bottomControls
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
+        }
+    }
+
+    /// Who and when, the selected caption's colour and backing, then the
+    /// buttons.
+    ///
+    /// Faded rather than removed while typing, so nothing above it moves.
+    private var bottomControls: some View {
+        VStack(spacing: 9) {
+            byline
+            if isMine, let target {
+                tintRows(for: target)
+                plateRow(for: target)
+            }
+            buttonRow
+        }
+        .opacity(editingCaption ? 0 : 1)
+        .allowsHitTesting(!editingCaption)
+        .animation(OneDay.Motion.soft, value: editingCaption)
     }
 
     /// Whose moment it is, and when it was filmed.
@@ -358,41 +434,34 @@ struct ClipPreviewView: View {
                 Text(timeText)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
         .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
     }
 
     /// Twelve colours, two rows of six, all on screen.
-    ///
-    /// It was six in one row and every one of them was a brand colour, which
-    /// made the row read as the app's palette rather than as a choice — and it
-    /// had no black, so a caption over snow, a white wall or a blown-out window
-    /// had nothing legible to be. Two rows rather than a scroller: a colour you
-    /// have to swipe to find is a colour nobody picks.
-    private var tintRows: some View {
-        VStack(spacing: 7) {
+    private func tintRows(for caption: Caption) -> some View {
+        let sticker = caption.placed
+        return VStack(spacing: 7) {
             ForEach(Array(tintPages.enumerated()), id: \.offset) { _, page in
                 HStack(spacing: 7) {
                     ForEach(page) { tint in
                         Button {
-                            saveSticker(reshaped(
-                                style: CaptionSticker.legibleStyle(
-                                    picking: tint, keeping: sticker.style),
-                                tint: tint))
+                            saveSticker(
+                                sticker.reshaped(
+                                    style: CaptionSticker.legibleStyle(
+                                        picking: tint, keeping: sticker.style),
+                                    tint: tint),
+                                for: caption.id)
                         } label: {
                             Circle()
                                 .fill(tint.color)
                                 .frame(height: 26)
                                 .frame(maxWidth: .infinity)
                                 .overlay {
-                                    // Two rings, outside the dot: white for the
-                                    // edge every dot needs against footage, and
-                                    // blue outside that for the chosen one. A
-                                    // white ring *was* the selection, which is
-                                    // invisible on the white dot — the one
-                                    // colour most captions start as.
+                                    // White for the edge every dot needs against
+                                    // footage, blue outside it for the chosen one.
                                     Circle()
                                         .strokeBorder(.white.opacity(0.55), lineWidth: 1)
                                         .frame(width: 26, height: 26)
@@ -423,24 +492,19 @@ struct ClipPreviewView: View {
         }
     }
 
-    /// The four backings, drawn as what they are.
-    ///
-    /// This replaces a 格式 button that cycled three styles: it could not say
-    /// what it was about to pick, so finding the dark band meant tapping until
-    /// it appeared. The samples say 字 in the caption's own colour on the
-    /// backing they would give it.
-    private var plateRow: some View {
-        HStack(spacing: 7) {
+    /// The four backings, drawn as what they are: 字 in the caption's own
+    /// colour on the backing tapping it would give.
+    private func plateRow(for caption: Caption) -> some View {
+        let sticker = caption.placed
+        return HStack(spacing: 7) {
             ForEach(CaptionSticker.Style.picker) { style in
                 let chosen = style == sticker.style.pickerEquivalent
-                // What tapping it would actually give you, colour correction
-                // included — so the square is a preview and not a label.
                 let sample = CaptionSticker(
                     x: 0.5, y: 0.5, style: style,
                     tint: CaptionSticker.legibleTint(
                         picking: style, keeping: sticker.tint))
                 Button {
-                    saveSticker(reshaped(style: style, tint: sample.tint))
+                    saveSticker(sticker.reshaped(style: style, tint: sample.tint), for: caption.id)
                 } label: {
                     Text(Strings.captionPlateSample)
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
@@ -454,10 +518,8 @@ struct ClipPreviewView: View {
                                 )
                                 .fill(fill)
                             } else {
-                                // "No backing" has to look like no backing, not
-                                // like a fourth colour of one: a faint fill and
-                                // a dashed edge, so it doesn't read as the
-                                // dimmed band sitting next to it.
+                                // "No backing" has to look like no backing: a
+                                // faint fill and a dashed edge.
                                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                                     .fill(.white.opacity(0.1))
                                     .overlay {
@@ -469,8 +531,6 @@ struct ClipPreviewView: View {
                             }
                         }
                         .overlay {
-                            // Blue for the same reason as the colour dots: a
-                            // white ring around the white sample is not there.
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .strokeBorder(
                                     chosen
@@ -487,20 +547,17 @@ struct ClipPreviewView: View {
         .accessibilityIdentifier("caption-plates")
     }
 
-    /// The three things you can do to a moment, side by side.
-    ///
-    /// Not a stacked list: 加字幕 is what almost everybody opened this screen
-    /// for, 重拍 is occasional, and 聊天 only exists in a room — three
-    /// identical rows said they were the same size of decision.
+    /// Everything you can do to this take, side by side.
     private var buttonRow: some View {
         HStack(spacing: 7) {
-            if isMine {
+            if isMine, canWrite {
                 actionButton(
-                    hasCaption ? "textformat" : "text.badge.plus",
-                    hasCaption ? Strings.captionEditAction : Strings.captionAction,
+                    "text.badge.plus", Strings.captionAction,
                     accented: !isShared,
                     identifier: "moment-caption",
-                    action: startEditingCaption)
+                    action: startNewCaption)
+            }
+            if isMine {
                 if let onReRecord {
                     actionButton(
                         "arrow.counterclockwise", Strings.rerecordShort,
@@ -513,13 +570,18 @@ struct ClipPreviewView: View {
                 }
             }
             if isShared {
-                // Accented here rather than 加字幕: in a room the thing that
-                // isn't obvious is that a moment has a thread on it at all.
+                // Accented in a room: what isn't obvious there is that a moment
+                // has a thread on it at all.
                 actionButton(
                     "bubble.left.fill", Strings.chatShort,
                     accented: true, identifier: "moment-chat",
                     badge: comments.isEmpty ? nil : comments.count
                 ) { showComments = true }
+            }
+            ForEach(extraActions.filter { !$0.isDestructive }) { extra in
+                actionButton(
+                    extra.symbol, extra.title, accented: false,
+                    identifier: extra.id, action: extra.action)
             }
         }
     }
@@ -535,7 +597,7 @@ struct ClipPreviewView: View {
                 Text(title)
                     .font(.system(size: 13.5, weight: .heavy, design: .rounded))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.75)
                 if let badge {
                     Text("\(badge)")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
@@ -543,10 +605,8 @@ struct ClipPreviewView: View {
                         .foregroundStyle(accented ? OneDay.onBrand.opacity(0.85) : .white.opacity(0.7))
                 }
             }
-            // White on both. The quiet one was `OneDay.ink` on a fixed white
-            // capsule, and `ink` turns light in dark mode — 1.7:1. This row
-            // sits on the clip's dark blurred bed, so dark glass is the quiet
-            // version, same as the camera's round buttons (`CameraGlass`).
+            // White on dark glass for the quiet ones: this row sits on the
+            // picture, so it has to read over whatever the picture is.
             .foregroundStyle(accented ? OneDay.onBrand : .white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
@@ -556,7 +616,7 @@ struct ClipPreviewView: View {
                 } else {
                     ZStack {
                         Capsule().fill(.ultraThinMaterial)
-                        Capsule().fill(.white.opacity(0.14))
+                        Capsule().fill(.black.opacity(0.18))
                     }
                     .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
                     .environment(\.colorScheme, .dark)
@@ -568,418 +628,11 @@ struct ClipPreviewView: View {
         .accessibilityIdentifier(identifier)
     }
 
-    /// Behind a film that doesn't fill the screen: itself, out of focus.
-    ///
-    /// Bedded on `Color.clear` rather than framed, because a filling image
-    /// reports the size it filled to and `.clipped()` only clips the drawing.
-    /// A stitched moment is 9:8, so the bed measured a screen's height times
-    /// 1.125 — 1078pt on a 440pt phone — and a ZStack lays its siblings out in
-    /// the width of its widest child. That dragged the whole of `chrome` out
-    /// with it: the caption button stretched to 749pt and "重拍" and "聊天"
-    /// were placed past the right edge of the screen, present and untappable.
-    /// `Color.clear` takes the offered size and overlays don't feed back into
-    /// it, so the bed can overflow without moving anything else.
-    private var backdrop: some View {
-        Color.clear
-            .overlay { ClipThumbnail(url: url, refreshToken: recordedAt) }
-            .clipped()
-            .blur(radius: 44)
-            // Darker than it was: it is the whole background now, not a strip
-            // either side of a filling clip, and the inset card needs something
-            // to sit against.
-            .overlay(Color.black.opacity(editingCaption ? 0.38 : 0.52))
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-    }
-
-    /// The caption, wherever it was put.
-    ///
-    /// A sticker, not a fixed line: `VideoStitcher.captionLayer` burns it at the
-    /// same fractions of the frame, in the same three styles, at the same size
-    /// relative to the frame. That parity is why this lives inside
-    /// `videoStage` rather than up in the chrome — it's part of the picture,
-    /// not part of the interface — and why the numbers here are fractions of
-    /// `proxy.size` rather than points.
-    ///
-    /// Tap edits the words. Drag moves them. Tapping anywhere else does
-    /// nothing, which is the fix: the old edit button was `.frame(maxWidth:
-    /// .infinity, maxHeight: .infinity)`, so the whole video was a button into
-    /// the text editor.
-    @ViewBuilder
-    private var captionLayer: some View {
-        if editingCaption {
-            ZStack {
-                // Somewhere to tap that means "done". The only other way out
-                // was the keyboard's return key, which on a phone is a key you
-                // have to know is there — and it's the key you press by
-                // accident, so it can't be the only one that commits.
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { captionFocused = false }
-                CaptionOverlayEditor(text: $captionDraft, isFocused: $captionFocused)
-            }
-        } else if let text = liveOverlayText, !text.isEmpty {
-            GeometryReader { proxy in
-                ZStack {
-                    // Tapping the picture puts the handles away. Only while
-                    // something is selected: the rest of the time this layer
-                    // must not eat taps meant for the video underneath it.
-                    if captionSelected {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture { deselectCaption() }
-                        if snappedToCentre { centreGuide }
-                    }
-
-                    captionText(text, in: proxy.size)
-                        // Inside the flexible frame, so the box is laid out
-                        // against the words themselves — including however many
-                        // lines they wrapped to — and inside the scale and the
-                        // rotation, so it grows and turns with them. Overlaid
-                        // outside either one, it stayed the size and the angle
-                        // the caption was before the gesture.
-                        .overlay {
-                            if captionSelected, isMine { selectionChrome(in: proxy.size) }
-                        }
-                        .frame(maxWidth: proxy.size.width * 0.76)
-                        // Live pinch and twist multiply the saved values rather
-                        // than replacing them, so a second gesture starts from
-                        // where the first one left off.
-                        .scaleEffect(pinch * handleScale)
-                        .rotationEffect(.degrees(sticker.angle + twist + handleTwist))
-                        .contentShape(Rectangle())
-                        .onTapGesture { tapCaption() }
-                        .position(
-                            x: (sticker.x + dragFraction(in: proxy.size).x) * proxy.size.width,
-                            y: (sticker.y + dragFraction(in: proxy.size).y) * proxy.size.height)
-                        .gesture(isMine ? shapeSticker(in: proxy.size) : nil)
-                        .animation(nil, value: captionDrag)
-                        .animation(nil, value: pinch)
-                        .animation(nil, value: twist)
-                        .animation(nil, value: handleScale)
-                        .animation(nil, value: handleTwist)
-
-                    if captionSelected, isMine, !gestureHintSeen { gestureHint }
-                }
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .coordinateSpace(name: Self.stageSpace)
-                // The guide appearing is the feedback that the sticker snapped;
-                // the tap is felt rather than watched, because at that moment
-                // the finger is covering the caption.
-                .sensoryFeedback(.alignment, trigger: snappedToCentre) { _, now in now }
-            }
-        }
-    }
-
-    /// The name the corner handle's drag measures itself in. A drag reported in
-    /// the handle's own space starts at the same point every time, which is no
-    /// use for an angle around the sticker's centre.
-    private static let stageSpace = "caption-stage"
-
-    /// The dashed box, the three corners and the ✕ — nothing that moves the
-    /// sticker on its own except the bottom-right corner.
-    ///
-    /// Drawn inside the scale and rotation, so the box hugs the words at
-    /// whatever size and angle they are. During a live gesture it grows with
-    /// them, which is what makes the corner feel attached to the text.
-    private func selectionChrome(in size: CGSize) -> some View {
-        RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .strokeBorder(
-                .white.opacity(0.92),
-                style: StrokeStyle(lineWidth: 1.2, dash: [4.5, 3.5]))
-            .padding(-9)
-            .overlay(alignment: .topLeading) {
-                Button(action: deleteCaption) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .black))
-                        // Fixed dark, not `OneDay.ink`: the disc is fixed white,
-                        // and `ink` goes light in dark mode.
-                        .foregroundStyle(Color(uiColor: UIColor(hex: 0x0F2E6B)))
-                        .frame(width: 20, height: 20)
-                        .background(.white, in: Circle())
-                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                        // Drawn at 20, hit at 44 — the disc is a corner mark,
-                        // the target is a thumb.
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                // 12pt further out than before so the 20pt disc stays exactly
-                // where it was inside its new 44pt frame.
-                .offset(x: -31, y: -31)
-                .accessibilityLabel(Strings.deleteCaptionAction)
-                .accessibilityIdentifier("caption-delete")
-            }
-            .overlay(alignment: .topTrailing) { handleDot.offset(x: 4, y: -14) }
-            .overlay(alignment: .bottomLeading) { handleDot.offset(x: -14, y: 4) }
-            .overlay(alignment: .bottomTrailing) {
-                handleDot
-                    .offset(x: 4, y: 4)
-                    // The one corner that does something. Bottom-right because
-                    // that is where it is in every app that has this, and
-                    // because it is the corner a right thumb reaches without
-                    // covering the words.
-                    .gesture(cornerDrag(in: size))
-                    .accessibilityLabel(Strings.captionResizeHandle)
-                    .accessibilityIdentifier("caption-handle")
-            }
-    }
-
-    private var handleDot: some View {
-        Circle()
-            .fill(.white)
-            .frame(width: 11, height: 11)
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-            .contentShape(Circle().scale(2.6))
-    }
-
-    /// The middle of the frame, drawn only while the sticker is held on it.
-    private var centreGuide: some View {
-        Rectangle()
-            .fill(.white.opacity(0.85))
-            .frame(width: 1)
-            .padding(.vertical, 12)
-            .allowsHitTesting(false)
-            .transition(.opacity)
-    }
-
-    private var gestureHint: some View {
-        VStack {
-            Spacer(minLength: 0)
-            Text(Strings.captionGestureHint)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(.black.opacity(0.45), in: Capsule())
-                .padding(.bottom, 12)
-        }
-        .allowsHitTesting(false)
-        .accessibilityIdentifier("caption-gesture-hint")
-    }
-
-    /// Drag, pinch and twist at once. Simultaneously rather than exclusively:
-    /// a two-finger gesture that starts as a pinch almost always rotates a
-    /// little too, and having the first millimetre of movement decide which
-    /// one you meant makes both feel broken.
-    private func shapeSticker(in size: CGSize) -> some Gesture {
-        SimultaneousGesture(
-            dragSticker(in: size),
-            SimultaneousGesture(
-                MagnifyGesture()
-                    .onChanged { pinch = $0.magnification }
-                    .onEnded { value in
-                        pinch = 1
-                        saveSticker(reshaped(scale: sticker.scale * value.magnification))
-                    },
-                RotateGesture()
-                    .onChanged { twist = $0.rotation.degrees }
-                    .onEnded { value in
-                        twist = 0
-                        saveSticker(reshaped(angle: sticker.angle + value.rotation.degrees))
-                    }))
-    }
-
-    /// The current sticker with one field changed. `CaptionSticker.init` does
-    /// the clamping, so a runaway pinch can't be saved.
-    private func reshaped(
-        x: Double? = nil, y: Double? = nil,
-        style: CaptionSticker.Style? = nil,
-        scale: Double? = nil, angle: Double? = nil,
-        tint: CaptionSticker.Tint? = nil
-    ) -> CaptionSticker {
-        CaptionSticker(
-            x: x ?? sticker.x,
-            y: y ?? sticker.y,
-            style: style ?? sticker.style,
-            scale: scale ?? sticker.scale,
-            angle: angle ?? sticker.angle,
-            tint: tint ?? sticker.tint)
-    }
-
-    /// What the live drag is worth, as a fraction of the frame, so the sticker
-    /// keeps up with the finger without a point-sized offset being stored
-    /// anywhere: the model only ever holds fractions.
-    private func dragFraction(in size: CGSize) -> (x: Double, y: Double) {
-        guard size.width > 0, size.height > 0 else { return (0, 0) }
-        return (captionDrag.width / size.width, captionDrag.height / size.height)
-    }
-
-    private func dragSticker(in size: CGSize) -> some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard size.width > 0 else {
-                    captionDrag = value.translation
-                    return
-                }
-                // Snapping is applied to the *live* translation, not just to
-                // what gets saved: a caption that jumps into place only after
-                // the finger lifts reads as the app moving it somewhere you
-                // didn't put it.
-                let wanted = sticker.x + value.translation.width / size.width
-                if let snapped = CaptionGestureMath.snapToCentre(wanted) {
-                    captionDrag = CGSize(
-                        width: (snapped - sticker.x) * size.width,
-                        height: value.translation.height)
-                    snappedToCentre = true
-                } else {
-                    captionDrag = value.translation
-                    snappedToCentre = false
-                }
-            }
-            .onEnded { value in
-                let moved = dragFraction(in: size)
-                let wasSnapped = snappedToCentre
-                captionDrag = .zero
-                snappedToCentre = false
-                guard abs(value.translation.width) + abs(value.translation.height) > 2
-                else { return }
-                saveSticker(reshaped(
-                    x: wasSnapped ? 0.5 : sticker.x + moved.x,
-                    y: sticker.y + moved.y))
-            }
-    }
-
-    /// One finger on the bottom-right corner: scale and rotate together.
-    private func cornerDrag(in size: CGSize) -> some Gesture {
-        DragGesture(coordinateSpace: .named(Self.stageSpace))
-            .onChanged { value in
-                guard let move = CaptionGestureMath.cornerDrag(
-                    centre: CGPoint(
-                        x: sticker.x * size.width, y: sticker.y * size.height),
-                    start: value.startLocation,
-                    current: value.location)
-                else { return }
-                handleScale = move.scale
-                handleTwist = move.angleDelta
-            }
-            .onEnded { _ in
-                let grown = sticker.scale * handleScale
-                let turned = sticker.angle + handleTwist
-                handleScale = 1
-                handleTwist = 0
-                // `CaptionSticker.init` clamps both, so a corner dragged across
-                // the screen cannot save a caption too big to fit or turned far
-                // enough to read as a mistake.
-                saveSticker(reshaped(scale: grown, angle: turned))
-            }
-    }
-
-    /// First tap selects, second tap types. A caption nobody has selected is
-    /// not editable by accident, which is the other half of the fix: the whole
-    /// video used to be a button into the text editor.
-    private func tapCaption() {
-        guard isMine else { return }
-        if captionSelected {
-            // Selected means the hint has been on screen, so this counts as
-            // taught whichever way the selection ends.
-            gestureHintSeen = true
-            startEditingCaption()
-        } else {
-            withAnimation(OneDay.Motion.soft) { captionSelected = true }
-        }
-    }
-
-    private func deselectCaption() {
-        withAnimation(OneDay.Motion.soft) { captionSelected = false }
-        // Counted as taught once it has been on screen through a selection.
-        gestureHintSeen = true
-    }
-
-    /// The ✕ on the box. Clears the words; the sticker's place, size, angle and
-    /// colour stay on the card, so writing a new caption puts it back where
-    /// this one was rather than at the default centre.
-    ///
-    /// One tap and the words were gone, with nothing to bring them back — so
-    /// the toast that follows offers 撤销 for a few seconds.
-    private func deleteCaption() {
-        guard challengeID != nil || onDraftCaption != nil else { return }
-        let removed = liveOverlayText ?? ""
-        writeCaption("")
-        if !removed.isEmpty {
-            withAnimation(OneDay.Motion.soft) { deletedCaption = removed }
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(4))
-                if deletedCaption == removed {
-                    withAnimation(OneDay.Motion.soft) { deletedCaption = nil }
-                }
-            }
-        }
-        captionDraft = ""
-        withAnimation(OneDay.Motion.soft) { captionSelected = false }
-        gestureHintSeen = true
-    }
-
-    /// The way back from the ✕. Puts the words back on the card; the sticker's
-    /// place and style never left it, so the caption returns where it was.
-    private var undoToast: some View {
-        VStack {
-            Spacer(minLength: 0)
-            HStack(spacing: 14) {
-                Text(Strings.captionDeleted)
-                    .font(.subheadline.weight(.semibold))
-                Button(Strings.undo) {
-                    guard let text = deletedCaption else { return }
-                    writeCaption(text)
-                    withAnimation(OneDay.Motion.soft) { deletedCaption = nil }
-                }
-                .font(.subheadline.weight(.heavy))
-                .foregroundStyle(Color.oneDaySky)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("caption-undo")
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18)
-            .background(.black.opacity(0.75), in: Capsule())
-            .padding(.bottom, 130)
-        }
-        .transition(.opacity)
-    }
-
-    /// Same fractions, weights and shadow the stitcher uses, so what you read
-    /// here is what gets exported.
-    private func captionText(_ text: String, in size: CGSize) -> some View {
-        let minEdge = min(size.width, size.height)
-        let base = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
-        let fontSize = base * sticker.scale
-        return Text(text)
-            .font(.system(
-                size: fontSize,
-                weight: sticker.style == .headline ? .heavy : .bold,
-                design: .rounded))
-            .foregroundStyle(sticker.tint.color)
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.68)
-            .padding(.horizontal, (sticker.style.plate?.padH ?? 0) * fontSize)
-            .padding(.vertical, (sticker.style.plate?.padV ?? 0) * fontSize)
-            .background {
-                if let plate = sticker.style.plate, let fill = sticker.plateColor {
-                    // The radius is a fraction of the plate's height, which for
-                    // a one-line caption is the font size plus both paddings.
-                    RoundedRectangle(
-                        cornerRadius: fontSize * (1 + plate.padV * 2) * plate.radius,
-                        style: .continuous
-                    )
-                    .fill(fill)
-                }
-            }
-            // Only the two plateless styles need their own edge; words on a bar
-            // are already sitting on one.
-            .shadow(
-                color: .black.opacity(sticker.style.plate == nil ? 0.28 : 0),
-                radius: 5, y: 2)
-    }
-
-    // MARK: - Chrome
-
     private var top: some View {
         ZStack {
             positionChip
             HStack {
-                // Labels here until `IconBubble` takes one itself; without them
-                // VoiceOver read the SF Symbol names.
-                IconBubble(systemName: "xmark") { dismiss() }
+                IconBubble(systemName: "xmark", overVideo: true) { dismiss() }
                     .accessibilityLabel(Strings.close)
                     .accessibilityIdentifier("moment-close")
                 Spacer(minLength: 0)
@@ -988,13 +641,8 @@ struct ClipPreviewView: View {
         }
     }
 
-    /// 完成 while a caption is being typed; otherwise the look button, and
-    /// that only on somebody else's clip.
-    ///
-    /// Your own take shows no filter entry: the camera already gave it its
-    /// look, and this screen changes the frame and the words, not the colour.
-    /// `LookPanel` and `lookOverlay` stay, unreachable from here, so the
-    /// stored look and the film export that reads it are untouched.
+    /// 完成 while a caption is being typed; otherwise the look button on
+    /// somebody else's clip, and the ⋯ menu when there is something in it.
     @ViewBuilder
     private var topTrailing: some View {
         if editingCaption {
@@ -1008,14 +656,37 @@ struct ClipPreviewView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("caption-done")
-        } else if !isMine {
-            // Up here rather than down with the caption and retake buttons,
-            // because it isn't a thing you do to this clip — it's how you
-            // want to see all of them.
-            IconBubble(systemName: look.isIdentity ? "camera.filters" : "sparkles") {
-                withAnimation(OneDay.Motion.soft) { showLook = true }
+        } else {
+            HStack(spacing: 8) {
+                if !isMine {
+                    IconBubble(
+                        systemName: look.isIdentity ? "camera.filters" : "sparkles",
+                        overVideo: true
+                    ) {
+                        withAnimation(OneDay.Motion.soft) { showLook = true }
+                    }
+                    .accessibilityLabel(Strings.lookTitle)
+                }
+                let destructive = extraActions.filter(\.isDestructive)
+                if !destructive.isEmpty {
+                    Menu {
+                        ForEach(destructive) { extra in
+                            Button(role: .destructive, action: extra.action) {
+                                Label(extra.title, systemImage: extra.symbol)
+                            }
+                            .accessibilityIdentifier(extra.id)
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 38)
+                            .background(.black.opacity(0.32), in: Circle())
+                    }
+                    .accessibilityLabel(Strings.moreLabel)
+                    .accessibilityIdentifier("moment-more")
+                }
             }
-            .accessibilityLabel(Strings.lookTitle)
         }
     }
 
@@ -1032,15 +703,7 @@ struct ClipPreviewView: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
-    /// Where you are in the story.
-    ///
-    /// The moment's name used to be in the navigation bar's title and its
-    /// *number* was printed across the middle of the video, so the screen said
-    /// "MOMENT 4" over someone's face while "Golden hour" sat in a white bar at
-    /// the top. One chip, above the picture, says both.
-    ///
-    /// Whose clip it is belongs at the bottom next to the time, not here — a
-    /// name is about the person, and the person is in the picture.
+    /// Where you are in the story: 「4 / 5 · Golden hour」.
     @ViewBuilder
     private var positionChip: some View {
         let parts = [
@@ -1063,21 +726,10 @@ struct ClipPreviewView: View {
 
     // MARK: - Comments
 
-    /// The thread, on request.
-    ///
-    /// It was an inline list under the video, which meant a clip with eight
-    /// comments on it pushed the clip off the screen — the one thing you opened
-    /// this screen to look at. In a sheet the video stays behind it, still
-    /// looping.
+    /// The thread, on request, in a sheet over the still-looping take.
     private var commentsSheet: some View {
         Group {
             if let challengeID {
-                // No `onOpenMoment` here: this screen *is* one moment and has
-                // no navigation of its own, so it cannot honour a quote
-                // pointing at a different one. The quotes stay plain labels —
-                // better than an arrow that does nothing four times out of
-                // five. The room chat opened from the story timeline is where
-                // they're links.
                 RoomChatView(
                     challengeID: challengeID,
                     moment: day,
@@ -1088,51 +740,379 @@ struct ClipPreviewView: View {
         .presentationBackground(Color.oneDayMist)
     }
 
-    // MARK: - Caption
+    // MARK: - Caption editing
 
-    /// Always full screen. A caption is placed as a fraction of the exported
-    /// frame, so placing one inside a 16pt-inset card means aiming at a
-    /// smaller picture than the one it lands on — and the keyboard would take
-    /// most of that card. Staying full screen afterwards is deliberate too:
-    /// the first thing you want after writing it is to see it.
-    private func startEditingCaption() {
-        captionDraft = liveOverlayText ?? ""
+    /// 加字幕: a new caption, typed straight onto the picture. It lands below
+    /// the ones already there rather than on top of them.
+    private func startNewCaption() {
+        guard canWrite else { return }
+        captionDraft = ""
+        editingID = UUID()
+        editingIsNew = true
+        beginTyping()
+    }
+
+    private func startEditing(_ id: UUID) {
+        guard let caption = liveCaptions.first(where: { $0.id == id }) else { return }
+        captionDraft = caption.text
+        editingID = id
+        editingIsNew = false
+        beginTyping()
+    }
+
+    private func beginTyping() {
         editingCaption = true
         captionFocused = true
         // The handles have no business being on screen behind a keyboard.
-        //
-        // Deliberately *not* marking the hint as seen: writing the words is
-        // how most captions start, and this used to run before anybody had
-        // ever selected one — so the line that teaches the gestures was
-        // retired by the act of typing, and never appeared at all.
-        captionSelected = false
+        selectedID = nil
     }
 
     private func saveCaption() {
         editingCaption = false
-        guard challengeID != nil || onDraftCaption != nil else { return }
+        guard canWrite, let id = editingID else { return }
         // A Return pressed at the end leaves a trailing newline; the burned
         // caption shouldn't carry an empty second line.
         let text = captionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        captionDraft = text
-        writeCaption(text)
+        captionDraft = ""
+        editingID = nil
+        var list = liveCaptions
+        if editingIsNew {
+            guard !text.isEmpty else { return }
+            list.append(Caption(id: id, text: text, sticker: Self.placement(after: list)))
+        } else if let i = list.firstIndex(where: { $0.id == id }) {
+            if text.isEmpty {
+                list.remove(at: i)
+            } else {
+                list[i].text = text
+            }
+        }
+        writeCaptions(list)
     }
 
-    /// The one way out of the editor: the 完成 button, a tap off the caption,
-    /// the keyboard's Return on the second line, and focus leaving all end here.
+    /// Where a new caption goes. The first one sits where every caption always
+    /// has; each one after drops into a free band of the frame, in the look of
+    /// the one before it, so two captions are never one pile of words.
+    static func placement(after list: [Caption]) -> CaptionSticker? {
+        let shown = list.drawable
+        guard let last = shown.last?.placed else { return nil }
+        let bands: [Double] = [0.62, 0.25, 0.78, 0.15, 0.5]
+        let taken = shown.map(\.placed.y)
+        let y = bands.first { band in taken.allSatisfy { abs($0 - band) > 0.1 } }
+            ?? bands[shown.count % bands.count]
+        return CaptionSticker(x: 0.5, y: y, style: last.style, tint: last.tint)
+    }
+
+    /// The one way out of the editor: 完成, a tap off the caption, Return on
+    /// the second line, and focus leaving all end here.
     private func commitCaption() {
         captionFocused = false
         if editingCaption { saveCaption() }
     }
 
-    /// Two lines at most, the same cap the burned caption has. Return on the
-    /// first line starts the second; Return on the second is 完成 — the extra
-    /// line break is dropped and the caption is saved.
+    /// Two lines at most, the same cap the burned caption has.
     private func limitCaptionLines(_ text: String) {
         guard editingCaption else { return }
         let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
         guard parts.count > 2 else { return }
         captionDraft = String(parts[0]) + "\n" + parts[1...].joined()
         commitCaption()
+    }
+
+    /// First tap selects, second tap types.
+    private func tapCaption(_ id: UUID) {
+        guard isMine, canWrite else { return }
+        if selectedID == id {
+            gestureHintSeen = true
+            startEditing(id)
+        } else {
+            withAnimation(OneDay.Motion.soft) { selectedID = id }
+        }
+    }
+
+    private func deselectCaption() {
+        withAnimation(OneDay.Motion.soft) { selectedID = nil }
+        gestureHintSeen = true
+    }
+
+    /// The ✕ on a caption's box. Takes that one caption off; 撤销 in the toast
+    /// puts it back where it was, in its place in the list.
+    private func deleteCaption(_ id: UUID) {
+        guard canWrite else { return }
+        var list = liveCaptions
+        guard let i = list.firstIndex(where: { $0.id == id }) else { return }
+        let removed = DeletedCaption(caption: list.remove(at: i), index: i)
+        writeCaptions(list)
+        withAnimation(OneDay.Motion.soft) {
+            deleted = removed
+            selectedID = nil
+        }
+        gestureHintSeen = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            if deleted == removed {
+                withAnimation(OneDay.Motion.soft) { deleted = nil }
+            }
+        }
+    }
+
+    private var undoToast: some View {
+        VStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 14) {
+                Text(Strings.captionDeleted)
+                    .font(.subheadline.weight(.semibold))
+                Button(Strings.undo) {
+                    guard let deleted else { return }
+                    var list = liveCaptions
+                    list.insert(deleted.caption, at: min(deleted.index, list.count))
+                    writeCaptions(list)
+                    withAnimation(OneDay.Motion.soft) { self.deleted = nil }
+                }
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Color.oneDaySky)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("caption-undo")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .background(.black.opacity(0.75), in: Capsule())
+            .padding(.bottom, 130)
+        }
+        .transition(.opacity)
+    }
+}
+
+// MARK: - One caption on the picture
+
+/// One caption, as a sticker: drawn where it was put, and moved, sized and
+/// turned by hand.
+///
+/// Its own view so each caption keeps its own live gesture state — a pinch on
+/// one must not grow the others. Like the old single sticker, it holds only the
+/// gesture in flight; the committed value goes back through `onChange` as a
+/// finished `CaptionSticker`, in fractions of the frame.
+private struct CaptionStickerView: View {
+    let caption: Caption
+    let stageSize: CGSize
+    let isSelected: Bool
+    let isMine: Bool
+    @Binding var snappedToCentre: Bool
+    let onTap: () -> Void
+    let onChange: (CaptionSticker) -> Void
+    let onDelete: () -> Void
+
+    @State private var drag: CGSize = .zero
+    @State private var pinch: CGFloat = 1
+    @State private var twist: Double = 0
+    @State private var handleScale: CGFloat = 1
+    @State private var handleTwist: Double = 0
+
+    /// The name the corner handle's drag measures itself in.
+    static let stageSpace = "caption-stage"
+
+    private var sticker: CaptionSticker { caption.placed }
+
+    var body: some View {
+        captionText
+            // Inside the flexible frame and inside the scale and rotation, so
+            // the box hugs the words at whatever size and angle they are.
+            .overlay {
+                if isSelected, isMine { selectionChrome }
+            }
+            .frame(maxWidth: stageSize.width * 0.76)
+            .scaleEffect(pinch * handleScale)
+            .rotationEffect(.degrees(sticker.angle + twist + handleTwist))
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onTap)
+            .position(
+                x: (sticker.x + dragFraction.x) * stageSize.width,
+                y: (sticker.y + dragFraction.y) * stageSize.height)
+            .gesture(isMine ? shape : nil)
+            .animation(nil, value: drag)
+            .animation(nil, value: pinch)
+            .animation(nil, value: twist)
+            .animation(nil, value: handleScale)
+            .animation(nil, value: handleTwist)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("caption-sticker")
+    }
+
+    /// Same fractions, weights and shadow the stitcher uses, so what you read
+    /// here is what gets exported.
+    private var captionText: some View {
+        let minEdge = min(stageSize.width, stageSize.height)
+        let base = minEdge * (sticker.style == .headline ? 0.092 : 0.062)
+        let fontSize = base * sticker.scale
+        return Text(caption.trimmedText ?? "")
+            .font(.system(
+                size: fontSize,
+                weight: sticker.style == .headline ? .heavy : .bold,
+                design: .rounded))
+            .foregroundStyle(sticker.tint.color)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.68)
+            .padding(.horizontal, (sticker.style.plate?.padH ?? 0) * fontSize)
+            .padding(.vertical, (sticker.style.plate?.padV ?? 0) * fontSize)
+            .background {
+                if let plate = sticker.style.plate, let fill = sticker.plateColor {
+                    RoundedRectangle(
+                        cornerRadius: fontSize * (1 + plate.padV * 2) * plate.radius,
+                        style: .continuous
+                    )
+                    .fill(fill)
+                }
+            }
+            .shadow(
+                color: .black.opacity(sticker.style.plate == nil ? 0.28 : 0),
+                radius: 5, y: 2)
+            .accessibilityIdentifier("caption-text")
+    }
+
+    /// The dashed box, the three corners and the ✕.
+    private var selectionChrome: some View {
+        RoundedRectangle(cornerRadius: 9, style: .continuous)
+            .strokeBorder(
+                .white.opacity(0.92),
+                style: StrokeStyle(lineWidth: 1.2, dash: [4.5, 3.5]))
+            .padding(-9)
+            .overlay(alignment: .topLeading) {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundStyle(Color(uiColor: UIColor(hex: 0x0F2E6B)))
+                        .frame(width: 20, height: 20)
+                        .background(.white, in: Circle())
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        // Drawn at 20, hit at 44.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .offset(x: -31, y: -31)
+                .accessibilityLabel(Strings.deleteCaptionAction)
+                .accessibilityIdentifier("caption-delete")
+            }
+            .overlay(alignment: .topTrailing) { handleDot.offset(x: 4, y: -14) }
+            .overlay(alignment: .bottomLeading) { handleDot.offset(x: -14, y: 4) }
+            .overlay(alignment: .bottomTrailing) {
+                handleDot
+                    .offset(x: 4, y: 4)
+                    // The one corner that does something: the corner a right
+                    // thumb reaches without covering the words.
+                    .gesture(cornerDrag)
+                    .accessibilityLabel(Strings.captionResizeHandle)
+                    .accessibilityIdentifier("caption-handle")
+            }
+    }
+
+    private var handleDot: some View {
+        Circle()
+            .fill(.white)
+            .frame(width: 11, height: 11)
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+            .contentShape(Circle().scale(2.6))
+    }
+
+    /// Drag, pinch and twist at once.
+    private var shape: some Gesture {
+        SimultaneousGesture(
+            dragGesture,
+            SimultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { pinch = $0.magnification }
+                    .onEnded { value in
+                        pinch = 1
+                        onChange(sticker.reshaped(scale: sticker.scale * value.magnification))
+                    },
+                RotateGesture()
+                    .onChanged { twist = $0.rotation.degrees }
+                    .onEnded { value in
+                        twist = 0
+                        onChange(sticker.reshaped(angle: sticker.angle + value.rotation.degrees))
+                    }))
+    }
+
+    /// The live drag, as a fraction of the frame: the model only holds
+    /// fractions.
+    private var dragFraction: (x: Double, y: Double) {
+        guard stageSize.width > 0, stageSize.height > 0 else { return (0, 0) }
+        return (drag.width / stageSize.width, drag.height / stageSize.height)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard stageSize.width > 0 else {
+                    drag = value.translation
+                    return
+                }
+                // Snapping applies to the live translation too: a caption that
+                // jumps into place only after the finger lifts reads as the app
+                // moving it somewhere you didn't put it.
+                let wanted = sticker.x + value.translation.width / stageSize.width
+                if let snapped = CaptionGestureMath.snapToCentre(wanted) {
+                    drag = CGSize(
+                        width: (snapped - sticker.x) * stageSize.width,
+                        height: value.translation.height)
+                    snappedToCentre = true
+                } else {
+                    drag = value.translation
+                    snappedToCentre = false
+                }
+            }
+            .onEnded { value in
+                let moved = dragFraction
+                let wasSnapped = snappedToCentre
+                drag = .zero
+                snappedToCentre = false
+                guard abs(value.translation.width) + abs(value.translation.height) > 2
+                else { return }
+                onChange(sticker.reshaped(
+                    x: wasSnapped ? 0.5 : sticker.x + moved.x,
+                    y: sticker.y + moved.y))
+            }
+    }
+
+    /// One finger on the bottom-right corner: scale and rotate together.
+    private var cornerDrag: some Gesture {
+        DragGesture(coordinateSpace: .named(Self.stageSpace))
+            .onChanged { value in
+                guard let move = CaptionGestureMath.cornerDrag(
+                    centre: CGPoint(
+                        x: sticker.x * stageSize.width, y: sticker.y * stageSize.height),
+                    start: value.startLocation,
+                    current: value.location)
+                else { return }
+                handleScale = move.scale
+                handleTwist = move.angleDelta
+            }
+            .onEnded { _ in
+                let grown = sticker.scale * handleScale
+                let turned = sticker.angle + handleTwist
+                handleScale = 1
+                handleTwist = 0
+                // `CaptionSticker.init` clamps both.
+                onChange(sticker.reshaped(scale: grown, angle: turned))
+            }
+    }
+}
+
+extension CaptionSticker {
+    /// This sticker with some fields changed. `init` does the clamping, so a
+    /// runaway pinch can't be saved.
+    func reshaped(
+        x: Double? = nil, y: Double? = nil,
+        style: Style? = nil,
+        scale: Double? = nil, angle: Double? = nil,
+        tint: Tint? = nil
+    ) -> CaptionSticker {
+        CaptionSticker(
+            x: x ?? self.x,
+            y: y ?? self.y,
+            style: style ?? self.style,
+            scale: scale ?? self.scale,
+            angle: angle ?? self.angle,
+            tint: tint ?? self.tint)
     }
 }

@@ -5,13 +5,13 @@ import Foundation
 struct RoomSyncTransport {
     var fetchClips: @MainActor (String, URL) async throws -> [CloudKitService.RemoteClip]
     var fetchInteractions: @MainActor (String) async throws -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
-    /// code, day, authorID, authorName, file, caption, when the take was
+    /// code, day, authorID, authorName, file, captions, when the take was
     /// filmed — which is not when this runs (see `CloudKitService.uploadClip`)
     /// — and which take (nil = take 1).
-    var uploadClip: @MainActor (String, Int, String, String, URL, String?, Date, UUID?) async throws -> Void
+    var uploadClip: @MainActor (String, Int, String, String, URL, [Caption], Date, UUID?) async throws -> Void
     /// Caption-only rewrite on a clip already in the room: code, day, authorID,
-    /// words, take (nil = take 1).
-    var updateClipCaption: @MainActor (String, Int, String, String?, UUID?) async throws -> Void
+    /// every caption, take (nil = take 1).
+    var updateClipCaption: @MainActor (String, Int, String, [Caption], UUID?) async throws -> Void
     var setReaction: @MainActor (String, Int, String, String, String, String, Bool) async throws -> Void
     var postComment: @MainActor (String, Int, String, String, String, String, String) async throws -> Void
     var deleteComment: @MainActor (String) async throws -> Void
@@ -34,8 +34,8 @@ struct RoomSyncTransport {
         RoomSyncTransport(
             fetchClips: { try await CloudKitService.fetchClips(code: $0, into: $1) },
             fetchInteractions: { try await CloudKitService.fetchInteractions(code: $0) },
-            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, overlayText: $5, recordedAt: $6, takeID: $7) },
-            updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, overlayText: $3, takeID: $4) },
+            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, captions: $5, recordedAt: $6, takeID: $7) },
+            updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, captions: $3, takeID: $4) },
             setReaction: { try await CloudKitService.setReaction(code: $0, day: $1, authorID: $2, authorName: $3, targetAuthorID: $4, emoji: $5, on: $6) },
             postComment: { try await CloudKitService.postComment(code: $0, day: $1, id: $2, text: $3, authorID: $4, authorName: $5, targetAuthorID: $6) },
             deleteComment: { try await CloudKitService.deleteComment(id: $0) },
@@ -98,7 +98,7 @@ final class LocalRoomSyncSource {
         clips[index] = .init(id: old.id, day: old.day, authorID: old.authorID,
             authorName: old.authorName, recordedAt: old.recordedAt,
             localURL: url, overlayText: old.overlayText,
-            captionSticker: old.captionSticker)
+            captionSticker: old.captionSticker, captionsJSON: old.captionsJSON)
     }
 
     func close() {

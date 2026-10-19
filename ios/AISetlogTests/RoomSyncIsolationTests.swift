@@ -32,14 +32,14 @@ final class RoomSyncIsolationTests: XCTestCase {
             },
             fetchInteractions: { calls.append("interactions:\($0)"); return ([], []) },
             uploadClip: { code, day, author, name, file, caption, recordedAt, takeID in
-                XCTAssertEqual([code, author, name, caption ?? ""], ["ROOM", "me", "Me", "mine"])
+                XCTAssertEqual([code, author, name, caption.firstText ?? ""], ["ROOM", "me", "Me", "mine"])
                 XCTAssertEqual(day, 2); XCTAssertEqual(file, url)
                 XCTAssertEqual(recordedAt, filmedAt)
                 XCTAssertNil(takeID)
                 calls.append("upload")
             },
             updateClipCaption: { code, day, author, caption, takeID in
-                XCTAssertEqual([code, author, caption ?? ""], ["ROOM", "me", "edited"])
+                XCTAssertEqual([code, author, caption.firstText ?? ""], ["ROOM", "me", "edited"])
                 XCTAssertEqual(day, 2)
                 XCTAssertNil(takeID)
                 calls.append("caption")
@@ -103,7 +103,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
         let transport = source.transport
         let operations: [() async throws -> Void] = [
-            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), nil, .now, nil) },
+            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), [], .now, nil) },
             { try await transport.setReaction("LOCAL", 1, "me", "Me", "friend", "♥", true) },
             { try await transport.postComment("LOCAL", 1, "id", "text", "me", "Me", "friend") },
             { try await transport.deleteComment("id") }

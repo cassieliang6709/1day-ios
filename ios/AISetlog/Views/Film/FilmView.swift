@@ -202,6 +202,9 @@ struct FilmView: View {
         /// without changing anything else, so a stale film has to be noticed
         /// here or the old one gets handed back.
         var captionSticker: CaptionSticker?
+        /// Every caption, for the same reason: adding a second one changes the
+        /// frames and leaves the first one's words and place alone.
+        var captions: [Caption] = []
         var recordedAt: Date?
         var emoji: [String] = []
         var comments: [String] = []
@@ -214,6 +217,7 @@ struct FilmView: View {
             label = clip.label
             overlayText = clip.overlayText
             captionSticker = clip.captionSticker
+            captions = clip.captions
             recordedAt = clip.recordedAt
             emoji = clip.emoji
             comments = clip.comments

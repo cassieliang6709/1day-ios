@@ -40,7 +40,8 @@ struct RoomFeed: View {
     var slotTitle: (Int) -> String? = { _ in nil }
     /// Whether I've put a heart on this clip.
     var isLiked: (DayClip) -> Bool = { _ in false }
-    let onPlay: (Int) -> Void
+    /// The tapped take — that person's, that one — not just its moment.
+    let onPlay: (DayClip) -> Void
     let onFilm: (Int) -> Void
     var onLike: (DayClip) -> Void = { _ in }
     var onReply: (DayClip) -> Void = { _ in }
@@ -244,7 +245,7 @@ struct RoomFeed: View {
     /// thirty players decoding at once.
     private func tile(_ clip: DayClip, in column: Column, isNewest: Bool) -> some View {
         let title = slotTitle(clip.day)
-        return Button { onPlay(clip.day) } label: {
+        return Button { onPlay(clip) } label: {
             Color.clear
                 .aspectRatio(Self.tileAspect, contentMode: .fit)
                 .overlay {
