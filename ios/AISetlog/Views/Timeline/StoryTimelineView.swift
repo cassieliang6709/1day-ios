@@ -42,7 +42,9 @@ struct StoryTimelineView: View {
     private var challenge: Challenge? { store.challenge(challengeID) }
 
     enum TimelineSheet: Identifiable, Equatable {
-        case record(day: Int)
+        /// `take` is what the new clip does to one already there: 重拍
+        /// (`.replace`, the default) or 再拍一段 (`.append`).
+        case record(day: Int, take: TakeTarget = .replace(nil))
         case preview(day: Int, authorID: String?)
         /// The whole moment rather than one person's take — everyone who
         /// filmed it, stacked. The grid opens this: a tile stands for the
@@ -51,7 +53,7 @@ struct StoryTimelineView: View {
 
         var id: String {
             switch self {
-            case .record(let day): "record-\(day)"
+            case .record(let day, _): "record-\(day)"
             case .preview(let day, let authorID): "preview-\(day)-\(authorID ?? "local")"
             case .moment(let day): "moment-\(day)"
             }
@@ -535,7 +537,7 @@ struct StoryTimelineView: View {
     @ViewBuilder
     private func sheetContent(_ presented: TimelineSheet) -> some View {
         switch presented {
-        case .record(let day):
+        case .record(let day, let take):
             RecordClipView(
                 day: day,
                 slotTitle: slotTitle(for: day),
@@ -547,7 +549,8 @@ struct StoryTimelineView: View {
             ) { url, overlayText in
                 let wasComplete = dayIsComplete
                 store.saveClip(
-                    from: url, day: day, challengeID: challengeID, overlayText: overlayText)
+                    from: url, day: day, challengeID: challengeID, overlayText: overlayText,
+                    take: take)
                 if !wasComplete, dayIsComplete { celebrateMyFinish() }
             }
 
@@ -562,10 +565,10 @@ struct StoryTimelineView: View {
                 challengeID: challengeID,
                 showsPrompt: showsPrompt(for: day),
                 myID: account.account?.id ?? "local"
-            ) {
+            ) { take in
                 sheet = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    sheet = .record(day: day)
+                    sheet = .record(day: day, take: take)
                 }
             }
 
@@ -585,10 +588,10 @@ struct StoryTimelineView: View {
                     clipLength: challenge?.resolvedClipLength ?? .tiny,
                     showsPrompt: challenge?.isTimeOnly != true,
                     startIndex: start
-                ) { retakeDay in
+                ) { retakeDay, take in
                     sheet = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        sheet = .record(day: retakeDay)
+                        sheet = .record(day: retakeDay, take: take)
                     }
                 }
             }

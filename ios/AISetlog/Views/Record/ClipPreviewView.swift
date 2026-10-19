@@ -40,7 +40,11 @@ struct ClipPreviewView: View {
     /// own fields, which are take 1's.
     var takeID: UUID? = nil
     /// Nil hides 重拍: replaying a clip from 我的 has no camera to go back to.
+    /// 重拍 replaces this take; the caller knows which one that is.
     let onReRecord: (() -> Void)?
+    /// 再拍一段: film this moment again and keep both. Nil hides it, for the
+    /// same reason as 重拍.
+    var onAddTake: (() -> Void)? = nil
     /// A clip in no story (one only you can see in 我的) has no card to write
     /// its caption to; this takes the words instead.
     var onDraftCaption: ((String?) -> Void)? = nil
@@ -501,6 +505,11 @@ struct ClipPreviewView: View {
                     actionButton(
                         "arrow.counterclockwise", Strings.rerecordShort,
                         accented: false, identifier: "moment-rerecord", action: onReRecord)
+                }
+                if let onAddTake {
+                    actionButton(
+                        "plus.rectangle.on.rectangle", Strings.addTakeShort,
+                        accented: false, identifier: "moment-add-take", action: onAddTake)
                 }
             }
             if isShared {

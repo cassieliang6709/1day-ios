@@ -222,14 +222,14 @@ final class RoomUploadRetryTests: XCTestCase {
         XCTAssertEqual(back.moreTakes, withTake.moreTakes)
     }
 
-    /// Filming a moment again adds a take; take 1 is exactly where it was.
+    /// 再拍一段 adds a take; take 1 is exactly where it was.
     func testASecondTakeIsAppendedAndTheFirstIsKept() async throws {
         let room = try roomWithMyTake()
         let second = filmedAt.addingTimeInterval(600)
 
         store.saveClip(
             from: try newTakeFile(), day: 1, challengeID: room.id,
-            overlayText: "again", recordedAt: second)
+            overlayText: "again", recordedAt: second, take: .append)
 
         let card = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 })
         XCTAssertEqual(card.clipFileName, "day1.mov")
@@ -245,7 +245,7 @@ final class RoomUploadRetryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: takeOne), Data("take".utf8))
 
         // A third take appends again rather than replacing the second.
-        store.saveClip(from: try newTakeFile("third.mov"), day: 1, challengeID: room.id)
+        store.saveClip(from: try newTakeFile("third.mov"), day: 1, challengeID: room.id, take: .append)
         XCTAssertEqual(store.challenge(room.id)?.cards.first { $0.day == 1 }?.moreTakes.count, 2)
     }
 
@@ -254,7 +254,7 @@ final class RoomUploadRetryTests: XCTestCase {
         let room = try roomWithMyTake()
         server.clips = [myRoomCopy(day: 1, at: filmedAt)]
 
-        store.saveClip(from: try newTakeFile(), day: 1, challengeID: room.id)
+        store.saveClip(from: try newTakeFile(), day: 1, challengeID: room.id, take: .append)
         await waitForUploads(1)
 
         let take = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 }?.moreTakes.first)
@@ -271,6 +271,80 @@ final class RoomUploadRetryTests: XCTestCase {
         let ids = Set(server.clips.map(\.id))
         XCTAssertTrue(ids.contains(CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1)))
         XCTAssertTrue(ids.contains(name))
+    }
+
+    /// 重拍 on take 1 replaces it in place — file, card and room record —
+    /// rather than adding a take. This is the default every caller gets.
+    func testRetakingTakeOneReplacesIt() async throws {
+        let room = try roomWithMyTake()
+        let later = filmedAt.addingTimeInterval(600)
+
+        store.saveClip(
+            from: try newTakeFile(), day: 1, challengeID: room.id,
+            overlayText: "new", recordedAt: later)
+        await waitForUploads(1)
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 })
+        XCTAssertEqual(card.clipFileName, "day1.mov")
+        XCTAssertEqual(card.recordedAt, later)
+        XCTAssertEqual(card.overlayText, "new")
+        XCTAssertTrue(card.moreTakes.isEmpty)
+        // No second file next to take 1. (Overwriting `day1.mov` itself is
+        // `DiskClipFileStore.storeClip`; this test's store doesn't write it.)
+        let files = try FileManager.default.contentsOfDirectory(
+            atPath: dir.appendingPathComponent(room.id.uuidString).path)
+        XCTAssertEqual(files, ["day1.mov"])
+        XCTAssertEqual(server.uploads.map(\.takeID), [nil])
+    }
+
+    /// 重拍 on take 2 replaces take 2 under the same id — so the same file name
+    /// and the same room record — and leaves take 1 alone.
+    func testRetakingAnExtraTakeReplacesOnlyThatTake() async throws {
+        var room = try roomWithMyTake()
+        let takeID = UUID()
+        let fileName = "day1_\(takeID.uuidString).mov"
+        let takeFile = dir.appendingPathComponent(room.id.uuidString).appendingPathComponent(fileName)
+        try Data("two".utf8).write(to: takeFile)
+        room.cards[0].moreTakes = [ClipTake(
+            id: takeID, fileName: fileName, recordedAt: filmedAt.addingTimeInterval(60),
+            overlayText: "two", captionSticker: nil)]
+        store.challenges = [room]
+        // The room already has take 1, so the sync after the upload has
+        // nothing of take 1 to retry.
+        server.clips = [myRoomCopy(day: 1, at: filmedAt)]
+        let later = filmedAt.addingTimeInterval(600)
+
+        store.saveClip(
+            from: try newTakeFile(), day: 1, challengeID: room.id,
+            overlayText: "two again", recordedAt: later, take: .replace(takeID))
+        await waitForUploads(1)
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 })
+        XCTAssertEqual(card.moreTakes.map(\.id), [takeID])
+        XCTAssertEqual(card.moreTakes.first?.fileName, fileName)
+        XCTAssertEqual(card.moreTakes.first?.recordedAt, later)
+        XCTAssertEqual(card.moreTakes.first?.overlayText, "two again")
+        XCTAssertEqual(try Data(contentsOf: takeFile), Data("again".utf8))
+        // Take 1 untouched.
+        XCTAssertEqual(card.overlayText, "hi")
+        XCTAssertEqual(card.recordedAt, filmedAt)
+        let takeOne = dir.appendingPathComponent(room.id.uuidString).appendingPathComponent("day1.mov")
+        XCTAssertEqual(try Data(contentsOf: takeOne), Data("take".utf8))
+        XCTAssertEqual(server.uploads.map(\.takeID), [takeID])
+    }
+
+    /// 重拍 on a take that's gone by the time the camera hands back keeps the
+    /// footage as a new take rather than dropping it or touching take 1.
+    func testRetakingAMissingTakeKeepsTheFootageAsANewTake() throws {
+        let room = try roomWithMyTake()
+
+        store.saveClip(from: try newTakeFile(), day: 1, challengeID: room.id, take: .replace(UUID()))
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first { $0.day == 1 })
+        XCTAssertEqual(card.moreTakes.count, 1)
+        XCTAssertEqual(card.overlayText, "hi")
+        let takeOne = dir.appendingPathComponent(room.id.uuidString).appendingPathComponent("day1.mov")
+        XCTAssertEqual(try Data(contentsOf: takeOne), Data("take".utf8))
     }
 
     /// The room has take 1; take 2 is still only here. Both show, once each.
@@ -431,6 +505,7 @@ private final class TempClipFileStore: ClipFileStore {
         let dest = clipURL(fileName: name, challengeID: challengeID)
         try? FileManager.default.createDirectory(
             at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: dest)
         return (try? FileManager.default.copyItem(at: tempURL, to: dest)) == nil ? nil : name
     }
     func clipURL(fileName: String, challengeID: UUID) -> URL {

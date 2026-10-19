@@ -24,10 +24,10 @@ struct ClipDeckReview: View {
     /// Which clip to show — whichever one was tapped. Named `startIndex` from
     /// when it was the first page of a pager; it is now the only one.
     let startIndex: Int
-    /// Re-record a day. Takes the day rather than closing over one, because by
-    /// the time it fires you may have swiped three moments away from where you
-    /// came in.
-    let onReRecord: (Int) -> Void
+    /// Film a day again: 重拍 replaces the take on screen, 再拍一段 adds one.
+    /// Takes the day rather than closing over one, because by the time it
+    /// fires you may have swiped three moments away from where you came in.
+    let onRecord: (Int, TakeTarget) -> Void
 
     init(
         deck: ClipDeck,
@@ -36,7 +36,7 @@ struct ClipDeckReview: View {
         clipLength: Challenge.ClipLength = .tiny,
         showsPrompt: Bool = true,
         startIndex: Int,
-        onReRecord: @escaping (Int) -> Void
+        onRecord: @escaping (Int, TakeTarget) -> Void
     ) {
         self.deck = deck
         self.challengeID = challengeID
@@ -44,7 +44,7 @@ struct ClipDeckReview: View {
         self.clipLength = clipLength
         self.showsPrompt = showsPrompt
         self.startIndex = startIndex
-        self.onReRecord = onReRecord
+        self.onRecord = onRecord
     }
 
     var body: some View {
@@ -81,6 +81,7 @@ struct ClipDeckReview: View {
             challengeID: challengeID,
             targetAuthorID: clip.authorID,
             takeID: clip.takeID,
-            onReRecord: { onReRecord(clip.day) })
+            onReRecord: { onRecord(clip.day, .replace(clip.takeID)) },
+            onAddTake: { onRecord(clip.day, .append) })
     }
 }

@@ -801,6 +801,8 @@ enum Strings {
     /// The same action as `rerecord`, for a chip sitting on top of the video
     /// where "Re-record this day" wraps to two lines and stops being a chip.
     static var rerecordShort: String { lang == .chinese ? "重拍" : "Retake" }
+    /// Beside 重拍: film the moment again without losing the take you have.
+    static var addTakeShort: String { lang == .chinese ? "再拍一段" : "Add take" }
     /// The review screen's card of things you can do to one moment, and the
     /// button that gives the clip the whole display when you want it.
     static var thisMoment: String { lang == .chinese ? "这个瞬间" : "This moment" }

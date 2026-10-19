@@ -223,6 +223,14 @@ struct CaptionSticker: Codable, Equatable {
 /// one of these: its own file (`dayN_<id>.ext`) and its own record
 /// (`code_author_dayN_<id>`), so filming the moment again adds to it instead of
 /// overwriting what was there.
+/// What a new recording does to a moment that already has a clip.
+enum TakeTarget: Hashable {
+    /// 重拍: replace this take — nil is take 1. The default everywhere.
+    case replace(UUID?)
+    /// 再拍一段: keep every take and add this one after them.
+    case append
+}
+
 struct ClipTake: Codable, Identifiable, Equatable {
     let id: UUID
     var fileName: String

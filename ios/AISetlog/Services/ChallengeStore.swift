@@ -580,32 +580,54 @@ final class ChallengeStore {
     /// is now; a draft filed later has its own time and passes it, otherwise
     /// the card — and every friend's copy of it — says the moment happened
     /// when somebody tidied their drafts.
+    ///
+    /// `take` only matters when the moment already has a clip. The default,
+    /// `.replace(nil)`, is 重拍 on take 1 and what every caller did before a
+    /// moment could hold more than one take; only 再拍一段 passes `.append`.
     func saveClip(
         from tempURL: URL,
         day: Int,
         challengeID: UUID,
         overlayText: String? = nil,
-        recordedAt: Date = .now
+        recordedAt: Date = .now,
+        take: TakeTarget = .replace(nil)
     ) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
 
-        // A moment that already has a take keeps it. Filming it again used to
-        // overwrite `dayN.mov` and the room record `code_author_dayN` — so the
-        // second time somebody caught the sunset, the first one was gone, on
-        // their phone and on every friend's. The new take goes next to it
-        // instead, under its own file and its own record; take 1 stays exactly
-        // where every version of the app expects it.
+        // 重拍 replaces the take you were looking at, file and room record
+        // both, so friends see the new one in its place. 再拍一段 keeps every
+        // take and adds the new one under its own file and its own record;
+        // take 1 stays exactly where every version of the app expects it.
+        let card = challenges[ci].cards[idx]
+        let extraIndex: Int? = switch take {
+        case .replace(let id?): card.moreTakes.firstIndex { $0.id == id }
+        case .replace(nil), .append: nil
+        }
+        let writesTakeOne = card.clipFileName == nil || take == .replace(nil)
+
         let fileName: String
         let takeID: UUID?
-        if challenges[ci].cards[idx].clipFileName == nil {
+        if writesTakeOne {
             guard let stored = fileStore.storeClip(from: tempURL, day: day, challengeID: challengeID) else { return }
             fileName = stored
             takeID = nil
             challenges[ci].cards[idx].clipFileName = fileName
             challenges[ci].cards[idx].recordedAt = recordedAt
             challenges[ci].cards[idx].overlayText = overlayText
+        } else if let t = extraIndex {
+            // Same take id, so the same file name and the same room record.
+            let id = card.moreTakes[t].id
+            guard let stored = fileStore.storeExtraTake(
+                from: tempURL, day: day, takeID: id, challengeID: challengeID) else { return }
+            fileName = stored
+            takeID = id
+            challenges[ci].cards[idx].moreTakes[t].fileName = stored
+            challenges[ci].cards[idx].moreTakes[t].recordedAt = recordedAt
+            challenges[ci].cards[idx].moreTakes[t].overlayText = overlayText
         } else {
+            // 再拍一段 — or 重拍 on a take that was gone by the time the camera
+            // handed back, where keeping the footage beats dropping it.
             let id = UUID()
             // `storeExtraTake` never deletes; nil means nothing was kept, and
             // nothing is touched — never "fall back" to `storeClip`, which

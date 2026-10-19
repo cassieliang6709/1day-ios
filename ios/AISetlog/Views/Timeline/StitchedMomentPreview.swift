@@ -17,7 +17,9 @@ struct StitchedMomentPreview: View {
     var challengeID: UUID?
     var showsPrompt = true
     let myID: String
-    let onReRecord: () -> Void
+    /// 重拍 on the moment as a whole replaces my take 1 — the one the
+    /// stitched version leads with. 再拍一段 adds one.
+    let onRecord: (TakeTarget) -> Void
 
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var stitched: URL?
@@ -90,7 +92,8 @@ struct StitchedMomentPreview: View {
             recordedAt: clips.first?.recordedAt,
             challengeID: challengeID,
             targetAuthorID: mine?.authorID,
-            onReRecord: onReRecord)
+            onReRecord: { onRecord(.replace(nil)) },
+            onAddTake: { onRecord(.append) })
     }
 
     private func stitch() async {
