@@ -177,6 +177,8 @@ struct StoryRowCard: View {
     var showsMembersAsCover = false
     /// Which of `memberNames` is me, so the stack can ring my own face.
     var myName: String?
+    /// Their avatars, by name, for the faces-as-cover stack.
+    var memberImages: [String: UIImage] = [:]
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     /// Same rule as the hero card: the row names today's moment, and says
@@ -190,7 +192,7 @@ struct StoryRowCard: View {
                 // Nobody known yet (before the first sync): one blank face,
                 // which `AvatarDot` draws as the mascot.
                 AvatarStack(names: memberNames.isEmpty ? [""] : memberNames,
-                            maxShown: 4, size: 38, you: myName)
+                            maxShown: 4, size: 38, you: myName, images: memberImages)
                     .frame(minWidth: 58, minHeight: 66)
             } else {
                 thumbnail

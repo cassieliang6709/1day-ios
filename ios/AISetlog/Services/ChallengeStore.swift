@@ -20,6 +20,9 @@ final class ChallengeStore {
 
     /// Set once at app launch so shared rooms can attribute + upload clips.
     var account: AccountStore?
+    /// My avatar and today's mood, as rooms should show them. Set at launch;
+    /// read whenever a room needs my `Member` record brought up to date.
+    var myRoomProfile: @MainActor () -> MyRoomProfile? = { nil }
 
     /// CloudKit room sync (remote clip cache + syncing spinners live there).
     let roomSync: RoomSyncService
@@ -141,6 +144,8 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
+        // The room I made has no `Member` record for me until this writes one.
+        await publishMyProfile(toRoom: room.code)
         return challenge
     }
 
@@ -178,6 +183,9 @@ final class ChallengeStore {
         // reaches this line, so it leaves no record behind.
         await roomSync.recordMembership(
             code: room.code, authorID: me.id, displayName: me.displayName)
+        // Joining wrote the record from scratch; put my avatar and mood back.
+        roomSync.forgetPublishedProfile(code: room.code)
+        await publishMyProfile(toRoom: room.code)
         await syncRoom(challenge.id)
         return challenge
     }
@@ -197,6 +205,7 @@ final class ChallengeStore {
             roomSync.remoteComments[code] = interactions.comments
             mergeInteractions(interactions, into: id)
         }
+        await roomSync.syncMembers(code: code)
     }
 
     /// Re-sends my takes the room doesn't have.

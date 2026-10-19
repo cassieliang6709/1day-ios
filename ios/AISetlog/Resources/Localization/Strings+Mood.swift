@@ -6,7 +6,9 @@ extension Strings {
     static var moodSectionTitle: String { AppLanguage.effective.resolved == .chinese ? "今天的心情" : "Today's mood" }
     static var moodPrompt: String { AppLanguage.effective.resolved == .chinese ? "今天感觉怎么样？" : "How are you feeling today?" }
     static var moodNotePlaceholder: String { AppLanguage.effective.resolved == .chinese ? "写一句话（可选）" : "One line about today (optional)" }
-    static var moodPrivateHint: String { AppLanguage.effective.resolved == .chinese ? "只有你自己看得到" : "Only you can see this" }
+    /// The face shows beside your avatar in your rooms (see `MemberFace`);
+    /// the note never leaves your private database.
+    static var moodPrivateHint: String { AppLanguage.effective.resolved == .chinese ? "朋友只看到表情，文字只有你看得到" : "Friends see the face; the words are only for you" }
 
     static var moodHappy: String { AppLanguage.effective.resolved == .chinese ? "开心" : "Happy" }
     static var moodCalm: String { AppLanguage.effective.resolved == .chinese ? "平静" : "Calm" }

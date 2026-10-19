@@ -516,7 +516,7 @@ struct PlansHomeView: View {
     private var header: some View {
         HStack(spacing: 11) {
             Button { showSettings = true } label: {
-                AvatarDot(name: account.account?.displayName, size: 42)
+                AvatarDot(name: account.account?.displayName, size: 42, image: AvatarStore.shared.image)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.settings)
@@ -814,7 +814,8 @@ struct PlansHomeView: View {
                 refreshToken: state.refreshToken,
                 memberNames: store.members(for: challenge.id).map(\.name),
                 showsMembersAsCover: membersAsCover,
-                myName: account.account?.displayName)
+                myName: account.account?.displayName,
+                memberImages: membersAsCover ? store.memberAvatars(for: challenge.id) : [:])
         }
         .buttonStyle(.plain)
         .contextMenu {

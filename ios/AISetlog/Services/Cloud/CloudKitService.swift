@@ -238,6 +238,88 @@ enum CloudKitService {
         print("[room] saved member code=\(code)")
     }
 
+    /// What I show the people in a room: my avatar and today's mood face.
+    /// Never the mood's note — that stays in the
+    /// private database (`MoodSync`).
+    struct MemberProfileWrite: Equatable {
+        let code: String
+        let authorID: String
+        let displayName: String
+        /// The finished avatar on disk. Nil leaves whatever the record had.
+        let avatarURL: URL?
+        /// Nil leaves the record's mood alone; it stops showing on its own
+        /// once its day is over.
+        let moodKind: String?
+        /// When the mood was picked. A friend shows it only on that same day.
+        let moodDay: Date?
+    }
+
+    /// A room member as their `Member` record describes them.
+    struct RemoteMember: Equatable {
+        let userID: String
+        let displayName: String
+        /// The downloaded avatar, cached on disk.
+        let avatarURL: URL?
+        let moodKind: String?
+        let moodDay: Date?
+    }
+
+    /// Adds my avatar and mood to my `Member` record in one room, creating the
+    /// record when there isn't one yet — a room I made myself never got one
+    /// from joining. Reads first so `joinedAt` survives.
+    static func saveMemberProfile(_ write: MemberProfileWrite) async throws {
+        try await ensureAccountAvailable()
+        let id = CKRecord.ID(recordName: memberRecordName(code: write.code, authorID: write.authorID))
+        let record: CKRecord
+        do {
+            record = try await db.record(for: id)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: "Member", recordID: id)
+            record["roomCode"] = write.code as CKRecordValue
+            record["userID"] = write.authorID as CKRecordValue
+            record["joinedAt"] = Date.now as CKRecordValue
+        }
+        record["displayName"] = write.displayName as CKRecordValue
+        if let avatarURL = write.avatarURL { record["avatar"] = CKAsset(fileURL: avatarURL) }
+        if let mood = write.moodKind, let day = write.moodDay {
+            record["moodKind"] = mood as CKRecordValue
+            record["moodDay"] = day as CKRecordValue
+        }
+        try await upsert(record)
+        print("[room] saved member profile code=\(write.code)")
+    }
+
+    /// Every `Member` record in a room, avatars downloaded into `cacheDir`.
+    /// Needs `roomCode` QUERYABLE (see docs/cloudkit-member-avatar-mood-deploy.md).
+    static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {
+        try await ensureAccountAvailable()
+        let query = CKQuery(recordType: "Member", predicate: NSPredicate(format: "roomCode == %@", code))
+        let records = try await allRecords(matching: query)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        return records.compactMap { r in
+            guard let userID = r["userID"] as? String else { return nil }
+            var local: URL?
+            if let asset = r["avatar"] as? CKAsset, let src = asset.fileURL {
+                let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: userID))
+                try? fm.removeItem(at: dst)
+                if (try? fm.copyItem(at: src, to: dst)) != nil { local = dst }
+            }
+            return RemoteMember(
+                userID: userID,
+                displayName: r["displayName"] as? String ?? "",
+                avatarURL: local,
+                moodKind: r["moodKind"] as? String,
+                moodDay: r["moodDay"] as? Date)
+        }
+    }
+
+    /// Apple user IDs carry dots; keep the file name to safe characters.
+    static func memberAvatarFileName(userID: String) -> String {
+        let safe = userID.map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+        return "avatar_\(safe).png"
+    }
+
     // MARK: - Clips
 
     struct RemoteClip: Identifiable {

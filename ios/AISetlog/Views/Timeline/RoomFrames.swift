@@ -182,7 +182,7 @@ private struct PersonFrame: View {
         let onVideo = !column.clips.isEmpty
         return Button(action: onOpenPerson) {
             HStack(spacing: 7) {
-                AvatarDot(name: column.isMine ? nil : column.name, size: 30, isYou: column.isMine)
+                MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 30, isYou: column.isMine)
                 Text(column.name)
                     .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .foregroundStyle(onVideo ? .white : OneDay.ink)
@@ -295,8 +295,8 @@ struct RoomPersonPage: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
-                        AvatarDot(name: column.isMine ? nil : column.name, size: 44,
-                                  isYou: column.isMine)
+                        MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 44,
+                                   isYou: column.isMine)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(column.name)
                                 .font(.system(size: 24, weight: .heavy, design: .rounded))

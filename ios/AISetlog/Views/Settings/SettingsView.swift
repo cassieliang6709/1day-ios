@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var deleteFailed = false
     @State private var isDeleting = false
     @State private var showSignIn = false
+    @State private var showAvatarSetup = false
     /// Signing out hides every shared room on this device, which nothing on
     /// the row itself suggests — so it asks first.
     @State private var showSignOutConfirmation = false
@@ -92,6 +93,9 @@ struct SettingsView: View {
             // the whole settings panel down with it.
             .sheet(isPresented: $showSignIn) {
                 SignInView { showSignIn = false }
+            }
+            .fullScreenCover(isPresented: $showAvatarSetup) {
+                AvatarSetupFlow(onFinish: { _ in showAvatarSetup = false }, skipLabel: Strings.cancel)
             }
             .onAppear { draftName = account.account?.displayName ?? "" }
             .onChange(of: account.account?.displayName) { _, name in
@@ -240,7 +244,14 @@ struct SettingsView: View {
 
     private var identityRow: some View {
         HStack(spacing: 13) {
-            AvatarDot(name: account.account?.displayName, size: 54)
+            // Tapping your own face redraws your avatar.
+            Button { showAvatarSetup = true } label: {
+                AvatarDot(name: account.account?.displayName, size: 54, image: AvatarStore.shared.image)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.avatarAccessibility)
+            .accessibilityHint(Strings.avatarRedoHint)
+            .accessibilityIdentifier("settings-avatar")
 
             if account.isSignedIn {
                 VStack(alignment: .leading, spacing: 2) {

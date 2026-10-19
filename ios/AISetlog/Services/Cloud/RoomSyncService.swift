@@ -16,6 +16,10 @@ final class RoomSyncService {
     var remoteReactions: [String: [CloudKitService.RemoteReaction]] = [:]
     /// Comments fetched per room code.
     var remoteComments: [String: [CloudKitService.RemoteComment]] = [:]
+    /// Everyone's `Member` record per room code, keyed by user ID: their
+    /// avatar and today's mood. Settable for the same reason as the caches
+    /// above.
+    var remoteMembers: [String: [String: CloudKitService.RemoteMember]] = [:]
     /// Room codes currently being synced (drives a spinner in the board).
     private(set) var syncing: Set<String> = []
     /// Clips on their way up, as "code#authorID#day". Recording, the board's
@@ -43,7 +47,9 @@ final class RoomSyncService {
         remoteClips[code] = nil
         remoteReactions[code] = nil
         remoteComments[code] = nil
+        remoteMembers[code] = nil
         lastError[code] = nil
+        forgetPublishedProfile(code: code)
     }
 
     /// Pull every member's clips for a room into the local cache. Interaction
@@ -170,6 +176,60 @@ final class RoomSyncService {
         } catch {
             print("[room] member record failed: \(error)")
         }
+    }
+
+    /// Pull the room's `Member` records — avatars and moods. Failure keeps
+    /// what we had: before the `Member` type is deployed to Production every
+    /// fetch fails, and that must not blank anybody's face.
+    @MainActor
+    func syncMembers(code: String) async {
+        do {
+            let members = try await transport.fetchMembers(
+                code, fileStore.remoteCacheDir(roomCode: code).appendingPathComponent("members", isDirectory: true))
+            remoteMembers[code] = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
+        } catch {
+            print("[room] member fetch failed: \(error)")
+        }
+        #if DEBUG
+        DebugMemberMoods.add(to: &remoteMembers, code: code, authors: (remoteClips[code] ?? []).map(\.authorID))
+        #endif
+    }
+
+    /// What was last written to my `Member` record per room, so the same
+    /// avatar and mood aren't sent again on every foreground. Persisted:
+    /// relaunching isn't a reason to upload the avatar to every room again.
+    @ObservationIgnored private var publishedProfiles: [String: String] =
+        UserDefaults.standard.dictionary(forKey: RoomSyncService.publishedProfilesKey) as? [String: String] ?? [:]
+    static let publishedProfilesKey = "memberProfile.published.v1"
+
+    /// Write my avatar and mood to one room's `Member` record, unless that
+    /// exact `signature` already went up. A failure is logged and remembered as
+    /// not sent, so the next call tries again; nothing waits on it.
+    @MainActor
+    @discardableResult
+    func publishProfile(_ write: CloudKitService.MemberProfileWrite, signature: String) async -> Bool {
+        guard publishedProfiles[write.code] != signature else { return false }
+        do {
+            try await transport.saveMemberProfile(write)
+            publishedProfiles[write.code] = signature
+            UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
+            return true
+        } catch {
+            print("[room] member profile failed: \(error)")
+            return false
+        }
+    }
+
+    /// What last went up for this room, if anything.
+    func publishedProfileSignature(code: String) -> String? {
+        publishedProfiles[code]
+    }
+
+    /// Joining rewrites the `Member` record from scratch; the next publish
+    /// has to put the avatar and mood back.
+    func forgetPublishedProfile(code: String) {
+        guard publishedProfiles.removeValue(forKey: code) != nil else { return }
+        UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
     }
 
     func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async {

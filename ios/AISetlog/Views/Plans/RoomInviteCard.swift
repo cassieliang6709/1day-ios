@@ -29,19 +29,26 @@ struct RoomInviteCardContent: Equatable, Sendable {
     /// Your display name. Nil before sign-in names you, in which case the card
     /// leads with the room instead of an invitation from nobody.
     let inviter: String?
+    /// The inviter's avatar file (spec §4.3). Nil draws their initial instead.
+    let inviterAvatarURL: URL?
 
-    init(title: String, code: String, inviter: String?) {
+    init(title: String, code: String, inviter: String?, inviterAvatarURL: URL? = nil) {
         self.title = title
         self.code = code
         let trimmed = inviter?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.inviter = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        self.inviterAvatarURL = inviterAvatarURL
     }
 
-    init(challenge: Challenge, inviter: String?) {
+    /// The avatar defaults to mine: every invite is sent by the person holding
+    /// the phone.
+    init(challenge: Challenge, inviter: String?,
+         inviterAvatarURL: URL? = AvatarStore.savedFileOnDisk) {
         self.init(
             title: ChallengePresenter(challenge: challenge).displayTitle,
             code: challenge.roomCode ?? "",
-            inviter: inviter)
+            inviter: inviter,
+            inviterAvatarURL: inviterAvatarURL)
     }
 
     var headline: String { Strings.inviteCardHeadline(inviter: inviter) }
@@ -90,6 +97,8 @@ struct RoomInviteCardView: View {
 
     private var header: some View {
         VStack(spacing: 6) {
+            inviterFace
+                .padding(.bottom, 4)
             Text("1Day")
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(OneDay.onBrand.opacity(0.85))
@@ -101,6 +110,29 @@ struct RoomInviteCardView: View {
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// Who it's from: their avatar, or — for someone who skipped making one —
+    /// their initial on 鹅黄, the spec's placeholder.
+    @ViewBuilder
+    private var inviterFace: some View {
+        if let url = content.inviterAvatarURL, let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(1.12)
+                .frame(width: 72, height: 72)
+                .background(Circle().fill(.white))
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+        } else if let inviter = content.inviter {
+            Text(Identity.initial(for: inviter))
+                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color(uiColor: UIColor(hex: 0x7A5200)))
+                .frame(width: 72, height: 72)
+                .background(Circle().fill(Color.oneDayButter))
+                .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+        }
     }
 
     /// White panel so the code reads at a glance in a chat thumbnail, where

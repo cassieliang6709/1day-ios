@@ -325,7 +325,8 @@ private struct RoomChatConversation: View {
             } else {
                 Group {
                     if startsRun {
-                        AvatarDot(name: entry.message.authorName, size: Self.avatarSize)
+                        MemberFace(id: entry.message.authorID, name: entry.message.authorName,
+                                   size: Self.avatarSize, showsMood: false)
                     } else {
                         Color.clear
                     }

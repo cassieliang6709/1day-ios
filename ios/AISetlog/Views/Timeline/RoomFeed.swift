@@ -217,7 +217,7 @@ struct RoomFeed: View {
     /// Face, name, and how many clips they have in the room.
     private func columnHeader(_ column: Column) -> some View {
         HStack(spacing: 6) {
-            AvatarDot(name: column.isMine ? nil : column.name, size: 26, isYou: column.isMine)
+            MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 26, isYou: column.isMine)
             Text(column.name)
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)

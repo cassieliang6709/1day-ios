@@ -12,6 +12,10 @@ struct AvatarDot: View {
     var isPending = false
     /// Draws a bright ring around the dot — used for "this is you".
     var isYou = false
+    /// The person's avatar (`AvatarStore`, or a friend's from their `Member`
+    /// record). Nil keeps the initial — which is what everyone without an
+    /// avatar, and every caller that doesn't pass one, still sees.
+    var image: UIImage? = nil
 
     /// Bound, not read: picking your own colour in Settings has to repaint
     /// every avatar of you on the screen behind it — the header, your clips'
@@ -24,7 +28,16 @@ struct AvatarDot: View {
 
     var body: some View {
         Group {
-            if hasName {
+            if let image {
+                // The avatar is a die-cut sticker on a transparent square; a
+                // little inset so its rainbow edge isn't cut by the circle.
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(1.12)
+                    .opacity(isPending ? 0.58 : 1)
+                    .accessibilityHidden(true)
+            } else if hasName {
                 // Fixed, relative to the dot: an initial that grew with
                 // Dynamic Type would burst out of a circle that doesn't.
                 Text(Identity.initial(for: name))
@@ -40,7 +53,9 @@ struct AvatarDot: View {
         }
             .frame(width: size, height: size)
             .background {
-                if isPending {
+                if image != nil {
+                    Circle().fill(Color.white)
+                } else if isPending {
                     Circle().fill(tint.opacity(0.14))
                 } else if hasName {
                     Circle().fill(tint.gradient)
@@ -97,6 +112,9 @@ struct AvatarStack: View {
     /// where the stack is a list of other people and pointing at one of them
     /// would be pointing at nobody.
     var you: String?
+    /// Avatars by name (`ChallengeStore.memberAvatars(for:)`). A name with no
+    /// picture keeps its initial.
+    var images: [String: UIImage] = [:]
 
     var body: some View {
         HStack(spacing: -size * 0.3) {
@@ -105,7 +123,8 @@ struct AvatarStack: View {
                     name: name,
                     size: size,
                     isPending: pending.contains(name),
-                    isYou: name == you)
+                    isYou: name == you,
+                    image: images[name])
             }
             if names.count > maxShown {
                 AvatarOverflowDot(count: names.count - maxShown, size: size)

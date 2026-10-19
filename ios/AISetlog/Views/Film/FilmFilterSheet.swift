@@ -77,7 +77,7 @@ private struct FilmPersonBadge: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            AvatarDot(name: person.name, size: size)
+            MemberFace(id: person.id, name: person.name, size: size, showsMood: false)
                 .opacity(included ? 1 : 0.32)
                 .overlay(alignment: .bottomTrailing) {
                     if included, heldCount > 0 {
@@ -174,7 +174,7 @@ struct FilmFilterSheet: View {
                     ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
                         NavigationLink(value: person.id) {
                             HStack(spacing: 12) {
-                                AvatarDot(name: person.name, size: 30)
+                                MemberFace(id: person.id, name: person.name, size: 30, showsMood: false)
                                     .opacity(draft.includes(person: person.id) ? 1 : 0.32)
                                 Text(person.name ?? Strings.defaultMemberName)
                                     .font(.body.weight(.semibold))

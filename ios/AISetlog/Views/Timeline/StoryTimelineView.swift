@@ -85,6 +85,7 @@ struct StoryTimelineView: View {
                 FilmView(
                     challenge: challenge,
                     clips: store.recordedClips(for: challengeID))
+                    .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
         }
         .sheet(isPresented: $showRoomChat) {
@@ -133,6 +134,9 @@ struct StoryTimelineView: View {
                         : Strings.deleteStoryWarning(challenge.recordedCount))
             }
         }
+        // Friends' avatars and today's moods, for every face on this page and
+        // in the sheets it opens (`MemberFace`).
+        .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
     }
 
     /// Every moment holds footage from somebody — the same rule the
@@ -210,6 +214,7 @@ struct StoryTimelineView: View {
                     column: column,
                     slotTitle: { slotTitle(for: $0) },
                     onPlay: { clip in sheet = .open(clip) })
+                    .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
         }
         .confirmationDialog(

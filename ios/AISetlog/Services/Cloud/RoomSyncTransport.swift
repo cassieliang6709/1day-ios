@@ -29,6 +29,15 @@ struct RoomSyncTransport {
     var saveMember: @MainActor (String, String, String, Date) async throws -> Void = { _, _, _, _ in
         throw CancellationError()
     }
+    /// My avatar and today's mood on my `Member` record in one room.
+    /// Defaulted to fail, like `saveMember`.
+    var saveMemberProfile: @MainActor (CloudKitService.MemberProfileWrite) async throws -> Void = { _ in
+        throw CancellationError()
+    }
+    /// Everyone's `Member` record in a room: code, where to cache avatars.
+    var fetchMembers: @MainActor (String, URL) async throws -> [CloudKitService.RemoteMember] = { _, _ in
+        throw CancellationError()
+    }
 
     static var live: RoomSyncTransport {
         RoomSyncTransport(
@@ -41,7 +50,9 @@ struct RoomSyncTransport {
             deleteComment: { try await CloudKitService.deleteComment(id: $0) },
             sendPoke: { try await CloudKitService.sendPoke(code: $0, authorID: $1, authorName: $2, targetAuthorID: $3) },
             fetchRoom: { try await CloudKitService.fetchRoom(code: $0) },
-            saveMember: { try await CloudKitService.saveMember(code: $0, authorID: $1, displayName: $2, joinedAt: $3) })
+            saveMember: { try await CloudKitService.saveMember(code: $0, authorID: $1, displayName: $2, joinedAt: $3) },
+            saveMemberProfile: { try await CloudKitService.saveMemberProfile($0) },
+            fetchMembers: { try await CloudKitService.fetchMembers(code: $0, into: $1) })
     }
 }
 

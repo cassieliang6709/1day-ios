@@ -6,11 +6,12 @@ import SwiftUI
 /// first film, once there is something meaningful to build on.
 struct FirstRunOnboardingView: View {
     let onCreateStory: () -> Void
-    let onJoin: () -> Void
 
     @Environment(AccountStore.self) private var account
     @Environment(\.colorScheme) private var colorScheme
     @State private var signInError: String?
+    /// The avatar's three steps, between signing in and the camera.
+    @State private var showsAvatarSetup = false
 
     /// Bound so Settings changes immediately redraw the localized lockup and
     /// copy even before someone has made their first story.
@@ -48,27 +49,10 @@ struct FirstRunOnboardingView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
 
+                        // One way on from here: 通过 Apple 继续. Joining by
+                        // code and filming solo both wait until after sign-in.
                         primaryAction
                             .padding(.top, isCompactHeight ? 26 : 38)
-
-                        Button(action: onJoin) {
-                            Text(Strings.firstRunJoin)
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundStyle(OneDay.inkSoft)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, isCompactHeight ? 20 : 27)
-
-                        if !account.isSignedIn {
-                            Button(action: onCreateStory) {
-                                Text(Strings.firstRunSoloFirst)
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(OneDay.inkSoft)
-                                    .frame(minHeight: 44)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.top, 6)
-                        }
 
                         Spacer().frame(height: 18)
                     }
@@ -81,12 +65,15 @@ struct FirstRunOnboardingView: View {
         }
         // A reinstall gets its Apple ID offered before anything is tapped.
         .task { account.offerExistingAccount() }
+        // Made or skipped, the camera is next.
+        .fullScreenCover(isPresented: $showsAvatarSetup, onDismiss: onCreateStory) {
+            AvatarSetupFlow { _ in showsAvatarSetup = false }
+        }
     }
 
     /// Signing in comes first, because filming together is what most people
     /// come for, and asking halfway through a join — a sheet over a sheet — is
-    /// where it kept going wrong. Filming solo still doesn't need an account,
-    /// so the way past it stays on the screen.
+    /// where it kept going wrong. It is the only button on the page.
     @ViewBuilder
     private var primaryAction: some View {
         if account.isSignedIn {
@@ -102,7 +89,12 @@ struct FirstRunOnboardingView: View {
                 } onCompletion: { result in
                     do {
                         try account.completeSignIn(result)
-                        onCreateStory()
+                        // An avatar already on this phone skips the three steps.
+                        if AvatarStore.shared.image == nil {
+                            showsAvatarSetup = true
+                        } else {
+                            onCreateStory()
+                        }
                     } catch {
                         if (error as? ASAuthorizationError)?.code == .canceled { return }
                         signInError = Strings.signInFailed
