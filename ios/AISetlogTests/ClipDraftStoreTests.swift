@@ -165,8 +165,7 @@ final class ClipDraftStoreTests: XCTestCase {
         let store = ChallengeStore(
             repository: UserDefaultsChallengeRepository(
                 defaults: defaults, fileStore: fileStore),
-            fileStore: fileStore,
-            coverStore: NoCoverStore())
+            fileStore: fileStore)
 
         let targets = ["Mine", "The room", "Third"].map {
             store.create(
@@ -215,8 +214,7 @@ final class ClipDraftStoreTests: XCTestCase {
         let store = ChallengeStore(
             repository: UserDefaultsChallengeRepository(
                 defaults: defaults, fileStore: fileStore),
-            fileStore: fileStore,
-            coverStore: NoCoverStore())
+            fileStore: fileStore)
         let story = store.create(
             title: "Filed later",
             mode: .oneDay,
@@ -255,8 +253,7 @@ final class ClipDraftStoreTests: XCTestCase {
         let store = ChallengeStore(
             repository: UserDefaultsChallengeRepository(
                 defaults: defaults, fileStore: fileStore),
-            fileStore: fileStore,
-            coverStore: NoCoverStore())
+            fileStore: fileStore)
 
         let challenge = store.create(
             title: "One slot only",
@@ -279,14 +276,6 @@ final class ClipDraftStoreTests: XCTestCase {
 }
 
 // MARK: - Doubles
-
-/// The batch-filing tests build a real `ChallengeStore`, which needs one of
-/// these; nothing they assert touches a template cover.
-private final class NoCoverStore: TemplateCoverStore {
-    func storeCover(_ imageData: Data, ownerID: UUID) -> String? { nil }
-    func coverURL(fileName: String) -> URL? { nil }
-    func deleteCover(fileName: String) {}
-}
 
 private final class InMemoryDraftRepository: ClipDraftRepository {
     private var stored: [ClipDraft] = []

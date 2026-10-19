@@ -1,17 +1,13 @@
 import XCTest
 
 final class ComposerGuidanceUITests: XCTestCase {
-    /// The rack has nothing to submit, and the name guidance lives on the page
-    /// a poster opens.
+    /// The composer is one page, and "a name is needed" shows up where a name
+    /// can actually be typed.
     ///
-    /// Three shapes of this screen, and this test has survived all three:
-    /// `1/2 Choose a style` → Next → `2/2 Set up your story` with both labels
-    /// asserted; then "the poster is the submit button" with the settings
-    /// behind a gear; now the poster opens the settings page and the page's own
-    /// button is what creates the story. What stays worth pinning is that the
-    /// rack itself has no second step, and that "a name is needed" still shows
-    /// up where a name can actually be typed.
-    func testPosterOpensTheSettingsPageAndKeepsNameGuidance() {
+    /// This test has survived four shapes of the screen: a 1/2 → 2/2 wizard, a
+    /// poster rack that submitted on tap, posters opening a settings page, and
+    /// now (1.5) no templates at all — 按时间拍 names the story for the date.
+    func testComposerIsOnePageAndKeepsNameGuidance() {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
@@ -21,25 +17,12 @@ final class ComposerGuidanceUITests: XCTestCase {
         compose.tap()
 
         XCTAssertTrue(app.staticTexts["composer-question"].waitForExistence(timeout: 15))
-        // No progress counter and no bottom button: both only made sense when
-        // choosing and submitting were two separate taps.
+        // No progress counter and no Next: choosing and submitting are one page.
         XCTAssertFalse(app.staticTexts["composer-step"].exists)
         XCTAssertFalse(app.buttons["Next"].exists)
-
-        // No gear to find: the poster is the way in, and tapping it no longer
-        // creates anything by itself.
-        XCTAssertFalse(app.buttons.matching(identifier: "poster-settings").firstMatch.exists)
-        // The templates are their own page now, pushed from one 从模板开始
-        // row; picking one comes straight back to the name field.
-        let entry = app.buttons["templates-entry"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 15))
-        XCTAssertFalse(entry.isSelected)
-        entry.tap()
-        let poster = app.buttons.matching(identifier: "poster-tile").firstMatch
-        XCTAssertTrue(poster.waitForExistence(timeout: 15))
-        poster.tap()
-        XCTAssertTrue(entry.waitForExistence(timeout: 15))
-        XCTAssertTrue(entry.isSelected)
+        // No templates (1.5).
+        XCTAssertFalse(app.buttons["templates-entry"].exists)
+        XCTAssertTrue(app.buttons["by-time-entry"].isSelected)
 
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
@@ -53,13 +36,6 @@ final class ComposerGuidanceUITests: XCTestCase {
         name.typeText("My edited story")
         XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
-        // Tapping the chosen template again lets it go, and comes back too.
-        entry.tap()
-        XCTAssertTrue(poster.waitForExistence(timeout: 15))
-        XCTAssertTrue(poster.isSelected)
-        poster.tap()
-        XCTAssertTrue(entry.waitForExistence(timeout: 15))
-        XCTAssertFalse(entry.isSelected)
         // Deliberately never create or join a room, or call the AI service.
     }
 }

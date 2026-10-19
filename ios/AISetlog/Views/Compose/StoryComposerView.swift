@@ -2,18 +2,15 @@ import SwiftUI
 
 /// Making a story, on one page (1.5).
 ///
-/// Top to bottom: 拍什么 (写今天的清单 / 从模板开始 / 按时间拍), 名字, 自己拍 /
-/// 和朋友一起拍, 用哪台相机拍, and one pinned 开始拍. No 一日 / 7 日 choice:
-/// every new story is one day. A room with friends has no list either — the
-/// room is what holds the day, so 拍什么 hides and it films by time.
-///
-/// 从模板开始 pushes `TemplatesPage` (the user's own first, then the
-/// built-ins). That push is the only reason this view has a `NavigationStack`;
-/// its bar stays hidden on this page, where the 关闭 bubble is the top row.
+/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 名字, 自己拍 / 和朋友一起拍,
+/// and one pinned 开始拍. No 一日 / 7 日 choice: every new story is one day. A
+/// room with friends has no list either — the room is what holds the day, so
+/// 拍什么 hides and it films by time.
 ///
 /// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
-/// drafted by AI from one sentence, in the same page. A template fills the
-/// same list; the page shows it folded to one 清单 · N 项 row.
+/// drafted by AI from one sentence, in the same page; the page shows it folded
+/// to one 清单 · N 项 row. Templates (从模板开始, 存为我的模板, the posters)
+/// are gone (1.5).
 struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
     /// How to leave. Nil means "I was presented, dismiss me" — the sheet path.
@@ -28,10 +25,8 @@ struct StoryComposerView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
 
-    /// 写今天的清单 or 按时间拍. Choosing a template switches this to the list.
+    /// 写今天的清单 or 按时间拍.
     @State private var entry: ComposerEntry = .byTime
-    /// A built-in poster or one of the user's own templates, when one is chosen.
-    @State private var templateID: UUID?
     /// No longer asked: 一日 / 7 日 is gone from the page, every new story is one day.
     private let days: Challenge.Mode = .oneDay
     /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
@@ -41,97 +36,47 @@ struct StoryComposerView: View {
     /// No longer asked (1.5): there is one camera.
     private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
-    /// 存为我的模板, asked in the list editor and done when the story starts,
-    /// once the name is known.
-    @State private var savesList = true
     @State private var title = ""
-    /// Set once the user edits the name, so switching templates stops
+    /// Set once the user edits the name, so the date name 按时间拍 gives stops
     /// overwriting what they typed.
     @State private var titleEdited = false
-    /// The story's moments. Seeded from the chosen template, then replaced
-    /// wholesale by whatever the list editor hands back.
+    /// The story's moments: whatever the list editor last handed back.
     @State private var moments: [String] = []
     @State private var showGuided = false
-    @State private var showTemplates = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
-    @State private var editingTemplate: ChallengeTemplate?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var oneDayPosters: [ChallengeTemplate] {
-        ChallengeTemplate.oneDayBuiltins.filter { !$0.isTimeOnly }
-    }
-
-    private var sevenDayPosters: [ChallengeTemplate] {
-        ChallengeTemplate.sevenDayBuiltins
-    }
-
-    private var allTemplates: [ChallengeTemplate] {
-        ChallengeTemplate.oneDayBuiltins + sevenDayPosters + store.customTemplates
-    }
-
-    /// The template backing the story: the chosen one, or the time-only
-    /// built-in behind 按时间拍. Nil for a list written by hand.
-    private var selected: ChallengeTemplate? {
-        if let templateID {
-            return allTemplates.first { $0.id == templateID }
-        }
-        return entry == .byTime ? ChallengeTemplate.liveWithMe : nil
-    }
-
-    private var isTimeOnly: Bool { selected?.isTimeOnly == true }
+    private var isTimeOnly: Bool { entry == .byTime }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                OneDayCanvas(seed: 1)
+        ZStack {
+            OneDayCanvas(seed: 1)
 
-                VStack(spacing: 0) {
-                    topBar
-                    page
-                    footer
-                }
+            VStack(spacing: 0) {
+                topBar
+                page
+                footer
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $showTemplates) { templatesPage }
         }
-        // The sheets hang on the stack rather than on the page: 编辑模板 is
-        // opened from the pushed templates page, and a sheet hung on a view
-        // that's been pushed over isn't reliably presented.
         .sheet(isPresented: $showGuided) {
-            GuidedMomentsView(
-                initialMoments: moments,
-                allowsSaving: templateID == nil,
-                savesToLibrary: savesList,
-                onDone: applyCustomDraft,
-                templates: store.customTemplates.map { ($0, true) } + oneDayPosters.map { ($0, false) },
-                onTemplate: { template in
-                    if templateID != template.id { choose(template) }
-                })
+            GuidedMomentsView(initialMoments: moments, onDone: applyCustomDraft)
         }
         .sheet(isPresented: $showSignIn) {
             SignInView { createSharedRoom() }
                 .presentationDetents([.medium])
         }
-        .sheet(item: $editingTemplate) { template in
-            BuildTemplateView(
-                template: template,
-                coverURL: store.coverURL(for: template)
-            ) { updated, coverImageData in
-                store.updateCustomTemplate(updated, coverImageData: coverImageData)
-            }
-        }
         .onAppear {
             if startsWithFriends { withFriends = true }
-            syncTitleToTemplate()
+            nameForTheDay()
         }
         // Switching to solo answers "sign into iCloud" all by itself, so the
         // warning shouldn't outlive the choice that caused it.
         .onChange(of: withFriends) { _, together in
             errorText = nil
-            // A room films by time: drop any list or template picked before.
+            // A room films by time: drop any list written before.
             if together { chooseByTime() }
         }
     }
@@ -159,10 +104,7 @@ struct StoryComposerView: View {
                 if !withFriends {
                     WhatToFilmSection(
                         entry: entry,
-                        templateName: templateID == nil ? nil : selected?.displayName,
-                        templateCount: store.customTemplates.count + oneDayPosters.count,
                         onWriteList: openList,
-                        onTemplates: { showTemplates = true },
                         onByTime: chooseByTime)
                 }
                 setup
@@ -173,21 +115,8 @@ struct StoryComposerView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var templatesPage: some View {
-        TemplatesPage(
-            mine: store.customTemplates,
-            builtIns: oneDayPosters,
-            selectedTemplateID: templateID,
-            onChoose: choose,
-            onEdit: { editingTemplate = $0 },
-            onDelete: deleteTemplate,
-            coverURL: { store.coverURL(for: $0) })
-    }
-
     private var setup: some View {
         SetupStep(
-            template: selected,
-            templateCoverURL: selected.flatMap { store.coverURL(for: $0) },
             title: $title,
             titleEdited: $titleEdited,
             withFriends: $withFriends,
@@ -260,38 +189,12 @@ struct StoryComposerView: View {
 
     private func chooseByTime() {
         entry = .byTime
-        templateID = nil
-        syncTitleToTemplate()
+        moments = []
+        nameForTheDay()
     }
 
     private func openList() {
         showGuided = true
-    }
-
-    /// A template fills the list. Tapping the chosen one again lets it go.
-    private func choose(_ template: ChallengeTemplate) {
-        if templateID == template.id {
-            deselectTemplate()
-            return
-        }
-        entry = .writeList
-        templateID = template.id
-        syncTitleToTemplate()
-    }
-
-    /// Back to an empty list: the template's moments and name were its, not
-    /// the user's.
-    private func deselectTemplate() {
-        let wasNamedByIt = !titleEdited
-        templateID = nil
-        moments = []
-        if wasNamedByIt { title = "" }
-    }
-
-    private func deleteTemplate(_ template: ChallengeTemplate) {
-        let wasSelected = templateID == template.id
-        store.deleteCustomTemplate(template)
-        if wasSelected { deselectTemplate() }
     }
 
     /// What the list editor wrote, applied to this story. The name only
@@ -299,31 +202,15 @@ struct StoryComposerView: View {
     private func applyCustomDraft(_ draft: CustomStoryDraft) {
         entry = .writeList
         moments = draft.moments
-        savesList = draft.savesToLibrary
         errorText = nil
-        if !titleEdited, templateID == nil {
+        if !titleEdited {
             title = draft.suggestedName ?? (isTitleFromByTime ? "" : title)
         }
     }
 
     /// The name 按时间拍 gave the story, which means nothing for a list.
     private var isTitleFromByTime: Bool {
-        let byTime = ChallengeTemplate.liveWithMe.displayName
-        return title == byTime || title == Strings.fullTitle7Days(byTime)
-            || title == Strings.byTimeTitle(.now)
-    }
-
-    /// 存为我的模板: a hand-written list becomes one of the user's templates,
-    /// under the name the story starts with.
-    private func saveListIfAsked() {
-        guard entry == .writeList, templateID == nil, savesList,
-              let keys = resolvedMoments, !keys.isEmpty else { return }
-        _ = store.addCustomTemplate(
-            ChallengeTemplate(
-                name: LocalizedText(en: trimmedTitle, zh: trimmedTitle),
-                momentKeys: keys.map { MomentCatalog.key(forDisplay: $0) ?? $0 },
-                isCustom: true),
-            coverImageData: nil)
+        title == Strings.byTimeTitle(.now)
     }
 
     // MARK: - Actions
@@ -352,9 +239,8 @@ struct StoryComposerView: View {
             clipLength: clipLength,
             orientation: orientation,
             cameraStyle: cameraStyle,
-            templateName: selected?.identityKey,
+            templateName: isTimeOnly ? Challenge.timeOnlyTemplateName : nil,
             momentTitles: resolvedMoments)
-        saveListIfAsked()
         leave()
         onCreate(challenge.id)
     }
@@ -371,9 +257,8 @@ struct StoryComposerView: View {
                     clipLength: clipLength,
                     orientation: orientation,
                     cameraStyle: cameraStyle,
-                    templateName: selected?.identityKey,
+                    templateName: isTimeOnly ? Challenge.timeOnlyTemplateName : nil,
                     momentTitles: resolvedMoments)
-                saveListIfAsked()
                 leave()
                 onCreate(challenge.id)
             } catch {
@@ -384,33 +269,19 @@ struct StoryComposerView: View {
 
     // MARK: - Derived state
 
-    /// Keeps the story name in step with the chosen script until the user
-    /// takes the name over.
-    private func syncTitleToTemplate() {
-        guard let selected else { return }
-        if selected.isTimeOnly {
-            // 按时间拍 (and a room) is a day, not a list: it's named for the date.
-            if !titleEdited { title = Strings.byTimeTitle(.now) }
-            moments = []
-            return
-        }
-        if !titleEdited {
-            title = days == .sevenDay
-                ? Strings.fullTitle7Days(selected.displayName)
-                : selected.displayName
-        }
-        // Moments always follow the template: picking one *is* the request for
-        // its prompts. The name doesn't, because you typed that.
-        moments = selected.momentKeys ?? []
+    /// 按时间拍 (and a room) is a day, not a list: it's named for the date,
+    /// until the user types a name of their own.
+    private func nameForTheDay() {
+        guard isTimeOnly, !titleEdited else { return }
+        title = Strings.byTimeTitle(.now)
     }
 
-    /// Blank rows are dropped; an entirely empty list falls back to the
-    /// template's own moments so a story can never be created with none.
+    /// Blank rows are dropped. Nil for 按时间拍, which has no list.
     private var resolvedMoments: [String]? {
         if isTimeOnly { return nil }
         let cleaned = moments
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        return cleaned.isEmpty ? selected?.momentKeys : cleaned
+        return cleaned.isEmpty ? nil : cleaned
     }
 }

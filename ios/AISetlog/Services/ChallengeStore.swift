@@ -18,10 +18,6 @@ final class ChallengeStore {
         }
     }
 
-    var customTemplates: [ChallengeTemplate] = [] {
-        didSet { repository.saveTemplates(customTemplates) }
-    }
-
     /// Set once at app launch so shared rooms can attribute + upload clips.
     var account: AccountStore?
 
@@ -30,21 +26,17 @@ final class ChallengeStore {
 
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
-    private let coverStore: TemplateCoverStore
     let effects: ChallengeStoreEffects
 
     init(repository: ChallengeRepository? = nil,
          fileStore: ClipFileStore = DiskClipFileStore(),
-         coverStore: TemplateCoverStore = DiskTemplateCoverStore(),
          roomSync: RoomSyncService? = nil,
          effects: ChallengeStoreEffects = .live) {
         self.effects = effects
         self.fileStore = fileStore
-        self.coverStore = coverStore
         self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
         self.roomSync = roomSync ?? RoomSyncService(fileStore: fileStore)
         challenges = self.repository.loadChallenges()
-        customTemplates = self.repository.loadTemplates()
     }
 
     /// Room codes currently being synced (drives a spinner in the board).
@@ -57,117 +49,6 @@ final class ChallengeStore {
 
     func challenge(_ id: UUID) -> Challenge? {
         challenges.first { $0.id == id }
-    }
-
-    /// Puts a template someone built into their library, filing the cover
-    /// picture (if they chose one) before the template that names it is saved
-    /// — so a template never points at a file that isn't there.
-    @discardableResult
-    func addCustomTemplate(
-        _ template: ChallengeTemplate, coverImageData: Data? = nil
-    ) -> ChallengeTemplate {
-        let filed = filing(coverImageData, into: template)
-        customTemplates.append(filed)
-        return filed
-    }
-
-    func deleteCustomTemplate(_ template: ChallengeTemplate) {
-        if let coverFileName = template.coverFileName {
-            coverStore.deleteCover(fileName: coverFileName)
-        }
-        customTemplates.removeAll { $0.id == template.id }
-    }
-
-    /// `coverImageData` is a newly picked picture; nil leaves the cover alone.
-    /// Clearing one back to matched artwork is `template.coverFileName = nil`,
-    /// and the file it used to point at goes with it.
-    func updateCustomTemplate(
-        _ template: ChallengeTemplate, coverImageData: Data? = nil
-    ) {
-        guard let index = customTemplates.firstIndex(where: { $0.id == template.id }) else {
-            return
-        }
-        let previousCover = customTemplates[index].coverFileName
-        let filed = filing(coverImageData, into: template)
-        if let previousCover, previousCover != filed.coverFileName {
-            coverStore.deleteCover(fileName: previousCover)
-        }
-        customTemplates[index] = filed
-    }
-
-    /// Where a template's own cover picture lives, if it has one. Nil sends
-    /// the card back to `matchedCoverAssetName`.
-    func coverURL(for template: ChallengeTemplate) -> URL? {
-        template.coverFileName.flatMap { coverStore.coverURL(fileName: $0) }
-    }
-
-    private func filing(
-        _ imageData: Data?, into template: ChallengeTemplate
-    ) -> ChallengeTemplate {
-        guard let imageData else { return template }
-        var filed = template
-        // A failed write leaves the old cover in place rather than blanking it.
-        if let stored = coverStore.storeCover(imageData, ownerID: template.id) {
-            filed.coverFileName = stored
-        }
-        return filed
-    }
-
-    // MARK: - A story's own cover
-
-    /// What the cover sheet came back with.
-    ///
-    /// `keepFilming` is not "no change": it is the choice to go back to the
-    /// automatic cover — the newest clip in the story, and the template's
-    /// poster before anything is filmed. That was the only behaviour there
-    /// used to be, so it has to stay reachable.
-    enum StoryCoverChoice: Equatable {
-        case preset(String)
-        case picked(Data)
-        case keepFilming
-    }
-
-    func setStoryCover(_ choice: StoryCoverChoice, for id: UUID) {
-        guard let index = challenges.firstIndex(where: { $0.id == id }) else { return }
-        let previous = challenges[index].coverFileName
-
-        switch choice {
-        case .preset(let assetName):
-            challenges[index].presetCoverAssetName = assetName
-            challenges[index].coverFileName = nil
-        case .picked(let data):
-            // Filed before the story that names it is saved, so a story never
-            // points at a file that isn't there — same order as templates.
-            guard let stored = coverStore.storeCover(data, ownerID: id) else { return }
-            challenges[index].coverFileName = stored
-            challenges[index].presetCoverAssetName = nil
-        case .keepFilming:
-            challenges[index].coverFileName = nil
-            challenges[index].presetCoverAssetName = nil
-        }
-
-        // The old picture goes with the choice that replaced it. Deleting after
-        // the swap rather than before: a failed write above returns early and
-        // the story keeps the cover it had.
-        if let previous, previous != challenges[index].coverFileName {
-            coverStore.deleteCover(fileName: previous)
-        }
-    }
-
-    /// The picture this story's card should show, or nil to fall back to art.
-    ///
-    /// Chosen beats automatic: a cover somebody picked outranks the newest
-    /// clip, which outranks the poster. `latestClipURL` is handed in because
-    /// which clip is newest is the caller's question — rooms count everybody's.
-    func storyCoverURL(for challenge: Challenge, latestClipURL: URL?) -> URL? {
-        if let own = challenge.coverFileName,
-           let url = coverStore.coverURL(fileName: own) {
-            return url
-        }
-        // A bundled preset is artwork, not a file: the card draws it by name
-        // (`ChallengePresenter.coverAssetName`), so there is no URL to give.
-        if challenge.presetCoverAssetName != nil { return nil }
-        return latestClipURL
     }
 
     func updatePlan(_ id: UUID, title: String, momentTitles: [String]) {
@@ -217,7 +98,7 @@ final class ChallengeStore {
             mode: .oneDay,
             clipLength: .tiny,
             orientation: .portrait,
-            templateName: ChallengeTemplate.liveWithMeIdentityKey,
+            templateName: Challenge.timeOnlyTemplateName,
             momentTitles: nil)
     }
 
@@ -560,11 +441,7 @@ final class ChallengeStore {
             fileStore.deleteClips(challengeID: challenge.id)
             if let code = challenge.roomCode { roomSync.clearRoom(code) }
         }
-        for coverFileName in customTemplates.compactMap(\.coverFileName) {
-            coverStore.deleteCover(fileName: coverFileName)
-        }
         challenges = []
-        customTemplates = []
         account?.signOut()
         effects.resetNotificationPreferences()
     }

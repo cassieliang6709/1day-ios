@@ -82,7 +82,7 @@ final class NotificationTests: XCTestCase {
             startDate: now,
             mode: .oneDay,
             cardCount: 7,
-            templateName: ChallengeTemplate.liveWithMeIdentityKey)
+            templateName: Challenge.timeOnlyTemplateName)
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }

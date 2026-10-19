@@ -64,9 +64,8 @@ struct StoryCard: View {
                 if let coverURL {
                     ClipThumbnail(url: coverURL, refreshToken: refreshToken)
                 } else {
-                    Image(presenter.coverAssetName)
-                        .resizable()
-                        .scaledToFill()
+                    // Nothing filmed yet: no poster any more (1.5), just the brand tint.
+                    StoryCoverPlaceholder()
                 }
             }
             .clipBox(height: 258)
@@ -106,8 +105,9 @@ struct StoryCard: View {
         }
     }
 
-    /// Members on the left, a slim capacity bar on the right — the whole
-    /// status line in one row, over the cover art.
+    /// Members on the left, over the cover art. The 1/7 count and pips that
+    /// sat on the right are gone (1.5): nobody needs to be told how far
+    /// through a day they are.
     private var statusRow: some View {
         HStack(spacing: 12) {
             if memberNames.count > 1 {
@@ -115,17 +115,6 @@ struct StoryCard: View {
             }
 
             Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                MomentPips(filled: progress.filled, total: max(progress.total, 1))
-                Text("\(progress.filled)/\(progress.total)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
         }
     }
 
@@ -173,27 +162,6 @@ struct StoryCard: View {
     }
 }
 
-/// The dot row that stands in for a progress bar. Seven filled circles reads
-/// as "moments collected"; a bar reads as a task at 43%.
-struct MomentPips: View {
-    let filled: Int
-    let total: Int
-    var size: CGFloat = 6
-    var tint: Color = .white
-
-    var body: some View {
-        HStack(spacing: size * 0.7) {
-            ForEach(0..<max(total, 1), id: \.self) { index in
-                Circle()
-                    .fill(index < filled ? tint : tint.opacity(0.32))
-                    .frame(width: size, height: size)
-                    .scaleEffect(index < filled ? 1 : 0.8)
-            }
-        }
-        .animation(OneDay.Motion.pop, value: filled)
-    }
-}
-
 // MARK: - Compact variant
 
 /// A story in a list: thumbnail, name, one status line, progress. Used for
@@ -238,18 +206,6 @@ struct StoryRowCard: View {
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    MomentPips(
-                        filled: progress.filled,
-                        total: max(progress.total, 1),
-                        size: 5,
-                        tint: .oneDayBrand)
-                    Text("\(progress.filled)/\(progress.total)")
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(OneDay.brandText)
-                }
             }
 
             Spacer(minLength: 4)
@@ -271,9 +227,8 @@ struct StoryRowCard: View {
             if let coverURL {
                 ClipThumbnail(url: coverURL, refreshToken: refreshToken)
             } else {
-                Image(presenter.coverAssetName)
-                    .resizable()
-                    .scaledToFill()
+                // Nothing filmed yet: no poster any more (1.5), just the brand tint.
+                StoryCoverPlaceholder()
             }
         }
         .frame(width: 58, height: 66)
@@ -353,9 +308,8 @@ struct TodayStoryRow: View {
             if let coverURL {
                 ClipThumbnail(url: coverURL, refreshToken: refreshToken)
             } else {
-                Image(presenter.coverAssetName)
-                    .resizable()
-                    .scaledToFill()
+                // Nothing filmed yet: no poster any more (1.5), just the brand tint.
+                StoryCoverPlaceholder()
             }
         }
         .frame(width: 52, height: 64)
@@ -375,15 +329,20 @@ struct TodayStoryRow: View {
                         .foregroundStyle(OneDay.inkFaint)
                 }
             }
-            HStack(spacing: 7) {
-                MomentPips(
-                    filled: progress.filled, total: max(progress.total, 1),
-                    size: 5, tint: .oneDayBrand)
-                Text("\(progress.filled)/\(progress.total)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(OneDay.brandText)
-            }
+        }
+    }
+}
+
+/// A story's cover before its first clip. The cover is that clip (1.5) —
+/// templates and their painted posters are gone — so until then it's a plain
+/// soft tint with the app's mark, not a picture standing in for one.
+struct StoryCoverPlaceholder: View {
+    var body: some View {
+        ZStack {
+            Color.oneDayBrand.opacity(0.18)
+            Image(systemName: "video.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(OneDay.brandText.opacity(0.45))
         }
     }
 }

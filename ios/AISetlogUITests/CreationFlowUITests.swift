@@ -56,9 +56,8 @@ final class CreationFlowUITests: XCTestCase {
         app.launch()
         openComposer()
 
-        // 1.5: one page. Two ways in (写今天的清单 above 按时间拍), 拍几天 as
-        // two rows, no second 设置 sheet. Templates are one 从模板开始 row
-        // that pushes their own page — no cards on this one any more.
+        // 1.5: one page. Two ways in (写今天的清单 above 按时间拍), no second
+        // 设置 sheet, no templates.
         let list = app.buttons["write-own-entry"]
         let byTime = app.buttons["by-time-entry"]
         XCTAssertTrue(list.waitForExistence(timeout: 15))
@@ -69,9 +68,9 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         XCTAssertFalse(app.buttons["made-before"].exists)
-        XCTAssertTrue(app.buttons["templates-entry"].exists)
+        // No templates (1.5): no 从模板开始 row, no posters.
+        XCTAssertFalse(app.buttons["templates-entry"].exists)
         XCTAssertFalse(app.buttons.matching(identifier: "poster-tile").firstMatch.exists)
-        XCTAssertFalse(app.buttons["templates-more"].exists)
         // Who's filming and the camera are on the same page, with the one button.
         XCTAssertTrue(app.buttons["company-solo"].exists)
         // One camera (DV), so the page no longer asks which.

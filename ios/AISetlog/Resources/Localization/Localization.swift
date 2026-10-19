@@ -318,19 +318,12 @@ enum Strings {
         return oneDay ? "1-day film" : "7-day challenge"
     }
 
-    static func fullTitle7Days(_ name: String) -> String {
-        lang == .chinese ? "7 天\(name)" : "7 Days of \(name)"
-    }
 
     // MARK: Home
 
     static var startToday: String { lang == .chinese ? "开始今天" : "Start today" }
     static var enterInviteCode: String { lang == .chinese ? "输入邀请码" : "Enter invite code" }
     static var newStory: String { lang == .chinese ? "新建选题" : "New topic" }
-    /// Home header progress, beside the date: "今天 1/7".
-    static func headerDateProgress(_ recorded: Int, _ total: Int) -> String {
-        lang == .chinese ? "今天 \(recorded)/\(total)" : "Today \(recorded)/\(total)"
-    }
     static var couldntJoin: String { lang == .chinese ? "无法加入" : "Couldn't join" }
     static var leaveRoom: String { lang == .chinese ? "退出房间" : "Leave room" }
     /// "挑战" is a word from an earlier version of the app; everything else on
@@ -448,9 +441,6 @@ enum Strings {
     static var modeOneDay: String { lang == .chinese ? "一日" : "1-Day" }
     static var modeSevenDay: String { lang == .chinese ? "七日" : "7-Day" }
     static var clipLengthHeader: String { lang == .chinese ? "片段时长" : "CLIP LENGTH" }
-    static var deleteTemplate: String { lang == .chinese ? "删除模板" : "Delete template" }
-    static var editTemplate: String { lang == .chinese ? "编辑模板" : "Edit template" }
-    static var buildYourOwn: String { lang == .chinese ? "自己搭一个" : "Build your own" }
     static var withFriends: String { lang == .chinese ? "和朋友一起" : "With friends" }
     static var createRoom: String { lang == .chinese ? "创建房间" : "Create room" }
     static func promptN(_ number: Int) -> String {
@@ -913,13 +903,6 @@ enum Strings {
 
     // MARK: Build template
 
-    static func yourOrder(_ count: Int) -> String {
-        lang == .chinese ? "你的顺序（\(count)）" : "YOUR ORDER (\(count))"
-    }
-    static var promptPool: String { lang == .chinese ? "提示词库" : "PROMPT POOL" }
-    static var nameYourTemplate: String {
-        lang == .chinese ? "给模板起个名字" : "Name your template"
-    }
 
     // MARK: Template library & covers
 
@@ -930,23 +913,6 @@ enum Strings {
         lang == .chinese
             ? "下次开新选题，这套题目还在，直接选就行。"
             : "Next time you start a story, this set of prompts is still there."
-    }
-    static var templateCoverLabel: String {
-        lang == .chinese ? "封面" : "COVER"
-    }
-    static var chooseCoverFromPhotos: String {
-        lang == .chinese ? "从相册选一张" : "Choose from photos"
-    }
-    static var presetCoverHeading: String {
-        lang == .chinese ? "选一个喜欢的场景" : "Choose a scene"
-    }
-    static var automaticCover: String {
-        lang == .chinese ? "自动搭配" : "Automatic"
-    }
-    static var matchedCoverNote: String {
-        lang == .chinese
-            ? "不选也行，会按你写的题目配一张。"
-            : "Or leave it — we'll match one to the prompts you wrote."
     }
 
     // MARK: Sign in
@@ -1090,9 +1056,6 @@ enum Strings {
     static func filmReadySubtitle(duration: String) -> String {
         lang == .chinese ? "影片完成 · \(duration)" : "Film ready · \(duration)"
     }
-    static var customTemplateBlurb: String {
-        lang == .chinese ? "你自己写的小脚本。" : "Your own little script."
-    }
     static var noPrompts: String { lang == .chinese ? "无题目" : "No prompts" }
 
     // MARK: Story composer
@@ -1182,23 +1145,10 @@ enum Strings {
         lang == .chinese ? "打开系统设置" : "Open Settings"
     }
 
-    static var storyCoverTitle: String { lang == .chinese ? "换封面" : "Change cover" }
     /// First of the three sources, because a frame out of the day is the most
     /// honest cover a story can have.
     static var coverFromClips: String {
         lang == .chinese ? "从拍好的片段里选" : "From what you filmed"
-    }
-    static var coverFromPhotos: String {
-        lang == .chinese ? "从相册选一张" : "Choose from photos"
-    }
-    static var coverFromLibrary: String { lang == .chinese ? "素材库" : "Cover library" }
-    /// Confirms the lifted frame. The frame is on screen above it, so the word
-    /// is 这张 and not "保存".
-    static var useThisFrame: String { lang == .chinese ? "用这张" : "Use this one" }
-    /// Back to the automatic cover — newest clip, then the poster. Named after
-    /// what it does next, not after "reset".
-    static var coverKeepFilming: String {
-        lang == .chinese ? "改回跟着拍摄变" : "Follow what I film"
     }
     /// Under the evening reminder switch: when it will actually go off.
     static func nextReminderAt(_ when: String) -> String {
@@ -1215,9 +1165,6 @@ enum Strings {
         lang == .chinese
             ? "系统里关掉了通知，到「设置 › 通知 › 1Day」打开"
             : "Notifications are off in iOS Settings › Notifications › 1Day"
-    }
-    static var coverFrameFailed: String {
-        lang == .chinese ? "这张图没读出来，换一张试试" : "Couldn't read that picture. Try another."
     }
     /// The two halves of the one pill selector at the top of the screen. They
     /// filter what's below; they are not themselves a thing you "pick", which
@@ -1406,11 +1353,6 @@ enum Strings {
         lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) \(momentWord(count))"
     }
 
-    /// The story page: how far the day has got, and the words on the list of
-    /// moments that are still yours to take.
-    static func momentsFilmed(_ filmed: Int, total: Int) -> String {
-        lang == .chinese ? "拍了 \(filmed)/\(total) 个瞬间" : "\(filmed) of \(total) filmed"
-    }
     static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
     /// The way into the film, on the one card the page allows itself — and
     /// only once there's nothing left to film.
@@ -1422,12 +1364,6 @@ enum Strings {
             ? "\(moments) 个瞬间，一支片"
             : "\(moments) \(momentWord(moments)), one film"
     }
-    /// The words beside the progress bar. A bar with no number could be read
-    /// as "almost" at 5 of 7 and "barely started" at the same 5 of 7.
-    static func momentsToGo(_ count: Int) -> String {
-        lang == .chinese ? "还差 \(count) 个" : "\(count) to go"
-    }
-    static var allFilmed: String { lang == .chinese ? "拍满了" : "All filmed" }
     /// VoiceOver for a filmed moment in a room: what it is, then who's in it —
     /// the faces on the thumbnail say that to everyone else.
     static func momentFilmedBy(_ title: String, names: [String]) -> String {

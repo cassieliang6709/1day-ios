@@ -74,6 +74,9 @@ struct Challenge: Codable, Identifiable {
     /// The camera everyone in this story films with (1.5). Nil means an older
     /// saved story; those film with whatever camera you last picked.
     var cameraStyle: CameraStyle? = nil
+    /// What the story was started from. Only ever means something now as
+    /// `timeOnlyTemplateName` — 按时间拍 — since templates are gone (1.5);
+    /// older stories may still carry a template's name, which is ignored.
     var templateName: String? = nil
     var momentTitles: [String]? = nil
 
@@ -86,25 +89,16 @@ struct Challenge: Codable, Identifiable {
     /// before they've filmed anything. nil in rooms saved before this existed.
     var ownerID: String? = nil
 
-    /// A cover the person chose for *this story*: a picture out of their photo
-    /// library, or a frame lifted from one of its own clips.
-    ///
-    /// Until now a story could not have a cover at all. The card showed the
-    /// newest clip in it, and before anything was filmed, the template's
-    /// painted poster — both automatic, neither choosable. nil keeps exactly
-    /// that behaviour, which is what every story saved before this has.
-    var coverFileName: String? = nil
-    /// A cover the person chose out of the bundled library, by asset name.
-    /// Separate from `coverFileName` so picking a bundled one doesn't have to
-    /// copy an image the app already ships.
-    var presetCoverAssetName: String? = nil
-
     var isShared: Bool { roomCode != nil }
     var resolvedMode: Mode { mode ?? .sevenDay }
     var resolvedClipLength: ClipLength { clipLength ?? .tiny }
     var resolvedOrientation: Orientation { orientation ?? .portrait }
     var isOneDay: Bool { resolvedMode == .oneDay }
-    var isTimeOnly: Bool { templateName == ChallengeTemplate.liveWithMeIdentityKey }
+    /// 按时间拍: no named moments, film whenever. Stored under the name of the
+    /// built-in template it used to be, so every saved story and room keeps
+    /// reading the same way.
+    static let timeOnlyTemplateName = "Live With Me"
+    var isTimeOnly: Bool { templateName == Self.timeOnlyTemplateName }
 
     /// 1-based index of "today" within the challenge (day 1 = startDate).
     /// Can exceed 7 once the week is over.

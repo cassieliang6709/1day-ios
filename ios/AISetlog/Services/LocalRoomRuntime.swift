@@ -138,7 +138,7 @@ final class LocalRoomRuntime {
         self.challengeID = challenge.id
         account = AccountStore(localIdentity: .init(id: chat.scope.accountID, displayName: challenge.ownerName ?? "Sample"))
         let sync = RoomSyncService(fileStore: storage, transport: source.transport)
-        store = ChallengeStore(repository: storage, fileStore: storage, coverStore: storage,
+        store = ChallengeStore(repository: storage, fileStore: storage,
                                roomSync: sync, effects: .isolated)
         store.account = account
         store.challenges = [challenge]
@@ -281,7 +281,6 @@ final class LocalRoomRuntime {
         source.close()
         store.roomSync.clearRoom(chat.scope.roomCode)
         store.challenges = []
-        store.customTemplates = []
         account.signOut()
         for url in derivedMedia { try? FileManager.default.removeItem(at: url) }
         derivedMedia = []

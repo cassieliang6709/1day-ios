@@ -99,9 +99,6 @@ final class JoinedRoomTests: XCTestCase {
 
 private final class MemoryRepository: ChallengeRepository {
     private var challenges: [Challenge] = []
-    private var templates: [ChallengeTemplate] = []
     func loadChallenges() -> [Challenge] { challenges }
     func saveChallenges(_ challenges: [Challenge]) { self.challenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { templates }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { self.templates = templates }
 }

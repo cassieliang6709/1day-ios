@@ -68,7 +68,6 @@ struct PlansHomeView: View {
     /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var hero: Challenge? { stories.hero.challenge }
     /// Everything except the hero, by the day it was for. See `StoryTimeline`.
     private var timeline: StoryTimeline { stories.timeline }
 
@@ -273,7 +272,7 @@ struct PlansHomeView: View {
                     // progress the archive is the page, and the round camera
                     // button is the way to add to it. Only a first run, with
                     // no stories and no clips, still gets the mascot.
-                    if store.challenges.isEmpty, library.clips.isEmpty { emptyState }
+                    if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
                 }
 
                 // Replaces the date-grouped story list (`timelineSection`):
@@ -591,11 +590,10 @@ struct PlansHomeView: View {
         .accessibilityIdentifier("home-join-room")
     }
 
-    /// Date, and — when there's a story in progress — how much of it is in.
-    /// The pips are the first thing to go on a narrow screen; the numbers
-    /// carry the same fact and always fit.
+    /// The date. It used to add 「今天 1/7」 and pips for the story in
+    /// progress; gone in 1.5 — a day isn't a quota.
     private var dateline: some View {
-        let summary = HomeHeaderSummary(progress: hero.map { cardState(for: $0).progress })
+        let summary = HomeHeaderSummary()
         return HStack(spacing: 6) {
             Text(summary.dateLine)
                 .font(.system(size: 11.5, weight: .bold, design: .rounded))
@@ -603,20 +601,6 @@ struct PlansHomeView: View {
                 .lineLimit(1)
                 .fixedSize()
 
-            if summary.hasProgress, let recorded = summary.recorded, let total = summary.total {
-                Circle()
-                    .fill(OneDay.inkFaint)
-                    .frame(width: 3, height: 3)
-
-                Text(summary.progressLine)
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
-                    .fixedSize()
-
-                MomentPips(filled: recorded, total: total, size: 4.5, tint: .oneDayBrand)
-                    .layoutPriority(-1)
-            }
         }
     }
 
@@ -708,7 +692,8 @@ struct PlansHomeView: View {
     private func todayStories(leading: Challenge) -> [Challenge] {
         let calendar = Calendar.current
         let others = store.challenges.filter { challenge in
-            guard challenge.id != leading.id, !challenge.isComplete, !challenge.cards.isEmpty
+            // Rooms are on 朋友, not here.
+            guard !challenge.isShared, challenge.id != leading.id, !challenge.isComplete, !challenge.cards.isEmpty
             else { return false }
             if challenge.isOneDay { return calendar.isDateInToday(challenge.startDate) }
             return (1...max(challenge.cards.count, 1)).contains(challenge.currentDay)
@@ -1006,18 +991,19 @@ struct PlansHomeView: View {
 
     private func cardState(for challenge: Challenge) -> CardState {
         let clips = store.recordedClips(for: challenge.id)
-        // Day breaks the tie, so a clip with no timestamp still sorts sanely
-        // rather than sinking to the bottom of the pile.
-        let latest = clips.max {
-            ($0.recordedAt ?? .distantPast, $0.day) < ($1.recordedAt ?? .distantPast, $1.day)
+        // The cover is the day's first clip (1.5; there are no posters to pick
+        // any more). Day breaks the tie, so a clip with no timestamp still
+        // sorts sanely.
+        let first = clips.min {
+            ($0.recordedAt ?? .distantFuture, $0.day) < ($1.recordedAt ?? .distantFuture, $1.day)
         }
         return CardState(
             progress: RoomProgress(
                 momentCount: challenge.cards.count,
                 clips: clips,
                 myID: account.account?.id ?? RoomProgress.soloAuthorID),
-            coverURL: store.storyCoverURL(for: challenge, latestClipURL: latest?.url),
-            refreshToken: latest?.recordedAt)
+            coverURL: first?.url,
+            refreshToken: first?.recordedAt)
     }
 
 }

@@ -6,8 +6,6 @@ struct CustomStoryDraft {
     /// A name the AI offered, or one derived from the sentence about today.
     /// The composer only uses it while the user hasn't typed a name.
     var suggestedName: String?
-    /// Keep this list as one of the user's own templates when the story starts.
-    var savesToLibrary: Bool
 }
 
 /// 写今天的清单 (1.5): the one editor behind the composer's list. A single
@@ -15,17 +13,10 @@ struct CustomStoryDraft {
 /// then the list itself — typed, reordered, trimmed — and one button at the
 /// bottom. 自己写 and AI 帮我写 used to be two entries into this page.
 struct GuidedMomentsView: View {
-    /// What the list holds now: a template's moments, or the last edit.
+    /// What the list holds now: the last edit. (Templates, and 从模板开始 /
+    /// 存为我的模板 with them, are gone — 1.5.)
     var initialMoments: [String] = []
-    /// Whether to offer 存为我的模板 — not when the list came from a template.
-    var allowsSaving = true
-    var savesToLibrary = true
     let onDone: (CustomStoryDraft) -> Void
-    /// Saved templates first, then the built-ins: a list to start from.
-    var templates: [(template: ChallengeTemplate, isMine: Bool)] = []
-    /// A template picked here; the composer applies it (list, name) and this
-    /// sheet closes.
-    var onTemplate: ((ChallengeTemplate) -> Void)? = nil
     /// Injectable so previews and tests don't reach the network.
     var suggestions: any PromptSuggesting = RemotePromptSuggestionService()
 
@@ -34,7 +25,6 @@ struct GuidedMomentsView: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     @State private var rows: [ListRow] = []
-    @State private var saves = true
     @State private var showPromptLibrary = false
     @FocusState private var focused: UUID?
 
@@ -75,14 +65,8 @@ struct GuidedMomentsView: View {
 
     private var list: some View {
         List {
-            if !templates.isEmpty, onTemplate != nil {
-                Section { templateStrip } header: { SectionLabel(text: Strings.listFromTemplate) }
-            }
             Section { intentRow } footer: { noteFooter }
             Section { listRows; addRow } header: { SectionLabel(text: Strings.listSection) }
-            if allowsSaving {
-                Section { saveRow } footer: { saveNote }
-            }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -92,41 +76,6 @@ struct GuidedMomentsView: View {
         // Always reorderable: the handles are the only edit-mode chrome,
         // because every row opts out of swipe-to-delete below.
         .environment(\.editMode, .constant(.active))
-    }
-
-    /// One row of chips, sideways: 我的 templates first.
-    private var templateStrip: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(templates, id: \.template.id) { item in
-                    Button {
-                        onTemplate?(item.template)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 4) {
-                            if item.isMine {
-                                Text(Strings.composerMineBadge)
-                                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                                    .foregroundStyle(OneDay.onBrand)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.oneDayBrand, in: Capsule())
-                            }
-                            Text(item.template.displayName)
-                                .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                                .foregroundStyle(OneDay.ink)
-                        }
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
-                        .background(OneDay.surfaceSoft, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-        .scrollIndicators(.hidden)
-        .accessibilityIdentifier("list-templates")
     }
 
     private var intentRow: some View {
@@ -213,23 +162,6 @@ struct GuidedMomentsView: View {
         .listRowBackground(OneDay.surface)
     }
 
-    private var saveRow: some View {
-        Toggle(isOn: $saves) {
-            Text(Strings.listSaveAsTemplate)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-        }
-        .tint(Color.oneDayBrand)
-        .accessibilityIdentifier("save-to-template-library")
-        .listRowBackground(OneDay.surface)
-    }
-
-    private var saveNote: some View {
-        Text(Strings.listSaveAsTemplateNote)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(OneDay.inkSoft)
-    }
-
     private var saveFooter: some View {
         Button(action: save) {
             Text(filledCount >= 2 ? Strings.listUseCount(filledCount) : Strings.listUse)
@@ -272,7 +204,6 @@ struct GuidedMomentsView: View {
         var texts = initialMoments.map { MomentCatalog.localize($0) }
         while texts.count < 2 { texts.append("") }
         rows = texts.map { ListRow(text: $0) }
-        saves = savesToLibrary
     }
 
     private func focusNext(after id: UUID) {
@@ -346,8 +277,7 @@ struct GuidedMomentsView: View {
         metrics.recordAdopted(offered: offeredPrompts, saved: moments)
         onDone(CustomStoryDraft(
             moments: moments,
-            suggestedName: suggestedName,
-            savesToLibrary: allowsSaving && saves))
+            suggestedName: suggestedName))
         dismiss()
     }
 }
@@ -458,7 +388,7 @@ private struct PromptLibraryPicker: View {
 
                 ScrollView {
                     FlowLayout(spacing: 9) {
-                        ForEach(ChallengeTemplate.promptPool, id: \.self) { prompt in
+                        ForEach(MomentCatalog.suggestionPool, id: \.self) { prompt in
                             Button {
                                 onChoose(MomentCatalog.localize(prompt))
                                 dismiss()

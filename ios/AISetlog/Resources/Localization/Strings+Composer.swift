@@ -25,17 +25,6 @@ extension Strings {
     static var composerPlanSevenDayLead: String {
         isChinese ? "每天拍一段，七天连成一支片" : "One a day, seven days, one film"
     }
-    static var composerTemplates: String { isChinese ? "模板" : "Templates" }
-    /// 从模板开始's line before anything is picked: how many there are to see.
-    static func composerTemplateEntryLead(_ count: Int) -> String {
-        isChinese ? "\(count) 个现成的清单，挑一个改改" : "\(count) ready-made lists to start from"
-    }
-    /// 从模板开始's line once one is picked, so the page says what it is
-    /// without the grid that used to show it.
-    static func composerTemplateChosen(_ name: String) -> String {
-        isChinese ? "已选：\(name)" : "Chosen: \(name)"
-    }
-    static var composerMineBadge: String { isChinese ? "我的" : "Mine" }
     static var composerName: String { isChinese ? "名字" : "Name" }
     static func composerListSummary(_ count: Int) -> String {
         isChinese ? "清单 · \(count) 项" : "List · \(count) items"
@@ -53,11 +42,6 @@ extension Strings {
     static var listSection: String { isChinese ? "清单" : "List" }
     static var listAddRow: String { isChinese ? "加一项" : "Add item" }
     static var listFromIdeas: String { isChinese ? "从提示库选" : "From ideas" }
-    static var listSaveAsTemplate: String { isChinese ? "存为我的模板" : "Save as my template" }
-    static var listSaveAsTemplateNote: String {
-        isChinese ? "开始拍时用选题名字存，下次在「模板」里直接选。"
-            : "Saved under the story's name when you start, ready in Templates next time."
-    }
     static func listUseCount(_ count: Int) -> String {
         isChinese ? "用这 \(count) 项" : "Use these \(count)"
     }
@@ -67,5 +51,4 @@ extension Strings {
     static func byTimeTitle(_ date: Date) -> String {
         date.formatted(.dateTime.month().day().locale(AppLanguage.effective.locale))
     }
-    static var listFromTemplate: String { isChinese ? "从模板开始" : "Start from a template" }
 }

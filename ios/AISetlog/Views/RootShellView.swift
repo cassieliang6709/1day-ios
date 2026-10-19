@@ -63,9 +63,10 @@ struct RootShellView: View {
 
     /// What the home screen leads with and what it lists underneath. See
     /// `HomeStories`; `HomeHeroChoice` covers why the lead isn't just "the
-    /// story with the fewest moments filmed".
+    /// story with the fewest moments filmed". Solo stories only (1.5): a room
+    /// lives on 朋友, and 我的 doesn't list it again.
     private var stories: HomeStories {
-        HomeStories(challenges: store.challenges)
+        HomeStories(challenges: store.challenges.filter { !$0.isShared })
     }
 
     var body: some View {

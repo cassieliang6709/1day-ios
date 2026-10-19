@@ -25,23 +25,11 @@ enum ComposerEntry: Hashable {
     case byTime
 }
 
-/// The three ways in, as three rows. 从模板开始 sits between the other two
-/// because a template *is* a written list — just one somebody wrote earlier —
-/// so it belongs next to 写今天的清单 rather than under the page as its own
-/// section. It's a row like the others, not a grid: the grid used to be here
-/// and pushed the name and camera off the first screen.
-///
-/// Only one row is checked at a time, even though a template also fills the
-/// list behind 写今天的清单: the check says where the list came from, and the
-/// 清单 · N 项 row under the name is the way into the list either way.
+/// The two ways in, as two rows. 从模板开始 used to sit between them; it's
+/// gone with templates (1.5).
 struct WhatToFilmSection: View {
     let entry: ComposerEntry
-    /// The chosen template's name, or nil when none is chosen.
-    let templateName: String?
-    /// How many templates the page behind 从模板开始 holds.
-    let templateCount: Int
     let onWriteList: () -> Void
-    let onTemplates: () -> Void
     let onByTime: () -> Void
 
     var body: some View {
@@ -49,16 +37,9 @@ struct WhatToFilmSection: View {
             SectionLabel(text: Strings.composerWhatToFilm)
             ChoiceRow(
                 title: Strings.composerWriteList, lead: Strings.composerWriteListLead,
-                isOn: entry == .writeList && templateName == nil,
+                isOn: entry == .writeList,
                 opensPage: true, icon: "checklist", action: onWriteList)
                 .accessibilityIdentifier("write-own-entry")
-            ChoiceRow(
-                title: Strings.listFromTemplate,
-                lead: templateName.map(Strings.composerTemplateChosen)
-                    ?? Strings.composerTemplateEntryLead(templateCount),
-                isOn: templateName != nil,
-                opensPage: true, icon: "square.grid.2x2.fill", action: onTemplates)
-                .accessibilityIdentifier("templates-entry")
             ChoiceRow(
                 title: Strings.composerByTimeTitle, lead: Strings.composerByTimeLead,
                 isOn: entry == .byTime, icon: "alarm.fill", action: onByTime)
@@ -152,168 +133,12 @@ private struct ChoiceRow: View {
     }
 }
 
-// MARK: - 模板
-
-/// Every template on a page of its own, pushed from 从模板开始: the user's own
-/// first (badged 我的), then the built-ins, two to a row.
-///
-/// Why a pushed page and not the grid that used to sit on 今天想拍什么 with a
-/// 更多模板 sheet behind it: the inline row only ever had room for two cards,
-/// so the grid was mostly a teaser for the sheet, and the sheet was a second
-/// copy of the same grid with its own close button. Two places to pick a
-/// template, one of them half a page long, on a page whose job is to answer
-/// three short questions. Now the page keeps a single row that says what was
-/// picked, and the picking happens here, with the system back button as the
-/// way out when nothing is picked.
-///
-/// Choosing is the composer's `choose` unchanged — tapping the chosen one again
-/// still lets go — and either way the page pops straight back, which is what
-/// the sheet did on a tap too: the next thing to do (the name, 开始拍) is on
-/// the page underneath.
-struct TemplatesPage: View {
-    let mine: [ChallengeTemplate]
-    let builtIns: [ChallengeTemplate]
-    let selectedTemplateID: UUID?
-    let onChoose: (ChallengeTemplate) -> Void
-    let onEdit: (ChallengeTemplate) -> Void
-    let onDelete: (ChallengeTemplate) -> Void
-    let coverURL: (ChallengeTemplate) -> URL?
-
-    @Environment(\.dismiss) private var dismiss
-    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-
-    private var all: [(template: ChallengeTemplate, isMine: Bool)] {
-        mine.map { ($0, true) } + builtIns.map { ($0, false) }
-    }
-
-    var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(all, id: \.template.id) { tile($0.template, isMine: $0.isMine) }
-            }
-            .padding(ComposerLayout.margin)
-        }
-        .background(OneDay.canvas)
-        .navigationTitle(Strings.composerTemplates)
-        .navigationBarTitleDisplayMode(.inline)
-        // The composer hides its bar (its own 关闭 bubble is the top row); this
-        // page needs one for the back button and the title.
-        .toolbar(.visible, for: .navigationBar)
-    }
-
-    private func tile(_ template: ChallengeTemplate, isMine: Bool) -> some View {
-        TemplateTile(
-            template: template,
-            isMine: isMine,
-            isSelected: template.id == selectedTemplateID,
-            coverURL: coverURL(template),
-            onSelect: {
-                onChoose(template)
-                dismiss()
-            },
-            // Edit and delete stay on the page: they're about the template, not
-            // about this story, so neither one sends you back.
-            onEdit: isMine ? { onEdit(template) } : nil,
-            onDelete: isMine ? { onDelete(template) } : nil)
-            .accessibilityIdentifier(isMine ? "saved-template-tile" : "poster-tile")
-    }
-}
-
-private struct TemplateTile: View {
-    let template: ChallengeTemplate
-    let isMine: Bool
-    let isSelected: Bool
-    var coverURL: URL?
-    let onSelect: () -> Void
-    var onEdit: (() -> Void)?
-    var onDelete: (() -> Void)?
-
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
-
-    /// "起床 · 咖啡…" — enough to recognise the day's shape at this size.
-    private var subtitleText: String {
-        guard let keys = template.momentKeys, !keys.isEmpty else { return template.displayBlurb }
-        let head = keys.prefix(2).map { MomentCatalog.localize($0) }.joined(separator: " · ")
-        return keys.count > 2 ? head + "…" : head
-    }
-
-    var body: some View {
-        Button(action: onSelect) { card }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .contextMenu {
-                if let onEdit {
-                    Button(Strings.editTemplate, systemImage: "pencil", action: onEdit)
-                }
-                if let onDelete {
-                    Button(Strings.deleteTemplate, systemImage: "trash",
-                           role: .destructive, action: onDelete)
-                }
-            }
-    }
-
-    private var card: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            cover
-            VStack(alignment: .leading, spacing: 2) {
-                Text(template.displayName)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .lineLimit(1)
-                Text(subtitleText)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 8)
-        }
-        .background(OneDay.surface, in: shape)
-        .clipShape(shape)
-        .contentShape(shape)
-        .overlay(shape.strokeBorder(
-            isSelected ? Color.oneDayBrand : OneDay.hairline, lineWidth: isSelected ? 2 : 1))
-        .overlay(alignment: .topTrailing) { if isSelected { check } }
-        .overlay(alignment: .topLeading) { if isMine { mineBadge } }
-    }
-
-    private var cover: some View {
-        TemplateCoverImage(assetName: template.matchedCoverAssetName, fileURL: coverURL)
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .aspectRatio(2, contentMode: .fit)
-            .clipped()
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-
-    private var check: some View {
-        Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: 18, weight: .bold))
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.white, Color.oneDayBrand)
-            .padding(6)
-    }
-
-    private var mineBadge: some View {
-        Text(Strings.composerMineBadge)
-            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-            .foregroundStyle(OneDay.brandText)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(OneDay.surface, in: Capsule())
-            .padding(6)
-    }
-}
-
 // MARK: - 名字, who's filming
 
 /// The rest of the page: the story's name (with the list's summary row under
 /// it) and 自己拍 / 和朋友一起拍. 用哪台相机拍 is gone (1.5): there is one
 /// camera, DV.
 struct SetupStep: View {
-    let template: ChallengeTemplate?
-    var templateCoverURL: URL?
     @Binding var title: String
     @Binding var titleEdited: Bool
     @Binding var withFriends: Bool
@@ -356,13 +181,6 @@ struct SetupStep: View {
 
     private var nameField: some View {
         HStack(spacing: 12) {
-            if let template {
-                TemplateCoverImage(assetName: template.matchedCoverAssetName, fileURL: templateCoverURL)
-                    .scaledToFill()
-                    .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityHidden(true)
-            }
             TextField("", text: $title, prompt: Text(Strings.titlePrompt(oneDay: isOneDay)))
                 .font(.system(size: 16.5, weight: .bold, design: .rounded))
                 .foregroundStyle(OneDay.ink)

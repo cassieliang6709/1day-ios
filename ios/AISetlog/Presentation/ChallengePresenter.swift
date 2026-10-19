@@ -5,32 +5,10 @@ import Foundation
 struct ChallengePresenter {
     let challenge: Challenge
 
-    private var builtInTemplate: ChallengeTemplate? {
-        ChallengeTemplate.builtIn(matching: challenge.templateName)
-            ?? ChallengeTemplate.builtIn(matching: challenge.title)
-    }
-
-    /// Built-in default titles follow the app language. A title the user has
-    /// edited remains exactly as authored, regardless of language changes.
-    var displayTitle: String {
-        guard let template = builtInTemplate,
-              challenge.title == template.name.en || challenge.title == template.name.zh
-        else { return challenge.title }
-        return template.displayName
-    }
-
-    /// Every story has real artwork before its first recorded frame: its
-    /// built-in poster when known, otherwise the closest poster its own
-    /// moments can earn, and only then the universal custom-story cover.
-    var coverAssetName: String {
-        // A preset the person picked for this story wins: it is the only one
-        // of these four that somebody chose on purpose.
-        challenge.presetCoverAssetName
-            ?? builtInTemplate?.coverAssetName
-            ?? TemplateCoverMatcher.assetName(
-                forMomentKeys: challenge.momentTitles ?? [], name: challenge.title)
-            ?? TemplateCoverMatcher.fallbackAssetName
-    }
+    /// The story's name as it was saved. Built-in templates used to swap
+    /// their default name into the app's language; they're gone (1.5), so a
+    /// name is just the name.
+    var displayTitle: String { challenge.title }
 
     var unitName: String { Strings.unitName(oneDay: challenge.isOneDay) }
     var unitNamePlural: String { Strings.unitNamePlural(oneDay: challenge.isOneDay) }

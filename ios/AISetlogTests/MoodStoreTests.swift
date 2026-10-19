@@ -155,69 +155,20 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertEqual(second.today?.note, "tea")
     }
 
-    // MARK: - Mascot chat
+    // MARK: - Mascot chat (removed, 1.5)
 
-    func testChatNeedsAMoodFirst() {
-        let store = makeStore()
-        XCTAssertFalse(store.appendChat(.user, "hi"))
-        XCTAssertTrue(store.chat().isEmpty)
-    }
+    /// 和小方块聊两句 is gone; the chat it saved next to the moods, and the
+    /// mascot's name, are cleared the next time the store opens.
+    func testTheOldMascotChatIsDeletedOnLaunch() throws {
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let chat = tempDir.appendingPathComponent("mascot-chat.json")
+        try Data(#"{"2026-10-19":[{"role":"user","content":"secret"}]}"#.utf8).write(to: chat)
+        UserDefaults.standard.set("豆豆", forKey: "mascotName")
 
-    func testChatIsPerDayAndSurvivesARelaunch() {
-        let first = makeStore()
-        first.setMood(.tired)
-        first.appendChat(.assistant, "辛苦啦")
-        first.appendChat(.user, "  好累  ")
-        let yesterday = clock
-        clock += 86_400
+        _ = makeStore()
 
-        let second = makeStore()
-
-        XCTAssertTrue(second.chat().isEmpty)
-        XCTAssertEqual(second.chat(on: yesterday).map(\.content), ["辛苦啦", "好累"])
-        XCTAssertEqual(second.chat(on: yesterday).map(\.role), [.assistant, .user])
-    }
-
-    func testChatStopsAtTheLimitAndLeavesRoomForTheLastReply() {
-        let store = makeStore()
-        store.setMood(.happy)
-        for i in 0..<(MoodStore.chatLimit - 2) {
-            store.appendChat(i.isMultiple(of: 2) ? .user : .assistant, "line \(i)")
-        }
-        XCTAssertTrue(store.canSendChat())
-        store.appendChat(.user, "last")
-        XCTAssertFalse(store.canSendChat())
-        XCTAssertTrue(store.appendChat(.assistant, "bye"))
-        XCTAssertFalse(store.appendChat(.user, "one more"))
-        XCTAssertEqual(store.chat().count, MoodStore.chatLimit)
-    }
-
-    func testChatIsNeverInTheSyncedSnapshot() async throws {
-        let fake = FakeSync()
-        let store = makeStore(sync: fake)
-        store.setMood(.sad)
-        store.appendChat(.user, "secret")
-        await store.syncNow()
-
-        let synced = try String(contentsOf: fileURL, encoding: .utf8)
-        XCTAssertFalse(synced.contains("secret"))
-        XCTAssertFalse(fake.pushed.contains { $0.note.contains("secret") })
-    }
-
-    func testMascotChatRequestAndReplyParsing() throws {
-        let history = [MascotChatMessage(role: .user, content: "hi")]
-        let data = try XCTUnwrap(RemoteMascotChatService.requestBody(
-            mood: .tired, note: "late", history: history, language: .english, device: "d"))
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(json["mood"] as? String, "tired")
-        XCTAssertEqual(json["note"] as? String, "late")
-        XCTAssertEqual(json["language"] as? String, "en")
-        let messages = try XCTUnwrap(json["messages"] as? [[String: String]])
-        XCTAssertEqual(messages, [["role": "user", "content": "hi"]])
-
-        XCTAssertEqual(try RemoteMascotChatService.reply(from: Data(#"{"reply":" 嗨 "}"#.utf8)), "嗨")
-        XCTAssertThrowsError(try RemoteMascotChatService.reply(from: Data(#"{"reply":""}"#.utf8)))
-        XCTAssertThrowsError(try RemoteMascotChatService.reply(from: Data("nope".utf8)))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: chat.path))
+        XCTAssertNil(UserDefaults.standard.string(forKey: "mascotName"))
     }
 
     func testEveryMoodHasAnImageInTheAppBundle() {

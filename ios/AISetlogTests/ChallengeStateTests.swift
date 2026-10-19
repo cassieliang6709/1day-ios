@@ -153,27 +153,6 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(repository.savedChallenges.first?.momentTitles?.last, "Shower")
     }
 
-    func testUpdatingCustomTemplateKeepsItsIdentityAndAllPrompts() throws {
-        let repository = MemoryChallengeRepository()
-        let store = ChallengeStore(
-            repository: repository,
-            fileStore: MigrationClipFileStore())
-        let template = ChallengeTemplate(
-            emoji: "☀️",
-            name: LocalizedText(en: "Morning", zh: "Morning"),
-            momentKeys: (1...9).map { "Step \($0)" },
-            isCustom: true)
-        store.addCustomTemplate(template)
-        var edited = template
-        edited.momentKeys?[8] = "Shower"
-
-        store.updateCustomTemplate(edited)
-
-        XCTAssertEqual(store.customTemplates.first?.id, template.id)
-        XCTAssertEqual(store.customTemplates.first?.momentKeys?.count, 9)
-        XCTAssertEqual(repository.savedTemplates.first?.momentKeys?.last, "Shower")
-    }
-
     func testLegacyChallengeMigrationSurvivesRelaunch() throws {
         struct LegacyChallenge: Codable {
             var title: String
@@ -280,12 +259,9 @@ final class ChallengeStateTests: XCTestCase {
 
 private final class MemoryChallengeRepository: ChallengeRepository {
     private(set) var savedChallenges: [Challenge] = []
-    private(set) var savedTemplates: [ChallengeTemplate] = []
 
     func loadChallenges() -> [Challenge] { [] }
     func saveChallenges(_ challenges: [Challenge]) { savedChallenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { [] }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { savedTemplates = templates }
 }
 
 private final class MigrationClipFileStore: ClipFileStore {

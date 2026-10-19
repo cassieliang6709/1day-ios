@@ -13,7 +13,7 @@ final class LocalRoomStoreTests: XCTestCase {
         XCTAssertTrue(effects.allowsCloudRoomManagement)
         effects.reconcileReminders = { _ in reminderCalls += 1 }
         effects.reconcileSubscriptions = { _ in subscriptionCalls += 1 }
-        let store = ChallengeStore(repository: files, fileStore: files, coverStore: files, effects: effects)
+        let store = ChallengeStore(repository: files, fileStore: files, effects: effects)
         XCTAssertEqual(reminderCalls, 1, "initial repository load reconciles reminders")
         let room = store.create(title: "Local story")
         XCTAssertEqual(reminderCalls, 2)
@@ -32,7 +32,7 @@ final class LocalRoomStoreTests: XCTestCase {
         defer { files.close() }
         let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
         let sync = RoomSyncService(fileStore: files, transport: source.transport)
-        let store = ChallengeStore(repository: files, fileStore: files, coverStore: files, roomSync: sync, effects: .isolated)
+        let store = ChallengeStore(repository: files, fileStore: files, roomSync: sync, effects: .isolated)
         let identity = AccountStore(localIdentity: .init(id: "local-a", displayName: "A"))
         store.account = identity
         let epoch = AccountStore.identityRevision
@@ -56,7 +56,7 @@ final class LocalRoomStoreTests: XCTestCase {
         defer { files.close() }
         func makeStore() -> ChallengeStore {
             let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
-            return ChallengeStore(repository: files, fileStore: files, coverStore: files,
+            return ChallengeStore(repository: files, fileStore: files,
                                   roomSync: RoomSyncService(fileStore: files, transport: source.transport), effects: .isolated)
         }
         let store = makeStore()

@@ -189,7 +189,7 @@ final class ClipCaptionSelectionTests: XCTestCase {
         let files = try LocalRoomDemoStorage()
         defer { files.close() }
         let store = ChallengeStore(
-            repository: files, fileStore: files, coverStore: files, effects: .isolated)
+            repository: files, fileStore: files, effects: .isolated)
         let story = store.create(title: "Caption story")
 
         store.updateOverlayText("golden hour", day: 1, challengeID: story.id)

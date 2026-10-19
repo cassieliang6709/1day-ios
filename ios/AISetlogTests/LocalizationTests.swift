@@ -54,77 +54,31 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
-    // MARK: Template identity and story titles
+    // MARK: Story titles
 
-    func testBuiltInTemplateLookupAcceptsStableAndLegacyLocalizedNames() {
-        XCTAssertEqual(
-            ChallengeTemplate.builtIn(matching: "Soft Reset")?.coverAssetName,
-            "TemplateSoftReset")
-        XCTAssertEqual(
-            ChallengeTemplate.builtIn(matching: "慢慢重启")?.identityKey,
-            "Soft Reset")
-        XCTAssertNil(ChallengeTemplate.builtIn(matching: "My own story"))
+    /// 按时间拍 is stored under the old template's name, so every saved story
+    /// and room keeps reading as time-only after templates went away (1.5).
+    func testTimeOnlyIsReadFromTheStoredTemplateName() {
+        let byTime = Challenge(
+            id: UUID(), title: "10月19日", startDate: .now, cards: [DayCard(day: 1)],
+            mode: .oneDay, templateName: Challenge.timeOnlyTemplateName)
+        XCTAssertTrue(byTime.isTimeOnly)
+        XCTAssertEqual(Challenge.timeOnlyTemplateName, "Live With Me")
+
+        let oldTemplate = Challenge(
+            id: UUID(), title: "Soft Reset", startDate: .now, cards: [DayCard(day: 1)],
+            mode: .oneDay, templateName: "Soft Reset")
+        XCTAssertFalse(oldTemplate.isTimeOnly)
     }
 
-    func testLiveWithMeIsAStablePromptFreeTemplate() {
-        let template = ChallengeTemplate.liveWithMe
-        XCTAssertTrue(template.isTimeOnly)
-        XCTAssertNil(template.momentKeys)
-        // Its own cover, not Main Character's: two templates sharing one
-        // picture is how the poster rack stopped meaning anything.
-        XCTAssertEqual(template.coverAssetName, "TemplateLiveWithMe")
-
+    /// A name is shown as it was saved — no template swaps it into the app's
+    /// language any more.
+    func testDisplayTitleIsTheSavedTitle() {
         let challenge = Challenge(
-            id: UUID(),
-            title: template.identityKey,
-            startDate: .now,
-            cards: [DayCard(day: 1)],
-            mode: .oneDay,
-            templateName: template.identityKey)
-        XCTAssertTrue(challenge.isTimeOnly)
-    }
-
-    func testBuiltInDefaultTitleSwitchesIndependentlyBetweenLanguages() {
-        let challenge = Challenge(
-            id: UUID(),
-            title: "Soft Reset",
-            startDate: .now,
-            cards: [DayCard(day: 1)],
-            mode: .oneDay,
-            templateName: "Soft Reset")
-        let presenter = ChallengePresenter(challenge: challenge)
-
+            id: UUID(), title: "Soft Reset", startDate: .now, cards: [DayCard(day: 1)],
+            mode: .oneDay, templateName: "Soft Reset")
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
-        XCTAssertEqual(presenter.displayTitle, "慢慢重启")
-        XCTAssertEqual(presenter.coverAssetName, "TemplateSoftReset")
-
-        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
-        XCTAssertEqual(presenter.displayTitle, "Soft Reset")
-    }
-
-    func testUserEditedTitleIsNotTranslatedAndCustomStoryGetsArtwork() {
-        let challenge = Challenge(
-            id: UUID(),
-            title: "Cassie's Sunday",
-            startDate: .now,
-            cards: [DayCard(day: 1)],
-            mode: .oneDay,
-            templateName: "Soft Reset")
-        let presenter = ChallengePresenter(challenge: challenge)
-
-        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
-        XCTAssertEqual(presenter.displayTitle, "Cassie's Sunday")
-
-        let custom = Challenge(
-            id: UUID(),
-            title: "我的周末",
-            startDate: .now,
-            cards: [DayCard(day: 1)],
-            mode: .oneDay,
-            templateName: "我的周末")
-        XCTAssertEqual(
-            ChallengePresenter(challenge: custom).coverAssetName,
-            "TemplateCustomStory")
+        XCTAssertEqual(ChallengePresenter(challenge: challenge).displayTitle, "Soft Reset")
     }
 
     // MARK: Strings
@@ -153,7 +107,6 @@ final class LocalizationTests: XCTestCase {
             inBothLanguages { Strings.recordByTime },
             inBothLanguages { Strings.coverFromClips },
             inBothLanguages { Strings.previewTheFilm(7) },
-            inBothLanguages { Strings.headerDateProgress(1, 7) },
         ]
 
         for (chinese, english) in pairs {
@@ -187,11 +140,9 @@ final class LocalizationTests: XCTestCase {
     func testPromptCountAndProgressCarryTheirNumbers() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertEqual(Strings.previewTheFilm(7), "预览 · 7 个瞬间")
-        XCTAssertEqual(Strings.headerDateProgress(1, 7), "今天 1/7")
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         XCTAssertEqual(Strings.previewTheFilm(7), "Preview · 7 moments")
-        XCTAssertEqual(Strings.headerDateProgress(1, 7), "Today 1/7")
     }
 
     func testForcedLanguageUsesMatchingLocaleAndPureCopy() throws {

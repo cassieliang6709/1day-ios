@@ -20,8 +20,7 @@ struct TimelineHeader: View {
     /// carrying it shows no title rather than that. Stories made since are
     /// named for their date, and a name you typed always shows.
     private var showsTitle: Bool {
-        let byTime = ChallengeTemplate.liveWithMe.name
-        return challenge.title != byTime.en && challenge.title != byTime.zh
+        challenge.title != "Live With Me" && challenge.title != "和我过一天"
     }
 
     var body: some View {

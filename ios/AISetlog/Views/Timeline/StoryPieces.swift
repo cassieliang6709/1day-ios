@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The pieces the story page is built from: how far the day has got, the
-/// moments that are still yours to take, the moments that happened, and — only
+/// The pieces the story page is built from: the moments that are still
+/// yours to take, the moments that happened, and — only
 /// once there is nothing left to film — the film.
 ///
 /// The page is deliberately weighted in that order rather than around a single
@@ -11,63 +11,6 @@ import SwiftUI
 /// the walk because you're on the walk. So every open moment here is the same
 /// row, the same size and the same tap; the only thing the suggestion earns is
 /// a softer word and a tint you have to be looking for.
-
-/// How much of the day exists. The bar and the count come from the same two
-/// numbers the story itself is made of — moments in the plan, and moments
-/// holding footage.
-struct StoryProgressBar: View {
-    let filmed: Int
-    let total: Int
-
-    private var fraction: Double {
-        guard total > 0 else { return 0 }
-        return min(Double(filmed) / Double(total), 1)
-    }
-
-    /// The bar, and one short count under its right end.
-    ///
-    /// It used to carry a full caption — `拍了 0/7 个瞬间` on the left, `这一天
-    /// 拍满了` on the right — which made it the third line in a row to print the
-    /// same three numbers, so 1.3 cut it down to the bare bar. That went one
-    /// step too far: a numberless bar reads as "almost there" at 5 of 7 and
-    /// "barely started" at the same 5 of 7, depending on who's looking. What
-    /// came back is the one number that answers "how much is left" — `还差 2 个`
-    /// — small and right-aligned, under the end the bar is filling towards.
-    ///
-    /// The full count stays in the accessibility label, because the shape is
-    /// the one thing VoiceOver can't relay.
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            // A `GeometryReader` rather than a fraction of `maxWidth`: the fill
-            // has to be a real width so the capsule keeps its round ends at 1/7
-            // of the way through a day.
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(OneDay.surfaceSoft.opacity(0.8))
-                    Capsule()
-                        .fill(OneDay.brandHorizontal)
-                        .frame(width: max(proxy.size.width * fraction, fraction > 0 ? 8 : 0))
-                }
-            }
-            .frame(height: 7)
-            .animation(OneDay.Motion.soft, value: fraction)
-
-            if total > 0 {
-                Text(remaining > 0 ? Strings.momentsToGo(remaining) : Strings.allFilmed)
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(remaining > 0 ? OneDay.inkFaint : Color.oneDayBrand)
-                    .contentTransition(.numericText())
-                    .animation(OneDay.Motion.soft, value: remaining)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Strings.momentsFilmed(filmed, total: total))
-        .accessibilityValue(total > 0 && filmed >= total ? Strings.dayIsFull : "")
-    }
-
-    private var remaining: Int { max(total - filmed, 0) }
-}
 
 /// The film, once every moment holds footage — and the only object on this
 /// page that gets the loudest treatment.

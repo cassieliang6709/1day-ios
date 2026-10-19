@@ -195,11 +195,8 @@ final class AccountDeletionServiceTests: XCTestCase {
 
 private final class MemoryDeletionRepository: ChallengeRepository {
     private var challenges: [Challenge] = []
-    private var templates: [ChallengeTemplate] = []
     func loadChallenges() -> [Challenge] { challenges }
     func saveChallenges(_ challenges: [Challenge]) { self.challenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { templates }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { self.templates = templates }
 }
 
 private final class NullDeletionFileStore: ClipFileStore {
