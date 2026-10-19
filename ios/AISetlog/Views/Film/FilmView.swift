@@ -81,6 +81,10 @@ struct FilmView: View {
     /// What goes into the render. Written only by the Adjust sheet's Apply —
     /// see `AdjustFilmSheet` for why the sheet edits a copy.
     @State private var adjustments = FilmAdjustments()
+    /// Whose takes go in and which stand still. Rooms only; written by the
+    /// filter sheet's Apply and saved for this story on this phone.
+    @State private var selection: FilmSelection
+    @State private var filterTarget: FilmFilterTarget?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     /// The film gets whatever you've been watching your clips in. It isn't
@@ -90,6 +94,23 @@ struct FilmView: View {
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
 
+    init(challenge: Challenge, clips: [DayClip]) {
+        self.challenge = challenge
+        self.clips = clips
+        _selection = State(initialValue: challenge.isShared
+            ? FilmSelectionStore.load(for: challenge.id) : FilmSelection())
+    }
+
+    /// Everyone with a take. The filter is a room's: a solo film is all you.
+    private var people: [FilmPerson] {
+        challenge.isShared ? FilmPerson.people(in: clips) : []
+    }
+
+    /// The takes the film is made of.
+    private var filmClips: [DayClip] {
+        challenge.isShared ? selection.applied(to: clips) : clips
+    }
+
     var body: some View {
         ZStack {
             OneDayCanvas(seed: 3)
@@ -97,21 +118,24 @@ struct FilmView: View {
             if let exportURL {
                 FinalFilmTimeline(
                     challenge: challenge,
-                    clips: clips,
+                    clips: filmClips,
                     filmURL: exportURL,
                     isSaving: isSaving,
                     isSaved: isSaved,
                     saveMessage: saveMessage,
                     onOpenSettings: photosDenied ? openSystemSettings : nil,
                     onSave: { url in Task { await saveToPhotos(url) } },
-                    onAdjust: { showAdjust = true })
+                    onAdjust: { showAdjust = true },
+                    people: people,
+                    selection: selection,
+                    onFilter: { filterTarget = $0 })
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else if let errorMessage {
                 failure(errorMessage)
             } else {
                 GeneratingFilm(
                     challenge: challenge,
-                    clips: clips,
+                    clips: filmClips,
                     stage: stage)
                     .transition(.opacity)
             }
@@ -130,6 +154,15 @@ struct FilmView: View {
             // second export of the same film racing the first.
             AdjustFilmSheet(initial: adjustments) { adjustments = $0 }
                 .presentationDetents([.medium])
+        }
+        .sheet(item: $filterTarget) { target in
+            // Same rule as Adjust: Apply writes the value, `renderRevision`
+            // carries it, and the `.task` below makes the one new film.
+            FilmFilterSheet(people: people, selection: selection, target: target) { picked in
+                let kept = picked.pruned(to: clips)
+                selection = kept
+                FilmSelectionStore.save(kept, for: challenge.id)
+            }
         }
         .task(id: renderRevision) { await render() }
         // A toast, not a status line: "saved" is news for a moment and then
@@ -173,11 +206,19 @@ struct FilmView: View {
     /// The exported film is derived data. Re-recording reuses the same file
     /// URL, so the clip URL alone cannot invalidate a render — include every
     /// field that gets burned into the frames.
+    ///
+    /// Only the takes that go in, plus where the held ones stop — a different
+    /// pick is a different film, so a film cached from another pick must not
+    /// come back (`FilmRenderCache` compares this whole list).
     private var renderRevision: [RenderRevision] {
-        clips.map(RenderRevision.init) + [
+        let held = challenge.isShared ? selection.freezeFrames(for: clips) : [:]
+        let holds = held.sorted { $0.key < $1.key }
+            .map { "\($0.key)@\(String(format: "%.3f", $0.value))" }
+            .joined(separator: ",")
+        return filmClips.map(RenderRevision.init) + [
             RenderRevision(
                 options: "\(adjustments.includeTitleCard)-\(adjustments.includeCaptions)"
-                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)")
+                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]")
         ]
     }
 
@@ -262,6 +303,10 @@ struct FilmView: View {
             // Solo films are all yours, so the grade is unrestricted; in a
             // shared room it stops at your own takes.
             options.lookAuthorID = challenge.isShared ? (account.account?.id ?? "local") : nil
+            if challenge.isShared {
+                options.keptClipIDs = Set(filmClips.map(\.id))
+                options.freezeFrames = selection.freezeFrames(for: clips)
+            }
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             // The scope refuses — and deletes — anything handed to it after it
             // closes, which is what 退出演示 does. Asked before the outcome is
@@ -337,7 +382,7 @@ struct FilmView: View {
             return VideoStitcher.TitleCard(
                 title: presenter.displayTitle,
                 subtitle: Strings.titleCardSubtitleOneDay(
-                    clips.count, challenge.cards.count,
+                    filmClips.count, challenge.cards.count,
                     secondsLabel: challenge.resolvedClipLength.secondsLabel))
         }
         return VideoStitcher.TitleCard(

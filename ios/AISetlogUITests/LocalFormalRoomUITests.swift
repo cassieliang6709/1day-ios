@@ -110,6 +110,42 @@ final class LocalFormalRoomUITests: XCTestCase {
         capture(app, "Production FilmView with local real synthesis")
     }
 
+    /// The filter under a finished room film: open one person's takes, hold
+    /// their first take still, apply, and get a new film back. Skipped on CI
+    /// for the same reason as `testFormalRoomFilmRenders` — it renders twice.
+    func testFormalRoomFilmFilterAndHold() {
+        let app = launch()
+        let demo = app.buttons["home-room-demo"]
+        XCTAssertTrue(demo.waitForExistence(timeout: 15))
+        demo.tap()
+        let film = app.buttons["room-make-vlog"]
+        XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
+        film.tap()
+
+        let person = app.buttons["film-person-0"]
+        XCTAssertTrue(person.waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["film-person-1"].exists, "one face per person in the room")
+        capture(app, "Film page with the people row")
+
+        person.tap()
+        let hold = app.switches["film-clip-hold-0"]
+        XCTAssertTrue(hold.waitForExistence(timeout: 15))
+        hold.switches.firstMatch.tap()
+        XCTAssertTrue(app.sliders["film-clip-hold-frame-0"].waitForExistence(timeout: 15))
+        app.sliders["film-clip-hold-frame-0"].adjust(toNormalizedSliderPosition: 0.5)
+        capture(app, "One person's takes with the first held")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["film-filter-toggle-1"].waitForExistence(timeout: 15))
+        capture(app, "Filter sheet, everyone")
+        app.buttons["film-filter-apply"].tap()
+
+        // Apply makes a new film; the page comes back once it's done.
+        XCTAssertTrue(app.buttons["film-adjust"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["film-person-0"].waitForExistence(timeout: 15))
+        capture(app, "Film page after applying a hold")
+    }
+
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

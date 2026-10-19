@@ -85,6 +85,14 @@ enum VideoStitcher {
         /// filmed in their light, not yours, and they never agreed to it. Nil
         /// means a solo film, where every clip is already yours.
         var lookAuthorID: String?
+        /// Which takes make the film, by `DayClip.id`. Nil keeps every take
+        /// handed in — the film as it always was.
+        var keptClipIDs: Set<String>?
+        /// Takes that stand still in the shared-room grid: `DayClip.id` →
+        /// seconds into the take. That cell shows the one frame for the whole
+        /// moment while everyone else keeps playing, and its sound is left
+        /// out. The sequential film has no cells, so it ignores this.
+        var freezeFrames: [String: Double] = [:]
         static let `default` = Options()
     }
 
@@ -103,6 +111,8 @@ enum VideoStitcher {
     }
 
     private struct LoadedClip {
+        /// `DayClip.id`, so `Options.freezeFrames` can find its take.
+        let id: String
         let day: Int
         let label: String?
         let authorName: String?
@@ -121,6 +131,9 @@ enum VideoStitcher {
         let audioRange: CMTimeRange
         let naturalSize: CGSize
         let preferredTransform: CGAffineTransform
+        /// One frame of the take, for holding it still. Invalid when the track
+        /// didn't say; `cellSegments` falls back to 1/30 s.
+        var frameDuration: CMTime = .invalid
         /// Baked by a camera that prints its own date (`CameraStyle`), so the
         /// film's date pill stays off this clip.
         var hasCameraStamp = false
@@ -169,7 +182,9 @@ enum VideoStitcher {
 
     // MARK: - Entry point
 
-    static func stitch(clips: [DayClip], options: Options = .default) async throws -> URL {
+    static func stitch(clips allClips: [DayClip], options: Options = .default) async throws -> URL {
+        // Before the look pass, so a take left out of the film isn't graded.
+        let clips = kept(allClips, ids: options.keptClipIDs)
         guard !clips.isEmpty else { throw StitchError.noClips }
 
         #if !targetEnvironment(simulator)
@@ -202,7 +217,9 @@ enum VideoStitcher {
             let transform = try await video.load(.preferredTransform)
             let audio = try await asset.loadTracks(withMediaType: .audio).first
             let audioRange = audio == nil ? CMTimeRange.zero : try await audio!.load(.timeRange)
+            let frameDuration = (try? await video.load(.minFrameDuration)) ?? .invalid
             loaded.append(LoadedClip(
+                id: clip.id,
                 day: clip.day, label: clip.label, authorName: clip.authorName,
                 captions: clip.captions,
                 recordedAt: clip.recordedAt,
@@ -210,6 +227,7 @@ enum VideoStitcher {
                 asset: asset, videoRange: videoRange, videoTrack: video,
                 audioTrack: audio, audioRange: audioRange,
                 naturalSize: naturalSize, preferredTransform: transform,
+                frameDuration: frameDuration,
                 hasCameraStamp: cameraStamped.contains(clip.id)))
         }
         guard !loaded.isEmpty else { throw StitchError.noClips }
@@ -254,7 +272,7 @@ enum VideoStitcher {
         case .friendsTogether:
             try buildFriendsTogether(
                 loaded: loaded, into: composition, renderSize: renderSize,
-                sourceAspect: sourceAspect,
+                sourceAspect: sourceAspect, freezeFrames: options.freezeFrames,
                 startAt: titleOffset, instructions: &instructions,
                 audioParams: &audioParams, captions: &captions,
                 authorCaptions: &authorCaptions)
@@ -542,6 +560,7 @@ enum VideoStitcher {
         into composition: AVMutableComposition,
         renderSize: CGSize,
         sourceAspect: CGFloat,
+        freezeFrames: [String: Double] = [:],
         startAt: CMTime,
         instructions: inout [any AVVideoCompositionInstructionProtocol],
         audioParams: inout [AVMutableAudioMixInputParameters],
@@ -575,16 +594,21 @@ enum VideoStitcher {
                     preferredTrackID: kCMPersistentTrackID_Invalid)
                 else { throw StitchError.compositionFailed }
 
-                var clipCursor = cursor
-                while clipCursor < end {
-                    let duration = CMTimeMinimum(
-                        clip.videoRange.duration,
-                        CMTimeSubtract(end, clipCursor))
+                let freezeAt = freezeFrames[clip.id]
+                for segment in cellSegments(
+                    videoRange: clip.videoRange, momentDuration: groupDuration,
+                    freezeAt: freezeAt, frameDuration: clip.frameDuration) {
+                    let at = CMTimeAdd(cursor, segment.offset)
                     try videoTrack.insertTimeRange(
-                        CMTimeRange(start: clip.videoRange.start, duration: duration),
-                        of: clip.videoTrack,
-                        at: clipCursor)
-                    clipCursor = CMTimeAdd(clipCursor, duration)
+                        segment.source, of: clip.videoTrack, at: at)
+                    // A held frame: one frame inserted, then stretched over the
+                    // whole moment. No still image is made, so the cell keeps
+                    // the take's own orientation and the compositor's maths.
+                    if segment.duration != segment.source.duration {
+                        videoTrack.scaleTimeRange(
+                            CMTimeRange(start: at, duration: segment.source.duration),
+                            toDuration: segment.duration)
+                    }
                 }
 
                 let row = index / columns
@@ -612,7 +636,10 @@ enum VideoStitcher {
                         start: CMTimeGetSeconds(cursor), end: CMTimeGetSeconds(end)))
                 }
 
-                if let audio = clip.audioTrack,
+                // A still picture with sound running under it reads as broken,
+                // so a held cell is silent and the others carry the moment.
+                if freezeAt == nil,
+                   let audio = clip.audioTrack,
                    let audioTrack = composition.addMutableTrack(
                        withMediaType: .audio,
                        preferredTrackID: kCMPersistentTrackID_Invalid) {
@@ -649,6 +676,66 @@ enum VideoStitcher {
                 end: CMTimeGetSeconds(end)))
             cursor = end
         }
+    }
+
+    /// One stretch of a grid cell's track: a piece of the take, where it
+    /// lands in the moment, and how long it lasts there. `duration` longer
+    /// than `source.duration` means the piece is held — stretched to fill.
+    struct CellSegment: Equatable {
+        let source: CMTimeRange
+        let offset: CMTime
+        let duration: CMTime
+    }
+
+    /// How one take fills a moment `momentDuration` long.
+    ///
+    /// Playing: the take from its start, looped until the moment ends — a
+    /// shorter take repeats under the longest one. Held (`freezeAt` set): one
+    /// frame, `freezeAt` seconds into the take, stretched over the whole
+    /// moment. The frame is clamped inside the take so a time past its end
+    /// still lands on its last frame.
+    static func cellSegments(
+        videoRange: CMTimeRange,
+        momentDuration: CMTime,
+        freezeAt: Double?,
+        frameDuration: CMTime
+    ) -> [CellSegment] {
+        guard videoRange.duration > .zero, momentDuration > .zero else { return [] }
+
+        if let freezeAt {
+            let fallback = CMTime(value: 1, timescale: 30)
+            let oneFrame = CMTimeMinimum(
+                frameDuration.isValid && frameDuration > .zero ? frameDuration : fallback,
+                videoRange.duration)
+            let latest = CMTimeSubtract(videoRange.duration, oneFrame)
+            let wanted = CMTime(seconds: max(freezeAt, 0), preferredTimescale: 600)
+            let into = CMTimeClampToRange(
+                wanted, range: CMTimeRange(start: .zero, duration: latest))
+            return [CellSegment(
+                source: CMTimeRange(
+                    start: CMTimeAdd(videoRange.start, into), duration: oneFrame),
+                offset: .zero,
+                duration: momentDuration)]
+        }
+
+        var segments: [CellSegment] = []
+        var offset = CMTime.zero
+        while offset < momentDuration {
+            let duration = CMTimeMinimum(
+                videoRange.duration, CMTimeSubtract(momentDuration, offset))
+            segments.append(CellSegment(
+                source: CMTimeRange(start: videoRange.start, duration: duration),
+                offset: offset,
+                duration: duration))
+            offset = CMTimeAdd(offset, duration)
+        }
+        return segments
+    }
+
+    /// The takes `ids` keeps, in their order. Nil keeps them all.
+    static func kept(_ clips: [DayClip], ids: Set<String>?) -> [DayClip] {
+        guard let ids else { return clips }
+        return clips.filter { ids.contains($0.id) }
     }
 
     // MARK: - Geometry

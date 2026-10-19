@@ -22,6 +22,11 @@ struct FinalFilmTimeline: View {
     /// Saves the film as it sounds now: with its music and voiceover, if any.
     let onSave: (URL) -> Void
     let onAdjust: () -> Void
+    /// Everyone in a room's film, for the row of faces under the player.
+    /// Empty for a solo film, which has no row.
+    var people: [FilmPerson] = []
+    var selection = FilmSelection()
+    var onFilter: ((FilmFilterTarget) -> Void)?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.roomPreviewMediaScope) private var previewMedia
@@ -42,6 +47,9 @@ struct FinalFilmTimeline: View {
             VStack(spacing: 22) {
                 heading
                 player
+                if let onFilter, !people.isEmpty {
+                    FilmPeopleRow(people: people, selection: selection, onOpen: onFilter)
+                }
                 FilmSoundtrackPanel(
                     baseURL: filmURL,
                     mood: moodStore?.mood(on: challenge.startDate)?.mood,

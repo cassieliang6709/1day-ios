@@ -159,4 +159,5 @@ jobs:
             -derivedDataPath build/DerivedData \
             $flags \
             -skip-testing:AISetlogUITests/LocalFormalRoomUITests/testFormalRoomFilmRenders \
+            -skip-testing:AISetlogUITests/LocalFormalRoomUITests/testFormalRoomFilmFilterAndHold \
             CODE_SIGNING_ALLOWED=NO
