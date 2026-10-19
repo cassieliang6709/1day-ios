@@ -122,8 +122,13 @@ struct RecordClipView: View {
     /// The free-form camera used to leave 68pt here for the floating bar
     /// under it. The bar is hidden while the camera is up as of 1.5.
     private var bottomInset: CGFloat { 8 }
-    /// What this take is filmed with: the story's camera when it has one.
-    private var activeCamera: CameraStyle { lockedCamera ?? cameraStyle }
+    /// What this take is filmed with. There is one camera now (DV, 1.5): a
+    /// story or room locked to a camera that's no longer offered films with
+    /// it too. Clips already filmed keep the look baked into them.
+    private var activeCamera: CameraStyle {
+        let camera = lockedCamera ?? cameraStyle
+        return CameraStyle.selectable.contains(camera) ? camera : CameraStyle.defaultCamera
+    }
 
     /// Portrait from 1.5 on: the camera decides the shape now. A story saved
     /// with landscape or square keeps it.
@@ -915,7 +920,7 @@ struct RecordClipView: View {
 
             HStack(spacing: 6) {
                 flipButton.rotationEffect(.degrees(deviceTurn))
-                if lockedCamera == nil { cameraStyleButton.rotationEffect(.degrees(deviceTurn)) }
+                flashButton.rotationEffect(.degrees(deviceTurn))
             }
             .frame(maxWidth: .infinity)
         }
@@ -1006,24 +1011,21 @@ struct RecordClipView: View {
             .allowsHitTesting(false)
     }
 
-    /// Dazz-style: which camera you're holding. Picks the frame, the date and
-    /// the tone baked into the next take — see `CameraStyle`.
-    private var cameraStyleButton: some View {
-        Menu {
-            Picker(Strings.cameraPicker, selection: $cameraStyle) {
-                ForEach(CameraStyle.selectable) { style in
-                    Label(style.displayName, systemImage: style.symbolName).tag(style)
-                }
-            }
-        } label: {
-            Image(systemName: cameraStyle.symbolName)
+    /// 闪光灯, where 换相机 used to be: there is one camera now. Lit while it's
+    /// on, dimmed on the front camera, which has no light — the choice is kept
+    /// and comes back when you flip to the back camera again.
+    private var flashButton: some View {
+        Button { recorder.toggleTorch() } label: {
+            Image(systemName: recorder.isTorchOn ? "bolt.fill" : "bolt.slash.fill")
+                .foregroundStyle(recorder.isTorchOn && recorder.canUseTorch ? Color.oneDayButter : .white)
                 .cameraGlass()
         }
-        .accessibilityLabel(Strings.cameraPicker)
-        .accessibilityValue(cameraStyle.displayName)
-        .accessibilityIdentifier("camera-style")
-        .disabled(recorder.state == .recording || recorder.clipURL != nil)
-        .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.cameraFlash)
+        .accessibilityAddTraits(recorder.isTorchOn ? .isSelected : [])
+        .accessibilityIdentifier("camera-flash")
+        .disabled(!recorder.canUseTorch)
+        .opacity(recorder.canUseTorch ? 1 : 0.45)
     }
 
     private var flipButton: some View {

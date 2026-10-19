@@ -74,7 +74,8 @@ final class CreationFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["templates-more"].exists)
         // Who's filming and the camera are on the same page, with the one button.
         XCTAssertTrue(app.buttons["company-solo"].exists)
-        XCTAssertTrue(app.buttons["camera-option-film"].exists)
+        // One camera (DV), so the page no longer asks which.
+        XCTAssertFalse(app.buttons["camera-option-film"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())

@@ -74,13 +74,6 @@ final class ClipLibraryTests: XCTestCase {
         XCTAssertEqual(library.filtered(friendsOnFilm, cameras: cameras).count, 1)
     }
 
-    func testCameraChipsOnlyForUsedCamerasInPickerOrder() {
-        let (library, cameras) = cameraLibrary()
-        // `.standard` never gets a chip; camcorder has no clips.
-        XCTAssertEqual(library.cameras(in: cameras), [.film, .instant])
-        XCTAssertEqual(library.cameras(in: [:]), [])
-    }
-
     func testCoverIsEarliestClipOfEachDay() {
         let s = story("A", shared: false)
         let day: TimeInterval = 86_400
@@ -152,62 +145,19 @@ final class ClipLibraryTests: XCTestCase {
             myIDs: [me])
     }
 
-    /// 我的 opens on `.archive`: my story clips and my draft, no friend.
-    func testArchiveDefaultShowsOnlyMine() {
+    /// 我的 shows my story clips and my draft, never a friend's.
+    func testMyArchiveShowsOnlyMine() {
         let library = mixedLibrary()
-        let shown = library.filtered(.archive)
-        XCTAssertEqual(shown.count, 3)
-        XCTAssertTrue(shown.allSatisfy(\.isMine))
-        XCTAssertFalse(LibraryFilter.archive.includesFriends)
+        let mine = library.scoped(includingFriends: false)
+        XCTAssertEqual(mine.clips.count, 3)
+        XCTAssertTrue(mine.filtered(.mine).allSatisfy(\.isMine))
+        XCTAssertEqual(mine.filtered(.mine).count, 3)
+        // Drafts are mine, so they stay.
+        XCTAssertEqual(mine.draftCount, 1)
+        // Covers come from what is shown, so no day's picture is a friend's clip.
+        XCTAssertTrue(mine.coverByDay(mine.filtered(.mine)).values.allSatisfy(\.isMine))
         // A bare filter (what a room's feed uses) still means everyone's.
         XCTAssertEqual(library.filtered(.all).count, 4)
-    }
-
-    func testIncludeFriendsBringsFriendsBack() {
-        let library = mixedLibrary()
-        var on = LibraryFilter.archive
-        on.includesFriends = true
-        XCTAssertEqual(library.filtered(on).count, 4)
-        XCTAssertEqual(library.filtered(on).filter { !$0.isMine }.count, 1)
-        // The scoped library the page counts and covers from agrees.
-        XCTAssertEqual(library.scoped(includingFriends: true).clips.count, 4)
-        XCTAssertEqual(library.scoped(includingFriends: false).clips.count, 3)
-        // Covers come from what is shown, so with the chip off no day's
-        // picture is a friend's clip.
-        let covers = library.coverByDay(library.filtered(.archive))
-        XCTAssertTrue(covers.values.allSatisfy(\.isMine))
-    }
-
-    /// An explicit 朋友拍的 pick shows friends whatever the chip says; 我拍的
-    /// is mine either way.
-    func testExplicitPeoplePickOverridesChip() {
-        let library = mixedLibrary()
-        let friendsChipOff = LibraryFilter(people: .friends, includesFriends: false)
-        XCTAssertEqual(library.filtered(friendsChipOff).count, 1)
-        let mineChipOn = LibraryFilter(people: .mine, includesFriends: true)
-        XCTAssertEqual(library.filtered(mineChipOn).count, 3)
-    }
-
-    func testDraftsShowWhetherOrNotFriendsAreIncluded() {
-        let library = mixedLibrary()
-        for includesFriends in [false, true] {
-            let filter = LibraryFilter(draftsOnly: true, includesFriends: includesFriends)
-            XCTAssertEqual(library.filtered(filter).count, 1)
-            XCTAssertEqual(library.scoped(includingFriends: includesFriends).draftCount, 1)
-            XCTAssertEqual(
-                library.filtered(LibraryFilter(includesFriends: includesFriends))
-                    .filter { $0.storyID == nil }.count, 1)
-        }
-    }
-
-    func testScopedCamerasIgnoreFriendsOnlyCameras() {
-        let (library, cameras) = cameraLibrary()
-        // Clip 3 (friend) is film, as is clip 1 (mine), so film stays; a
-        // camera only the friend used would drop out.
-        var friendOnly = cameras
-        for item in library.clips where !item.isMine { friendOnly[item.cameraKey] = .camcorder }
-        XCTAssertTrue(library.cameras(in: friendOnly).contains(.camcorder))
-        XCTAssertFalse(library.scoped(includingFriends: false).cameras(in: friendOnly).contains(.camcorder))
     }
 
     func testDraftsFilterCombinesWithDay() {

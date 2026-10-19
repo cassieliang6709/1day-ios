@@ -38,7 +38,8 @@ struct StoryComposerView: View {
     /// and the camera you pick already decides the frame's shape.
     private let clipLength: Challenge.ClipLength = .scene
     private let orientation: Challenge.Orientation = .portrait
-    @State private var cameraStyle: CameraStyle = CameraStyle.defaultCamera
+    /// No longer asked (1.5): there is one camera.
+    private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
     /// 存为我的模板, asked in the list editor and done when the story starts,
     /// once the name is known.
@@ -190,7 +191,6 @@ struct StoryComposerView: View {
             title: $title,
             titleEdited: $titleEdited,
             withFriends: $withFriends,
-            cameraStyle: $cameraStyle,
             isOneDay: days == .oneDay,
             listCount: entry == .writeList ? resolvedMoments?.count ?? 0 : nil,
             onOpenList: openList)

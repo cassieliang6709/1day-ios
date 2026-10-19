@@ -185,21 +185,11 @@ struct StoryTimelineView: View {
         let members = store.members(for: challengeID)
         let myID = account.account?.id ?? RoomProgress.soloAuthorID
         let agenda = StoryAgenda(momentCount: challenge.cards.count, clips: clips, myID: myID)
-        // Only ever built for a shared room. Everything it draws — the roster,
-        // who filmed, who we're waiting on — is a sentence about other people,
-        // and a solo story has none to write about.
-        let cast = challenge.isShared
-            ? RoomCast(
-                members: members, clips: clips,
-                momentCount: challenge.cards.count,
-                myID: myID, myName: account.account?.displayName)
-            : nil
 
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 TimelineHeader(
                     challenge: challenge,
-                    cast: cast,
                     isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
 
                 // A shared room is a feed now (1.5, after Setlog) — no

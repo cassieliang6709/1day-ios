@@ -1,18 +1,15 @@
 import SwiftUI
 
 /// 我的's archive (1.5): your clips — from every story and room, plus your
-/// drafts — with a camera filter row, a people menu, a grid or a month
-/// calendar, and a select mode that turns any set of clips into a vlog. Lives
-/// inside `PlansHomeView`'s scroll view, which keeps the header, the
-/// in-progress story card and all launch routing.
+/// drafts — as a grid or a month calendar, and a select mode that turns any
+/// set of clips into a vlog. Lives inside `PlansHomeView`'s scroll view,
+/// which keeps the header, the in-progress story card and all launch routing.
 ///
-/// Friends' clips are left out by default: 我的 is *my* area, and finding a
-/// friend's clip in it read as "did I film this?". The 含朋友的 chip at the
-/// head of the chip row brings them back (the 1.5 behaviour), and is
-/// remembered per viewer. Everything the page computes — the grid, the day
-/// counts, the calendar covers, the camera chips, the 待归档 count, what can
-/// be picked for a vlog — goes through the same scope, `scope` plus
-/// `activeFilter`, so no number on the page counts a clip the grid hides.
+/// Only ever yours. Friends' clips stay in the room they were filmed in: 我的
+/// is *my* area, and finding a friend's clip in it read as "did I film this?".
+/// There is no filter row any more either — no 含朋友的, no 只有我, no camera
+/// chips (there is one camera) — so everything the page computes goes
+/// through `scope`, and no number on the page counts a clip the grid hides.
 struct LibrarySection: View {
     let library: ClipLibrary
     /// Shared stories. No longer drawn as chips (the row filters by camera
@@ -28,12 +25,6 @@ struct LibrarySection: View {
 
     enum Mode: Hashable { case grid, calendar }
 
-    /// The chip row and people menu. `includesFriends` here is ignored —
-    /// `activeFilter` overlays the remembered 含朋友的 choice on it.
-    @State private var filter: LibraryFilter = .archive
-    /// 含朋友的. `@AppStorage` so it survives relaunches: someone who wants
-    /// their friends' clips in 我的 shouldn't have to ask every time.
-    @AppStorage("library.includesFriends.v1") private var includesFriends = false
     @State private var mode: Mode = .grid
     @State private var day: Date?
     @State private var month = Calendar.current.startOfMonth(for: .now)
@@ -53,32 +44,24 @@ struct LibrarySection: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var cameraIndex: ClipCameraIndex { .shared }
-    /// The library this page draws from: friends' clips only with 含朋友的 on.
-    private var scope: ClipLibrary { library.scoped(includingFriends: includesFriends) }
-    private var activeFilter: LibraryFilter {
-        var active = filter
-        active.includesFriends = includesFriends
-        return active
-    }
+    /// The library this page draws from: my clips, never a friend's.
+    private var scope: ClipLibrary { library.scoped(includingFriends: false) }
     private var shown: [LibraryClip] {
-        scope.filtered(activeFilter, cameras: cameraIndex.cameras, on: day)
+        scope.filtered(.mine, cameras: cameraIndex.cameras, on: day)
     }
-    /// Whether the 含朋友的 chip is worth drawing: only if a friend has a clip.
-    private var hasFriendsClips: Bool { library.clips.contains { !$0.isMine } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             titleRow
-            filterRow
 
-            if library.clips.isEmpty {
+            if scope.clips.isEmpty {
                 emptyLine(Strings.libraryEmpty)
             } else {
                 if mode == .calendar {
                     LibraryCalendar(
                         month: $month,
                         covers: scope.coverByDay(
-                            scope.filtered(activeFilter, cameras: cameraIndex.cameras)),
+                            scope.filtered(.mine, cameras: cameraIndex.cameras)),
                         selectedDay: $day,
                         showsMoods: true)
                         .padding(.horizontal, 20)
@@ -135,9 +118,7 @@ struct LibrarySection: View {
             SectionLabel(text: Strings.libraryTitle)
             Spacer(minLength: 6)
 
-            if !library.clips.isEmpty {
-                peopleMenu
-
+            if !scope.clips.isEmpty {
                 Button {
                     withAnimation(OneDay.Motion.snap) {
                         mode = mode == .grid ? .calendar : .grid
@@ -169,151 +150,14 @@ struct LibrarySection: View {
         .padding(.horizontal, 20)
     }
 
-    /// 全部人 / 我拍的 / 朋友拍的. A menu rather than chips: it is the less
-    /// used of the two filters, and the chip row belongs to the cameras.
-    private var peopleMenu: some View {
-        Menu {
-            Picker(Strings.filterWhoFilmed, selection: peopleSelection) {
-                ForEach(LibraryFilter.People.allCases, id: \.self) { people in
-                    Text(peopleName(people)).tag(people)
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(peopleName(filter.people))
-                Image(systemName: "chevron.down").font(.system(size: 10, weight: .heavy))
-            }
-            .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(filter.people == .everyone ? OneDay.inkSoft : OneDay.brandText)
-            .padding(.horizontal, 11)
-            .frame(height: 38)
-            .background(OneDay.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-        }
-        .accessibilityLabel(Strings.filterWhoFilmed)
-        .accessibilityValue(peopleName(filter.people))
-        .accessibilityIdentifier("library-people")
-    }
-
-    /// Picking 朋友拍的 turns 含朋友的 on rather than showing friends while
-    /// the chip says they're excluded. The other reading — the chip wins and
-    /// the grid comes up empty — punishes an explicit request; and showing
-    /// them while the chip stays off would leave a chip that lies. Turning it
-    /// on keeps the menu and the chip telling the same story, and it sticks,
-    /// which matches what the person just asked for.
-    private var peopleSelection: Binding<LibraryFilter.People> {
-        Binding(
-            get: { filter.people },
-            set: { people in
-                if people == .friends { includesFriends = true }
-                filter.people = people
-            })
-    }
-
-    private func peopleName(_ people: LibraryFilter.People) -> String {
-        switch people {
-        case .everyone: Strings.filterEveryone
-        case .mine: Strings.filterMine
-        case .friends: Strings.filterFriends
-        }
-    }
-
-    /// 含朋友的 when a friend has any clip, then 全部, 待归档 (N) when there
-    /// are drafts, then one chip per camera that has at least one clip in
-    /// scope. With nothing but 全部 the row isn't drawn.
-    ///
-    /// 含朋友的 goes first, set off by a hairline: it is a switch that combines
-    /// with the others, not one more choice among them, and at the far end of
-    /// a row of cameras it would scroll out of sight.
-    @ViewBuilder
-    private var filterRow: some View {
-        let cameras = scope.cameras(in: cameraIndex.cameras)
-        let draftCount = scope.draftCount
-        if !cameras.isEmpty || draftCount > 0 || hasFriendsClips {
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    if hasFriendsClips {
-                        chip(Strings.libraryIncludeFriendsChip, isOn: includesFriends) {
-                            setIncludesFriends(!includesFriends)
-                        }
-                        .accessibilityIdentifier("library-filter-friends")
-                        Rectangle()
-                            .fill(OneDay.hairline)
-                            .frame(width: 1, height: 20)
-                    }
-                    chip(Strings.filterAll, isOn: filter.camera == nil && !filter.draftsOnly) {
-                        filter.camera = nil
-                        filter.draftsOnly = false
-                    }
-                    .accessibilityIdentifier("library-filter-all")
-                    if draftCount > 0 {
-                        chip(Strings.libraryDraftsChip(draftCount), isOn: filter.draftsOnly) {
-                            filter.camera = nil
-                            filter.draftsOnly = true
-                        }
-                        .accessibilityIdentifier("library-filter-drafts")
-                    }
-                    ForEach(cameras) { style in
-                        chip(style.displayName, isOn: filter.camera == style) {
-                            filter.draftsOnly = false
-                            filter.camera = style
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-
-    /// Turning 含朋友的 off takes friends back out of everything that could
-    /// still hold them: a 朋友拍的 pick goes back to 全部人 (which now means
-    /// yours), a camera chip only friends' clips earned goes away with its
-    /// selection, and a friend's clip already picked for a vlog is unpicked —
-    /// the selection bar must not count clips the grid no longer shows.
-    private func setIncludesFriends(_ on: Bool) {
-        includesFriends = on
-        guard !on else { return }
-        if filter.people == .friends { filter.people = .everyone }
-        if let camera = filter.camera,
-           !library.scoped(includingFriends: false).cameras(in: cameraIndex.cameras).contains(camera) {
-            filter.camera = nil
-        }
-        picked.removeAll { !$0.isMine }
-    }
-
-    /// 待归档 from the camera's drafts button: the grid, every date, drafts only.
+    /// The camera's drafts button: the grid, every date. It used to narrow
+    /// to 只有我 (drafts only); that chip is gone, so this shows everything.
     private func showDrafts() {
         isSelecting = false
         mode = .grid
         day = nil
-        filter.camera = nil
-        filter.draftsOnly = true
     }
 
-    private func chip(_ label: String, isOn: Bool, select: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(OneDay.Motion.snap) { select() }
-        } label: {
-            Text(label)
-                .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                .lineLimit(1)
-                .monospacedDigit()
-                .foregroundStyle(isOn ? OneDay.onBrand : OneDay.inkSoft)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 8)
-                .background {
-                    if isOn {
-                        Capsule().fill(Color.oneDayBrand)
-                    } else {
-                        Capsule().fill(OneDay.surface)
-                            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
-    }
 
     private func emptyLine(_ text: String) -> some View {
         Text(text)
@@ -414,7 +258,7 @@ struct LibrarySection: View {
         } label: {
             // A fixed 3:4 box with the thumbnail fitted into it: given the
             // thumbnail itself as the sizing view, a portrait clip grew the
-            // cell past its column and over the filter row.
+            // cell past its column and over the row above.
             Color.clear
                 .aspectRatio(3 / 4, contentMode: .fit)
                 .overlay {
@@ -422,17 +266,6 @@ struct LibrarySection: View {
                 }
                 .clipped()
                 .overlay(alignment: .bottomLeading) { caption(clip) }
-                .overlay(alignment: .bottomTrailing) {
-                    if clip.storyID == nil { draftBadge }
-                }
-                .overlay(alignment: .topLeading) {
-                    // Only someone else's clip says whose it is; yours don't
-                    // need a face on every tile.
-                    if !clip.isMine {
-                        AvatarDot(name: clip.authorName, size: 20)
-                            .padding(6)
-                    }
-                }
                 .overlay(alignment: .topTrailing) {
                     if isSelecting { pickMark(order) }
                 }
@@ -465,16 +298,6 @@ struct LibrarySection: View {
     private func clockTime(_ date: Date) -> String {
         let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
-    }
-
-    private var draftBadge: some View {
-        Text(Strings.libraryDraftBadge)
-            .font(.system(size: 10, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(.black.opacity(0.55), in: Capsule())
-            .padding(5)
     }
 
     private func pickMark(_ order: Int?) -> some View {
@@ -809,7 +632,8 @@ struct LibraryDayPlayer: View {
                     .dateTime.month().day().weekday(.abbreviated).locale(AppLanguage.effective.locale)))
                     .font(.system(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                Text("\(index + 1) / \(playback.clips.count) · \(sourceName)")
+                Text(["\(index + 1) / \(playback.clips.count)", sourceName]
+                    .compactMap { $0 }.joined(separator: " · "))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(OneDay.inkSoft)
@@ -908,10 +732,11 @@ struct LibraryDayPlayer: View {
         }
     }
 
-    private var sourceName: String {
+    /// The story the clip is in; nil for a draft, which is in none.
+    private var sourceName: String? {
         switch clip.source {
         case .story(_, let title, _): title
-        case .draft: Strings.libraryDraftBadge
+        case .draft: nil
         }
     }
 

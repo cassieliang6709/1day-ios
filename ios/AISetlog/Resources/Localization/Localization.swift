@@ -563,9 +563,6 @@ enum Strings {
     static var aiWriteLead: String { lang == .chinese ? "说一句今天干嘛，自动列好" : "Say what today is; get a shot list" }
     static var saveToMine: String { lang == .chinese ? "存到我的" : "Save to Mine" }
     static var libraryTitle: String { lang == .chinese ? "所有片段" : "All clips" }
-    static var filterAll: String { lang == .chinese ? "全部" : "All" }
-    static var filterMine: String { lang == .chinese ? "我拍的" : "Mine" }
-    static var filterFriends: String { lang == .chinese ? "朋友拍的" : "Friends'" }
     static var libraryGrid: String { lang == .chinese ? "网格" : "Grid" }
     static var libraryCalendar: String { lang == .chinese ? "日历" : "Calendar" }
     static var librarySelect: String { lang == .chinese ? "选择" : "Select" }
@@ -640,15 +637,11 @@ enum Strings {
     static var switchOrientation: String { lang == .chinese ? "切换画幅" : "Switch frame" }
     static var flipCamera: String { lang == .chinese ? "切换前后摄像头" : "Flip camera" }
     static var dualCamera: String { lang == .chinese ? "前后同时拍" : "Front and back together" }
-    static var cameraPicker: String { lang == .chinese ? "换相机" : "Camera" }
+    static var cameraFlash: String { lang == .chinese ? "闪光灯" : "Flash" }
     static var cameraStandard: String { lang == .chinese ? "标准" : "Standard" }
     static var cameraCamcorder: String { lang == .chinese ? "DV 机" : "Camcorder" }
     static var cameraFilm: String { lang == .chinese ? "胶片机" : "Film camera" }
     static var cameraInstant: String { lang == .chinese ? "拍立得" : "Instant" }
-    static var pickCamera: String { lang == .chinese ? "用哪台相机拍" : "Which camera" }
-    static var cameraCamcorderCaption: String { lang == .chinese ? "3:4 · 原色 · 时间码" : "3:4 · true colour · timecode" }
-    static var cameraFilmCaption: String { lang == .chinese ? "2:3 · 微暖 · 橙色日期" : "2:3 · a little warm · orange date" }
-    static var cameraInstantCaption: String { lang == .chinese ? "3:4 · 原色 · 白边相纸" : "3:4 · true colour · white border" }
 
     // The zoom values themselves ("0.5x") are formatted by `CameraZoom.label`
     // and are the same in both languages, so they are not copy.
@@ -1409,7 +1402,6 @@ enum Strings {
     static var noCodeOnClipboard: String {
         lang == .chinese ? "剪贴板里没有邀请码" : "No invite code on the clipboard"
     }
-    static var inviteCodeCopied: String { lang == .chinese ? "已复制" : "Copied" }
     static func previewTheFilm(_ count: Int) -> String {
         lang == .chinese ? "预览 · \(count) 个瞬间" : "Preview · \(count) \(momentWord(count))"
     }
@@ -1472,15 +1464,6 @@ enum Strings {
         return lang == .chinese ? "\(count) 人在这个房间" : "\(count) people in this room"
     }
 
-    /// The room page's whole header line under the title: 「2 人 · 邀请码
-    /// KPADC7」. It replaced a row of faces, 「2 人在这个房间」 and a second
-    /// sentence about who had filmed — three lines saying what the columns
-    /// right below now show by having one per person, with that person's
-    /// clips in it.
-    static func roomPeopleCount(_ count: Int) -> String {
-        if lang == .chinese { return "\(count) 人" }
-        return count == 1 ? "1 person" : "\(count) people"
-    }
     /// How many clips one person has in the room, at the top of their column.
     static func roomColumnClipCount(_ count: Int) -> String {
         if lang == .chinese { return "\(count) 段" }

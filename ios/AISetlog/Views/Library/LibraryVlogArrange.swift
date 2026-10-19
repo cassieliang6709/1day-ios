@@ -85,10 +85,12 @@ struct LibraryVlogArrange: View {
                             .locale(AppLanguage.effective.locale)))
                         .font(.system(size: 14.5, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.ink)
-                    Text(sourceName(clip))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
+                    if let source = sourceName(clip) {
+                        Text(source)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.inkSoft)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
                 if isShown {
@@ -102,10 +104,11 @@ struct LibraryVlogArrange: View {
         .accessibilityIdentifier("vlog-arrange-row-\(number)")
     }
 
-    private func sourceName(_ clip: LibraryClip) -> String {
+    /// The story the clip is in; nil for a draft, which is in none.
+    private func sourceName(_ clip: LibraryClip) -> String? {
         switch clip.source {
         case .story(_, let title, _): title
-        case .draft: Strings.libraryDraftBadge
+        case .draft: nil
         }
     }
 }

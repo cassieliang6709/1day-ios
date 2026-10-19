@@ -239,6 +239,43 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         state = .ready
     }
 
+    // MARK: - Torch (闪光灯)
+
+    /// 闪光灯 on the camera screen. Video has no flash, so this is the back
+    /// camera's light held on for as long as it's switched on — through the
+    /// preview and the take alike, which is what you want when the room is
+    /// dark. Kept while you flip to the front camera (which has no light) and
+    /// lit again when you flip back.
+    private(set) var isTorchOn = false
+
+    /// Whether the camera on screen now has a light to turn on. The front
+    /// camera has none; in dual mode the back one still does.
+    var canUseTorch: Bool { torchDevice != nil }
+
+    private var torchDevice: AVCaptureDevice? {
+        [videoInput?.device, secondaryInput?.device]
+            .compactMap { $0 }
+            .first { $0.position == .back && $0.hasTorch && $0.isTorchModeSupported(.on) }
+    }
+
+    func toggleTorch() {
+        isTorchOn.toggle()
+        applyTorch()
+    }
+
+    /// Sets the light to match `isTorchOn`. Called after anything that swaps
+    /// an input or starts the session, because a new input comes up dark.
+    private func applyTorch() {
+        guard let device = torchDevice else { return }
+        let on = isTorchOn
+        // Same queue as zoom and session setup: `lockForConfiguration` blocks.
+        Self.sessionQueue.async {
+            do { try device.lockForConfiguration() } catch { return }
+            device.torchMode = on ? .on : .off
+            device.unlockForConfiguration()
+        }
+    }
+
     // MARK: - Zoom
 
     /// Point the lens at a display zoom value — 0.5, 1, 2, or anything in
@@ -298,6 +335,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         Self.sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
+            // A torch only lights on a running session.
+            Task { @MainActor in self.applyTorch() }
         }
     }
 
@@ -451,6 +490,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         // portrait clip sideways.
         applyOrientation()
         refreshZoom()
+        applyTorch()
     }
 
     func startRecording(seconds: Double) {
@@ -694,6 +734,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 if !self.isDualCamera { self.isSwapped = false }
                 self.applyOrientation()
                 self.refreshZoom()
+                self.applyTorch()
             }
         }
     }

@@ -20,12 +20,14 @@ enum CameraStyle: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
     static let storageKey = "cameraStyle"
-    /// What the picker offers. There's no plain option: you always film with one
-    /// of the three cameras. `.standard` stays only as the "no camera" value for
-    /// places that aren't the camera — a take under review, a shell elsewhere.
-    static let selectable: [CameraStyle] = [.camcorder, .film, .instant]
-    /// The camera you start with, and what an old stored `.standard` becomes.
-    static let defaultCamera: CameraStyle = .film
+    /// The cameras you can film with: only DV, as of 1.5. 胶片 and 拍立得 stay
+    /// as cases because clips already filmed with them carry their look and a
+    /// stored story may still name one; nobody can pick them any more.
+    /// `.standard` stays only as the "no camera" value for places that aren't
+    /// the camera — a take under review, a shell elsewhere.
+    static let selectable: [CameraStyle] = [.camcorder]
+    /// The camera you film with, and what any camera no longer offered becomes.
+    static let defaultCamera: CameraStyle = .camcorder
 
     var displayName: String {
         switch self {
@@ -33,26 +35,6 @@ enum CameraStyle: String, CaseIterable, Identifiable, Codable {
         case .camcorder: Strings.cameraCamcorder
         case .film: Strings.cameraFilm
         case .instant: Strings.cameraInstant
-        }
-    }
-
-    /// The one line under the camera on the setup page.
-    var setupCaption: String {
-        switch self {
-        case .standard: ""
-        case .camcorder: Strings.cameraCamcorderCaption
-        case .film: Strings.cameraFilmCaption
-        case .instant: Strings.cameraInstantCaption
-        }
-    }
-
-    /// The mascot-style camera picture on the composer's camera cards.
-    var imageName: String {
-        switch self {
-        case .standard: "CameraFilm"
-        case .camcorder: "CameraCamcorder"
-        case .film: "CameraFilm"
-        case .instant: "CameraInstant"
         }
     }
 

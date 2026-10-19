@@ -306,17 +306,17 @@ private struct TemplateTile: View {
     }
 }
 
-// MARK: - 名字, who's filming, which camera
+// MARK: - 名字, who's filming
 
 /// The rest of the page: the story's name (with the list's summary row under
-/// it), 自己拍 / 和朋友一起拍, and 用哪台相机拍.
+/// it) and 自己拍 / 和朋友一起拍. 用哪台相机拍 is gone (1.5): there is one
+/// camera, DV.
 struct SetupStep: View {
     let template: ChallengeTemplate?
     var templateCoverURL: URL?
     @Binding var title: String
     @Binding var titleEdited: Bool
     @Binding var withFriends: Bool
-    @Binding var cameraStyle: CameraStyle
     let isOneDay: Bool
     /// Nil when the story films by time — then nothing shows under the name.
     let listCount: Int?
@@ -340,7 +340,6 @@ struct SetupStep: View {
         VStack(alignment: .leading, spacing: 24) {
             nameSection
             CompanySegment(withFriends: $withFriends)
-            cameraSection
         }
         .padding(.horizontal, ComposerLayout.margin)
     }
@@ -379,20 +378,6 @@ struct SetupStep: View {
         .background(OneDay.surface, in: RoundedRectangle(cornerRadius: ComposerLayout.rowRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: ComposerLayout.rowRadius, style: .continuous)
             .strokeBorder(OneDay.hairline, lineWidth: 1))
-    }
-
-    private var cameraSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: Strings.pickCamera)
-            HStack(alignment: .top, spacing: 10) {
-                ForEach(CameraStyle.selectable) { style in
-                    CameraOption(style: style, isOn: cameraStyle == style) {
-                        cameraStyle = style
-                    }
-                    .accessibilityIdentifier("camera-option-\(style.rawValue)")
-                }
-            }
-        }
     }
 }
 
@@ -477,62 +462,3 @@ private struct CompanySegment: View {
     }
 }
 
-/// One camera on the page: the camera itself as a little mascot, a corner
-/// badge in the shape of its frame, its name and what it looks like.
-private struct CameraOption: View {
-    let style: CameraStyle
-    let isOn: Bool
-    let action: () -> Void
-
-    private var shape: CGFloat { style.aspectRatio(for: .portrait) ?? 3 / 4 }
-    private var card: RoundedRectangle {
-        RoundedRectangle(cornerRadius: ComposerLayout.rowRadius, style: .continuous)
-    }
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                picture
-                Text(style.displayName)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                Text(style.setupCaption)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity)
-            .background(OneDay.surface, in: card)
-            .overlay(card.fill(Color.oneDayBrand.opacity(isOn ? 0.08 : 0)))
-            .overlay(card.strokeBorder(
-                isOn ? Color.oneDayBrand : OneDay.hairline, lineWidth: isOn ? 1.5 : 1))
-            .contentShape(card)
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
-    }
-
-    private var picture: some View {
-        Image(style.imageName)
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .frame(height: 64)
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .bottomTrailing) { frameBadge }
-            .accessibilityHidden(true)
-    }
-
-    /// The frame's shape, drawn small: 3:4 or 2:3, upright.
-    private var frameBadge: some View {
-        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-            .strokeBorder(OneDay.inkSoft, lineWidth: 1.5)
-            .aspectRatio(shape, contentMode: .fit)
-            .frame(height: 16)
-            .padding(.trailing, 4)
-    }
-}
