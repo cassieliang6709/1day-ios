@@ -346,11 +346,10 @@ struct PlansHomeView: View {
                 if sharedStories.isEmpty {
                     friendsEmptyState
                 } else {
-                    Button(Strings.inviteFriends) { inviteFriends() }
-                        .buttonStyle(.primaryAction)
-                        .padding(.horizontal, 20)
-                        .accessibilityIdentifier("friends-invite")
-
+                    // No 邀请朋友一起拍 above the list any more (1.5): each
+                    // room sends its own code from 邀请 on its page. The
+                    // empty state keeps it — there it's how the first room
+                    // gets made.
                     LazyVStack(alignment: .leading, spacing: 9) {
                         ForEach(sharedStories) { challenge in
                             storyRow(challenge)
@@ -371,13 +370,13 @@ struct PlansHomeView: View {
 
     /// 一进朋友页就是房间: with exactly one room, 朋友 opens on it. Pushed
     /// rather than embedded so the room's back button leads somewhere — the
-    /// list, where 加入 and 邀请朋友一起拍 still are.
+    /// list, where 加入 still is.
     ///
     /// Runs when the page is first built, when the room count changes, and
     /// every time 朋友 is picked in the tab bar — so 朋友 always means the room,
     /// even after going back to the list. Not on the list's own appearance:
     /// the room's back button still leads to the list and stays there, which
-    /// is where 加入 and 邀请 are.
+    /// is where 加入 is.
     private func openSoleRoom() {
         guard scope == .friends, path.isEmpty, sharedStories.count == 1 else { return }
         path = [sharedStories[0].id]

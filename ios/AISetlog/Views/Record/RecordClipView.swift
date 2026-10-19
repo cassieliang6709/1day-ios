@@ -423,8 +423,9 @@ struct RecordClipView: View {
 
     /// One tap films a two-second take that stops on its own. A `Button`
     /// again: with nothing to hold, firing on release is what a tap means.
+    /// No line under it (1.5) — 点一下，拍 2 秒 is VoiceOver's hint only.
     private var idleRecordingControl: some View {
-        CenteredCaptureControl(instruction: Strings.tapToFilmTwoSeconds) {
+        CenteredCaptureControl(instruction: nil) {
             Button { startCapture() } label: {
                 recordButtonVisual
                     .frame(maxWidth: .infinity)
@@ -442,10 +443,10 @@ struct RecordClipView: View {
         .accessibilityAction { startCapture() }
     }
 
-    /// Match the idle shutter's center axis; translated instructions sit below
-    /// rather than pushing the countdown sideways.
+    /// Match the idle shutter's center axis. No 正在拍，2 秒自动停 under it
+    /// (1.5): the ring filling up already says so.
     private var recordingControls: some View {
-        CenteredCaptureControl(instruction: Strings.filmingTwoSeconds) {
+        CenteredCaptureControl(instruction: nil) {
             countdownRing
         }
     }
