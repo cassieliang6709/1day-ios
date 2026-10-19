@@ -103,7 +103,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
         let transport = source.transport
         let operations: [() async throws -> Void] = [
-            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), nil, .now) },
+            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), nil, .now, nil) },
             { try await transport.setReaction("LOCAL", 1, "me", "Me", "friend", "♥", true) },
             { try await transport.postComment("LOCAL", 1, "id", "text", "me", "Me", "friend") },
             { try await transport.deleteComment("id") }
