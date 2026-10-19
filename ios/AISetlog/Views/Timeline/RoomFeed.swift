@@ -266,7 +266,7 @@ struct RoomFeed: View {
                                 .opacity(0.85)
                         }
                         if let at = clip.recordedAt {
-                            Text(at.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                            Text(at.formatted(.roomClock))
                                 .font(.system(size: 26, weight: .heavy, design: .rounded))
                                 .monospacedDigit()
                         }
@@ -419,5 +419,13 @@ struct RoomFeed: View {
                 selectedDay: $day)
                 .padding(.bottom, 14)
         }
+    }
+}
+
+extension FormatStyle where Self == Date.FormatStyle {
+    /// When a room clip was filmed, as a 24-hour clock: 02:07. Both halves
+    /// spelled `.twoDigits` — with only the hour padded, 2:07 came out "02:7".
+    static var roomClock: Date.FormatStyle {
+        .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
     }
 }

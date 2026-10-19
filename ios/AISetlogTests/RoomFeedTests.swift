@@ -66,4 +66,17 @@ final class RoomFeedTests: XCTestCase {
         XCTAssertEqual(columns.map(\.id), [myID])
         XCTAssertTrue(columns[0].clips.isEmpty)
     }
+
+    /// 2:07 used to show as "02:7": the hour was padded, the minute wasn't.
+    func testRoomClockPadsTheMinute() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let date = try XCTUnwrap(calendar.date(
+            from: DateComponents(year: 2026, month: 10, day: 19, hour: 2, minute: 7)))
+        for id in ["zh-Hans", "en_US"] {
+            var style = Date.FormatStyle.roomClock
+            style.timeZone = calendar.timeZone
+            XCTAssertEqual(date.formatted(style.locale(Locale(identifier: id))), "02:07", id)
+        }
+    }
 }

@@ -430,8 +430,7 @@ private struct RoomChatConversation: View {
                                 .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                         }
                         .overlay(alignment: .bottomLeading) {
-                            Text(event.recordedAt.formatted(
-                                .dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                            Text(event.recordedAt.formatted(.roomClock))
                                 .font(.system(size: 20, weight: .heavy, design: .rounded))
                                 .monospacedDigit()
                                 .foregroundStyle(.white)
