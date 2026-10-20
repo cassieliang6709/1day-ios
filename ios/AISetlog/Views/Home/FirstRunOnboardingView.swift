@@ -12,6 +12,8 @@ struct FirstRunOnboardingView: View {
     @State private var signInError: String?
     /// The avatar's three steps, between signing in and the camera.
     @State private var showsAvatarSetup = false
+    /// The permission page, right after signing in.
+    @State private var showsPermissions = false
 
     /// Bound so Settings changes immediately redraw the localized lockup and
     /// copy even before someone has made their first story.
@@ -66,6 +68,9 @@ struct FirstRunOnboardingView: View {
         // A reinstall gets its Apple ID offered before anything is tapped.
         .task { account.offerExistingAccount() }
         // Made or skipped, the camera is next.
+        .fullScreenCover(isPresented: $showsPermissions, onDismiss: afterPermissions) {
+            PermissionPrimerView { showsPermissions = false }
+        }
         .fullScreenCover(isPresented: $showsAvatarSetup, onDismiss: onCreateStory) {
             AvatarSetupFlow { _ in showsAvatarSetup = false }
         }
@@ -74,6 +79,15 @@ struct FirstRunOnboardingView: View {
     /// Signing in comes first, because filming together is what most people
     /// come for, and asking halfway through a join — a sheet over a sheet — is
     /// where it kept going wrong. It is the only button on the page.
+    /// An avatar already on this phone skips the three steps.
+    private func afterPermissions() {
+        if AvatarStore.shared.image == nil {
+            showsAvatarSetup = true
+        } else {
+            onCreateStory()
+        }
+    }
+
     @ViewBuilder
     private var primaryAction: some View {
         if account.isSignedIn {
@@ -89,11 +103,10 @@ struct FirstRunOnboardingView: View {
                 } onCompletion: { result in
                     do {
                         try account.completeSignIn(result)
-                        // An avatar already on this phone skips the three steps.
-                        if AvatarStore.shared.image == nil {
-                            showsAvatarSetup = true
+                        if PermissionPrimerView.isNeeded {
+                            showsPermissions = true
                         } else {
-                            onCreateStory()
+                            afterPermissions()
                         }
                     } catch {
                         if (error as? ASAuthorizationError)?.code == .canceled { return }
