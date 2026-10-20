@@ -25,6 +25,7 @@ extension Strings {
     static var composerPlanSevenDayLead: String {
         isChinese ? "每天拍一段，七天连成一支片" : "One a day, seven days, one film"
     }
+    static var todaysPlanTitle: String { isChinese ? "今天的计划" : "Today's plan" }
     static var composerName: String { isChinese ? "名字" : "Name" }
     static func composerListSummary(_ count: Int) -> String {
         isChinese ? "清单 · \(count) 项" : "List · \(count) items"

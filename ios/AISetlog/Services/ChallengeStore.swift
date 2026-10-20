@@ -353,6 +353,36 @@ final class ChallengeStore {
     }
 
     /// Members seen in a room: owner + everyone who has uploaded a clip + me.
+    /// Puts a clip into a room. A room is filmed whenever, so it is never
+    /// full: the first empty slot, else one more take on the last one.
+    @discardableResult
+    func sendToRoom(
+        from url: URL, roomID: UUID, overlayText: String? = nil,
+        captions: [Caption]? = nil, recordedAt: Date = .now
+    ) -> Bool {
+        guard let room = challenge(roomID), room.isShared, let last = room.cards.last?.day else { return false }
+        if let day = ClipFiling.targetDay(in: room) {
+            saveClip(from: url, day: day, challengeID: roomID, overlayText: overlayText,
+                     captions: captions, recordedAt: recordedAt)
+        } else {
+            saveClip(from: url, day: last, challengeID: roomID, overlayText: overlayText,
+                     captions: captions, recordedAt: recordedAt, take: .append)
+        }
+        return true
+    }
+
+    /// Today's plan — my own one-day story with a list, made today. There
+    /// is at most one a day; this is it.
+    func todaysPlan(now: Date = .now, calendar: Calendar = .current) -> Challenge? {
+        challenges.first {
+            !$0.isShared && !$0.isTimeOnly && $0.momentTitles?.isEmpty == false
+                && calendar.isDate($0.startDate, inSameDayAs: now)
+        }
+    }
+
+    /// The most people a room takes.
+    static let roomCapacity = 6
+
     func members(for challengeID: UUID) -> [(id: String, name: String)] {
         guard let challenge = challenge(challengeID), let code = challenge.roomCode else { return [] }
         var seen: [String: String] = [:]

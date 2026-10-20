@@ -257,6 +257,13 @@ struct RootShellView: View {
     }
 
     private func openCompose(together: Bool) {
+        // One plan a day: once today has one, 新建 on 我的 opens it.
+        if !together, let plan = store.todaysPlan() {
+            returnTab = .plans
+            guardedSurface.wrappedValue = .plans
+            launchAction = .openStory(plan.id)
+            return
+        }
         if surface == .plans || surface == .friends { returnTab = surface }
         composeTogether = together
         // Leaving the camera for the composer still goes through the guard: a

@@ -141,7 +141,6 @@ private struct ChoiceRow: View {
 struct SetupStep: View {
     @Binding var title: String
     @Binding var titleEdited: Bool
-    @Binding var withFriends: Bool
     let isOneDay: Bool
     /// Nil when the story films by time — then nothing shows under the name.
     let listCount: Int?
@@ -164,7 +163,6 @@ struct SetupStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             nameSection
-            CompanySegment(withFriends: $withFriends)
         }
         .padding(.horizontal, ComposerLayout.margin)
     }

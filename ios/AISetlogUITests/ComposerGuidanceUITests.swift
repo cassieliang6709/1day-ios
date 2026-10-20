@@ -22,7 +22,6 @@ final class ComposerGuidanceUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Next"].exists)
         // No templates (1.5).
         XCTAssertFalse(app.buttons["templates-entry"].exists)
-        XCTAssertTrue(app.buttons["by-time-entry"].isSelected)
 
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
@@ -30,11 +29,10 @@ final class ComposerGuidanceUITests: XCTestCase {
         let original = name.value as? String ?? ""
         XCTAssertFalse(original.isEmpty)
         name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.count))
-        let guidance = app.staticTexts["composer-name-needed"]
-        XCTAssertTrue(guidance.waitForExistence(timeout: 15))
-        XCTAssertEqual(guidance.label, "Give the topic a name first")
+        // No name: no explanation, the button is just off (copy audit).
+        XCTAssertFalse(app.staticTexts["composer-name-needed"].exists)
+        XCTAssertFalse(app.buttons["composer-start"].isEnabled)
         name.typeText("My edited story")
-        XCTAssertFalse(guidance.exists)
         XCTAssertEqual(name.value as? String, "My edited story")
         // Deliberately never create or join a room, or call the AI service.
     }

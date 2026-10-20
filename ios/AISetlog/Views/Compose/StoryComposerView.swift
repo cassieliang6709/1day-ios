@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Making a story, on one page (1.5).
+/// Making today's plan, or a room — two pages from two doors (1.5).
 ///
-/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 名字, 自己拍 / 和朋友一起拍,
-/// and one pinned 开始拍. No 一日 / 7 日 choice: every new story is one day. A
-/// room with friends has no list either — the room is what holds the day, so
-/// 拍什么 hides and it films by time.
+/// From 我的 it's a plan: a name and today's list, then 开始拍. One plan a
+/// day — once there is one, 新建 opens it instead (`RootShellView`).
+/// From 朋友 it's a room: a name, then 创建房间 and the code. A room has no
+/// list: everyone films whenever, and the order is settled in the film.
 ///
 /// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
 /// drafted by AI from one sentence, in the same page; the page shows it folded
@@ -17,8 +17,8 @@ struct StoryComposerView: View {
     /// `RootShellView` passes a closure instead, because as the 新建 surface
     /// this view has no presentation to dismiss and `dismiss()` is a no-op.
     var onClose: (() -> Void)? = nil
-    /// Opens with 和朋友一起 already chosen — the 朋友 tab's invite button.
-    /// Only the starting value; the cards on the page still work.
+    /// A room (the 朋友 tab's 新建) rather than a plan (我的's). Fixed: the
+    /// page doesn't switch between the two.
     var startsWithFriends = false
 
     @Environment(ChallengeStore.self) private var store
@@ -69,15 +69,9 @@ struct StoryComposerView: View {
                 .presentationDetents([.medium])
         }
         .onAppear {
-            if startsWithFriends { withFriends = true }
+            withFriends = startsWithFriends
+            entry = startsWithFriends ? .byTime : .writeList
             nameForTheDay()
-        }
-        // Switching to solo answers "sign into iCloud" all by itself, so the
-        // warning shouldn't outlive the choice that caused it.
-        .onChange(of: withFriends) { _, together in
-            errorText = nil
-            // A room films by time: drop any list written before.
-            if together { chooseByTime() }
         }
     }
 
@@ -96,17 +90,11 @@ struct StoryComposerView: View {
     private var page: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text(Strings.newStoryQuestion)
+                Text(withFriends ? Strings.newRoomRow : Strings.todaysPlanTitle)
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .accessibilityIdentifier("composer-question")
                     .padding(.horizontal, ComposerLayout.margin)
-                if !withFriends {
-                    WhatToFilmSection(
-                        entry: entry,
-                        onWriteList: openList,
-                        onByTime: chooseByTime)
-                }
                 setup
             }
             .padding(.bottom, 16)
@@ -119,7 +107,6 @@ struct StoryComposerView: View {
         SetupStep(
             title: $title,
             titleEdited: $titleEdited,
-            withFriends: $withFriends,
             isOneDay: days == .oneDay,
             listCount: entry == .writeList ? resolvedMoments?.count ?? 0 : nil,
             onOpenList: openList)
@@ -131,10 +118,6 @@ struct StoryComposerView: View {
             // screen when the tap happens.
             if let errorText {
                 footerNote(errorText, systemImage: "exclamationmark.circle.fill", color: .red)
-            }
-            if trimmedTitle.isEmpty {
-                footerNote(Strings.storyNameNeeded, color: .secondary)
-                    .accessibilityIdentifier("composer-name-needed")
             }
             startButton
         }
@@ -187,12 +170,6 @@ struct StoryComposerView: View {
 
     // MARK: - Choices
 
-    private func chooseByTime() {
-        entry = .byTime
-        moments = []
-        nameForTheDay()
-    }
-
     private func openList() {
         showGuided = true
     }
@@ -203,14 +180,10 @@ struct StoryComposerView: View {
         entry = .writeList
         moments = draft.moments
         errorText = nil
-        if !titleEdited {
-            title = draft.suggestedName ?? (isTitleFromByTime ? "" : title)
+        // The AI's name replaces the date name, until the user types one.
+        if !titleEdited, let name = draft.suggestedName {
+            title = name
         }
-    }
-
-    /// The name 按时间拍 gave the story, which means nothing for a list.
-    private var isTitleFromByTime: Bool {
-        title == Strings.byTimeTitle(.now)
     }
 
     // MARK: - Actions
@@ -269,10 +242,9 @@ struct StoryComposerView: View {
 
     // MARK: - Derived state
 
-    /// 按时间拍 (and a room) is a day, not a list: it's named for the date,
-    /// until the user types a name of their own.
+    /// Named for the date until the user types a name of their own.
     private func nameForTheDay() {
-        guard isTimeOnly, !titleEdited else { return }
+        guard !titleEdited else { return }
         title = Strings.byTimeTitle(.now)
     }
 

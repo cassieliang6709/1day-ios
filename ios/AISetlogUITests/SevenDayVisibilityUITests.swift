@@ -15,14 +15,15 @@ final class SevenDayVisibilityUITests: XCTestCase {
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
         compose.tap()
-        XCTAssertTrue(app.buttons["by-time-entry"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["composer-list-summary"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["by-time-entry"].exists)
         XCTAssertFalse(app.buttons["plan-one-day"].exists)
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         // 按时间拍 names the story for the date.
         XCTAssertFalse((name.value as? String ?? "").isEmpty)
-        XCTAssertTrue(app.buttons["company-solo"].exists)
+        XCTAssertFalse(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
     }
 

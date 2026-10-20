@@ -11,7 +11,7 @@ final class IntentFirstCreationUITests: XCTestCase {
         compose.tap()
         // 写今天的清单 is one editor: the sentence about today with a small
         // Draft it, then the list.
-        let own = app.buttons["write-own-entry"]
+        let own = app.buttons["composer-list-summary"]
         XCTAssertTrue(own.waitForExistence(timeout: 15))
         own.tap()
         let intent = app.textFields["today-intent"]
@@ -30,6 +30,8 @@ final class IntentFirstCreationUITests: XCTestCase {
         firstRow.typeText("Empty room")
         XCTAssertFalse(app.buttons["use-these-moments"].isEnabled)
         app.buttons["Cancel"].tap()
-        XCTAssertFalse(app.buttons["composer-list-summary"].exists)
+        // Cancelled: still no list, so nothing to start.
+        XCTAssertTrue(app.buttons["composer-list-summary"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["composer-start"].isEnabled)
     }
 }
