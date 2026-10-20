@@ -972,6 +972,10 @@ enum Strings {
             ? "房间没建起来，过一会儿再试一次。也可以先选自己来。"
             : "Couldn't create the room. Try again in a moment, or record on your own."
     }
+    static var sentToRooms: String { lang == .chinese ? "已发送" : "Sent" }
+    static var permissionCamera: String { lang == .chinese ? "相机" : "Camera" }
+    static var permissionNotifications: String { lang == .chinese ? "通知" : "Notifications" }
+    static var errorRoomFull: String { lang == .chinese ? "房间满了，最多 6 人" : "This room is full (6 people max)" }
     static var errorRoomJoinFailed: String {
         lang == .chinese
             ? "进不去这个房间，过一会儿再试一次。"

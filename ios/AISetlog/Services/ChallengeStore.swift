@@ -169,6 +169,13 @@ final class ChallengeStore {
             throw CloudKitService.CKServiceError.roomNotFound
         }
         let room = try await roomSync.fetchRoom(code: normalized)
+        // Six people at most (PRD 5.5). Counted from the `Member` records;
+        // when those can't be read the join goes ahead rather than turning
+        // somebody away on a guess.
+        if let people = await roomSync.peopleInRoom(code: normalized, ownerID: room.ownerID),
+           !people.contains(me.id), people.count >= Self.roomCapacity {
+            throw CloudKitService.CKServiceError.roomFull
+        }
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
@@ -354,6 +361,10 @@ final class ChallengeStore {
         // in it and can't tell whether the code worked.
         if let ownerName = challenge.ownerName {
             seen[challenge.ownerID ?? ownerName] = ownerName
+        }
+        // Everyone with a `Member` record: joined, maybe not filmed yet.
+        for member in (roomSync.remoteMembers[code] ?? [:]).values where !member.displayName.isEmpty {
+            seen[member.userID] = member.displayName
         }
         for clip in roomSync.remoteClips[code] ?? [] { seen[clip.authorID] = clip.authorName }
         if let me = account?.account { seen[me.id] = me.displayName }

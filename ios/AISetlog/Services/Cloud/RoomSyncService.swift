@@ -196,6 +196,18 @@ final class RoomSyncService {
         #endif
     }
 
+    /// Who is in a room by user ID — every `Member` record plus the owner,
+    /// who may not have one. Nil when the records can't be read.
+    @MainActor
+    func peopleInRoom(code: String, ownerID: String) async -> Set<String>? {
+        guard let members = try? await transport.fetchMembers(
+            code, fileStore.remoteCacheDir(roomCode: code).appendingPathComponent("members", isDirectory: true))
+        else { return nil }
+        var people = Set(members.map(\.userID))
+        if !ownerID.isEmpty { people.insert(ownerID) }
+        return people
+    }
+
     /// What was last written to my `Member` record per room, so the same
     /// avatar and mood aren't sent again on every foreground. Persisted:
     /// relaunching isn't a reason to upload the avatar to every room again.

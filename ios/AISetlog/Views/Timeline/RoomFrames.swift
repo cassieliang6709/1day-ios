@@ -1,16 +1,18 @@
 import SwiftUI
 
-/// A shared room as one big frame per person, stacked top to bottom (1.5).
+/// A shared room as one big frame per person (1.5).
+///
+/// The frames fill the screen in the grid `RoomFrames.grid(for:)` picks
+/// for the head count: one column of two or three, then two columns —
+/// 2×2 for four, 2×3 for five and six, the sixth place left empty for five
+/// with nothing drawn in it. Footage is cropped to fill each frame from the
+/// centre, never letterboxed.
 ///
 /// Each frame is one person's clips, newest first, one clip per page —
-/// swipe sideways to go through them. Two people get two frames that split
-/// the height between them; more people get shorter frames, and once a
-/// frame would drop below `minimumFrameHeight` the stack scrolls instead.
-///
-/// The face and name at the top of a frame open that person's page
-/// (`RoomPersonPage`), every clip of theirs as a grid. Somebody who hasn't
-/// filmed gets the 拍一拍 poke where their clips would be; my own empty frame
-/// is a way into the camera.
+/// swipe sideways to go through them. The face and name at the top open
+/// that person's page (`RoomPersonPage`). Nobody's frame says who hasn't
+/// filmed: an empty friend's frame is just empty, and 拍一拍 is a long press
+/// on their frame. My own empty frame is a way into the camera.
 ///
 /// Who goes in which frame, and in what order, is `RoomFeed.columns` — the
 /// same rule the column layout used, so the order didn't change with the
@@ -33,10 +35,22 @@ struct RoomFrames: View {
     var onPoke: (String) -> Void = { _ in }
 
     /// Below this a frame is too short to tell what is in the clip, and the
-    /// stack scrolls instead. Low enough that three people fit on one phone
-    /// screen; four or more scroll.
+    /// grid scrolls instead. Six people always fit; only a room from before
+    /// the cap, with more than six, can reach it.
     private static let minimumFrameHeight: CGFloat = 150
     private static let spacing: CGFloat = 12
+
+    /// Columns × rows for a head count, portrait (PRD 5.5): fewer columns
+    /// and more rows, never three columns of thin strips.
+    static func grid(for count: Int) -> (columns: Int, rows: Int) {
+        switch count {
+        case ...1: return (1, 1)
+        case 2: return (1, 2)
+        case 3: return (1, 3)
+        case 4: return (2, 2)
+        default: return (2, (count + 1) / 2)
+        }
+    }
 
     private var columns: [RoomFeed.Column] {
         RoomFeed.columns(clips: clips, members: members, myID: myID)
@@ -44,23 +58,28 @@ struct RoomFrames: View {
 
     var body: some View {
         let columns = columns
+        let grid = Self.grid(for: columns.count)
+        let rows = stride(from: 0, to: columns.count, by: grid.columns).map {
+            Array(columns[$0..<min($0 + grid.columns, columns.count)])
+        }
         GeometryReader { proxy in
-            let count = CGFloat(max(columns.count, 1))
+            let count = CGFloat(grid.rows)
             let fit = (proxy.size.height - Self.spacing * (count - 1)) / count
             let height = max(fit, Self.minimumFrameHeight)
             ScrollView(.vertical) {
                 VStack(spacing: Self.spacing) {
-                    ForEach(columns) { column in
-                        PersonFrame(
-                            column: column,
-                            nextToFilm: nextToFilm,
-                            slotTitle: slotTitle,
-                            onPlay: onPlay,
-                            onFilm: onFilm,
-                            onOpenPerson: { onOpenPerson(column) },
-                            hasPoked: hasPoked,
-                            onPoke: onPoke)
-                            .frame(height: height)
+                    ForEach(rows.indices, id: \.self) { index in
+                        HStack(spacing: Self.spacing) {
+                            ForEach(rows[index]) { column in
+                                frame(column)
+                            }
+                            // Five people: the sixth place stays empty —
+                            // no outline, no grey block, nothing to fill.
+                            ForEach(0..<(grid.columns - rows[index].count), id: \.self) { _ in
+                                Color.clear.frame(maxWidth: .infinity)
+                            }
+                        }
+                        .frame(height: height)
                     }
                 }
             }
@@ -69,6 +88,18 @@ struct RoomFrames: View {
             // rubber-band the frames.
             .scrollDisabled(fit >= Self.minimumFrameHeight)
         }
+    }
+
+    private func frame(_ column: RoomFeed.Column) -> some View {
+        PersonFrame(
+            column: column,
+            nextToFilm: nextToFilm,
+            slotTitle: slotTitle,
+            onPlay: onPlay,
+            onFilm: onFilm,
+            onOpenPerson: { onOpenPerson(column) },
+            hasPoked: hasPoked,
+            onPoke: onPoke)
     }
 }
 
@@ -103,8 +134,26 @@ private struct PersonFrame: View {
         .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
         .overlay(alignment: .topLeading) { person }
         .overlay(alignment: .topTrailing) { topTrailing }
+        .contextMenu { pokeMenu }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-frame")
+    }
+
+    /// 拍一拍 is a long press on a friend's frame, once a day per person.
+    @ViewBuilder
+    private var pokeMenu: some View {
+        if !column.isMine {
+            let sent = pokedNow || hasPoked(column.id)
+            Button {
+                onPoke(column.id)
+                pokedNow = true
+            } label: {
+                Label(sent ? Strings.roomTilePoked : Strings.roomTilePoke,
+                      systemImage: sent ? "checkmark" : "hand.tap.fill")
+            }
+            .disabled(sent)
+            .accessibilityIdentifier("room-tile-poke")
+        }
     }
 
     private var pages: some View {
@@ -228,52 +277,23 @@ private struct PersonFrame: View {
         .padding(6)
     }
 
-    /// Nothing filmed yet. Mine is a way into the camera; somebody else's
-    /// gets the poke.
+    /// Nothing filmed yet. Mine is a camera button; somebody else's is
+    /// just the empty frame — it never says they haven't filmed.
     @ViewBuilder
     private var empty: some View {
-        if column.isMine {
-            Button {
-                if let nextToFilm { onFilm(nextToFilm) }
-            } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 24, weight: .bold))
-                    Text(nextToFilm == nil ? Strings.roomColumnEmpty : Strings.roomFeedFilm)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(nextToFilm == nil ? OneDay.inkFaint : OneDay.brandText)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
+        if column.isMine, let nextToFilm {
+            Button { onFilm(nextToFilm) } label: {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(OneDay.brandText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(nextToFilm == nil)
+            .accessibilityLabel(Strings.roomFeedFilm)
             .accessibilityIdentifier("room-feed-film")
         } else {
-            let sent = pokedNow || hasPoked(column.id)
-            VStack(spacing: 12) {
-                Text(Strings.roomColumnEmpty)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkFaint)
-                Button {
-                    onPoke(column.id)
-                    pokedNow = true
-                } label: {
-                    Label(sent ? Strings.roomTilePoked : Strings.roomTilePoke,
-                          systemImage: sent ? "checkmark" : "hand.tap.fill")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 40)
-                        .background(
-                            sent ? OneDay.surface : Color.oneDayBrand.opacity(0.14),
-                            in: Capsule())
-                        .foregroundStyle(sent ? OneDay.inkFaint : OneDay.brandText)
-                }
-                .buttonStyle(.plain)
-                .disabled(sent)
-                .accessibilityIdentifier("room-tile-poke")
-            }
+            Color.clear
         }
     }
 }
@@ -309,13 +329,9 @@ struct RoomPersonPage: View {
                         }
                     }
 
-                    if column.clips.isEmpty {
-                        Text(Strings.roomColumnEmpty)
-                            .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    } else {
+                    // Nothing filmed: the page is just empty (nobody is
+                    // told who hasn't filmed).
+                    if !column.clips.isEmpty {
                         LazyVGrid(
                             columns: [GridItem(.flexible(), spacing: 10),
                                       GridItem(.flexible(), spacing: 10)],

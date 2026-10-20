@@ -66,6 +66,7 @@ enum CloudKitService {
         case networkUnavailable
         case roomCreateFailed
         case roomJoinFailed
+        case roomFull
 
         var errorDescription: String? {
             switch self {
@@ -81,6 +82,8 @@ enum CloudKitService {
                 return Strings.errorRoomCreateFailed
             case .roomJoinFailed:
                 return Strings.errorRoomJoinFailed
+            case .roomFull:
+                return Strings.errorRoomFull
             }
         }
     }
