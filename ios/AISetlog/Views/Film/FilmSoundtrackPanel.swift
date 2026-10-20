@@ -42,9 +42,6 @@ struct FilmSoundtrackPanel: View {
                 Spacer()
                 if working {
                     ProgressView().controlSize(.small)
-                    Text(Strings.soundWorking)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
                 }
             }
 

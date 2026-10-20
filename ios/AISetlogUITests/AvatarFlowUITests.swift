@@ -23,9 +23,9 @@ final class AvatarFlowUITests: XCTestCase {
     func testUploadStepSaysWhatTheSpecSaysAndCanBeSkipped() {
         let app = launch()
         XCTAssertTrue(app.staticTexts["用一张照片，画一个你。"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["给我看看你"].exists)
-        XCTAssertTrue(app.staticTexts["拍一张，或从相册挑。"].exists)
-        XCTAssertTrue(app.staticTexts["正面照效果最好"].exists)
+        // Copy audit: the title, the second line and the hint are gone.
+        XCTAssertFalse(app.staticTexts["给我看看你"].exists)
+        XCTAssertFalse(app.staticTexts["正面照效果最好"].exists)
         XCTAssertTrue(app.buttons["avatar-take-photo"].exists)
         XCTAssertTrue(app.buttons["avatar-pick-photo"].exists)
         capture(app, "Avatar upload")
@@ -38,19 +38,17 @@ final class AvatarFlowUITests: XCTestCase {
         let path = try Self.writeSample()
         let app = launch(sample: path)
 
-        XCTAssertTrue(app.staticTexts["正在画你。"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["几秒钟。"].exists)
+        XCTAssertTrue(app.staticTexts["正在画你"].waitForExistence(timeout: 30))
         capture(app, "Avatar generating")
 
         let confirm = app.buttons["avatar-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 90))
-        XCTAssertTrue(app.staticTexts["画好了。这是你。"].exists)
+        XCTAssertTrue(app.staticTexts["这是你"].exists)
         XCTAssertTrue(app.buttons["avatar-redraw"].exists)
         XCTAssertTrue(app.images["avatar-result"].exists)
         capture(app, "Avatar confirm")
 
         confirm.tap()
-        XCTAssertTrue(app.staticTexts["好了，去记今天。"].waitForExistence(timeout: 10))
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 15))
     }
 

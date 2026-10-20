@@ -15,13 +15,13 @@ extension Strings {
 
     /// "已选 4 段 · 约 8 秒". Seconds are nil until the files have been read.
     static func librarySelectedSummary(_ count: Int, seconds: Int?) -> String {
-        let clips = zh ? "已选 \(count) 段" : (count == 1 ? "1 clip" : "\(count) clips")
+        let clips = zh ? "\(count) 段" : (count == 1 ? "1 clip" : "\(count) clips")
         guard let seconds, count > 0 else { return clips }
-        return zh ? "\(clips) · 约 \(seconds) 秒" : "\(clips) · about \(seconds)s"
+        return zh ? "\(clips) · \(seconds) 秒" : "\(clips) · about \(seconds)s"
     }
     static var libraryMakeVlogCTA: String { zh ? "生成 vlog" : "Make vlog" }
 
-    static var vlogArrangeTitle: String { zh ? "排一下顺序" : "Arrange clips" }
+    static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }
     static var vlogArrangeHint: String {
         zh ? "按住右边的横线拖动换顺序，点一段看看。" : "Drag the handle to reorder. Tap a clip to preview it."
     }

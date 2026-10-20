@@ -48,10 +48,10 @@ struct GeneratingFilm: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 22) {
+                // Copy audit: the title and the bar. The step list, the
+                // count and the note under it said the same thing again.
                 heading
                 progressCard
-                stepList
-                careNote
             }
             .padding(.horizontal, 22)
             .padding(.top, 52)
@@ -66,9 +66,6 @@ struct GeneratingFilm: View {
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
                 .multilineTextAlignment(.center)
-            Text(Strings.generatingSubtitle)
-                .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
         }
     }
 
@@ -80,10 +77,6 @@ struct GeneratingFilm: View {
                 OneDayBuddy(size: 46, isWorking: true)
 
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(Strings.mergedProgress(mergedCount, total: max(clips.count, 1)))
-                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.oneDaySky.opacity(0.25))

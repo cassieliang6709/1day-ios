@@ -173,9 +173,6 @@ struct RoomInviteCardView: View {
                 .scaledToFit()
                 .frame(width: 34, height: 34)
                 .clipShape(Circle())
-            Text(Strings.inviteCardFooter)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(OneDay.onBrand.opacity(0.9))
         }
     }
 }

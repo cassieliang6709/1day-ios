@@ -632,7 +632,7 @@ struct CaptionEditor: View {
             TextField(
                 "",
                 text: $text,
-                prompt: Text(Strings.writeOnMoment)
+                prompt: Text(Strings.addCaption)
                     .foregroundStyle(Color.black.opacity(0.45))
             )
             .font(.subheadline.weight(.semibold))

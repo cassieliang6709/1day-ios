@@ -15,7 +15,7 @@ extension Strings {
     static var soundMix: String { sound("混合", "Mix") }
     static var soundNextTrack: String { sound("换一首", "Next song") }
     static var soundWorking: String { sound("正在配声音…", "Mixing sound…") }
-    static var soundFailed: String { sound("声音没配好，先放原声", "Couldn't mix the sound — playing the original") }
+    static var soundFailed: String { sound("没配上音乐", "Couldn't add music") }
     static func soundTrackName(_ id: String) -> String {
         switch id {
         case "sunny": sound("晴天", "Sunny")

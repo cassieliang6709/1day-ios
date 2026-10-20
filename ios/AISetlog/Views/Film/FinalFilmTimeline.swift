@@ -45,7 +45,7 @@ struct FinalFilmTimeline: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 22) {
-                heading
+                // No 片子好了 heading: the film playing says it.
                 player
                 if let onFilter, !people.isEmpty {
                     FilmPeopleRow(people: people, selection: selection, onOpen: onFilter)

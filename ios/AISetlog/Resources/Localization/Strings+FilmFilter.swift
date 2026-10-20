@@ -23,7 +23,7 @@ extension Strings {
         filterCopy("\(count) 段定格", "\(count) frozen")
     }
     static var filmNothingLeft: String {
-        filterCopy("至少留一段，成片才做得出来。", "Keep at least one clip to make a film.")
+        filterCopy("至少留一段", "Keep at least one")
     }
 
     static var filmPersonIncluded: String { filterCopy("放进成片", "In the film") }

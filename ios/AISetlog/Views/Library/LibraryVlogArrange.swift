@@ -34,9 +34,6 @@ struct LibraryVlogArrange: View {
                 Spacer()
                 IconBubble(systemName: "xmark") { dismiss() }
             }
-            Text(Strings.vlogArrangeHint)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
         }
         .padding(.horizontal, 20)
     }

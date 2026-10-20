@@ -272,7 +272,7 @@ enum Strings {
     }
     static func roomPokeActivity(name: String?) -> String {
         if lang == .chinese {
-            return named(name).map { "\($0) 拍了拍你，快来拍一段" } ?? "有人拍了拍你，快来拍一段"
+            return named(name).map { "\($0) 拍了拍你" } ?? "有人拍了拍你"
         }
         return named(name).map { "\($0) poked you — come film something" }
             ?? "Someone poked you — come film something"
@@ -280,7 +280,7 @@ enum Strings {
 
     static func roomReactionActivity(name: String?) -> String {
         if lang == .chinese {
-            return named(name).map { "\($0) 回应了你们的片段。" } ?? "有人回应了你们的片段。"
+            return named(name).map { "\($0) 回应了" } ?? "有人回应了"
         }
         return named(name).map { "\($0) reacted to your shared film." }
             ?? "Someone reacted to your shared film."
@@ -377,7 +377,7 @@ enum Strings {
     static var joinShort: String { lang == .chinese ? "加入" : "Join" }
     static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
     static var firstRunHeadline: String {
-        lang == .chinese ? "和朋友，拍同一天" : "Film the same day, together"
+        lang == .chinese ? "日日是好日" : "Every day is a good day"
     }
     static var firstRunGuide: String {
         lang == .chinese
@@ -385,7 +385,7 @@ enum Strings {
             : "Hold to film a few clips. They become one film."
     }
     static var firstRunStart: String {
-        lang == .chinese ? "开始我的第一支片" : "Start my first film"
+        lang == .chinese ? "开始" : "Start"
     }
     static var firstRunStartHint: String {
         lang == .chinese ? "创建一支包含三个瞬间的个人短片。" : "Creates a personal film with three moments."
@@ -452,13 +452,13 @@ enum Strings {
     static var friend: String { lang == .chinese ? "朋友" : "Friend" }
     static func shareMessageCaptured(first: String, title: String, code: String) -> String {
         lang == .chinese
-            ? "我刚在 1Day 为「\(title)」拍下了\(first)。快来加入我的挑战！邀请码：\(code)\noneday://join?code=\(code)"
-            : "I just captured \(first) for “\(title)” on 1Day. Join my challenge! Code: \(code)\noneday://join?code=\(code)"
+            ? "来 1Day 和我一起拍「\(title)」。邀请码 \(code)\noneday://join?code=\(code)"
+            : "Film “\(title)” with me on 1Day. Code \(code)\noneday://join?code=\(code)"
     }
     static func shareMessageInvite(title: String, code: String) -> String {
         lang == .chinese
-            ? "来 1Day 加入我的「\(title)」挑战！邀请码：\(code)\noneday://join?code=\(code)"
-            : "Join my “\(title)” challenge on 1Day! Code: \(code)\noneday://join?code=\(code)"
+            ? "来 1Day 和我一起拍「\(title)」。邀请码 \(code)\noneday://join?code=\(code)"
+            : "Film “\(title)” with me on 1Day. Code \(code)\noneday://join?code=\(code)"
     }
     static func recordedProgress(
         _ recorded: Int,
@@ -493,7 +493,7 @@ enum Strings {
     /// error. Said out loud because the camera going quietly back to ready
     /// reads as "I didn't press it properly".
     static var recordingFailed: String {
-        lang == .chinese ? "没拍成，再试一次" : "Didn't record — try again"
+        lang == .chinese ? "没拍成" : "Didn't record"
     }
     /// The microphone was refused, so every take is silent. Small and on the
     /// camera rather than an alert: it's worth knowing, not worth stopping for.
@@ -752,7 +752,7 @@ enum Strings {
     /// Said separately from "camera not available", because the way out is
     /// different: iOS won't ask a second time, so retrying here can never work.
     static var cameraDeniedTitle: String {
-        lang == .chinese ? "还没允许使用相机" : "Camera access is off"
+        lang == .chinese ? "没有相机权限" : "No camera access"
     }
     static var cameraDeniedFootnote: String {
         lang == .chinese
@@ -773,7 +773,7 @@ enum Strings {
     static func momentPosition(_ index: Int, of total: Int) -> String {
         lang == .chinese ? "第 \(index) 个瞬间，共 \(total) 个" : "Moment \(index) of \(total)"
     }
-    static var addCaption: String { lang == .chinese ? "加一句字幕" : "Add a caption" }
+    static var addCaption: String { lang == .chinese ? "字幕" : "Caption" }
     static var writeOnMoment: String {
         lang == .chinese ? "给这个瞬间写点什么" : "Write on this moment"
     }
@@ -870,9 +870,9 @@ enum Strings {
         lang == .chinese ? "正在把你的片段合在一起…" : "Stitching your week together…"
     }
     static var photosDenied: String {
-        lang == .chinese ? "需要相册权限才能保存视频。" : "Photos access is needed to save the video."
+        lang == .chinese ? "没有相册权限" : "No Photos access"
     }
-    static var savedToPhotos: String { lang == .chinese ? "已保存到相册。" : "Saved to Photos." }
+    static var savedToPhotos: String { lang == .chinese ? "已保存" : "Saved" }
     /// Fixed words, not the Photos framework's own error — that one is logged.
     static var saveFailed: String {
         lang == .chinese ? "没存进相册，再试一次" : "Couldn't save to Photos. Try again."
@@ -1030,9 +1030,9 @@ enum Strings {
     static var guideTitle: String { lang == .chinese ? "怎么用 1Day" : "How 1Day works" }
     static var guideSteps: [String] {
         lang == .chinese
-            ? ["点下面的相机，随手拍几秒。",
-               "拍的都在「我的」，可以挑几段做成一支 vlog。",
-               "想和朋友一起拍，去「朋友」建一个房间，把邀请码发给他们。"]
+            ? ["点相机，拍几秒",
+               "拍的都在这里，可以挑几段做 vlog",
+               "去「朋友」建房间，发邀请码"]
             : ["Tap the camera below and film a few seconds.",
                "Everything you film lands in Mine — pick a few clips to make a vlog.",
                "To film with friends, open a room in Friends and send them the code."]
@@ -1294,10 +1294,10 @@ enum Strings {
     /// Not an error dialog: the thing they were doing still works, and the list
     /// is right there. This only explains why nothing appeared.
     static var suggestFailed: String {
-        lang == .chinese ? "没连上，可以重试或者自己写" : "Couldn't connect. Retry or write your own."
+        lang == .chinese ? "没连上" : "Couldn't connect"
     }
     static var suggestRateLimited: String {
-        lang == .chinese ? "请求太频繁，过一分钟再试" : "Too many requests — try again in a minute"
+        lang == .chinese ? "等一分钟再试" : "Try again in a minute"
     }
 
     static var yourPrompts: String { lang == .chinese ? "想拍的画面" : "Scenes to film" }
@@ -1489,7 +1489,7 @@ enum Strings {
     static var chatEmpty: String {
         lang == .chinese ? "在这里聊聊今天拍的" : "Talk about your story here"
     }
-    static var chatTitle: String { lang == .chinese ? "房间聊天" : "Room chat" }
+    static var chatTitle: String { lang == .chinese ? "聊天" : "Chat" }
     /// A clip somebody put in the room, as a line in the chat. The chat used
     /// to be words only, so the one thing a room exists for — somebody filmed
     /// something — never appeared in the place people talk about it. Built on
@@ -1517,17 +1517,17 @@ enum Strings {
         lang == .chinese ? "聊天记录没存上，再试一次" : "Couldn't save the chat. Try again."
     }
     static var chatErrorFetch: String {
-        lang == .chinese ? "没连上，新消息待会儿再刷" : "Can't load new messages right now"
+        lang == .chinese ? "没连上" : "Couldn't connect"
     }
     static var chatErrorSend: String {
         lang == .chinese ? "有消息没发出去，点它下面的重试" : "A message didn't send. Tap Retry under it."
     }
     static var chatErrorDelete: String {
-        lang == .chinese ? "没删掉，长按消息再试一次" : "Couldn't delete. Long-press the message to try again."
+        lang == .chinese ? "没删掉" : "Couldn't delete"
     }
     static func chatErrorTooLong(_ limit: Int) -> String {
         lang == .chinese
-            ? "一条最多 \(limit) 字，你写的还在"
+            ? "最多 \(limit) 字"
             : "Messages max out at \(limit) characters. Your text is still here."
     }
 
@@ -1564,7 +1564,7 @@ enum Strings {
     /// error, which is an AVFoundation sentence nobody can act on — the raw
     /// one goes to the log.
     static var filmFailedTryAgain: String {
-        lang == .chinese ? "这次没合成出来，再试一次" : "Couldn't make the film. Try again."
+        lang == .chinese ? "没做出来" : "Couldn't make the film"
     }
     /// The save button once this render is in Photos. It stays that way until
     /// the film is rebuilt, because saving the same file twice is two copies.
@@ -1594,7 +1594,7 @@ enum Strings {
     /// somebody has to be called something in a room full of friends.
     static var defaultMemberName: String { lang == .chinese ? "朋友" : "Friend" }
     static var notSignedIn: String {
-        lang == .chinese ? "未登录（只有和朋友一起拍需要登录）" : "Not signed in — only shared stories need it"
+        lang == .chinese ? "未登录" : "Not signed in"
     }
     /// The way back in. Until this existed, signing out was one-way from here:
     /// the only other sign-in gate is the one guarding a shared story.
@@ -1607,7 +1607,7 @@ enum Strings {
     }
     static var signOutConfirmMessage: String {
         lang == .chinese
-            ? "退出后，共享房间会在这台设备上隐藏，重新登录就会回来。自己的选题不受影响。"
+            ? "房间会先隐藏，重新登录就回来"
             : "Shared rooms will be hidden on this device until you sign back in. Your own stories stay put."
     }
     static var avatarColourLabel: String { lang == .chinese ? "头像颜色" : "Avatar colour" }
@@ -1634,7 +1634,7 @@ enum Strings {
     }
     static var deleteAccountFailedMessage: String {
         lang == .chinese
-            ? "网络中断，云端还有一部分没删掉。你的选题和视频都还在这台设备上，没有动。连上网络后再试一次，会从断掉的地方接着删。"
+            ? "还有一部分没删掉，连上网再试一次会接着删"
             : "The connection dropped and some of your records are still in the cloud. Nothing on this device has been touched. Try again when you're back online and it will pick up where it stopped."
     }
     /// Replaces a departed creator's name on a room their friends still use.

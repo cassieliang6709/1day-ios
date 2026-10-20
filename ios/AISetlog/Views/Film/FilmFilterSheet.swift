@@ -166,8 +166,6 @@ struct FilmFilterSheet: View {
                     .scrollIndicators(.hidden)
                 } header: {
                     Text(Strings.filmPeopleHeader)
-                } footer: {
-                    Text(Strings.filmPeopleTapHint)
                 }
 
                 Section(Strings.filmPerPersonHeader) {
@@ -278,8 +276,6 @@ private struct FilmPersonPage: View {
                 Toggle(Strings.filmPersonAllHeld, isOn: allHeld)
                     .disabled(!included)
                     .accessibilityIdentifier("film-person-hold-all")
-            } footer: {
-                Text(Strings.filmHoldFooter)
             }
 
             Section(Strings.filmEachClip) {

@@ -208,12 +208,7 @@ struct CommentsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if comments.isEmpty {
-                Text(Strings.firstComment)
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
+            if !comments.isEmpty {
                 ForEach(comments) { comment in
                     CommentRow(comment: comment, isMine: comment.authorID == myID) {
                         onDelete(comment)

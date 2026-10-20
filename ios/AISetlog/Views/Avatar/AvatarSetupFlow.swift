@@ -32,7 +32,6 @@ struct AvatarSetupFlow: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var showsPicker = false
     @State private var showsCamera = false
-    @State private var asksCamera = false
     @State private var work: Task<Void, Never>?
 
     var body: some View {
@@ -62,12 +61,6 @@ struct AvatarSetupFlow: View {
             }
             .ignoresSafeArea()
         }
-        .alert(Strings.avatarTakePhoto, isPresented: $asksCamera) {
-            Button(Strings.avatarCameraContinue) { showsCamera = true }
-            Button(Strings.cancel, role: .cancel) {}
-        } message: {
-            Text(Strings.avatarCameraPermission)
-        }
         .task { startDebugSampleIfAsked() }
         .onDisappear { work?.cancel() }
     }
@@ -77,28 +70,24 @@ struct AvatarSetupFlow: View {
     private var upload: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
-            Text(Strings.avatarUploadTitle)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
             Text(Strings.avatarUploadHeadline)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
                 .multilineTextAlignment(.center)
                 .padding(.top, 10)
-            Text(Strings.avatarUploadSubtitle)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .padding(.top, 8)
 
             AvatarPlaceholderCard()
                 .frame(width: 210, height: 210)
                 .padding(.top, 32)
 
-            Text(error ?? Strings.avatarFrontFacingHint)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(error == nil ? OneDay.inkSoft : Color.oneDayEmber)
-                .multilineTextAlignment(.center)
-                .padding(.top, 18)
+            // Only a failure says anything here.
+            if let error {
+                Text(error)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.oneDayEmber)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 18)
+            }
 
             Spacer(minLength: 24)
 
@@ -136,11 +125,8 @@ struct AvatarSetupFlow: View {
             showsPicker = true
             return
         }
-        if AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
-            asksCamera = true
-        } else {
-            showsCamera = true
-        }
+        // The system prompt explains the camera; nothing of ours before it.
+        showsCamera = true
     }
 
     // MARK: - 2. 正在画你
@@ -151,10 +137,6 @@ struct AvatarSetupFlow: View {
             Text(Strings.avatarGeneratingHeadline)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-            Text(Strings.avatarGeneratingSubtitle)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .padding(.top, 8)
 
             AvatarCard {
                 if let frame {
@@ -235,11 +217,8 @@ struct AvatarSetupFlow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 120, height: 120)
+                    .accessibilityIdentifier("avatar-done")
             }
-            Text(Strings.avatarDone)
-                .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .accessibilityIdentifier("avatar-done")
         }
     }
 

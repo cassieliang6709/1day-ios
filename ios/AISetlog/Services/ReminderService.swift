@@ -21,6 +21,9 @@ enum ReminderService {
     private static let scheduler = ReminderScheduler()
     private static let prefix = "reminder."
 
+    /// Evening capture reminders are off (1.5).
+    static let schedulesEveningReminders = false
+
     static func reconcile(for challenges: [Challenge]) {
         Task {
             await scheduler.reconcile(challenges: challenges)
@@ -160,6 +163,10 @@ enum ReminderService {
 
         func reconcile(challenges: [Challenge]) async {
             await removeScheduledReminders()
+            // Off (1.5): an evening nudge to film is the app telling you to
+            // record, which it doesn't do any more. Reconciling still clears
+            // whatever an earlier build scheduled.
+            guard ReminderService.schedulesEveningReminders else { return }
             guard NotificationPreferences.eveningEnabled else { return }
             let settings = await center.notificationSettings()
             guard settings.authorizationStatus == .authorized

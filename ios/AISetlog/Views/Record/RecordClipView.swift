@@ -752,11 +752,6 @@ struct RecordClipView: View {
             if cameraAccessDenied {
                 Text(Strings.cameraDeniedTitle)
                     .font(.headline)
-                Text(Strings.cameraDeniedFootnote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
                 Button(Strings.openSettings) {
                     guard let url = URL(string: UIApplication.openSettingsURLString)
                     else { return }
@@ -818,9 +813,6 @@ struct RecordClipView: View {
             ProgressView()
                 .controlSize(.large)
                 .tint(.cyan)
-            Text(Strings.openingCamera)
-                .font(.headline)
-                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 18)

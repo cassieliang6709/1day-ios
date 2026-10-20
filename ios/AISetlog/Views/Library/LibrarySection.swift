@@ -54,9 +54,8 @@ struct LibrarySection: View {
         VStack(alignment: .leading, spacing: 14) {
             titleRow
 
-            if scope.clips.isEmpty {
-                emptyLine(Strings.libraryEmpty)
-            } else {
+            // Nothing filmed: nothing said (copy audit) — empty is empty.
+            if !scope.clips.isEmpty {
                 if mode == .calendar {
                     LibraryCalendar(
                         month: $month,
@@ -82,9 +81,7 @@ struct LibrarySection: View {
                 }
 
                 if mode == .grid || day != nil {
-                    if shown.isEmpty {
-                        emptyLine(Strings.libraryNothingHere)
-                    } else {
+                    if !shown.isEmpty {
                         grid
                     }
                 }

@@ -21,14 +21,14 @@ extension Strings {
                "The camera takes one photo of you. It's only used to draw your avatar, and the photo is never uploaded.")
     }
     static var avatarCameraContinue: String { avatar("好", "OK") }
-    static var avatarFailed: String { avatar("这张没画出来，换一张试试。", "That one didn't work. Try another photo.") }
+    static var avatarFailed: String { avatar("没画出来，换一张", "That one didn't work. Try another photo.") }
 
     // Generating
-    static var avatarGeneratingHeadline: String { avatar("正在画你。", "Drawing you.") }
+    static var avatarGeneratingHeadline: String { avatar("正在画你", "Drawing you.") }
     static var avatarGeneratingSubtitle: String { avatar("几秒钟。", "A few seconds.") }
 
     // Confirm
-    static var avatarConfirmHeadline: String { avatar("画好了。这是你。", "Done. This is you.") }
+    static var avatarConfirmHeadline: String { avatar("这是你", "Done. This is you.") }
     static var avatarConfirm: String { avatar("就是这样", "That's me") }
     static var avatarRedraw: String { avatar("重画一张", "Draw another") }
     static var avatarDone: String { avatar("好了，去记今天。", "All set. Go film today.") }

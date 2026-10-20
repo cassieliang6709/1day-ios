@@ -136,10 +136,6 @@ struct RoomInviteCodeCard: View {
                 .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(OneDay.inkSoft)
             codeText
-            Text(Strings.inviteSheetBody)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .multilineTextAlignment(.center)
             buttons
         }
         .padding(24)

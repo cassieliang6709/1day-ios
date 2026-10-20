@@ -40,21 +40,15 @@ struct FirstRunOnboardingView: View {
                             .minimumScaleFactor(0.76)
                             .padding(.top, isCompactHeight ? 20 : 26)
 
-                        SameDayAnimation()
-                            .frame(height: isCompactHeight ? 200 : 250)
-                            .padding(.top, isCompactHeight ? 10 : 18)
 
-                        Text(Strings.firstRunGuide)
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 6)
+                        // The name sits in the middle, the button at the
+                        // bottom where the thumb is: two spacers share the
+                        // room the animation used to take.
+                        Spacer(minLength: isCompactHeight ? 26 : 38)
 
                         // One way on from here: 通过 Apple 继续. Joining by
                         // code and filming solo both wait until after sign-in.
                         primaryAction
-                            .padding(.top, isCompactHeight ? 26 : 38)
 
                         Spacer().frame(height: 18)
                     }
@@ -117,11 +111,13 @@ struct FirstRunOnboardingView: View {
                 .frame(height: 52)
                 .clipShape(Capsule())
 
-                Text(signInError ?? Strings.firstRunSignInNote)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(signInError == nil ? OneDay.inkSoft : Color.oneDayEmber)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let signInError {
+                    Text(signInError)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.oneDayEmber)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

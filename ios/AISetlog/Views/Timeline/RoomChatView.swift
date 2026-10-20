@@ -177,7 +177,8 @@ private struct RoomChatConversation: View {
                         .background(Color.oneDayLavender.opacity(0.14))
                         .accessibilityIdentifier("chat-local-demo-banner")
                 }
-                if let error = session.error {
+                // A message that didn't send says so under itself.
+                if let error = session.error, error != .send {
                     HStack {
                         Text(errorText(error))
                             .font(.system(size: 13, weight: .medium, design: .rounded))
@@ -198,12 +199,6 @@ private struct RoomChatConversation: View {
                         uniqueKeysWithValues: entries.enumerated().map { ($1.id, $0) })
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            if rows.isEmpty {
-                                Text(Strings.chatEmpty)
-                                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                                    .foregroundStyle(OneDay.inkSoft)
-                                    .padding(.top, 48)
-                            }
                             ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                                 VStack(spacing: 10) {
                                     if startsNewTimeBlock(at: index, in: rows) {
