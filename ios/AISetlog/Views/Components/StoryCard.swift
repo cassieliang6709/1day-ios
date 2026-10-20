@@ -238,7 +238,8 @@ struct StoryRowCard: View {
     }
 
     private var subtitle: String {
-        if progress.isComplete {
+        // 朋友's rooms never say 影片完成 (1.5).
+        if progress.isComplete, !challenge.isShared {
             return Strings.filmReadySubtitle(
                 duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }
