@@ -6,6 +6,7 @@ extension Strings {
         AppLanguage.effective.resolved == .chinese ? zh : en
     }
 
+    static var filmOrder: String { filterCopy("排顺序", "Order") }
     static var filmFilter: String { filterCopy("筛选", "Pick") }
     static var filmPeopleHeader: String { filterCopy("成片里有谁", "Who's in it") }
     static var filmPeopleTapHint: String {

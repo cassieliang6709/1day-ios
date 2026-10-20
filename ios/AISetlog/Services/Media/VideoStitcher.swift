@@ -93,6 +93,9 @@ enum VideoStitcher {
         /// moment while everyone else keeps playing, and its sound is left
         /// out. The sequential film has no cells, so it ignores this.
         var freezeFrames: [String: Double] = [:]
+        /// The shared-room grid's moments in play order, by slot. Nil plays
+        /// them by slot number, as always.
+        var dayOrder: [Int]?
         static let `default` = Options()
     }
 
@@ -273,6 +276,7 @@ enum VideoStitcher {
             try buildFriendsTogether(
                 loaded: loaded, into: composition, renderSize: renderSize,
                 sourceAspect: sourceAspect, freezeFrames: options.freezeFrames,
+                dayOrder: options.dayOrder,
                 startAt: titleOffset, instructions: &instructions,
                 audioParams: &audioParams, captions: &captions,
                 authorCaptions: &authorCaptions)
@@ -561,14 +565,16 @@ enum VideoStitcher {
         renderSize: CGSize,
         sourceAspect: CGFloat,
         freezeFrames: [String: Double] = [:],
+        dayOrder: [Int]? = nil,
         startAt: CMTime,
         instructions: inout [any AVVideoCompositionInstructionProtocol],
         audioParams: inout [AVMutableAudioMixInputParameters],
         captions: inout [CaptionWindow],
         authorCaptions: inout [AuthorCaptionWindow]
     ) throws {
+        let rank = Dictionary((dayOrder ?? []).enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
         let groups = Dictionary(grouping: loaded, by: \.day)
-            .sorted { $0.key < $1.key }
+            .sorted { (rank[$0.key] ?? Int.max, $0.key) < (rank[$1.key] ?? Int.max, $1.key) }
         var cursor = startAt
 
         for (day, clips) in groups {

@@ -188,6 +188,17 @@ struct FilmFilterSheet: View {
                     }
                 }
 
+                // 排顺序 (1.5): which moment plays first. Your copy only.
+                if Set(allClips.filter(draft.includes).map(\.day)).count > 1 {
+                    Section {
+                        NavigationLink(value: FilmOrderPage.route) {
+                            Label(Strings.filmOrder, systemImage: "arrow.up.arrow.down")
+                                .font(.body.weight(.semibold))
+                        }
+                        .accessibilityIdentifier("film-order")
+                    }
+                }
+
                 if leavesNothing {
                     Section {
                         Text(Strings.filmNothingLeft)
@@ -200,7 +211,9 @@ struct FilmFilterSheet: View {
             .navigationTitle(Strings.filmFilter)
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { key in
-                if let person = people.first(where: { $0.id == key }) {
+                if key == FilmOrderPage.route {
+                    FilmOrderPage(clips: allClips.filter(draft.includes), draft: $draft)
+                } else if let person = people.first(where: { $0.id == key }) {
                     FilmPersonPage(person: person, draft: $draft)
                 }
             }
@@ -399,5 +412,46 @@ private struct FrameThumbnail: View {
                 image = UIImage(cgImage: cgImage)
             }
         }
+    }
+}
+
+// MARK: - Order
+
+/// 排顺序: the film's moments, one row each with everyone's take in it,
+/// dragged into the order the film plays them. Kept on this phone with the
+/// rest of the selection.
+struct FilmOrderPage: View {
+    static let route = "__film-order"
+
+    let clips: [DayClip]
+    @Binding var draft: FilmSelection
+
+    private var days: [Int] { draft.orderedDays(clips.map(\.day)) }
+
+    var body: some View {
+        List {
+            ForEach(days, id: \.self) { day in
+                HStack(spacing: 6) {
+                    ForEach(clips.filter { $0.day == day }) { clip in
+                        ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                            .frame(width: 42, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 2)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Strings.filmClipNumber((days.firstIndex(of: day) ?? 0) + 1))
+                .accessibilityIdentifier("film-order-row")
+            }
+            .onMove { from, to in
+                var order = days
+                order.move(fromOffsets: from, toOffset: to)
+                draft.dayOrder = order
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .navigationTitle(Strings.filmOrder)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

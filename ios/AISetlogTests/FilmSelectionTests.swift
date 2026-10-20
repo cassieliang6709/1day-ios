@@ -281,4 +281,27 @@ final class FilmHoldStitchTests: XCTestCase {
 
 private extension Array where Element == Int {
     func diff(_ other: [Int]) -> Int { zip(self, other).reduce(0) { $0 + abs($1.0 - $1.1) } }
+
+    // MARK: - 排顺序
+
+    func testDraggedSlotsPlayFirstTheRestBySlot() {
+        var selection = FilmSelection()
+        selection.dayOrder = [3, 1]
+        XCTAssertEqual(selection.orderedDays([1, 2, 3, 2]), [3, 1, 2])
+    }
+
+    func testOrderIsPartOfTheCacheKeyAndPrunedWithTheRoom() {
+        var selection = FilmSelection()
+        let plain = selection.cacheKey
+        selection.dayOrder = [2, 1]
+        XCTAssertNotEqual(selection.cacheKey, plain, "a different order is a different film")
+        XCTAssertEqual(selection.pruned(to: []).dayOrder, [])
+    }
+
+    func testASelectionSavedBeforeOrderStillLoads() throws {
+        let old = #"{"leftOutPeople":["b"],"leftOutClips":[],"freezes":{}}"#
+        let loaded = try JSONDecoder().decode(FilmSelection.self, from: Data(old.utf8))
+        XCTAssertEqual(loaded.leftOutPeople, ["b"])
+        XCTAssertEqual(loaded.dayOrder, [])
+    }
 }

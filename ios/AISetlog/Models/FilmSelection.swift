@@ -16,6 +16,29 @@ struct FilmSelection: Codable, Equatable {
     var leftOutClips: Set<String> = []
     /// Takes held on one frame: `DayClip.id` → seconds into the take.
     var freezes: [String: Double] = [:]
+    /// The order the film plays its moments in, by slot (`DayClip.day`),
+    /// as dragged on 排顺序. Empty is slot order; a slot not listed (filmed
+    /// after the drag) comes after the listed ones.
+    var dayOrder: [Int] = []
+
+    init() {}
+
+    // Selections saved before `dayOrder` existed still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        leftOutPeople = try c.decodeIfPresent(Set<String>.self, forKey: .leftOutPeople) ?? []
+        leftOutClips = try c.decodeIfPresent(Set<String>.self, forKey: .leftOutClips) ?? []
+        freezes = try c.decodeIfPresent([String: Double].self, forKey: .freezes) ?? [:]
+        dayOrder = try c.decodeIfPresent([Int].self, forKey: .dayOrder) ?? []
+    }
+
+    /// The film's slots in play order: dragged ones first as dragged, the
+    /// rest by number.
+    func orderedDays(_ days: some Sequence<Int>) -> [Int] {
+        let unique = Array(Set(days))
+        let rank = Dictionary(dayOrder.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        return unique.sorted { (rank[$0] ?? Int.max, $0) < (rank[$1] ?? Int.max, $1) }
+    }
 
     /// Who filmed a take, as the key this selection files them under. The
     /// account id when there is one, so two people with one name stay apart.
@@ -68,6 +91,8 @@ struct FilmSelection: Codable, Equatable {
         var out = self
         out.leftOutClips = leftOutClips.filter(ids.contains)
         out.freezes = freezes.filter { ids.contains($0.key) }
+        let days = Set(clips.map(\.day))
+        out.dayOrder = dayOrder.filter(days.contains)
         return out
     }
 
@@ -79,7 +104,8 @@ struct FilmSelection: Codable, Equatable {
         let held = freezes.sorted { $0.key < $1.key }
             .map { "\($0.key)@\(String(format: "%.3f", $0.value))" }
             .joined(separator: ",")
-        return "p[\(people)]c[\(clips)]f[\(held)]"
+        let order = dayOrder.map(String.init).joined(separator: ",")
+        return "p[\(people)]c[\(clips)]f[\(held)]o[\(order)]"
     }
 }
 

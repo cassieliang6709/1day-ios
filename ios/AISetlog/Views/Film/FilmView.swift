@@ -218,7 +218,8 @@ struct FilmView: View {
         return filmClips.map(RenderRevision.init) + [
             RenderRevision(
                 options: "\(adjustments.includeTitleCard)-\(adjustments.includeCaptions)"
-                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]")
+                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]"
+                    + "-order[\(selection.dayOrder.map(String.init).joined(separator: ","))]")
         ]
     }
 
@@ -306,6 +307,7 @@ struct FilmView: View {
             if challenge.isShared {
                 options.keptClipIDs = Set(filmClips.map(\.id))
                 options.freezeFrames = selection.freezeFrames(for: clips)
+                if !selection.dayOrder.isEmpty { options.dayOrder = selection.dayOrder }
             }
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             // The scope refuses — and deletes — anything handed to it after it
