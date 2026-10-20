@@ -897,7 +897,6 @@ enum Strings {
     }
     static var adjust: String { lang == .chinese ? "调整" : "Adjust" }
 
-    static var renameRoom: String { lang == .chinese ? "房间名" : "Room name" }
     static var roomNamePlaceholder: String { lang == .chinese ? "给房间起个名字" : "Name this room" }
     static var editPlan: String { lang == .chinese ? "编辑计划" : "Edit plan" }
     static var planTitle: String { lang == .chinese ? "计划名称" : "Plan name" }

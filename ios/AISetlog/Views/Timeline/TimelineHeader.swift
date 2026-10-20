@@ -13,11 +13,13 @@ struct TimelineHeader: View {
     let challenge: Challenge
     var isSyncing = false
     /// A room's name can be changed by anyone in it (1.5): tapping the title
-    /// asks for a new one. Nil keeps the title plain text.
+    /// turns it into the text field, in place — no dialog. Return saves;
+    /// tapping away leaves it as it was. Nil keeps the title plain text.
     var onRename: ((String) -> Void)? = nil
 
     @State private var renaming = false
     @State private var draftTitle = ""
+    @FocusState private var fieldFocused: Bool
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
@@ -31,21 +33,33 @@ struct TimelineHeader: View {
 
     var body: some View {
         if let onRename {
-            Button {
-                draftTitle = showsTitle ? challenge.title : ""
-                renaming = true
-            } label: {
-                title
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("room-title")
-            .alert(Strings.renameRoom, isPresented: $renaming) {
-                TextField(Strings.roomNamePlaceholder, text: $draftTitle)
-                Button(Strings.cancel, role: .cancel) {}
-                Button(Strings.save) {
-                    let name = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !name.isEmpty { onRename(name) }
+            if renaming {
+                TextField("", text: $draftTitle, prompt: Text(Strings.roomNamePlaceholder))
+                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .tint(Color.oneDayBrand)
+                    .focused($fieldFocused)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        let name = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !name.isEmpty { onRename(name) }
+                        renaming = false
+                    }
+                    // Tapped away without Return: nothing changes.
+                    .onChange(of: fieldFocused) { _, focused in
+                        if !focused { renaming = false }
+                    }
+                    .onAppear { fieldFocused = true }
+                    .accessibilityIdentifier("room-title-field")
+            } else {
+                Button {
+                    draftTitle = showsTitle ? challenge.title : ""
+                    renaming = true
+                } label: {
+                    title
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("room-title")
             }
         } else if showsTitle || isSyncing {
             title
