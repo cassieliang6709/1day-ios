@@ -526,7 +526,13 @@ final class ChallengeStore {
     func delete(_ id: UUID) {
         fileStore.deleteClips(challengeID: id)
         if let code = challenge(id)?.roomCode {
-            // Leaves the room locally; the shared record stays for others.
+            // Leaving takes me out for everyone (1.5): my takes and my
+            // `Member` record go too, so friends stop seeing my frame. The
+            // room itself stays for them.
+            if effects.allowsCloudRoomManagement, let me = account?.account {
+                let sync = roomSync
+                Task { @MainActor in await sync.leaveRemotely(code: code, authorID: me.id) }
+            }
             roomSync.clearRoom(code)
         }
         challenges.removeAll { $0.id == id }

@@ -13,6 +13,7 @@ final class MemberProfileSyncTests: XCTestCase {
     private var fetchFails = false
     private var titleWrites: [(code: String, title: String, at: Date)] = []
     private var titleWriteFails = false
+    private var deleted: Set<String> = []
     private var account: AccountStore!
 
     override func setUp() {
@@ -23,6 +24,7 @@ final class MemberProfileSyncTests: XCTestCase {
         fetchFails = false
         titleWrites = []
         titleWriteFails = false
+        deleted = []
         UserDefaults.standard.removeObject(forKey: RoomSyncService.publishedProfilesKey)
         UserDefaults.standard.removeObject(forKey: RoomSyncService.pendingRoomTitlesKey)
         account = AccountStore()
@@ -46,6 +48,13 @@ final class MemberProfileSyncTests: XCTestCase {
             setReaction: { _, _, _, _, _, _, _ in },
             postComment: { _, _, _, _, _, _, _ in },
             deleteComment: { _ in },
+            fetchRoom: { code in
+                CloudKitService.RemoteRoom(
+                    code: code, title: "房间", startDate: .now, ownerID: "owner-1", ownerName: "Leo",
+                    mode: .oneDay, clipLength: .tiny, orientation: .portrait,
+                    cameraStyle: nil, templateName: nil, momentTitles: nil)
+            },
+            saveMember: { _, _, _, _ in },
             saveMemberProfile: { [self] write in
                 if writeFails { throw CloudKitService.CKServiceError.networkUnavailable }
                 writes.append(write)
@@ -53,6 +62,13 @@ final class MemberProfileSyncTests: XCTestCase {
             saveRoomTitle: { [self] code, _, _, title, at in
                 if titleWriteFails { throw CloudKitService.CKServiceError.networkUnavailable }
                 titleWrites.append((code, title, at))
+            },
+            myRecordNames: { code, author in
+                ["\(code)_\(author)", "clip-\(author)-1", "comment-\(author)"]
+            },
+            deleteRecords: { [self] names in
+                deleted.formUnion(names)
+                return names
             },
             fetchMembers: { [self] _, _ in
                 if fetchFails { throw CloudKitService.CKServiceError.networkUnavailable }
@@ -233,6 +249,75 @@ final class MemberProfileSyncTests: XCTestCase {
         await isolated.renameRoom(isolated.challenges[0].id, to: "演示")
         XCTAssertEqual(isolated.challenges[0].title, "演示")
         XCTAssertTrue(titleWrites.isEmpty)
+    }
+
+    // MARK: - Leaving
+
+    func testLeavingARoomDeletesMyRecordsForEveryone() async throws {
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        let me = try XCTUnwrap(account.account?.id)
+        store.delete(store.challenges[0].id)
+        XCTAssertTrue(store.challenges.isEmpty, "gone here at once")
+        for _ in 0..<50 where deleted.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertEqual(deleted, ["AAAAAA_\(me)", "clip-\(me)-1", "comment-\(me)"])
+    }
+
+    func testDeletingMyOwnStoryTouchesNoRoom() async throws {
+        let store = store(rooms: [], profile: nil)
+        let story = store.create(title: "我的", mode: .oneDay, clipLength: .tiny,
+                                 orientation: .portrait, templateName: nil, momentTitles: ["a"])
+        store.delete(story.id)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(deleted.isEmpty)
+    }
+
+    // MARK: - Room size
+
+    func testTheGridFollowsTheHeadCount() {
+        XCTAssertTrue(RoomFrames.grid(for: 1) == (1, 1))
+        XCTAssertTrue(RoomFrames.grid(for: 2) == (1, 2), "two people: one above the other")
+        XCTAssertTrue(RoomFrames.grid(for: 3) == (1, 3))
+        XCTAssertTrue(RoomFrames.grid(for: 4) == (2, 2))
+        XCTAssertTrue(RoomFrames.grid(for: 5) == (2, 3), "five: six places, the last left empty")
+        XCTAssertTrue(RoomFrames.grid(for: 6) == (2, 3))
+    }
+
+    private func person(_ id: String) -> CloudKitService.RemoteMember {
+        .init(userID: id, displayName: id, avatarURL: nil, moodKind: nil, moodDay: nil)
+    }
+
+    func testAFullRoomTurnsTheSeventhPersonAway() async {
+        fetched = (1...5).map { person("p\($0)") }   // plus the owner: six
+        let store = store(rooms: [], profile: nil)
+        do {
+            _ = try await store.joinRoom(code: "ABCDEF")
+            XCTFail("a seventh person must not get in")
+        } catch {
+            XCTAssertEqual(error as? CloudKitService.CKServiceError, .roomFull)
+        }
+        XCTAssertTrue(store.challenges.isEmpty)
+    }
+
+    func testARoomWithSpaceLetsMeIn() async throws {
+        fetched = (1...4).map { person("p\($0)") }   // plus the owner: five
+        let store = store(rooms: [], profile: nil)
+        _ = try await store.joinRoom(code: "ABCDEF")
+        XCTAssertEqual(store.challenges.first?.roomCode, "ABCDEF")
+    }
+
+    func testUnreadableMembersDoNotBlockAJoin() async throws {
+        fetchFails = true
+        let store = store(rooms: [], profile: nil)
+        _ = try await store.joinRoom(code: "ABCDEF")
+        XCTAssertEqual(store.challenges.count, 1)
+    }
+
+    func testSomebodyWhoJoinedButHasntFilmedIsInTheRoom() async {
+        fetched = [person("quiet")]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.roomSync.syncMembers(code: "AAAAAA")
+        let ids = store.members(for: store.challenges[0].id).map(\.id)
+        XCTAssertTrue(ids.contains("quiet"))
     }
 
     // MARK: - Reading

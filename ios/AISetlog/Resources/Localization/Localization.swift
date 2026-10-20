@@ -355,8 +355,8 @@ enum Strings {
     }
     static var leaveRoomWarning: String {
         lang == .chinese
-            ? "这台设备上就看不到这个房间了。你已经拍的片段还留在房间里，其他人照常能看。"
-            : "The room disappears from this device. The clips you filmed stay in it — everyone else can still see them."
+            ? "你拍的片段会从房间里删掉，找不回来"
+            : "Your clips will be deleted from the room for good"
     }
     static var history: String { lang == .chinese ? "历史" : "HISTORY" }
     static var joining: String { lang == .chinese ? "加入中…" : "Joining…" }

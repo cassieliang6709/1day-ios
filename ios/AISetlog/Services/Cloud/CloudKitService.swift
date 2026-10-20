@@ -688,6 +688,34 @@ enum CloudKitService {
         return confirmed
     }
 
+    /// Everything I put in one room, by record name: my clips (every take),
+    /// my reactions and comments, and my `Member` record. What leaving a
+    /// room deletes (1.5), so friends no longer see me there. Names only —
+    /// no fields, so no video is downloaded to find them. A type whose
+    /// index is missing is skipped rather than failing the whole leave.
+    static func myRecordNames(inRoom code: String, authorID: String) async throws -> Set<String> {
+        try await ensureAccountAvailable()
+        var names: Set<String> = [memberRecordName(code: code, authorID: authorID)]
+        for type in ["Clip", "Reaction", "Comment"] {
+            let query = CKQuery(
+                recordType: type,
+                predicate: NSPredicate(format: "roomCode == %@ AND authorID == %@", code, authorID))
+            do {
+                var response = try await db.records(matching: query, desiredKeys: [])
+                for _ in 0..<50 {
+                    for (id, result) in response.matchResults where (try? result.get()) != nil {
+                        names.insert(id.recordName)
+                    }
+                    guard let cursor = response.queryCursor else { break }
+                    response = try await db.records(continuingMatchFrom: cursor, desiredKeys: [])
+                }
+            } catch let error as CKError where error.code == .invalidArguments || error.code == .unknownItem {
+                print("[room] leave: skipping \(type): \(error.code)")
+            }
+        }
+        return names
+    }
+
     static func deleteMyRoomData(
         authorID: String,
         clips: [(code: String, day: Int)],

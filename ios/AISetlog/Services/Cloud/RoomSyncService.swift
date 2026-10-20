@@ -245,6 +245,25 @@ final class RoomSyncService {
         UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
     }
 
+    // MARK: - Leaving
+
+    /// Takes me out of a room for everyone (1.5): my clips, reactions,
+    /// comments and `Member` record are deleted, so my frame and my footage
+    /// leave every friend's copy. True when all of it is confirmed gone.
+    @MainActor
+    @discardableResult
+    func leaveRemotely(code: String, authorID: String) async -> Bool {
+        do {
+            let names = try await transport.myRecordNames(code, authorID)
+            let gone = try await transport.deleteRecords(names)
+            print("[room] left code=\(code) deleted=\(gone.count)/\(names.count)")
+            return gone.count == names.count
+        } catch {
+            print("[room] leave failed: \(error)")
+            return false
+        }
+    }
+
     // MARK: - Room name
 
     /// A rename on this phone that hasn't reached my `Member` record yet,
