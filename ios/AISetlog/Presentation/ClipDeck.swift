@@ -86,6 +86,19 @@ struct ClipDeck {
         }
     }
 
+    /// Where a tap on one particular take lands: that take if the deck has
+    /// it, otherwise that person's moment, otherwise anyone's take of it — a
+    /// clip that changed under the tap still opens something of that moment.
+    func index(ofDay day: Int, authorID: String?, takeID: UUID?) -> Int? {
+        guard let person = index(ofDay: day, authorID: authorID) else {
+            return clips.firstIndex { $0.day == day }
+        }
+        let author = clips[person].authorID
+        return clips.indices.first {
+            clips[$0].day == day && clips[$0].authorID == author && clips[$0].takeID == takeID
+        } ?? person
+    }
+
     /// What the chip over the video says.
     struct Position: Equatable {
         /// 1-based slot in the story.

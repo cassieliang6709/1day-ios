@@ -32,7 +32,8 @@ final class JoinedRoomTests: XCTestCase {
                 try? await CloudKitService.deleteMyRoomData(
                     authorID: id,
                     clips: (1...3).map { (code: code, day: $0) },
-                    reactions: [], commentIDs: [], roomCodes: [code])
+                    reactions: [], commentIDs: [], roomCodes: [code],
+                    otherRecordNames: [CloudKitService.memberRecordName(code: code, authorID: id)])
             }
         }
         UserDefaults.standard.removeObject(forKey: "account.v1")
@@ -98,9 +99,6 @@ final class JoinedRoomTests: XCTestCase {
 
 private final class MemoryRepository: ChallengeRepository {
     private var challenges: [Challenge] = []
-    private var templates: [ChallengeTemplate] = []
     func loadChallenges() -> [Challenge] { challenges }
     func saveChallenges(_ challenges: [Challenge]) { self.challenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { templates }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { self.templates = templates }
 }

@@ -18,33 +18,28 @@ final class ChallengeStore {
         }
     }
 
-    var customTemplates: [ChallengeTemplate] = [] {
-        didSet { repository.saveTemplates(customTemplates) }
-    }
-
     /// Set once at app launch so shared rooms can attribute + upload clips.
     var account: AccountStore?
+    /// My avatar and today's mood, as rooms should show them. Set at launch;
+    /// read whenever a room needs my `Member` record brought up to date.
+    var myRoomProfile: @MainActor () -> MyRoomProfile? = { nil }
 
     /// CloudKit room sync (remote clip cache + syncing spinners live there).
     let roomSync: RoomSyncService
 
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
-    private let coverStore: TemplateCoverStore
     let effects: ChallengeStoreEffects
 
     init(repository: ChallengeRepository? = nil,
          fileStore: ClipFileStore = DiskClipFileStore(),
-         coverStore: TemplateCoverStore = DiskTemplateCoverStore(),
          roomSync: RoomSyncService? = nil,
          effects: ChallengeStoreEffects = .live) {
         self.effects = effects
         self.fileStore = fileStore
-        self.coverStore = coverStore
         self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
         self.roomSync = roomSync ?? RoomSyncService(fileStore: fileStore)
         challenges = self.repository.loadChallenges()
-        customTemplates = self.repository.loadTemplates()
     }
 
     /// Room codes currently being synced (drives a spinner in the board).
@@ -57,117 +52,6 @@ final class ChallengeStore {
 
     func challenge(_ id: UUID) -> Challenge? {
         challenges.first { $0.id == id }
-    }
-
-    /// Puts a template someone built into their library, filing the cover
-    /// picture (if they chose one) before the template that names it is saved
-    /// — so a template never points at a file that isn't there.
-    @discardableResult
-    func addCustomTemplate(
-        _ template: ChallengeTemplate, coverImageData: Data? = nil
-    ) -> ChallengeTemplate {
-        let filed = filing(coverImageData, into: template)
-        customTemplates.append(filed)
-        return filed
-    }
-
-    func deleteCustomTemplate(_ template: ChallengeTemplate) {
-        if let coverFileName = template.coverFileName {
-            coverStore.deleteCover(fileName: coverFileName)
-        }
-        customTemplates.removeAll { $0.id == template.id }
-    }
-
-    /// `coverImageData` is a newly picked picture; nil leaves the cover alone.
-    /// Clearing one back to matched artwork is `template.coverFileName = nil`,
-    /// and the file it used to point at goes with it.
-    func updateCustomTemplate(
-        _ template: ChallengeTemplate, coverImageData: Data? = nil
-    ) {
-        guard let index = customTemplates.firstIndex(where: { $0.id == template.id }) else {
-            return
-        }
-        let previousCover = customTemplates[index].coverFileName
-        let filed = filing(coverImageData, into: template)
-        if let previousCover, previousCover != filed.coverFileName {
-            coverStore.deleteCover(fileName: previousCover)
-        }
-        customTemplates[index] = filed
-    }
-
-    /// Where a template's own cover picture lives, if it has one. Nil sends
-    /// the card back to `matchedCoverAssetName`.
-    func coverURL(for template: ChallengeTemplate) -> URL? {
-        template.coverFileName.flatMap { coverStore.coverURL(fileName: $0) }
-    }
-
-    private func filing(
-        _ imageData: Data?, into template: ChallengeTemplate
-    ) -> ChallengeTemplate {
-        guard let imageData else { return template }
-        var filed = template
-        // A failed write leaves the old cover in place rather than blanking it.
-        if let stored = coverStore.storeCover(imageData, ownerID: template.id) {
-            filed.coverFileName = stored
-        }
-        return filed
-    }
-
-    // MARK: - A story's own cover
-
-    /// What the cover sheet came back with.
-    ///
-    /// `keepFilming` is not "no change": it is the choice to go back to the
-    /// automatic cover — the newest clip in the story, and the template's
-    /// poster before anything is filmed. That was the only behaviour there
-    /// used to be, so it has to stay reachable.
-    enum StoryCoverChoice: Equatable {
-        case preset(String)
-        case picked(Data)
-        case keepFilming
-    }
-
-    func setStoryCover(_ choice: StoryCoverChoice, for id: UUID) {
-        guard let index = challenges.firstIndex(where: { $0.id == id }) else { return }
-        let previous = challenges[index].coverFileName
-
-        switch choice {
-        case .preset(let assetName):
-            challenges[index].presetCoverAssetName = assetName
-            challenges[index].coverFileName = nil
-        case .picked(let data):
-            // Filed before the story that names it is saved, so a story never
-            // points at a file that isn't there — same order as templates.
-            guard let stored = coverStore.storeCover(data, ownerID: id) else { return }
-            challenges[index].coverFileName = stored
-            challenges[index].presetCoverAssetName = nil
-        case .keepFilming:
-            challenges[index].coverFileName = nil
-            challenges[index].presetCoverAssetName = nil
-        }
-
-        // The old picture goes with the choice that replaced it. Deleting after
-        // the swap rather than before: a failed write above returns early and
-        // the story keeps the cover it had.
-        if let previous, previous != challenges[index].coverFileName {
-            coverStore.deleteCover(fileName: previous)
-        }
-    }
-
-    /// The picture this story's card should show, or nil to fall back to art.
-    ///
-    /// Chosen beats automatic: a cover somebody picked outranks the newest
-    /// clip, which outranks the poster. `latestClipURL` is handed in because
-    /// which clip is newest is the caller's question — rooms count everybody's.
-    func storyCoverURL(for challenge: Challenge, latestClipURL: URL?) -> URL? {
-        if let own = challenge.coverFileName,
-           let url = coverStore.coverURL(fileName: own) {
-            return url
-        }
-        // A bundled preset is artwork, not a file: the card draws it by name
-        // (`ChallengePresenter.coverAssetName`), so there is no URL to give.
-        if challenge.presetCoverAssetName != nil { return nil }
-        return latestClipURL
     }
 
     func updatePlan(_ id: UUID, title: String, momentTitles: [String]) {
@@ -184,6 +68,7 @@ final class ChallengeStore {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) -> Challenge {
@@ -195,6 +80,7 @@ final class ChallengeStore {
             mode: mode,
             clipLength: clipLength,
             orientation: orientation,
+            cameraStyle: cameraStyle,
             templateName: templateName,
             momentTitles: momentTitles
         )
@@ -205,6 +91,9 @@ final class ChallengeStore {
     /// The first-run story: an immediately filmable personal day. Keeping this
     /// alongside `create` means it has the exact same persistence and reminder
     /// behavior as a story made in the composer.
+    ///
+    /// 按时间 as of 1.5 — no prompts to read before the first take, which is
+    /// what 晨光 / 在路上 / 傍晚的光 asked of someone who had just opened the app.
     @discardableResult
     func createQuickStart() -> Challenge {
         create(
@@ -212,7 +101,8 @@ final class ChallengeStore {
             mode: .oneDay,
             clipLength: .tiny,
             orientation: .portrait,
-            momentTitles: ["morning_light", "on_the_move", "golden_hour"])
+            templateName: Challenge.timeOnlyTemplateName,
+            momentTitles: nil)
     }
 
     // MARK: - Shared rooms (CloudKit)
@@ -233,6 +123,7 @@ final class ChallengeStore {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> Challenge {
@@ -241,16 +132,20 @@ final class ChallengeStore {
         let room = try await CloudKitService.createRoom(
             title: title, ownerID: me.id, ownerName: me.displayName,
             mode: mode, clipLength: clipLength, orientation: orientation,
+            cameraStyle: cameraStyle,
             templateName: templateName, momentTitles: momentTitles)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
             orientation: room.orientation,
+            cameraStyle: room.cameraStyle,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
+        // The room I made has no `Member` record for me until this writes one.
+        await publishMyProfile(toRoom: room.code)
         return challenge
     }
 
@@ -259,7 +154,7 @@ final class ChallengeStore {
     @discardableResult
     func joinRoom(code: String) async throws -> Challenge {
         guard effects.allowsCloudRoomManagement else { throw IsolationError.cloudRoomManagementDisabled }
-        guard account?.account != nil else { throw RoomError.notSignedIn }
+        guard let me = account?.account else { throw RoomError.notSignedIn }
         let normalized = InviteCode.normalize(code)
         // Already joined? Jump to it.
         if let existing = challenges.first(where: { $0.roomCode == normalized }) {
@@ -273,31 +168,109 @@ final class ChallengeStore {
         guard InviteCode.isValid(normalized) else {
             throw CloudKitService.CKServiceError.roomNotFound
         }
-        let room = try await CloudKitService.fetchRoom(code: normalized)
+        let room = try await roomSync.fetchRoom(code: normalized)
         let challenge = Challenge(
             id: UUID(), title: room.title, startDate: room.startDate,
             cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
             mode: room.mode, clipLength: room.clipLength,
             orientation: room.orientation,
+            cameraStyle: room.cameraStyle,
             templateName: room.templateName,
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
+        // Only once the room is really here: a code that found nothing never
+        // reaches this line, so it leaves no record behind.
+        await roomSync.recordMembership(
+            code: room.code, authorID: me.id, displayName: me.displayName)
+        // Joining wrote the record from scratch; put my avatar and mood back.
+        roomSync.forgetPublishedProfile(code: room.code)
+        await publishMyProfile(toRoom: room.code)
         await syncRoom(challenge.id)
         return challenge
     }
 
-    /// Pull every member's clips for a room into the local cache, then fold
-    /// remote reactions/comments into the local cards.
+    /// Pull every member's clips for a room into the local cache, send up any
+    /// of mine the room is missing, then fold remote reactions/comments into
+    /// the local cards.
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
-        _ = await roomSync.syncClips(code: code)
+        if let remote = await roomSync.syncClips(code: code),
+           await uploadMissingClips(in: challenge, code: code, remote: remote) {
+            _ = await roomSync.syncClips(code: code)
+        }
         if let interactions = await roomSync.fetchInteractions(code: code) {
             roomSync.remoteReactions[code] = interactions.reactions
             roomSync.remoteComments[code] = interactions.comments
             mergeInteractions(interactions, into: id)
         }
+        await roomSync.syncMembers(code: code)
+    }
+
+    /// Re-sends my takes the room doesn't have.
+    ///
+    /// `saveClip` uploads once, at record time. A take whose upload failed — no
+    /// network, iCloud refusing the app — used to stay on this phone for good:
+    /// shown to me as pending, to nobody else, and "retry sync" only pulled.
+    /// Runs only after a fetch succeeded, so "missing" means missing rather
+    /// than unreachable.
+    ///
+    /// - Returns: whether anything went up, so the caller can pull it back.
+    @MainActor
+    private func uploadMissingClips(
+        in challenge: Challenge, code: String, remote: [CloudKitService.RemoteClip]
+    ) async -> Bool {
+        guard effects.allowsCloudRoomManagement, let me = account?.account else { return false }
+        // Keyed by take, not by day: a moment can hold several of my takes, and
+        // the room having take 1 says nothing about take 2.
+        let roomCopies = Dictionary(
+            remote.filter { $0.authorID == me.id }
+                .map { (Self.takeKey(day: $0.day, takeID: takeID(of: $0, code: code)), $0.recordedAt) },
+            uniquingKeysWith: max)
+        var uploadedAny = false
+        for card in challenge.cards {
+            guard let fileName = card.clipFileName else { continue }
+            // Extra takes first in code, independent of take 1's fate below:
+            // each is its own record, and a take never re-recorded in place, so
+            // "the room has a record by this name" is the whole question.
+            for take in card.moreTakes
+            where roomCopies[Self.takeKey(day: card.day, takeID: take.id)] == nil {
+                let file = fileStore.clipURL(fileName: take.fileName, challengeID: challenge.id)
+                guard FileManager.default.fileExists(atPath: file.path) else { continue }
+                if await roomSync.uploadClip(
+                    code: code, day: card.day, authorID: me.id,
+                    authorName: me.displayName, fileURL: file,
+                    captions: take.captions,
+                    recordedAt: take.recordedAt,
+                    takeID: take.id
+                ) {
+                    uploadedAny = true
+                }
+            }
+            // The room's copy carries the time its take was filmed (it used to
+            // carry the time it went up). Same take: equal stamps, nothing to
+            // do. A re-record whose upload failed: the card's take is later
+            // than the one the room still holds, so it goes up. A copy written
+            // by an older client is stamped at upload, which is after the take
+            // it holds, so it still reads as "already there".
+            if let roomCopy = roomCopies[Self.takeKey(day: card.day, takeID: nil)], roomCopy >= (card.recordedAt ?? .distantPast) {
+                continue
+            }
+            let file = fileStore.clipURL(fileName: fileName, challengeID: challenge.id)
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            if await roomSync.uploadClip(
+                code: code, day: card.day, authorID: me.id,
+                authorName: me.displayName, fileURL: file,
+                captions: card.captions,
+                // A card from before `recordedAt` existed has no better answer
+                // than now; every card saved since has one.
+                recordedAt: card.recordedAt ?? .now
+            ) {
+                uploadedAny = true
+            }
+        }
+        return uploadedAny
     }
 
     /// Refreshes every locally joined room when the app becomes active.
@@ -399,6 +372,7 @@ final class ChallengeStore {
             var reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)] = []
             var commentIDs: [String] = []
             var roomCodes: [String] = []
+            var otherRecordNames: [String] = []
 
             for challenge in challenges {
                 guard let code = challenge.roomCode else { continue }
@@ -406,6 +380,7 @@ final class ChallengeStore {
                 for card in challenge.cards {
                     clips.append((code, card.day))
                 }
+                otherRecordNames += extraTakeRecordNames(in: challenge, authorID: me.id)
                 for reaction in roomSync.remoteReactions[code] ?? []
                 where reaction.authorID == me.id {
                     reactions.append((code, reaction.targetAuthorID, reaction.day, reaction.emoji))
@@ -427,10 +402,35 @@ final class ChallengeStore {
                 clips: clips,
                 reactions: reactions,
                 commentIDs: commentIDs,
-                roomCodes: roomCodes)
+                roomCodes: roomCodes,
+                otherRecordNames: otherRecordNames)
         }
 
         await wipeLocalAccountData()
+    }
+
+    /// Record names of every extra take of mine in a room — names
+    /// `deleteMyRoomData` and `AccountDeletionService.inventory` can't rebuild
+    /// from a day alone, the way they rebuild take 1's.
+    ///
+    /// The ones this phone filmed, from the cards, and any the room is known to
+    /// hold that this phone doesn't — filmed on another device signed in as me.
+    /// Sorted and unique, so a resumed deletion pages the same list.
+    func extraTakeRecordNames(in challenge: Challenge, authorID: String) -> [String] {
+        guard let code = challenge.roomCode else { return [] }
+        var names: Set<String> = []
+        for card in challenge.cards {
+            for take in card.moreTakes {
+                names.insert(CloudKitService.clipRecordName(
+                    code: code, authorID: authorID, day: card.day, takeID: take.id))
+            }
+        }
+        for clip in roomSync.remoteClips[code] ?? [] where clip.authorID == authorID
+            && CloudKitService.takeID(fromClipRecordName: clip.id, code: code,
+                                      authorID: authorID, day: clip.day) != nil {
+            names.insert(clip.id)
+        }
+        return names.sorted()
     }
 
     /// The device half of account deletion: every stored clip, story, cover and
@@ -450,11 +450,7 @@ final class ChallengeStore {
             fileStore.deleteClips(challengeID: challenge.id)
             if let code = challenge.roomCode { roomSync.clearRoom(code) }
         }
-        for coverFileName in customTemplates.compactMap(\.coverFileName) {
-            coverStore.deleteCover(fileName: coverFileName)
-        }
         challenges = []
-        customTemplates = []
         account?.signOut()
         effects.resetNotificationPreferences()
     }
@@ -469,18 +465,75 @@ final class ChallengeStore {
     }
 
     /// Moves a freshly recorded clip into permanent storage and marks the card done.
+    ///
+    /// `recordedAt` is when the take was filmed. Straight from the camera that
+    /// is now; a draft filed later has its own time and passes it, otherwise
+    /// the card — and every friend's copy of it — says the moment happened
+    /// when somebody tidied their drafts.
+    ///
+    /// `take` only matters when the moment already has a clip. The default,
+    /// `.replace(nil)`, is 重拍 on take 1 and what every caller did before a
+    /// moment could hold more than one take; only 再拍一段 passes `.append`.
     func saveClip(
         from tempURL: URL,
         day: Int,
         challengeID: UUID,
-        overlayText: String? = nil
+        overlayText: String? = nil,
+        captions: [Caption]? = nil,
+        recordedAt: Date = .now,
+        take: TakeTarget = .replace(nil)
     ) {
+        // A draft filed into a story brings every caption it had; the camera
+        // hands over the one line typed while filming.
+        let captions = (captions ?? .single(overlayText)).drawable
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
-        guard let fileName = fileStore.storeClip(from: tempURL, day: day, challengeID: challengeID) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
-        challenges[ci].cards[idx].clipFileName = fileName
-        challenges[ci].cards[idx].recordedAt = .now
-        challenges[ci].cards[idx].overlayText = overlayText
+
+        // 重拍 replaces the take you were looking at, file and room record
+        // both, so friends see the new one in its place. 再拍一段 keeps every
+        // take and adds the new one under its own file and its own record;
+        // take 1 stays exactly where every version of the app expects it.
+        let card = challenges[ci].cards[idx]
+        let extraIndex: Int? = switch take {
+        case .replace(let id?): card.moreTakes.firstIndex { $0.id == id }
+        case .replace(nil), .append: nil
+        }
+        let writesTakeOne = card.clipFileName == nil || take == .replace(nil)
+
+        let fileName: String
+        let takeID: UUID?
+        if writesTakeOne {
+            guard let stored = fileStore.storeClip(from: tempURL, day: day, challengeID: challengeID) else { return }
+            fileName = stored
+            takeID = nil
+            challenges[ci].cards[idx].clipFileName = fileName
+            challenges[ci].cards[idx].recordedAt = recordedAt
+            challenges[ci].cards[idx].captions = captions
+        } else if let t = extraIndex {
+            // Same take id, so the same file name and the same room record.
+            let id = card.moreTakes[t].id
+            guard let stored = fileStore.storeExtraTake(
+                from: tempURL, day: day, takeID: id, challengeID: challengeID) else { return }
+            fileName = stored
+            takeID = id
+            challenges[ci].cards[idx].moreTakes[t].fileName = stored
+            challenges[ci].cards[idx].moreTakes[t].recordedAt = recordedAt
+            challenges[ci].cards[idx].moreTakes[t].captions = captions
+        } else {
+            // 再拍一段 — or 重拍 on a take that was gone by the time the camera
+            // handed back, where keeping the footage beats dropping it.
+            let id = UUID()
+            // `storeExtraTake` never deletes; nil means nothing was kept, and
+            // nothing is touched — never "fall back" to `storeClip`, which
+            // clears `dayN.*` first.
+            guard let stored = fileStore.storeExtraTake(
+                from: tempURL, day: day, takeID: id, challengeID: challengeID) else { return }
+            fileName = stored
+            takeID = id
+            challenges[ci].cards[idx].moreTakes.append(ClipTake(
+                id: id, fileName: stored, recordedAt: recordedAt,
+                captions: captions))
+        }
 
         // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {
@@ -489,7 +542,8 @@ final class ChallengeStore {
                 if await roomSync.uploadClip(
                     code: code, day: day, authorID: me.id,
                     authorName: me.displayName, fileURL: dest,
-                    overlayText: overlayText
+                    captions: captions, recordedAt: recordedAt,
+                    takeID: takeID
                 ) {
                     await syncRoom(challengeID)
                 }
@@ -509,44 +563,85 @@ final class ChallengeStore {
     /// practice meant never: most captions are written *after* the take, so a
     /// friend saw the words you typed at record time and nothing you changed
     /// afterwards — including a caption you deleted.
-    func updateOverlayText(_ text: String?, day: Int, challengeID: UUID) {
+    ///
+    /// `takeID` nil is take 1 (the card's own fields); otherwise the extra take
+    /// with that id. A take id the card doesn't have changes nothing — it must
+    /// not land on take 1, whose words are somebody else's take.
+    func updateOverlayText(_ text: String?, day: Int, challengeID: UUID, takeID: UUID? = nil) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
         else { return }
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let words = trimmed?.isEmpty == true ? nil : trimmed
-        challenges[ci].cards[idx].overlayText = words
-        pushCaptionToRoom(words, day: day, challengeIndex: ci)
-        // Clearing the words clears where they were. Otherwise a caption
-        // deleted and typed again would reappear wherever the last one was
-        // dragged to, which reads as the app remembering something you threw
-        // away.
-        if words == nil { challenges[ci].cards[idx].captionSticker = nil }
+        if let takeID {
+            guard let t = challenges[ci].cards[idx].moreTakes.firstIndex(where: { $0.id == takeID })
+            else { return }
+            challenges[ci].cards[idx].moreTakes[t].overlayText = words
+            if words == nil { challenges[ci].cards[idx].moreTakes[t].captionSticker = nil }
+        } else {
+            challenges[ci].cards[idx].overlayText = words
+            // Clearing the words clears where they were. Otherwise a caption
+            // deleted and typed again would reappear wherever the last one was
+            // dragged to, which reads as the app remembering something you
+            // threw away.
+            if words == nil { challenges[ci].cards[idx].captionSticker = nil }
+        }
+        pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
+    }
+
+    /// Every caption on one take at once — what the full-screen editor saves
+    /// after each change. Blank ones are dropped. `takeID` as in
+    /// `updateOverlayText`; pushed to the room the same way.
+    func updateCaptions(_ captions: [Caption], day: Int, challengeID: UUID, takeID: UUID? = nil) {
+        guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
+              let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
+        else { return }
+        let kept = captions.drawable
+        if let takeID {
+            guard let t = challenges[ci].cards[idx].moreTakes.firstIndex(where: { $0.id == takeID })
+            else { return }
+            guard challenges[ci].cards[idx].moreTakes[t].captions != kept else { return }
+            challenges[ci].cards[idx].moreTakes[t].captions = kept
+        } else {
+            guard challenges[ci].cards[idx].captions != kept else { return }
+            challenges[ci].cards[idx].captions = kept
+        }
+        pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
     }
 
     /// Where the caption sits on the clip, and how it's drawn.
     ///
     /// Written on every drag, so it takes the finished sticker rather than a
     /// delta — the gesture owns the arithmetic, the card owns the result.
-    func updateCaptionSticker(_ sticker: CaptionSticker?, day: Int, challengeID: UUID) {
+    /// `takeID` as in `updateOverlayText`.
+    func updateCaptionSticker(_ sticker: CaptionSticker?, day: Int, challengeID: UUID, takeID: UUID? = nil) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
         else { return }
-        challenges[ci].cards[idx].captionSticker = sticker
+        if let takeID {
+            guard let t = challenges[ci].cards[idx].moreTakes.firstIndex(where: { $0.id == takeID })
+            else { return }
+            challenges[ci].cards[idx].moreTakes[t].captionSticker = sticker
+        } else {
+            challenges[ci].cards[idx].captionSticker = sticker
+        }
     }
 
-    /// Sends an edited caption to the room, when there is one to send to.
+    /// Sends a take's captions to the room, when there is one to send to.
     ///
-    /// Words only. Where the caption sits is `CaptionSticker`, which rides the
-    /// clip record's own field and is rewritten by the next upload — moving
-    /// that to its own round trip is a bigger change than this, and a friend
-    /// reading the wrong *position* is a much smaller wrong than a friend
-    /// reading words you deleted.
-    private func pushCaptionToRoom(_ words: String?, day: Int, challengeIndex ci: Int) {
-        guard let code = challenges[ci].roomCode, let me = account?.account else { return }
+    /// Every caption, position and look included — `captionsJSON` carries
+    /// them, `overlayText` carries the first one's words for 1.5 (31). Read
+    /// off the card when the push is made, so it sends what is saved now.
+    private func pushCaptionsToRoom(day: Int, takeID: UUID?, challengeIndex ci: Int) {
+        guard let code = challenges[ci].roomCode, let me = account?.account,
+              let card = challenges[ci].cards.first(where: { $0.day == day })
+        else { return }
+        let captions = takeID.map { id in
+            card.moreTakes.first { $0.id == id }?.captions ?? []
+        } ?? card.captions
         Task { @MainActor in
             await roomSync.updateClipCaption(
-                code: code, day: day, authorID: me.id, overlayText: words)
+                code: code, day: day, authorID: me.id, captions: captions, takeID: takeID)
         }
     }
 
@@ -599,6 +694,30 @@ final class ChallengeStore {
                     targetAuthorID: targetAuthorID, emoji: emoji, on: nowOn)
             }
         }
+    }
+
+    // MARK: - 拍一拍
+
+    /// Whether I already poked this friend in this room today.
+    func hasPokedToday(challengeID: UUID, targetAuthorID: String) -> Bool {
+        guard let code = challenge(challengeID)?.roomCode else { return false }
+        return PokeLimiter().hasPoked(code: code, targetAuthorID: targetAuthorID)
+    }
+
+    /// Nudge a friend who hasn't filmed today. Once per friend per day; the
+    /// CloudKit write is best-effort like a reaction's.
+    @discardableResult
+    func poke(challengeID: UUID, targetAuthorID: String) -> Bool {
+        guard let code = challenge(challengeID)?.roomCode,
+              let acct = account?.account, targetAuthorID != acct.id,
+              PokeLimiter().claim(code: code, targetAuthorID: targetAuthorID)
+        else { return false }
+        Task { @MainActor in
+            await roomSync.sendPoke(
+                code: code, authorID: acct.id, authorName: acct.displayName,
+                targetAuthorID: targetAuthorID)
+        }
+        return true
     }
 
     /// Append a comment to a day's clip. Empty/whitespace-only text is ignored.
@@ -668,21 +787,40 @@ final class ChallengeStore {
             let remoteReactions = roomSync.remoteReactions[code] ?? []
             let remoteComments = roomSync.remoteComments[code] ?? []
             let myID = account?.account?.id
-            // Days of mine the room already has. Anything else I've filmed is
-            // still only on this device, and belongs in the list once.
-            let uploaded = Set(remote.filter { $0.authorID == myID }.map(\.day))
+            // Takes of mine the room already has, by record name — a day is no
+            // longer enough, since one moment can hold several of my takes and
+            // the room can have take 1 while take 2 is still only here.
+            // Anything else I've filmed belongs in the list once.
+            let uploaded = Set(remote.filter { $0.authorID == myID }
+                .map { Self.takeKey(day: $0.day, takeID: takeID(of: $0, code: code)) })
             let pending = localClips(in: challenge, presenter: presenter)
-                .filter { !uploaded.contains($0.day) }
+                .filter { !uploaded.contains(Self.takeKey(day: $0.day, takeID: $0.takeID)) }
             return (remote
                 .map { clip in
                     let isMe = clip.authorID == (account?.account?.id ?? "")
                     let card = isMe ? challenge.cards.first { c in c.day == clip.day } : nil
-                    
-                    let emojis = isMe 
+                    let take = takeID(of: clip, code: code)
+                    // Reactions and comments are addressed to a person's
+                    // moment, not to one take of it, so they ride take 1 only —
+                    // on every take, the film would float the same 🔥 twice.
+                    let carriesInteractions = take == nil
+                    // My own words come off this phone's card: it is where
+                    // they were edited, and until `captionsJSON` is deployed
+                    // the room's copy only knows the first one.
+                    let localCaptions: [Caption]?
+                    if !isMe {
+                        localCaptions = nil
+                    } else if let take {
+                        localCaptions = card?.moreTakes.first { $0.id == take }?.captions
+                    } else {
+                        localCaptions = card?.captions
+                    }
+
+                    let emojis = !carriesInteractions ? [] : isMe
                         ? (card?.reactions.map(\.emoji) ?? [])
                         : remoteReactions.filter { $0.day == clip.day && $0.targetAuthorID == clip.authorID }.map(\.emoji)
-                        
-                    let commentLines = isMe
+
+                    let commentLines = !carriesInteractions ? [] : isMe
                         ? (card.map(Self.commentLines(for:)) ?? [])
                         : remoteComments
                             .filter { $0.day == clip.day && $0.targetAuthorID == clip.authorID }
@@ -693,36 +831,74 @@ final class ChallengeStore {
                         day: clip.day, url: clip.localURL, authorName: clip.authorName,
                         authorID: clip.authorID,
                         label: challenge.isTimeOnly ? nil : presenter.title(forSlot: clip.day),
-                        overlayText: clip.overlayText,
-                        captionSticker: clip.captionSticker,
+                        captions: localCaptions ?? clip.captions,
                         recordedAt: clip.recordedAt,
                         emoji: emojis,
                         comments: commentLines,
-                        key: clip.id)
+                        key: clip.id,
+                        takeID: take)
                 } + pending)
-                .sorted { ($0.day, $0.authorName ?? "") < ($1.day, $1.authorName ?? "") }
+                // Stable within a person's moment too: take 1, then the
+                // others in the order they were filmed.
+                .sorted {
+                    ($0.day, $0.authorName ?? "", $0.takeID == nil ? 0 : 1, $0.recordedAt ?? .distantPast)
+                        < ($1.day, $1.authorName ?? "", $1.takeID == nil ? 0 : 1, $1.recordedAt ?? .distantPast)
+                }
         }
         return localClips(in: challenge, presenter: presenter)
     }
 
-    /// My own clips, from the cards on this device.
+    /// Which take a room clip is, read off its record name. Nil for take 1 —
+    /// and for any name this app didn't write, which is how every clip from
+    /// before takes existed reads.
+    private func takeID(of clip: CloudKitService.RemoteClip, code: String) -> UUID? {
+        CloudKitService.takeID(
+            fromClipRecordName: clip.id, code: code, authorID: clip.authorID, day: clip.day)
+    }
+
+    /// One string per take of one moment: the room copy and the local copy of
+    /// the same take derive the same one.
+    private static func takeKey(day: Int, takeID: UUID?) -> String {
+        "\(day)#\(takeID?.uuidString ?? "1")"
+    }
+
+    /// My own clips, from the cards on this device: one per take, take 1 first.
     private func localClips(
         in challenge: Challenge, presenter: ChallengePresenter
     ) -> [DayClip] {
-        challenge.cards.compactMap { card in
-            clipURL(for: card, in: challenge.id).map {
+        challenge.cards.flatMap { card -> [DayClip] in
+            // Extra takes only ever exist beside a take 1; a card whose take 1
+            // file name is gone has nothing to show.
+            guard let first = clipURL(for: card, in: challenge.id) else { return [] }
+            let authorName = account?.account?.displayName
+            let authorID = account?.account?.id ?? RoomProgress.soloAuthorID
+            let label = challenge.isTimeOnly ? nil : presenter.title(forSlot: card.day)
+            let takeOne = DayClip(
+                day: card.day,
+                url: first,
+                authorName: authorName,
+                authorID: authorID,
+                label: label,
+                captions: card.captions,
+                recordedAt: card.recordedAt,
+                emoji: card.reactions.map(\.emoji),
+                comments: Self.commentLines(for: card))
+            // Keyed apart from take 1's "dayN" — `DayClip.id` feeds SwiftUI
+            // `ForEach`, and two clips with one id is one clip on screen.
+            // Interactions stay on take 1 (see `recordedClips`).
+            let others = card.moreTakes.map { take in
                 DayClip(
                     day: card.day,
-                    url: $0,
-                    authorName: account?.account?.displayName,
-                    authorID: account?.account?.id ?? RoomProgress.soloAuthorID,
-                    label: challenge.isTimeOnly ? nil : presenter.title(forSlot: card.day),
-                    overlayText: card.overlayText,
-                    captionSticker: card.captionSticker,
-                    recordedAt: card.recordedAt,
-                    emoji: card.reactions.map(\.emoji),
-                    comments: Self.commentLines(for: card))
+                    url: fileStore.clipURL(fileName: take.fileName, challengeID: challenge.id),
+                    authorName: authorName,
+                    authorID: authorID,
+                    label: label,
+                    captions: take.captions,
+                    recordedAt: take.recordedAt,
+                    key: "day\(card.day)_\(take.id.uuidString)",
+                    takeID: take.id)
             }
+            return [takeOne] + others
         }
     }
 

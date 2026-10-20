@@ -51,38 +51,14 @@ final class ChineseCopyPurityTests: XCTestCase {
         XCTAssertTrue(missing.isEmpty, "prompts with no English: \(missing)")
     }
 
-    // MARK: Templates
+    // MARK: Moment suggestions
 
-    func testEveryBuiltInTemplateIsNamedAndDescribedInChinese() {
-        var untranslated: [String] = []
-        for template in ChallengeTemplate.oneDayBuiltins + ChallengeTemplate.sevenDayBuiltins {
-            // `liveWithMe` carries a stable identity key as its English name,
-            // which is not display copy; its Chinese name is what shows.
-            if template.name.zh.isEmpty || looksEnglish(template.name.zh) {
-                untranslated.append("name \(template.name.en): \(template.name.zh)")
-            }
-            // A blurb is optional; one that exists has to be translated.
-            if let blurb = template.blurb,
-               blurb.zh.isEmpty || blurb.zh == blurb.en || looksEnglish(blurb.zh) {
-                untranslated.append("blurb \(template.name.en): \(blurb.zh)")
-            }
-        }
-        XCTAssertTrue(
-            untranslated.isEmpty,
-            "templates that would show in English on a Chinese phone: \(untranslated.sorted())")
-    }
-
-    /// A template whose key isn't in the catalogue falls through to the raw
+    /// A suggestion whose key isn't in the catalogue falls through to the raw
     /// key — `wake_up` rather than 起床 — which is the other way English
     /// reaches a Chinese screen, and the one no amount of translating fixes.
-    func testEveryTemplatePromptKeyResolvesInTheCatalogue() {
-        var dangling: [String] = []
-        for template in ChallengeTemplate.oneDayBuiltins + ChallengeTemplate.sevenDayBuiltins {
-            for key in template.momentKeys ?? [] where MomentCatalog.entries[key] == nil {
-                dangling.append("\(template.name.en) → \(key)")
-            }
-        }
-        XCTAssertTrue(dangling.isEmpty, "prompt keys with no catalogue entry: \(dangling)")
+    func testEverySuggestedMomentKeyResolvesInTheCatalogue() {
+        let dangling = MomentCatalog.suggestionPool.filter { MomentCatalog.entries[$0] == nil }
+        XCTAssertTrue(dangling.isEmpty, "suggestion keys with no catalogue entry: \(dangling)")
     }
 
     // MARK: The rule itself

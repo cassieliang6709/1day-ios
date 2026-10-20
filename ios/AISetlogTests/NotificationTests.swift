@@ -82,7 +82,7 @@ final class NotificationTests: XCTestCase {
             startDate: now,
             mode: .oneDay,
             cardCount: 7,
-            templateName: ChallengeTemplate.liveWithMeIdentityKey)
+            templateName: Challenge.timeOnlyTemplateName)
 
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
@@ -91,6 +91,39 @@ final class NotificationTests: XCTestCase {
 
         XCTAssertEqual(plan?.body, Strings.timeOnlyReminder)
         XCTAssertFalse(plan?.body.contains("Day") == true)
+    }
+
+    /// A room doesn't number its days on screen (1.5), so its reminders
+    /// can't either; a solo week still says which day it is.
+    func testSharedRoomReminderNamesNoDay() throws {
+        let now = try date(2026, 7, 25, 12, 0)
+        let shared = makeChallenge(
+            title: "Together", startDate: now, mode: .sevenDay, cardCount: 3,
+            roomCode: "ABCDEF")
+        let solo = makeChallenge(
+            title: "Solo", startDate: now, mode: .sevenDay, cardCount: 3)
+
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
+        let roomPlans = ReminderService.plannedReminders(
+            for: [shared], now: now, calendar: calendar, hour: 20, minute: 30)
+        let soloPlans = ReminderService.plannedReminders(
+            for: [solo], now: now, calendar: calendar, hour: 20, minute: 30)
+
+        XCTAssertFalse(roomPlans.isEmpty)
+        XCTAssertTrue(roomPlans.allSatisfy { $0.body == Strings.roomReminderBody(prompt: nil) })
+        XCTAssertTrue(roomPlans.allSatisfy { !$0.body.contains("天") })
+        XCTAssertTrue(soloPlans.allSatisfy { $0.body.contains("第 \($0.day) 天") })
+    }
+
+    /// The push for a friend's clip says who, not which day.
+    func testRoomClipActivityNamesNoDay() {
+        defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
+        UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.roomClipActivity(name: "小蓝"), "小蓝 刚拍了一段")
+        XCTAssertEqual(Strings.roomClipActivity(name: nil), "有人刚拍了一段")
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
+        XCTAssertEqual(Strings.roomClipActivity(name: "Ana"), "Ana just filmed a clip")
     }
 
     func testNotificationRouteParsesCloudKitPayload() {

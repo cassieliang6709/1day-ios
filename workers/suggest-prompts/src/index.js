@@ -24,6 +24,20 @@ const MAX_INTENT = 140;
 const MIN_COUNT = 3;
 const MAX_COUNT = 7;
 
+/**
+ * Past these a "prompt" is a sentence, which reads badly on a recording
+ * screen. The model is asked for 8 characters / 5 words; this is the backstop
+ * for when it doesn't listen, loose enough not to throw away near misses.
+ */
+const MAX_PROMPT_CHARS = 12;
+const MAX_PROMPT_WORDS = 8;
+
+/**
+ * Under the app's own timeout, so a slow model comes back as a 502 the app can
+ * retry, rather than as a client-side timeout with nothing left to retry in.
+ */
+const UPSTREAM_TIMEOUT_MS = 7000;
+
 /** Per device, per hour. Making a story is a once-a-day act; 20 is generous. */
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -37,20 +51,21 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
  */
 const recentCalls = new Map();
 
-function overRateLimit(deviceKey, now) {
-  const window = (recentCalls.get(deviceKey) ?? []).filter(
+function overRateLimit(deviceKey, now, calls = recentCalls, limit = RATE_LIMIT) {
+  const window = (calls.get(deviceKey) ?? []).filter(
     (t) => now - t < RATE_WINDOW_MS
   );
   window.push(now);
-  recentCalls.set(deviceKey, window);
+  calls.set(deviceKey, window);
 
-  if (recentCalls.size > 5000) {
-    for (const [key, times] of recentCalls) {
-      if (times.every((t) => now - t >= RATE_WINDOW_MS)) recentCalls.delete(key);
+  if (calls.size > 5000) {
+    for (const [key, times] of calls) {
+      if (times.every((t) => now - t >= RATE_WINDOW_MS)) calls.delete(key);
     }
   }
-  return window.length > RATE_LIMIT;
+  return window.length > limit;
 }
+
 
 function systemPrompt(count, language) {
   const inChinese = language !== 'en';
@@ -60,7 +75,7 @@ function systemPrompt(count, language) {
     'Rules:',
     '- Each prompt is a thing to point a camera at, in the order it would happen through the day.',
     '- Present or future tense, never past: the day has not happened yet.',
-    `- Short. ${inChinese ? 'At most 8 Chinese characters each.' : 'At most 5 words each.'}`,
+    `- Short. ${inChinese ? 'At most 8 Chinese characters each — count them. "关灯拍空房间" is right; "关上灯最后拍一下空房间" is too long.' : 'At most 5 words each — count them. "The empty room" is right; "Turning off the lights in the empty room" is too long.'}`,
     '- Concrete and filmable. "The first box" beats "reflect on the move".',
     `- Write them in ${inChinese ? 'Simplified Chinese' : 'English'}.`,
     '- No numbering, no trailing punctuation, no commentary.',
@@ -74,7 +89,7 @@ function systemPrompt(count, language) {
  * the input that arrives malformed eventually — so accept the object, accept a
  * bare array, and dig either out of surrounding prose or a code fence.
  */
-export function parsePrompts(text, count) {
+export function parsePrompts(text, count, language = 'zh') {
   const candidates = [
     sliceBetween(text, '{', '}'),
     sliceBetween(text, '[', ']'),
@@ -94,6 +109,7 @@ export function parsePrompts(text, count) {
       .filter((p) => typeof p === 'string')
       .map((p) => p.trim())
       .filter(Boolean)
+      .filter((p) => !tooLong(p, language))
       .slice(0, count);
 
     if (prompts.length >= MIN_COUNT) return prompts;
@@ -101,8 +117,8 @@ export function parsePrompts(text, count) {
   return null;
 }
 
-export function parseStory(text, count) {
-  const prompts = parsePrompts(text, count);
+export function parseStory(text, count, language = 'zh') {
+  const prompts = parsePrompts(text, count, language);
   if (!prompts) return null;
   let title;
   try {
@@ -112,6 +128,13 @@ export function parseStory(text, count) {
     }
   } catch { /* Legacy bare arrays still work. */ }
   return title ? { title, prompts } : { prompts };
+}
+
+/** Dropped rather than cut: half a sentence is worse than one fewer prompt. */
+function tooLong(prompt, language) {
+  return language === 'en'
+    ? prompt.split(/\s+/).length > MAX_PROMPT_WORDS
+    : [...prompt].length > MAX_PROMPT_CHARS;
 }
 
 function sliceBetween(text, open, close) {
@@ -148,13 +171,17 @@ export default {
     if (url.pathname !== '/api/suggest-prompts' && url.pathname !== '/') {
       return json({ error: 'not_found' }, 404);
     }
+    // The app sends this when the composer opens, so the TLS handshake — the
+    // slow part on a phone network — is done before anyone taps the button.
+    if (request.method === 'HEAD') {
+      return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+    }
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'method_not_allowed' }), {
         status: 405,
         headers: { 'content-type': 'application/json', allow: 'POST' },
       });
     }
-
     const key = env.DEEPSEEK_API_KEY;
     if (!key) return json({ error: 'unavailable' }, 503);
 
@@ -198,14 +225,16 @@ export default {
           // Generous, because the failure mode of being wrong about this is a
           // truncated reply, and unused tokens cost nothing.
           max_tokens: 1200,
-          temperature: 1.0,
+          // Lower than the default so the length rule is followed more often;
+          // still loose enough that two days of moving house don't read alike.
+          temperature: 0.8,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt(count, language) },
             { role: 'user', content: intent },
           ],
         }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       });
 
       if (!upstream.ok) {
@@ -217,7 +246,8 @@ export default {
       const payload = await upstream.json();
       const story = parseStory(
         String(payload?.choices?.[0]?.message?.content ?? ''),
-        count
+        count,
+        language
       );
       if (!story) return json({ error: 'unavailable' }, 502);
 

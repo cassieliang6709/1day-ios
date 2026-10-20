@@ -17,41 +17,54 @@ final class LocalFormalMomentUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["home-room-demo"].waitForExistence(timeout: 15))
         app.buttons["home-room-demo"].tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertFalse(app.staticTexts["LOCAL-DEMO"].exists)
         let moment = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "一起出发")).firstMatch
         XCTAssertTrue(moment.exists)
+        // Mine is the first column, so its tile is the first match.
         moment.tap()
-        let caption = app.buttons["加字幕"]
+        let caption = app.buttons["moment-caption"]
         XCTAssertTrue(caption.waitForExistence(timeout: UITestWait.media))
-        // One layout now: a big inset picture with 加字幕 / 重拍 / 聊天 side by
-        // side under it. 全屏看 is gone, and so is the mode it led to. The
-        // regression this test exists for is unchanged: every one of the three
-        // has to be on screen and hittable.
+        // A tile opens that one take full screen — not the moment with
+        // everyone stitched together. The video is the screen and 加字幕 / 重拍
+        // / 再拍一段 / 聊天 float over its bottom edge; every one of them has
+        // to be on screen and hittable.
         XCTAssertTrue(app.buttons["moment-caption"].isHittable)
         XCTAssertTrue(app.buttons["moment-rerecord"].isHittable)
+        XCTAssertTrue(app.buttons["moment-add-take"].isHittable)
         XCTAssertFalse(app.buttons["moment-full-screen"].exists)
+
+        // Two captions on one take: 加字幕 always adds another.
+        for words in ["早上好", "第一杯咖啡"] {
+            caption.tap()
+            XCTAssertTrue(app.buttons["caption-done"].waitForExistence(timeout: 10))
+            app.typeText(words)
+            app.buttons["caption-done"].tap()
+            XCTAssertTrue(caption.waitForExistence(timeout: 10))
+        }
+        let stickers = app.staticTexts.matching(identifier: "caption-text")
+        XCTAssertEqual(stickers.count, 2, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["早上好"].exists)
+        XCTAssertTrue(app.staticTexts["第一杯咖啡"].exists)
+
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Production one-layout StitchedMomentPreview"
+        screenshot.name = "Full-screen clip editor with two captions"
         screenshot.lifetime = .keepAlways
         add(screenshot)
         let chat = app.buttons["moment-chat"]
         XCTAssertTrue(chat.isHittable)
         chat.tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        // The composer says what the next message will be tagged with. It now
-        // carries the moment's own prompt after the number, so match the part
-        // that is the contract — the moment this chat was opened from.
-        XCTAssertTrue(
-            app.staticTexts
-                .matching(NSPredicate(format: "label CONTAINS %@", "第 1 个瞬间"))
-                .firstMatch.exists)
-        app.buttons["退出演示"].tap()
+        // The composer says what the next message will be tagged with: the
+        // moment's own name. It led with 「第 1 个瞬间」 until rooms stopped
+        // numbering their moments on screen (1.5).
+        XCTAssertTrue(app.staticTexts["chat-moment-about"].label.contains("一起出发"))
+        app.buttons["chat-done"].tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))
-        let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "关闭", "xmark"])).firstMatch
+        let close = app.buttons["moment-close"]
         XCTAssertTrue(close.exists, app.debugDescription)
         close.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
         // Reopening must use this owner's still-readable scoped cache.
         moment.tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))

@@ -5,23 +5,54 @@ import Foundation
 struct RoomSyncTransport {
     var fetchClips: @MainActor (String, URL) async throws -> [CloudKitService.RemoteClip]
     var fetchInteractions: @MainActor (String) async throws -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
-    var uploadClip: @MainActor (String, Int, String, String, URL, String?) async throws -> Void
+    /// code, day, authorID, authorName, file, captions, when the take was
+    /// filmed — which is not when this runs (see `CloudKitService.uploadClip`)
+    /// — and which take (nil = take 1).
+    var uploadClip: @MainActor (String, Int, String, String, URL, [Caption], Date, UUID?) async throws -> Void
     /// Caption-only rewrite on a clip already in the room: code, day, authorID,
-    /// words.
-    var updateClipCaption: @MainActor (String, Int, String, String?) async throws -> Void
+    /// every caption, take (nil = take 1).
+    var updateClipCaption: @MainActor (String, Int, String, [Caption], UUID?) async throws -> Void
     var setReaction: @MainActor (String, Int, String, String, String, String, Bool) async throws -> Void
     var postComment: @MainActor (String, Int, String, String, String, String, String) async throws -> Void
     var deleteComment: @MainActor (String) async throws -> Void
+    /// 拍一拍: code, authorID, authorName, targetAuthorID.
+    var sendPoke: @MainActor (String, String, String, String) async throws -> Void = { _, _, _, _ in
+        throw CancellationError()
+    }
+    /// The room behind a join code. Defaulted to fail, like the two below: a
+    /// transport that doesn't say how to reach a room never reaches CloudKit.
+    var fetchRoom: @MainActor (String) async throws -> CloudKitService.RemoteRoom = { _ in
+        throw CancellationError()
+    }
+    /// My `Member` record for a room I just joined: code, authorID,
+    /// displayName, joinedAt.
+    var saveMember: @MainActor (String, String, String, Date) async throws -> Void = { _, _, _, _ in
+        throw CancellationError()
+    }
+    /// My avatar and today's mood on my `Member` record in one room.
+    /// Defaulted to fail, like `saveMember`.
+    var saveMemberProfile: @MainActor (CloudKitService.MemberProfileWrite) async throws -> Void = { _ in
+        throw CancellationError()
+    }
+    /// Everyone's `Member` record in a room: code, where to cache avatars.
+    var fetchMembers: @MainActor (String, URL) async throws -> [CloudKitService.RemoteMember] = { _, _ in
+        throw CancellationError()
+    }
 
     static var live: RoomSyncTransport {
         RoomSyncTransport(
             fetchClips: { try await CloudKitService.fetchClips(code: $0, into: $1) },
             fetchInteractions: { try await CloudKitService.fetchInteractions(code: $0) },
-            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, overlayText: $5) },
-            updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, overlayText: $3) },
+            uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, captions: $5, recordedAt: $6, takeID: $7) },
+            updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, captions: $3, takeID: $4) },
             setReaction: { try await CloudKitService.setReaction(code: $0, day: $1, authorID: $2, authorName: $3, targetAuthorID: $4, emoji: $5, on: $6) },
             postComment: { try await CloudKitService.postComment(code: $0, day: $1, id: $2, text: $3, authorID: $4, authorName: $5, targetAuthorID: $6) },
-            deleteComment: { try await CloudKitService.deleteComment(id: $0) })
+            deleteComment: { try await CloudKitService.deleteComment(id: $0) },
+            sendPoke: { try await CloudKitService.sendPoke(code: $0, authorID: $1, authorName: $2, targetAuthorID: $3) },
+            fetchRoom: { try await CloudKitService.fetchRoom(code: $0) },
+            saveMember: { try await CloudKitService.saveMember(code: $0, authorID: $1, displayName: $2, joinedAt: $3) },
+            saveMemberProfile: { try await CloudKitService.saveMemberProfile($0) },
+            fetchMembers: { try await CloudKitService.fetchMembers(code: $0, into: $1) })
     }
 }
 
@@ -51,14 +82,21 @@ final class LocalRoomSyncSource {
                 try check(code)
                 return ([], [])
             },
-            uploadClip: { [self] code, _, _, _, _, _ in try rejectWrite(code) },
-            updateClipCaption: { [self] code, _, _, _ in try rejectWrite(code) },
+            uploadClip: { [self] code, _, _, _, _, _, _, _ in try rejectWrite(code) },
+            updateClipCaption: { [self] code, _, _, _, _ in try rejectWrite(code) },
             setReaction: { [self] code, _, _, _, _, _, _ in try rejectWrite(code) },
             postComment: { [self] code, _, _, _, _, _, _ in try rejectWrite(code) },
             deleteComment: { [self] _ in
                 guard !closed else { throw Failure.closed }
                 throw Failure.readOnly
-            })
+            },
+            sendPoke: { [self] code, _, _, _ in try rejectWrite(code) },
+            // A demo room is joined from fixtures, never by code.
+            fetchRoom: { [self] code in
+                try check(code)
+                throw Failure.readOnly
+            },
+            saveMember: { [self] code, _, _, _ in try rejectWrite(code) })
     }
 
     /// Local fixture administration only; remote transport writes remain rejected.
@@ -71,7 +109,7 @@ final class LocalRoomSyncSource {
         clips[index] = .init(id: old.id, day: old.day, authorID: old.authorID,
             authorName: old.authorName, recordedAt: old.recordedAt,
             localURL: url, overlayText: old.overlayText,
-            captionSticker: old.captionSticker)
+            captionSticker: old.captionSticker, captionsJSON: old.captionsJSON)
     }
 
     func close() {

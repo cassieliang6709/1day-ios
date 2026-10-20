@@ -85,6 +85,14 @@ enum VideoStitcher {
         /// filmed in their light, not yours, and they never agreed to it. Nil
         /// means a solo film, where every clip is already yours.
         var lookAuthorID: String?
+        /// Which takes make the film, by `DayClip.id`. Nil keeps every take
+        /// handed in — the film as it always was.
+        var keptClipIDs: Set<String>?
+        /// Takes that stand still in the shared-room grid: `DayClip.id` →
+        /// seconds into the take. That cell shows the one frame for the whole
+        /// moment while everyone else keeps playing, and its sound is left
+        /// out. The sequential film has no cells, so it ignores this.
+        var freezeFrames: [String: Double] = [:]
         static let `default` = Options()
     }
 
@@ -103,11 +111,13 @@ enum VideoStitcher {
     }
 
     private struct LoadedClip {
+        /// `DayClip.id`, so `Options.freezeFrames` can find its take.
+        let id: String
         let day: Int
         let label: String?
         let authorName: String?
-        let overlayText: String?
-        let captionSticker: CaptionSticker?
+        /// The clip's own words, every one of them, each burned where it was put.
+        let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
@@ -121,6 +131,12 @@ enum VideoStitcher {
         let audioRange: CMTimeRange
         let naturalSize: CGSize
         let preferredTransform: CGAffineTransform
+        /// One frame of the take, for holding it still. Invalid when the track
+        /// didn't say; `cellSegments` falls back to 1/30 s.
+        var frameDuration: CMTime = .invalid
+        /// Baked by a camera that prints its own date (`CameraStyle`), so the
+        /// film's date pill stays off this clip.
+        var hasCameraStamp = false
 
         var duration: CMTime { videoRange.duration }
 
@@ -154,24 +170,34 @@ enum VideoStitcher {
         let day: Int
         let label: String?
         let authorName: String?
-        let overlayText: String?
-        let captionSticker: CaptionSticker?
+        /// The clip's own words, every one of them, each burned where it was put.
+        let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
         let start: Double
         let end: Double
+        var hasCameraStamp = false
     }
 
     // MARK: - Entry point
 
-    static func stitch(clips: [DayClip], options: Options = .default) async throws -> URL {
+    static func stitch(clips allClips: [DayClip], options: Options = .default) async throws -> URL {
+        // Before the look pass, so a take left out of the film isn't graded.
+        let clips = kept(allClips, ids: options.keptClipIDs)
         guard !clips.isEmpty else { throw StitchError.noClips }
 
         #if !targetEnvironment(simulator)
         let drawCaptions = options.showDayCaptions
         let titleCard = options.titleCard
         #endif
+
+        // Read before the look pass: its graded copies aren't promised to carry
+        // the original's metadata.
+        var cameraStamped: Set<String> = []
+        for clip in clips where await CameraStyleBaker.hasCameraStamp(clip.url) {
+            cameraStamped.insert(clip.id)
+        }
 
         // ---- The look, one clip at a time, before anything is stitched ------
         let (source, scratch) = try await filteredClips(
@@ -191,15 +217,18 @@ enum VideoStitcher {
             let transform = try await video.load(.preferredTransform)
             let audio = try await asset.loadTracks(withMediaType: .audio).first
             let audioRange = audio == nil ? CMTimeRange.zero : try await audio!.load(.timeRange)
+            let frameDuration = (try? await video.load(.minFrameDuration)) ?? .invalid
             loaded.append(LoadedClip(
+                id: clip.id,
                 day: clip.day, label: clip.label, authorName: clip.authorName,
-                overlayText: clip.overlayText,
-                captionSticker: clip.captionSticker,
+                captions: clip.captions,
                 recordedAt: clip.recordedAt,
                 emoji: clip.emoji, comments: clip.comments,
                 asset: asset, videoRange: videoRange, videoTrack: video,
                 audioTrack: audio, audioRange: audioRange,
-                naturalSize: naturalSize, preferredTransform: transform))
+                naturalSize: naturalSize, preferredTransform: transform,
+                frameDuration: frameDuration,
+                hasCameraStamp: cameraStamped.contains(clip.id)))
         }
         guard !loaded.isEmpty else { throw StitchError.noClips }
 
@@ -243,7 +272,7 @@ enum VideoStitcher {
         case .friendsTogether:
             try buildFriendsTogether(
                 loaded: loaded, into: composition, renderSize: renderSize,
-                sourceAspect: sourceAspect,
+                sourceAspect: sourceAspect, freezeFrames: options.freezeFrames,
                 startAt: titleOffset, instructions: &instructions,
                 audioParams: &audioParams, captions: &captions,
                 authorCaptions: &authorCaptions)
@@ -478,11 +507,11 @@ enum VideoStitcher {
             let fadeSeconds = CMTimeGetSeconds(fade)
             captions.append(CaptionWindow(
                 day: p.clip.day, label: p.clip.label, authorName: p.clip.authorName,
-                overlayText: p.clip.overlayText,
-                captionSticker: p.clip.captionSticker,
+                captions: p.clip.captions,
                 recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
-                end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds))
+                end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds,
+                hasCameraStamp: p.clip.hasCameraStamp))
         }
 
         // Audio tracks are added up front but only filled for clips that have
@@ -531,6 +560,7 @@ enum VideoStitcher {
         into composition: AVMutableComposition,
         renderSize: CGSize,
         sourceAspect: CGFloat,
+        freezeFrames: [String: Double] = [:],
         startAt: CMTime,
         instructions: inout [any AVVideoCompositionInstructionProtocol],
         audioParams: inout [AVMutableAudioMixInputParameters],
@@ -564,16 +594,21 @@ enum VideoStitcher {
                     preferredTrackID: kCMPersistentTrackID_Invalid)
                 else { throw StitchError.compositionFailed }
 
-                var clipCursor = cursor
-                while clipCursor < end {
-                    let duration = CMTimeMinimum(
-                        clip.videoRange.duration,
-                        CMTimeSubtract(end, clipCursor))
+                let freezeAt = freezeFrames[clip.id]
+                for segment in cellSegments(
+                    videoRange: clip.videoRange, momentDuration: groupDuration,
+                    freezeAt: freezeAt, frameDuration: clip.frameDuration) {
+                    let at = CMTimeAdd(cursor, segment.offset)
                     try videoTrack.insertTimeRange(
-                        CMTimeRange(start: clip.videoRange.start, duration: duration),
-                        of: clip.videoTrack,
-                        at: clipCursor)
-                    clipCursor = CMTimeAdd(clipCursor, duration)
+                        segment.source, of: clip.videoTrack, at: at)
+                    // A held frame: one frame inserted, then stretched over the
+                    // whole moment. No still image is made, so the cell keeps
+                    // the take's own orientation and the compositor's maths.
+                    if segment.duration != segment.source.duration {
+                        videoTrack.scaleTimeRange(
+                            CMTimeRange(start: at, duration: segment.source.duration),
+                            toDuration: segment.duration)
+                    }
                 }
 
                 let row = index / columns
@@ -594,14 +629,17 @@ enum VideoStitcher {
                     orientation: FriendsTogetherPlacement.orientation(
                         for: clip.preferredTransform)))
 
-                if let words = clip.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !words.isEmpty {
+                for caption in clip.captions {
+                    guard let words = caption.trimmedText else { continue }
                     authorCaptions.append(AuthorCaptionWindow(
-                        text: words, sticker: clip.captionSticker ?? .default, cell: cell,
+                        text: words, sticker: caption.placed, cell: cell,
                         start: CMTimeGetSeconds(cursor), end: CMTimeGetSeconds(end)))
                 }
 
-                if let audio = clip.audioTrack,
+                // A still picture with sound running under it reads as broken,
+                // so a held cell is silent and the others carry the moment.
+                if freezeAt == nil,
+                   let audio = clip.audioTrack,
                    let audioTrack = composition.addMutableTrack(
                        withMediaType: .audio,
                        preferredTrackID: kCMPersistentTrackID_Invalid) {
@@ -630,8 +668,7 @@ enum VideoStitcher {
                 day: day,
                 label: clips.first?.label,
                 authorName: nil,
-                overlayText: nil,
-                captionSticker: nil,
+                captions: [],
                 recordedAt: clips.compactMap(\.recordedAt).max(),
                 emoji: clips.flatMap(\.emoji),
                 comments: clips.flatMap(\.comments),
@@ -639,6 +676,66 @@ enum VideoStitcher {
                 end: CMTimeGetSeconds(end)))
             cursor = end
         }
+    }
+
+    /// One stretch of a grid cell's track: a piece of the take, where it
+    /// lands in the moment, and how long it lasts there. `duration` longer
+    /// than `source.duration` means the piece is held — stretched to fill.
+    struct CellSegment: Equatable {
+        let source: CMTimeRange
+        let offset: CMTime
+        let duration: CMTime
+    }
+
+    /// How one take fills a moment `momentDuration` long.
+    ///
+    /// Playing: the take from its start, looped until the moment ends — a
+    /// shorter take repeats under the longest one. Held (`freezeAt` set): one
+    /// frame, `freezeAt` seconds into the take, stretched over the whole
+    /// moment. The frame is clamped inside the take so a time past its end
+    /// still lands on its last frame.
+    static func cellSegments(
+        videoRange: CMTimeRange,
+        momentDuration: CMTime,
+        freezeAt: Double?,
+        frameDuration: CMTime
+    ) -> [CellSegment] {
+        guard videoRange.duration > .zero, momentDuration > .zero else { return [] }
+
+        if let freezeAt {
+            let fallback = CMTime(value: 1, timescale: 30)
+            let oneFrame = CMTimeMinimum(
+                frameDuration.isValid && frameDuration > .zero ? frameDuration : fallback,
+                videoRange.duration)
+            let latest = CMTimeSubtract(videoRange.duration, oneFrame)
+            let wanted = CMTime(seconds: max(freezeAt, 0), preferredTimescale: 600)
+            let into = CMTimeClampToRange(
+                wanted, range: CMTimeRange(start: .zero, duration: latest))
+            return [CellSegment(
+                source: CMTimeRange(
+                    start: CMTimeAdd(videoRange.start, into), duration: oneFrame),
+                offset: .zero,
+                duration: momentDuration)]
+        }
+
+        var segments: [CellSegment] = []
+        var offset = CMTime.zero
+        while offset < momentDuration {
+            let duration = CMTimeMinimum(
+                videoRange.duration, CMTimeSubtract(momentDuration, offset))
+            segments.append(CellSegment(
+                source: CMTimeRange(start: videoRange.start, duration: duration),
+                offset: offset,
+                duration: duration))
+            offset = CMTimeAdd(offset, duration)
+        }
+        return segments
+    }
+
+    /// The takes `ids` keeps, in their order. Nil keeps them all.
+    static func kept(_ clips: [DayClip], ids: Set<String>?) -> [DayClip] {
+        guard let ids else { return clips }
+        return clips.filter { ids.contains($0.id) }
     }
 
     // MARK: - Geometry
@@ -1169,13 +1266,24 @@ enum VideoStitcher {
         duration: Double,
         edge: Double
     ) {
-        guard let rawText = caption.overlayText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !rawText.isEmpty else { return }
+        // Every caption on the clip, each where it was put, all over the same
+        // window: they were placed together on one frame, so they come and go
+        // together.
+        for line in caption.captions {
+            guard let rawText = line.trimmedText else { continue }
 
-        let text = captionLayer(
-            text: rawText, sticker: caption.captionSticker ?? .default,
-            in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
+            let text = captionLayer(
+                text: rawText, sticker: line.placed,
+                in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
 
+            addCaptionFade(text, for: caption, duration: duration, edge: edge)
+            parentLayer.addSublayer(text)
+        }
+    }
+
+    private static func addCaptionFade(
+        _ text: CALayer, for caption: CaptionWindow, duration: Double, edge: Double
+    ) {
         text.opacity = 0
         let anim = CAKeyframeAnimation(keyPath: "opacity")
         anim.values = [0, 1, 1, 0]
@@ -1185,8 +1293,6 @@ enum VideoStitcher {
         anim.isRemovedOnCompletion = false
         anim.fillMode = .both
         text.add(anim, forKey: "overlayTextWindow")
-
-        parentLayer.addSublayer(text)
     }
 
     private static func addStampDecor(
@@ -1200,6 +1306,8 @@ enum VideoStitcher {
         // Solo diaries: a clean, BeReal-style "date · time" pill — no avatar,
         // no colored ring, just a quiet timestamp for that real-moment feel.
         guard showAuthorMark else {
+            // The camera already printed its own date onto the picture.
+            if caption.hasCameraStamp { return }
             addTimestampPill(
                 for: caption, to: parentLayer, renderSize: renderSize,
                 duration: duration, edge: edge)

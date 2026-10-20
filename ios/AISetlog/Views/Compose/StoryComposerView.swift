@@ -1,78 +1,55 @@
 import SwiftUI
 
-/// Making a story: pick a poster, then one page of settings.
+/// Making a story, on one page (1.5).
 ///
-/// The 1.2 shape was "the poster is the submit button" — a tap created the
-/// story with defaults and went straight to filming, and the settings were
-/// optional behind a gear on the poster's corner. It was fast, and it was
-/// wrong about one thing: 谁一起拍 was in there. The obvious gesture answered
-/// it 自己来 without asking, and answering it any other way meant noticing a
-/// 26pt icon. That is not a default, it is a decision being made for you.
+/// Top to bottom: 拍什么 (写今天的清单 / 按时间拍), 名字, 自己拍 / 和朋友一起拍,
+/// and one pinned 开始拍. No 一日 / 7 日 choice: every new story is one day. A
+/// room with friends has no list either — the room is what holds the day, so
+/// 拍什么 hides and it films by time.
 ///
-/// So the poster opens the page now, and the page's own button creates the
-/// story. Every decision on one page, made once, before anything exists. The
-/// page is a sheet rather than a push because the rack behind it is the thing
-/// you came from and a sheet keeps it there.
+/// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
+/// drafted by AI from one sentence, in the same page; the page shows it folded
+/// to one 清单 · N 项 row. Templates (从模板开始, 存为我的模板, the posters)
+/// are gone (1.5).
 struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
     /// How to leave. Nil means "I was presented, dismiss me" — the sheet path.
-    /// `RootShellView` passes a closure instead, because as the 新建 tab this
-    /// view has no presentation to dismiss and `dismiss()` is a no-op: without
-    /// this the ✕ did nothing and creating a story left the composer on screen
-    /// behind the story it had just made.
+    /// `RootShellView` passes a closure instead, because as the 新建 surface
+    /// this view has no presentation to dismiss and `dismiss()` is a no-op.
     var onClose: (() -> Void)? = nil
+    /// Opens with 和朋友一起 already chosen — the 朋友 tab's invite button.
+    /// Only the starting value; the cards on the page still work.
+    var startsWithFriends = false
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
 
-    /// Which shelf of posters is showing. Purely a filter — the story's style
-    /// and mode come from the poster that gets tapped.
-    @State private var rack: TemplateRack = .oneDay
-    /// Style, template and mode as one value — see `ComposerSelection` for why
-    /// the style can't be inferred from the template.
-    @State private var selection = ComposerSelection.initial(
-        oneDay: ChallengeTemplate.oneDayBuiltins)
-    @State private var clipLength: Challenge.ClipLength = .tiny
-    @State private var orientation: Challenge.Orientation = .portrait
+    /// 写今天的清单 or 按时间拍.
+    @State private var entry: ComposerEntry = .byTime
+    /// No longer asked: 一日 / 7 日 is gone from the page, every new story is one day.
+    private let days: Challenge.Mode = .oneDay
+    /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
+    /// and the camera you pick already decides the frame's shape.
+    private let clipLength: Challenge.ClipLength = .scene
+    private let orientation: Challenge.Orientation = .portrait
+    /// No longer asked (1.5): there is one camera.
+    private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
     @State private var title = ""
-    /// Set once the user edits the name, so switching templates stops
+    /// Set once the user edits the name, so the date name 按时间拍 gives stops
     /// overwriting what they typed.
     @State private var titleEdited = false
-    /// The story's moments. Seeded from the chosen template, then editable —
-    /// and replaced wholesale by the guided flow.
+    /// The story's moments: whatever the list editor last handed back.
     @State private var moments: [String] = []
-    @State private var isCustomPromptStory = false
     @State private var showGuided = false
-    /// The settings page. Raised by a poster tap — there is no other way to it
-    /// and no way past it.
-    @State private var showSetup = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
-    @State private var editingTemplate: ChallengeTemplate?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    private var oneDayTemplates: [ChallengeTemplate] {
-        ChallengeTemplate.oneDayBuiltins + store.customTemplates
-    }
-
-    private var sevenDayTemplates: [ChallengeTemplate] {
-        ChallengeTemplate.sevenDayBuiltins
-    }
-
-    private var allTemplates: [ChallengeTemplate] {
-        oneDayTemplates + sevenDayTemplates
-    }
-
-    private var mode: Challenge.Mode { selection.mode }
-
-    private var selected: ChallengeTemplate? {
-        guard let templateID = selection.templateID else { return nil }
-        return allTemplates.first { $0.id == templateID }
-    }
+    private var isTimeOnly: Bool { entry == .byTime }
 
     var body: some View {
         ZStack {
@@ -80,172 +57,160 @@ struct StoryComposerView: View {
 
             VStack(spacing: 0) {
                 topBar
-
-                MoodStep(
-                    oneDayBuiltins: ChallengeTemplate.oneDayBuiltins,
-                    sevenDayTemplates: sevenDayTemplates,
-                    customTemplates: store.customTemplates,
-                    rack: $rack,
-                    onBuildOwn: beginCustomPromptFlow,
-                    onChoose: openSettings,
-                    onEdit: { editingTemplate = $0 },
-                    onDelete: deleteTemplate,
-                    coverURL: { store.coverURL(for: $0) })
-            }
-
-            // Only for the poster-tap route into a shared room. The settings
-            // sheet has its own inline spinner and its own error line above the
-            // button; out here on the rack there was neither, so a slow room
-            // creation looked like a tap that missed and a failed one looked
-            // like nothing at all.
-            if creating, !showSetup, withFriends {
-                Color.black.opacity(0.18).ignoresSafeArea()
-                ProgressView(Strings.creatingRoom)
-                    .controlSize(.large)
-                    .padding(22)
-                    .glassSurface(radius: OneDay.Radius.card)
+                page
+                footer
             }
         }
-        .alert(
-            Strings.couldNotCreateRoom,
-            isPresented: Binding(
-                get: { errorText != nil && !showSetup },
-                set: { if !$0 { errorText = nil } })
-        ) {
-            Button(Strings.ok) { errorText = nil }
-        } message: {
-            Text(errorText ?? "")
+        .sheet(isPresented: $showGuided) {
+            GuidedMomentsView(initialMoments: moments, onDone: applyCustomDraft)
         }
-        .sheet(isPresented: $showSetup) { setupSheet }
         .sheet(isPresented: $showSignIn) {
             SignInView { createSharedRoom() }
                 .presentationDetents([.medium])
         }
-        .sheet(isPresented: $showGuided) {
-            GuidedMomentsView(onDone: applyCustomDraft)
-        }
-        .sheet(item: $editingTemplate) { template in
-            BuildTemplateView(
-                template: template,
-                coverURL: store.coverURL(for: template)
-            ) { updated, coverImageData in
-                store.updateCustomTemplate(updated, coverImageData: coverImageData)
-            }
-        }
-        .onAppear(perform: syncTitleToTemplate)
-        .onChange(of: selection.templateID) { _, newID in
-            guard newID != nil else { return }
-            isCustomPromptStory = false
-            // `titleEdited` deliberately survives this. Zeroing it here made
-            // the flag unreadable — every call site reached `syncTitleToTemplate`
-            // with it false — so naming a story 我的搬家日 and then browsing to
-            // another template silently replaced the name with the template's.
-            syncTitleToTemplate()
+        .onAppear {
+            if startsWithFriends { withFriends = true }
+            nameForTheDay()
         }
         // Switching to solo answers "sign into iCloud" all by itself, so the
         // warning shouldn't outlive the choice that caused it.
-        .onChange(of: withFriends) { _, _ in errorText = nil }
-        .onChange(of: selection.mode) { _, _ in
-            guard !isCustomPromptStory else { return }
-            selection.reconcileTemplate(
-                oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
+        .onChange(of: withFriends) { _, together in
+            errorText = nil
+            // A room films by time: drop any list written before.
+            if together { chooseByTime() }
         }
     }
 
-    // MARK: - Chrome
+    // MARK: - Layout
 
-    /// Just the way out. There is no progress counter and no back chevron
-    /// because there is one screen: the settings arrive as a sheet over it, and
-    /// a sheet already has its own ✕.
     private var topBar: some View {
         HStack(spacing: 12) {
             IconBubble(systemName: "xmark") { leave() }
             Spacer()
             Color.clear.frame(width: 38, height: 38)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 2)
+        .padding(.horizontal, ComposerLayout.margin - 4)
+        .padding(.top, 8)
     }
 
-    // MARK: - The settings sheet
-
-    /// The one page: name, 谁一起拍, clip length, frame, and the moment list.
-    /// Its button is what creates the story.
-    private var setupSheet: some View {
-        VStack(spacing: 0) {
-            // No title of its own: `SetupStep` already leads with 设置, and two
-            // headings stacked read as two screens.
-            HStack {
-                Spacer()
-                IconBubble(systemName: "xmark") { showSetup = false }
+    private var page: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text(Strings.newStoryQuestion)
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .accessibilityIdentifier("composer-question")
+                    .padding(.horizontal, ComposerLayout.margin)
+                if !withFriends {
+                    WhatToFilmSection(
+                        entry: entry,
+                        onWriteList: openList,
+                        onByTime: chooseByTime)
+                }
+                setup
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, -6)
-
-            SetupStep(
-                template: selected,
-                templateCoverURL: selected.flatMap { store.coverURL(for: $0) },
-                title: $title,
-                titleEdited: $titleEdited,
-                withFriends: $withFriends,
-                clipLength: $clipLength,
-                orientation: $orientation,
-                moments: $moments,
-                isOneDay: mode == .oneDay,
-                isTimeOnly: selection.style == .timeOnly)
-
-            sheetFooter
+            .padding(.bottom, 16)
         }
-        .background(OneDayCanvas(seed: 3))
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
     }
 
-    private var sheetFooter: some View {
-        VStack(spacing: 10) {
-            // Above the button, not at the bottom of the scroll: the reason a
-            // tap did nothing has to be on screen when the tap happens.
-            if let errorText {
-                Label(errorText, systemImage: "exclamationmark.circle.fill")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
-            }
+    private var setup: some View {
+        SetupStep(
+            title: $title,
+            titleEdited: $titleEdited,
+            withFriends: $withFriends,
+            isOneDay: days == .oneDay,
+            listCount: entry == .writeList ? resolvedMoments?.count ?? 0 : nil,
+            onOpenList: openList)
+    }
 
-            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(Strings.storyNameNeeded)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    private var footer: some View {
+        VStack(spacing: 10) {
+            // Above the button: the reason a tap did nothing has to be on
+            // screen when the tap happens.
+            if let errorText {
+                footerNote(errorText, systemImage: "exclamationmark.circle.fill", color: .red)
+            }
+            if trimmedTitle.isEmpty {
+                footerNote(Strings.storyNameNeeded, color: .secondary)
                     .accessibilityIdentifier("composer-name-needed")
             }
-
-            Button(action: start) {
-                HStack(spacing: 8) {
-                    if creating {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(withFriends ? Strings.createRoom : Strings.startFilmingCTA)
-                        Image(systemName: "sparkles")
-                    }
-                }
-            }
-            .buttonStyle(.primaryAction)
-            .disabled(!canStart)
-            .opacity(canStart ? 1 : 0.55)
+            startButton
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, ComposerLayout.margin)
         .padding(.top, 10)
         .padding(.bottom, 8)
         .animation(OneDay.Motion.soft, value: errorText)
     }
 
+    private func footerNote(_ text: String, systemImage: String? = nil, color: Color) -> some View {
+        Group {
+            if let systemImage {
+                Label(text, systemImage: systemImage)
+            } else {
+                Text(text)
+            }
+        }
+        .font(.system(size: 13, weight: .medium, design: .rounded))
+        .foregroundStyle(color)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .transition(.opacity)
+    }
+
+    private var startButton: some View {
+        Button(action: start) {
+            HStack(spacing: 8) {
+                if creating {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(withFriends ? Strings.createRoom : Strings.startFilmingCTA)
+                    Image(systemName: "sparkles")
+                }
+            }
+        }
+        .buttonStyle(.primaryAction)
+        .disabled(!canStart)
+        .opacity(canStart ? 1 : 0.55)
+        .accessibilityIdentifier("composer-start")
+    }
+
+    private var trimmedTitle: String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var canStart: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty && !creating
+        !trimmedTitle.isEmpty && !creating && (isTimeOnly || resolvedMoments?.isEmpty == false)
+    }
+
+    // MARK: - Choices
+
+    private func chooseByTime() {
+        entry = .byTime
+        moments = []
+        nameForTheDay()
+    }
+
+    private func openList() {
+        showGuided = true
+    }
+
+    /// What the list editor wrote, applied to this story. The name only
+    /// follows the AI's suggestion while the user hasn't typed one.
+    private func applyCustomDraft(_ draft: CustomStoryDraft) {
+        entry = .writeList
+        moments = draft.moments
+        errorText = nil
+        if !titleEdited {
+            title = draft.suggestedName ?? (isTitleFromByTime ? "" : title)
+        }
+    }
+
+    /// The name 按时间拍 gave the story, which means nothing for a list.
+    private var isTitleFromByTime: Bool {
+        title == Strings.byTimeTitle(.now)
     }
 
     // MARK: - Actions
@@ -260,28 +225,24 @@ struct StoryComposerView: View {
     }
 
     private func start() {
-        let name = title.trimmingCharacters(in: .whitespaces)
         // `dismiss()` isn't instant, so a second tap inside the closing
-        // animation used to insert a second story. The shared path had this
-        // guard through `creating`; the solo path — the common one — didn't.
-        guard !name.isEmpty, !creating else { return }
+        // animation used to insert a second story.
+        guard canStart else { return }
         if withFriends {
             if account.isSignedIn { createSharedRoom() } else { showSignIn = true }
-        } else {
-            creating = true
-            let challenge = store.create(
-                title: name,
-                mode: mode,
-                clipLength: clipLength,
-                orientation: orientation,
-                templateName: selected?.identityKey,
-                momentTitles: resolvedMoments)
-            // Closing the sheet first: dismissing the composer out from under
-            // an open sheet leaves the sheet animating over the story page.
-            showSetup = false
-            leave()
-            onCreate(challenge.id)
+            return
         }
+        creating = true
+        let challenge = store.create(
+            title: trimmedTitle,
+            mode: days,
+            clipLength: clipLength,
+            orientation: orientation,
+            cameraStyle: cameraStyle,
+            templateName: isTimeOnly ? Challenge.timeOnlyTemplateName : nil,
+            momentTitles: resolvedMoments)
+        leave()
+        onCreate(challenge.id)
     }
 
     private func createSharedRoom() {
@@ -291,13 +252,13 @@ struct StoryComposerView: View {
             defer { creating = false }
             do {
                 let challenge = try await store.createSharedRoom(
-                    title: title.trimmingCharacters(in: .whitespaces),
-                    mode: mode,
+                    title: trimmedTitle,
+                    mode: days,
                     clipLength: clipLength,
                     orientation: orientation,
-                    templateName: selected?.identityKey,
+                    cameraStyle: cameraStyle,
+                    templateName: isTimeOnly ? Challenge.timeOnlyTemplateName : nil,
                     momentTitles: resolvedMoments)
-                showSetup = false
                 leave()
                 onCreate(challenge.id)
             } catch {
@@ -306,99 +267,21 @@ struct StoryComposerView: View {
         }
     }
 
-    private func deleteTemplate(_ template: ChallengeTemplate) {
-        let wasSelected = selection.templateID == template.id
-        store.deleteCustomTemplate(template)
-        if wasSelected {
-            selection.clearTemplate(fallingBackTo: ChallengeTemplate.oneDayBuiltins)
-        }
-    }
-
-    private func beginCustomPromptFlow() {
-        showGuided = true
-    }
-
-    /// Tapping a poster: adopt that script, then open the settings page.
-    ///
-    /// This is the whole flow as of 1.3. It used to create the story on the spot
-    /// and the settings were optional, behind a gear — which meant the fast path
-    /// answered 谁一起拍 as 自己来 without asking, and answering it any other way
-    /// required noticing a 26pt icon in a poster's corner. Now the tap opens the
-    /// page and the page's own button is what creates the story, so every
-    /// decision is made once, in one place, before anything exists.
-    private func openSettings(_ template: ChallengeTemplate) {
-        adopt(template)
-        errorText = nil
-        showSetup = true
-    }
-
-    /// Makes `template` the story's script, without deciding what happens next.
-    private func adopt(_ template: ChallengeTemplate) {
-        selection.select(template, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
-        isCustomPromptStory = false
-        syncTitleToTemplate()
-    }
-
-    /// What the guided flow wrote, applied to this story — and, if the user
-    /// asked for it, kept as a template first.
-    ///
-    /// Saving takes the ordinary template path from there: the new script is
-    /// simply *selected*, exactly as if it had always been on the shelf. That
-    /// keeps one code path for "a story made from a template" instead of a
-    /// second, subtly different one for scripts written five seconds ago.
-    private func applyCustomDraft(_ draft: CustomStoryDraft) {
-        title = draft.name
-        titleEdited = true
-        moments = draft.moments
-
-        if draft.savesToLibrary {
-            let saved = store.addCustomTemplate(
-                ChallengeTemplate(
-                    name: LocalizedText(en: draft.name, zh: draft.name),
-                    momentKeys: draft.moments.map {
-                        MomentCatalog.key(forDisplay: $0) ?? $0
-                    },
-                    isCustom: true,
-                    presetCoverAssetName: draft.presetCoverAssetName),
-                coverImageData: draft.coverImageData)
-            isCustomPromptStory = false
-            selection.select(
-                saved, oneDay: oneDayTemplates, sevenDay: sevenDayTemplates)
-        } else {
-            isCustomPromptStory = true
-            selection.useCustomPrompts()
-        }
-
-        // Straight into settings rather than straight into creating: the user
-        // just wrote these moments by hand, so this is the one path where the
-        // defaults behind a poster haven't been agreed to yet.
-        errorText = nil
-        showSetup = true
-    }
-
     // MARK: - Derived state
 
-    /// Keeps the story name in step with the chosen script until the user
-    /// takes the name over.
-    private func syncTitleToTemplate() {
-        guard let selected else { return }
-        if !titleEdited {
-            title = mode == .sevenDay
-                ? Strings.fullTitle7Days(selected.displayName)
-                : selected.displayName
-        }
-        // Moments always follow the template: picking one *is* the request for
-        // its prompts. The name doesn't, because you typed that.
-        moments = selected.momentKeys ?? []
+    /// 按时间拍 (and a room) is a day, not a list: it's named for the date,
+    /// until the user types a name of their own.
+    private func nameForTheDay() {
+        guard isTimeOnly, !titleEdited else { return }
+        title = Strings.byTimeTitle(.now)
     }
 
-    /// Blank rows are dropped; an entirely empty list falls back to the
-    /// template's own moments so a story can never be created with none.
+    /// Blank rows are dropped. Nil for 按时间拍, which has no list.
     private var resolvedMoments: [String]? {
-        if selected?.isTimeOnly == true { return nil }
+        if isTimeOnly { return nil }
         let cleaned = moments
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        return cleaned.isEmpty ? selected?.momentKeys : cleaned
+        return cleaned.isEmpty ? nil : cleaned
     }
 }

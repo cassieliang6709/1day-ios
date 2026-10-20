@@ -1,32 +1,31 @@
 import SwiftUI
 
-/// The top of the timeline: what this story is and who's in it.
+/// The top of the timeline: what this story is called.
 ///
 /// It no longer says how far the day has got. That was a `RoomProgress` the
 /// header only used to print `0/3` beside two other numbers, and the bar
 /// underneath says it better; the parameter went with the line.
+///
+/// A room used to add 「2 人 · 邀请码 KPADC7」 under the title. Gone (1.5):
+/// the columns below already show who's here, and the code goes out through
+/// 邀请 in the nav bar, which is the only place anyone sends it from.
 struct TimelineHeader: View {
     let challenge: Challenge
-    /// Who's in the room. Nil for a solo story, which has nobody to name.
-    let cast: RoomCast?
     var isSyncing = false
-
-    @Environment(\.roomPreviewMediaScope) private var previewMedia
-    @State private var didCopyCode = false
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
+    /// 「和我过一天」 is the name 按时间拍 used to give every story it made —
+    /// a template's label, not a name anybody chose — so a story still
+    /// carrying it shows no title rather than that. Stories made since are
+    /// named for their date, and a name you typed always shows.
+    private var showsTitle: Bool {
+        challenge.title != "Live With Me" && challenge.title != "和我过一天"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        if showsTitle || isSyncing {
             title
-
-            if let cast, !cast.members.isEmpty {
-                RoomRoster(cast: cast)
-            }
-
-            if previewMedia == nil, challenge.isShared, let code = challenge.roomCode {
-                inviteCode(code)
-            }
         }
     }
 
@@ -45,10 +44,12 @@ struct TimelineHeader: View {
     /// it is about to matter, and the runtime is on the film screen.
     private var title: some View {
         HStack(spacing: 8) {
-            Text(presenter.displayTitle)
-                .font(.system(size: 29, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .lineLimit(2)
+            if showsTitle {
+                Text(presenter.displayTitle)
+                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(2)
+            }
 
             if isSyncing {
                 ProgressView()
@@ -57,51 +58,6 @@ struct TimelineHeader: View {
             }
         }
     }
-
-    /// The join code, in full, on the screen the owner is already looking at.
-    /// Sharing used to mean opening a share sheet and pulling six characters
-    /// out of a sentence — fine for iMessage, useless when you just want to
-    /// read the code aloud. Tapping copies the bare code, not the blurb.
-    private func inviteCode(_ code: String) -> some View {
-        Button {
-            UIPasteboard.general.string = code
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.easeOut(duration: 0.15)) { didCopyCode = true }
-        } label: {
-            HStack(spacing: 8) {
-                Text(Strings.inviteCodeLabel)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-
-                Text(code)
-                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
-                    .tracking(2)
-                    .foregroundStyle(Color.oneDayBrand)
-
-                Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(didCopyCode ? Color.oneDayMint : OneDay.inkFaint)
-
-                if didCopyCode {
-                    Text(Strings.inviteCodeCopied)
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayMint)
-                        .transition(.opacity)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(OneDay.surfaceSoft.opacity(0.7), in: Capsule())
-            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .task(id: didCopyCode) {
-            guard didCopyCode else { return }
-            try? await Task.sleep(for: .seconds(1.6))
-            withAnimation(.easeOut(duration: 0.2)) { didCopyCode = false }
-        }
-    }
-
 }
 
 /// Renaming a story and its moment prompts. A plain form on purpose — this is
@@ -135,7 +91,7 @@ struct EditPlanSheet: View {
                         HStack(spacing: 12) {
                             Text("\(index + 1)")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(OneDay.onBrand)
                                 .frame(width: 24, height: 24)
                                 .background(Color.oneDayBrand, in: Circle())
                             TextField(

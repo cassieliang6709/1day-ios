@@ -33,13 +33,14 @@ struct RoomChatView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppLanguage.storageKey) private var language: AppLanguage = .system
 
-    /// The moment's own prompt, so a quote can say 「第 2 个瞬间 · 咖啡」 rather
-    /// than just a number. Nil for a record-by-time story, which has no prompts.
+    /// The moment's own name, so a quote can say 「咖啡」. Nil when it has
+    /// none — a record-by-time story, or a room whose moments were never
+    /// named. Chat only exists in a room, and a room doesn't number its days
+    /// or moments on screen any more (1.5), so there is no 「第 2 个瞬间」 to
+    /// fall back to.
     private func momentTitle(_ day: Int) -> String? {
-        guard let challenge = store.challenge(challengeID), !challenge.isTimeOnly else {
-            return nil
-        }
-        return ChallengePresenter(challenge: challenge).title(forSlot: day)
+        guard let challenge = store.challenge(challengeID) else { return nil }
+        return ChallengePresenter(challenge: challenge).momentName(forSlot: day)
     }
 
     /// The moment's reactions, above the thread.
@@ -68,35 +69,32 @@ struct RoomChatView: View {
                     authorName: me.displayName,
                     moment: moment,
                     source: sessionSource,
+                    clips: RoomChatTimeline.clipEvents(
+                        from: store.recordedClips(for: challengeID),
+                        myID: me.id,
+                        momentTitle: momentTitle),
                     momentTitle: momentTitle,
                     onOpenMoment: onOpenMoment)
                     .id("\(sessionSource.identity):\(me.id):\(code)")
             }
         } else {
             VStack(spacing: 20) {
-                Text(language.resolved == .chinese ? "登录并加入房间后才能聊天。" : "Sign in and join the room to chat.")
+                Text(Strings.chatSignInToJoin)
                 Button(Strings.done) { dismiss() }
             }.padding()
         }
     }
 }
 
-#if DEBUG || LOCAL_ROOM_CHAT_DEMO
-@MainActor
-struct RoomChatDemoView: View {
-    let chinese: Bool
-
-    var body: some View {
-        LocalRoomDemoView(chinese: chinese)
-    }
-}
-#endif
-
 private struct RoomChatConversation: View {
     @StateObject private var session: RoomChatSession
     private let authorName: String
     private let preview: RoomChatDemoTransport?
-    @State private var showDemo = false
+    /// The room's clips, threaded between the messages by time.
+    private let clips: [RoomChatClipEvent]
+    /// A clip being watched from here, when the host gave no way to open its
+    /// moment (the chat opened from a clip's own player).
+    @State private var playing: RoomChatClipEvent?
     @State private var moment: Int?
     @State private var followsLatest = true
     @State private var deletionCandidate: UUID?
@@ -112,37 +110,72 @@ private struct RoomChatConversation: View {
         authorName: String,
         moment: Int?,
         source: RoomChatSessionSource,
+        clips: [RoomChatClipEvent] = [],
         momentTitle: @escaping (Int) -> String?,
         onOpenMoment: ((Int) -> Void)?
     ) {
         self.authorName = authorName
         self.preview = source.preview
+        self.clips = clips
         self.momentTitle = momentTitle
         self.onOpenMoment = onOpenMoment
         _moment = State(initialValue: moment)
         _session = StateObject(wrappedValue: source.makeSession(scope: scope))
     }
 
-    /// 「第 2 个瞬间 · 咖啡」, or just the number for a story without prompts.
+    /// The composer's band and the quote inside a bubble both say the
+    /// moment's own name — 「咖啡」. They used to lead with 「第 2 个瞬间」,
+    /// and the quote fell back to it when there was no name; a room doesn't
+    /// number its moments on screen any more (1.5), so without a name it is
+    /// just 「这个瞬间」.
     private func momentLabel(_ day: Int) -> String {
-        let numbered = text("第 \(day) 个瞬间", "Moment \(day)")
-        guard let title = momentTitle(day), !title.isEmpty else { return numbered }
-        return "\(numbered) · \(MomentCatalog.localize(title))"
+        guard let title = momentTitle(day), !title.isEmpty else { return Strings.thisMoment }
+        return MomentCatalog.localize(title)
     }
 
-    private func text(_ zh: String, _ en: String) -> String { language.resolved == .chinese ? zh : en }
+    private func quoteLabel(_ day: Int) -> String { momentLabel(day) }
+
     private var entries: [RoomChatEntry] { session.state?.orderedEntries ?? [] }
+
+    /// What the thread shows: the messages, with the room's clips threaded in
+    /// by when they were filmed. See `RoomChatTimeline`.
+    private var items: [RoomChatItem] { RoomChatTimeline.merge(entries: entries, clips: clips) }
+
+    private var myAccountID: String { session.state?.scope.accountID ?? "" }
+
+    /// My newest message — the only one whose "sending…" is worth a line.
+    /// Every bubble used to end in 已发送 or 发送中, which in a normal thread
+    /// is the same word under every message I wrote.
+    private var myLatestID: UUID? { entries.last(where: isMine)?.id }
+
+    /// Whether to print the time above this row: the first one, and any that
+    /// comes after five minutes of quiet. A timestamp under every bubble was
+    /// the loudest thing in the thread and said the same minute ten times.
+    private func startsNewTimeBlock(at index: Int, in items: [RoomChatItem]) -> Bool {
+        guard index > 0 else { return true }
+        return items[index].date.timeIntervalSince(items[index - 1].date) > 5 * 60
+    }
+
+    /// The first of a run of rows from one other person — where their face
+    /// goes. Later bubbles in the run leave the space empty so the run still
+    /// lines up.
+    private func startsRun(at index: Int, in items: [RoomChatItem]) -> Bool {
+        guard index > 0, !startsNewTimeBlock(at: index, in: items) else { return true }
+        return items[index - 1].authorKey(myID: myAccountID)
+            != items[index].authorKey(myID: myAccountID)
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 if preview != nil {
-                    Text(text("本地演示 · 不会发送给朋友", "Local demo · Nothing is sent to friends"))
+                    Text(Strings.chatLocalDemoBanner)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkSoft)
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .background(Color.oneDayLavender.opacity(0.14))
+                        .accessibilityIdentifier("chat-local-demo-banner")
                 }
                 if let error = session.error {
                     HStack {
@@ -150,9 +183,9 @@ private struct RoomChatConversation: View {
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(OneDay.ink)
                         if error == .fetch {
-                            Button(text("重试", "Retry")) { Task { await session.refresh() } }
+                            Button(Strings.retry) { Task { await session.refresh() } }
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.oneDayBrand)
+                                .foregroundStyle(OneDay.brandText)
                         }
                     }
                     .padding(12)
@@ -160,16 +193,33 @@ private struct RoomChatConversation: View {
                     .background(Color.oneDayAmber.opacity(0.16))
                 }
                 ScrollViewReader { proxy in
+                    let rows = items
+                    let entryIndex = Dictionary(
+                        uniqueKeysWithValues: entries.enumerated().map { ($1.id, $0) })
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            if entries.isEmpty {
-                                Text(text("在这里聊聊你们的故事", "Talk about your story here"))
+                            if rows.isEmpty {
+                                Text(Strings.chatEmpty)
                                     .font(.system(size: 14.5, weight: .medium, design: .rounded))
                                     .foregroundStyle(OneDay.inkSoft)
                                     .padding(.top, 48)
                             }
-                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                                bubble(entry, namesAuthor: namesAuthor(at: index)).id(entry.id)
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
+                                VStack(spacing: 10) {
+                                    if startsNewTimeBlock(at: index, in: rows) {
+                                        timeSeparator(item.date)
+                                    }
+                                    switch item {
+                                    case .message(let entry):
+                                        bubble(
+                                            entry,
+                                            namesAuthor: entryIndex[entry.id].map { namesAuthor(at: $0) } ?? false,
+                                            startsRun: startsRun(at: index, in: rows))
+                                    case .clip(let event):
+                                        clipRow(event)
+                                    }
+                                }
+                                .id(item.id)
                             }
                             Color.clear.frame(height: 1).id("latest")
                                 .onAppear { followsLatest = true }
@@ -178,7 +228,7 @@ private struct RoomChatConversation: View {
                     }
                     .defaultScrollAnchor(.bottom)
                     .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: entries.count) { _, _ in
+                    .onChange(of: items.count) { _, _ in
                         if followsLatest { proxy.scrollTo("latest", anchor: .bottom) }
                     }
                 }
@@ -189,34 +239,32 @@ private struct RoomChatConversation: View {
             // grey, which is why the one input on the page was the hardest
             // thing on it to find.
             .background(OneDayCanvas(seed: 4))
-            .navigationTitle(preview == nil ? text("房间聊天", "Room chat") : text("聊天演示", "Chat demo"))
+            // No 演示 button and no 聊天演示 title any more. The demo was a
+            // second, local sample room opened from inside a real room's chat
+            // — in a Debug build that is every build the owner runs, so it sat
+            // in the top-left of every real conversation. The local sample
+            // still exists (home screen, behind `-demoEntries`), and inside it
+            // this screen is the real one with a banner, not a different mode.
+            .navigationTitle(Strings.chatTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                if preview == nil {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(text("演示", "Demo")) { showDemo = true }
-                    }
-                }
-                #endif
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(preview == nil ? Strings.done : text("退出演示", "Exit demo")) { dismiss() }
+                    Button(Strings.done) { dismiss() }
+                        .accessibilityIdentifier("chat-done")
                 }
             }
-            .sheet(isPresented: $showDemo) {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                RoomChatDemoView(chinese: language.resolved == .chinese)
-                #endif
+            .fullScreenCover(item: $playing) { event in
+                clipPlayer(event)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { composer }
-            .confirmationDialog(text("删除这条消息？", "Delete this message?"), isPresented: Binding(
+            .confirmationDialog(Strings.chatDeleteTitle, isPresented: Binding(
                 get: { deletionCandidate != nil }, set: { if !$0 { deletionCandidate = nil } })) {
-                Button(text("删除消息", "Delete message"), role: .destructive) {
+                Button(Strings.chatDeleteMessage, role: .destructive) {
                     if let id = deletionCandidate { Task { await session.delete(id) } }
                     deletionCandidate = nil
                 }
             } message: {
-                Text(text("删除成功后，房间里的其他人刷新时也会移除这条消息。", "Once deleted, this message will be removed for others when they refresh."))
+                Text(Strings.chatDeleteForEveryone)
             }
         }
         .task(id: scenePhase) {
@@ -253,15 +301,47 @@ private struct RoomChatConversation: View {
         return earlier.last?.message.authorID != entry.message.authorID
     }
 
-    private func bubble(_ entry: RoomChatEntry, namesAuthor: Bool) -> some View {
+    /// The time a block of messages starts, centred over it.
+    private func timeSeparator(_ date: Date) -> some View {
+        Text(date, format: .dateTime.month().day().hour().minute())
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .foregroundStyle(OneDay.inkFaint)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
+    }
+
+    private static let avatarSize: CGFloat = 26
+
+    /// One message. Somebody else's carries their face beside the first
+    /// bubble of each run and, where a name is needed at all, the name in
+    /// their own colour — the same `Identity` tint as their avatar and their
+    /// clips' bylines, so a person reads as one colour across the app. The
+    /// grey name this replaces looked the same for everyone in the room.
+    private func bubble(_ entry: RoomChatEntry, namesAuthor: Bool, startsRun: Bool) -> some View {
         let mine = isMine(entry)
-        return HStack(alignment: .bottom) {
-            if mine { Spacer(minLength: 40) }
+        return HStack(alignment: .top, spacing: 8) {
+            if mine {
+                Spacer(minLength: 40)
+            } else {
+                Group {
+                    if startsRun {
+                        MemberFace(id: entry.message.authorID, name: entry.message.authorName,
+                                   size: Self.avatarSize, showsMood: false)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(width: Self.avatarSize, height: Self.avatarSize)
+                // The name is said by the bubble's label below.
+                .accessibilityHidden(true)
+                // Level with the bubble rather than the name above it.
+                .padding(.top, namesAuthor ? 19 : 0)
+            }
             VStack(alignment: mine ? .trailing : .leading, spacing: 5) {
                 if namesAuthor {
                     Text(entry.message.authorName)
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.inkFaint)
+                        .foregroundStyle(Identity.tint(for: entry.message.authorName))
                 }
                 VStack(alignment: .leading, spacing: 7) {
                     if let context = entry.message.moment {
@@ -275,7 +355,7 @@ private struct RoomChatConversation: View {
                 // messages reads as coming from one side.
                 .padding(.horizontal, 13)
                 .padding(.vertical, 10)
-                .foregroundStyle(mine ? Color.white : OneDay.ink)
+                .foregroundStyle(mine ? OneDay.onBrand : OneDay.ink)
                 .background {
                     let shape = UnevenRoundedRectangle(
                         cornerRadii: .init(
@@ -294,30 +374,133 @@ private struct RoomChatConversation: View {
                 .oneDaySoftShadow(strength: mine ? 0 : 0.5)
                 .contextMenu {
                     if mine && entry.delivery == .sent {
-                        Button(text("删除消息", "Delete message"), role: .destructive) {
+                        Button(Strings.chatDeleteMessage, role: .destructive) {
                             deletionCandidate = entry.id
                         }.disabled(session.deletingIDs.contains(entry.id))
                     }
                 }
-                HStack(spacing: 8) {
-                    Text(entry.message.createdAt, format: .dateTime.month().day().hour().minute())
-                    if mine {
-                        switch entry.delivery {
-                        case .sending: Text(text("发送中", "Sending"))
-                        case .sent:
-                            Text(session.deletingIDs.contains(entry.id) ? text("正在删除", "Deleting") : text("已发送", "Sent"))
-                        case .failed:
-                            Button(text("发送失败 · 重试", "Failed · Retry")) {
-                                Task { await session.retry(entry.id) }
-                            }.padding(.vertical, 8)
-                        }
-                    }
-                }
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.inkFaint)
+                if mine { deliveryLine(entry) }
             }
             if !mine { Spacer(minLength: 40) }
         }
+    }
+
+    private static let clipThumbSize = CGSize(width: 116, height: 154)
+
+    /// A clip in the thread: who filmed it (and the moment, when it has a
+    /// name) over a still of it with the time it was filmed. Mine on the
+    /// right and others on the left, like a message — it is the room's other
+    /// way of saying something. Every clip row carries its author's face,
+    /// because the line names them anyway and a clip is never a reply in a
+    /// run of chatter.
+    ///
+    /// Tapping plays it through the host's moment player when the chat was
+    /// opened from the room page (`onOpenMoment`), which is the same path a
+    /// tile on that page takes; opened from a clip's own player there is no
+    /// page to go back to, so it plays here.
+    private func clipRow(_ event: RoomChatClipEvent) -> some View {
+        let mine = event.isMine
+        return HStack(alignment: .top, spacing: 8) {
+            if mine {
+                Spacer(minLength: 40)
+            } else {
+                AvatarDot(name: event.authorName, size: Self.avatarSize)
+                    .frame(width: Self.avatarSize, height: Self.avatarSize)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: mine ? .trailing : .leading, spacing: 6) {
+                Text(Strings.chatClipEvent(name: event.authorName, moment: event.momentTitle))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(mine ? OneDay.inkSoft : Identity.tint(for: event.authorName))
+                    .lineLimit(2)
+                    .multilineTextAlignment(mine ? .trailing : .leading)
+                Button {
+                    if let onOpenMoment { onOpenMoment(event.day) } else { playing = event }
+                } label: {
+                    ClipThumbnail(url: event.url, refreshToken: event.recordedAt)
+                        .frame(width: Self.clipThumbSize.width, height: Self.clipThumbSize.height)
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, .clear, .black.opacity(0.5)],
+                                startPoint: .top, endPoint: .bottom)
+                        }
+                        .overlay {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        }
+                        .overlay(alignment: .bottomLeading) {
+                            Text(event.recordedAt.formatted(.roomClock))
+                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                                .padding(9)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(OneDay.hairline, lineWidth: 1)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "\(Strings.chatClipEvent(name: event.authorName, moment: event.momentTitle)), "
+                        + event.recordedAt.formatted(date: .omitted, time: .shortened))
+                .accessibilityIdentifier("chat-clip")
+            }
+            if !mine { Spacer(minLength: 40) }
+        }
+    }
+
+    /// The clip on its own, full screen, with sound — the same looping player
+    /// the room page's tiles use.
+    private func clipPlayer(_ event: RoomChatClipEvent) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            LoopingClipPlayer(url: event.url, refreshToken: event.recordedAt)
+                .aspectRatio(9 / 16, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Button { playing = nil } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel(Strings.done)
+            .padding(16)
+        }
+    }
+
+    /// Only what needs saying. "Sending" under my newest message while it is
+    /// on its way; "failed · retry" under *any* message that didn't go — that
+    /// one stays wherever it is, because it is the only way to resend it; and
+    /// "deleting" while a delete is in flight. A delivered message says
+    /// nothing: delivered is the normal case.
+    @ViewBuilder
+    private func deliveryLine(_ entry: RoomChatEntry) -> some View {
+        Group {
+            if session.deletingIDs.contains(entry.id) {
+                Text(Strings.chatDeleting)
+            } else {
+                switch entry.delivery {
+                case .sending where entry.id == myLatestID:
+                    Text(Strings.chatSending)
+                case .failed:
+                    Button(Strings.chatFailedRetry) {
+                        Task { await session.retry(entry.id) }
+                    }
+                    .frame(minHeight: 44)
+                default:
+                    EmptyView()
+                }
+            }
+        }
+        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+        .foregroundStyle(OneDay.inkFaint)
     }
 
     /// What this message is about, inside the bubble it belongs to.
@@ -333,7 +516,7 @@ private struct RoomChatConversation: View {
         let rule = mine ? Color.white.opacity(0.55) : Color.oneDayLavender
         let ink = mine ? Color.white.opacity(0.9) : OneDay.inkSoft
         let label = HStack(spacing: 5) {
-            Text(momentLabel(day))
+            Text(quoteLabel(day))
                 .font(.system(size: 11.5, weight: .bold, design: .rounded))
                 .foregroundStyle(ink)
                 .lineLimit(1)
@@ -365,10 +548,11 @@ private struct RoomChatConversation: View {
             // `caption` type above the field.
             if let context = moment {
                 HStack(spacing: 6) {
-                    Text(text("在说：\(momentLabel(context))", "About: \(momentLabel(context))"))
+                    Text(Strings.chatAbout(momentLabel(context)))
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.oneDayNavy)
                         .lineLimit(1)
+                        .accessibilityIdentifier("chat-moment-about")
                     Spacer(minLength: 4)
                     Button {
                         moment = nil
@@ -378,7 +562,7 @@ private struct RoomChatConversation: View {
                             .foregroundStyle(OneDay.inkSoft)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(text("取消引用", "Remove context"))
+                    .accessibilityLabel(Text(Strings.chatRemoveContext))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
@@ -389,7 +573,7 @@ private struct RoomChatConversation: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 10) {
-                TextField(text("发消息…", "Message…"), text: Binding(
+                TextField(Strings.chatPlaceholder, text: Binding(
                     get: { session.state?.draft ?? "" }, set: { session.setDraft($0) }), axis: .vertical)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(OneDay.ink)
@@ -408,21 +592,32 @@ private struct RoomChatConversation: View {
                     }
                     .oneDayGlow(.oneDayBrand, strength: 0.45)
                     .disabled(session.state == nil)
+                    .accessibilityIdentifier("chat-input")
                 Button {
                     followsLatest = true
                     Task { await session.send(authorName: authorName, moment: moment) }
                 } label: {
+                    // Visibly off while there's nothing to send. It used to be
+                    // the same glowing blue disc either way, so an empty
+                    // field's send button looked tappable and did nothing.
                     Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .black))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(canSend ? OneDay.onBrand : OneDay.inkFaint)
                         .frame(width: 44, height: 44)
-                        .background(OneDay.brandHorizontal, in: Circle())
-                        .oneDayGlow(.oneDayBrand, strength: 0.8)
+                        .background {
+                            if canSend {
+                                Circle().fill(OneDay.brandHorizontal)
+                            } else {
+                                Circle().fill(OneDay.surfaceSoft)
+                            }
+                        }
+                        .oneDayGlow(.oneDayBrand, strength: canSend ? 0.8 : 0)
+                        .animation(.easeOut(duration: 0.15), value: canSend)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(text("发送", "Send"))
-                .disabled(session.state?.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false ||
-                          (session.state?.draft.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0) > RoomChatState.maximumMessageLength)
+                .accessibilityLabel(Text(Strings.chatSend))
+                .accessibilityIdentifier("chat-send")
+                .disabled(!canSend)
             }
             if let count = session.state?.draft.count, count > 1_800 {
                 Text("\(count) / \(RoomChatState.maximumMessageLength)")
@@ -438,13 +633,18 @@ private struct RoomChatConversation: View {
         .background(.regularMaterial)
     }
 
+    private var canSend: Bool {
+        let trimmed = session.state?.draft.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !trimmed.isEmpty && trimmed.count <= RoomChatState.maximumMessageLength
+    }
+
     private func errorText(_ error: RoomChatSession.Failure) -> String {
         switch error {
-        case .storage: text("无法保存聊天数据，请勿清除应用数据。", "Could not save chat data. Do not clear app data.")
-        case .fetch: text("暂时无法获取新消息，已保留现有消息。", "Could not fetch new messages. Existing messages are kept.")
-        case .send: text("有消息未发送成功，请点消息下方重试。", "A message failed to send. Tap Retry below it.")
-        case .delete: text("删除失败，消息已保留。长按消息可再次删除。", "Deletion failed. The message is kept. Long press it to try again.")
-        case .messageTooLong: text("每条消息最多 2000 个字符，文字已保留。", "Messages can have up to 2,000 characters. Your text is kept.")
+        case .storage: Strings.chatErrorStorage
+        case .fetch: Strings.chatErrorFetch
+        case .send: Strings.chatErrorSend
+        case .delete: Strings.chatErrorDelete
+        case .messageTooLong: Strings.chatErrorTooLong(RoomChatState.maximumMessageLength)
         }
     }
 }

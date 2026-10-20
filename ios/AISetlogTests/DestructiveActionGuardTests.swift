@@ -81,9 +81,9 @@ final class DestructiveActionGuardTests: XCTestCase {
     /// The footnote is the part that makes the choice answerable.
     func testTheKeepOrDiscardFootnoteSaysWhereKeepPutsIt() {
         inChinese()
-        XCTAssertTrue(Strings.keepClipFootnote.contains("草稿"))
+        XCTAssertTrue(Strings.keepClipFootnote.contains("我的"))
         inEnglish()
-        XCTAssertTrue(Strings.keepClipFootnote.lowercased().contains("draft"))
+        XCTAssertTrue(Strings.keepClipFootnote.contains("Mine"))
     }
 
     // MARK: Camera permission

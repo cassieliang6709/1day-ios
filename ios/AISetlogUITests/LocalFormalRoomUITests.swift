@@ -51,38 +51,38 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.staticTexts["local-room-notice"].exists)
         capture(app, "Formal two-member StoryTimelineView")
-        app.buttons["聊天"].tap()
+        app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["本地演示 · 不会发送给朋友"].exists)
-        let input = app.textFields["发消息…"]
+        XCTAssertTrue(app.staticTexts["chat-local-demo-banner"].exists)
+        let input = app.textFields["chat-input"]
         XCTAssertTrue(input.exists)
         input.tap()
         input.typeText("local UI message")
-        app.buttons["发送"].tap()
+        app.buttons["chat-send"].tap()
         XCTAssertTrue(app.staticTexts["local UI message"].waitForExistence(timeout: 15))
-        app.buttons["退出演示"].tap()
+        app.buttons["chat-done"].tap()
 
         // The shell's member selector remains outside the navigation stack;
         // changing it replaces only this local session and its navigation state.
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: 15))
-        app.buttons["三人"].tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
-        app.buttons["聊天"].tap()
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
+        app.segmentedControls["local-room-members"].buttons.element(boundBy: 1).tap()
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         // The three-member session is a different room: the message typed into
         // the two-member one must not be in it.
         XCTAssertFalse(app.staticTexts["local UI message"].exists)
-        app.buttons["退出演示"].tap()
+        app.buttons["chat-done"].tap()
         capture(app, "Formal three-member StoryTimelineView")
         app.buttons["room-back"].tap()
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         XCTAssertTrue(demo.isHittable)
         demo.tap()
-        XCTAssertTrue(app.buttons["看成片"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertTrue(app.buttons["两人"].isSelected)
+        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.segmentedControls["local-room-members"].buttons.element(boundBy: 0).isSelected)
     }
 
     /// The film actually assembling, from the production `FilmView` over a
@@ -92,7 +92,7 @@ final class LocalFormalRoomUITests: XCTestCase {
     /// outruns the 240s ceiling on a GPU-less runner, so on CI this measures
     /// the machine. On a Mac it takes about 40 seconds.
     ///
-    /// What it pins that no unit test can: that 「看成片」 reaches a rendered
+    /// What it pins that no unit test can: that 「生成 vlog」 reaches a rendered
     /// film through the real navigation stack, and that 保存 and 分享 are
     /// disabled for a demo room — a demo must not be able to write to the photo
     /// library or leave the device.
@@ -101,13 +101,49 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        let film = app.buttons["看成片"]
+        let film = app.buttons["room-make-vlog"]
         XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
         film.tap()
-        XCTAssertTrue(app.buttons["调整"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertFalse(app.buttons["保存"].isEnabled)
-        XCTAssertFalse(app.buttons["分享"].isEnabled)
+        XCTAssertTrue(app.buttons["film-adjust"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertFalse(app.buttons["film-save"].isEnabled)
+        XCTAssertFalse(app.buttons["film-share"].isEnabled)
         capture(app, "Production FilmView with local real synthesis")
+    }
+
+    /// The filter under a finished room film: open one person's takes, hold
+    /// their first take still, apply, and get a new film back. Skipped on CI
+    /// for the same reason as `testFormalRoomFilmRenders` — it renders twice.
+    func testFormalRoomFilmFilterAndHold() {
+        let app = launch()
+        let demo = app.buttons["home-room-demo"]
+        XCTAssertTrue(demo.waitForExistence(timeout: 15))
+        demo.tap()
+        let film = app.buttons["room-make-vlog"]
+        XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
+        film.tap()
+
+        let person = app.buttons["film-person-0"]
+        XCTAssertTrue(person.waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["film-person-1"].exists, "one face per person in the room")
+        capture(app, "Film page with the people row")
+
+        person.tap()
+        let hold = app.switches["film-clip-hold-0"]
+        XCTAssertTrue(hold.waitForExistence(timeout: 15))
+        hold.switches.firstMatch.tap()
+        XCTAssertTrue(app.sliders["film-clip-hold-frame-0"].waitForExistence(timeout: 15))
+        app.sliders["film-clip-hold-frame-0"].adjust(toNormalizedSliderPosition: 0.5)
+        capture(app, "One person's takes with the first held")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["film-filter-toggle-1"].waitForExistence(timeout: 15))
+        capture(app, "Filter sheet, everyone")
+        app.buttons["film-filter-apply"].tap()
+
+        // Apply makes a new film; the page comes back once it's done.
+        XCTAssertTrue(app.buttons["film-adjust"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["film-person-0"].waitForExistence(timeout: 15))
+        capture(app, "Film page after applying a hold")
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {

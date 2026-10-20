@@ -175,19 +175,15 @@ a:focus-visible { outline: 3px solid #9dccff; outline-offset: 5px; border-radius
 .app-proof figcaption, .film-result figcaption { margin-top: 12px; font-size: 11px; line-height: 1.5; color: #bdd5ef; text-align: center; }
 .hero-product { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 0; width: 100%; }
 .hero-product .app-proof { position: relative; width: 100%; z-index: 1; }
-.hero-art { display: grid; gap: 25px; margin-right: -30px; transform: rotate(-5deg); }
-.hero-art img { width: 100%; aspect-ratio: 1.05; object-fit: cover; border: 4px solid #dcecff; border-radius: 22px; box-shadow: 0 20px 40px #00153440; }
-.hero-art img:last-child { width: 85%; transform: rotate(9deg); }
+.hero-bounce-cards { z-index: 0; justify-self: center; margin-right: -34px; }
+.hero-bounce-cards .bounce-card { width: clamp(148px, 15vw, 188px); box-shadow: 0 24px 48px #00102f52; }
 .theme-section { grid-template-areas: 'intro cards' 'preview cards' 'app app'; }
 .theme-app { grid-area: app; display: grid; grid-template-columns: 230px 1fr; align-items: center; gap: 50px; padding: 35px 30px 0; border-top: 1px solid #d6e8fb; margin-top: 8px; }
 .theme-app h3 { max-width: 430px; font-size: clamp(25px,3vw,36px); line-height: 1.2; letter-spacing: -.04em; margin: 12px 0; }
 .theme-app p:not(.eyebrow) { color: #527095; line-height: 1.6; font-size: 14px; }
 .theme-app .app-proof figcaption { color: #527095; }
 .moment-product { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 24px; }
-.moment-portraits { display: grid; gap: 24px; }
-.moment-portraits figure { margin: 0; }
-.moment-portraits img { width: 100%; aspect-ratio: 1.3; object-fit: cover; border-radius: 16px; }
-.moment-portraits figcaption { font-size: 12px; margin-top: 8px; color: #d8e9ff; }
+.moment-bounce-cards { justify-self: center; }
 .together-visual { grid-template-columns: .8fr 1.2fr; }
 .invite-screen img { width: min(100%, 260px); }
 .film-section { grid-template-columns: .85fr 1.15fr; padding-inline: 25px; gap: 55px; }
@@ -197,6 +193,7 @@ a:focus-visible { outline: 3px solid #9dccff; outline-offset: 5px; border-radius
 .demo-film video { display: block; width: 100%; aspect-ratio: 16/9; border-radius: 16px; background: #10203a; }
 @media (max-width: 800px) {
  .hero-product { max-width: 460px; justify-self: center; }
+ .hero-bounce-cards { margin-right: -24px; transform: scale(.82); }
  .theme-section { grid-template-areas: 'intro' 'cards' 'preview' 'app'; }
  .theme-app { grid-template-columns: 190px 1fr; gap: 25px; padding-inline: 0; }
  .moment-product { max-width: 520px; margin-inline: auto; }
@@ -206,13 +203,11 @@ a:focus-visible { outline: 3px solid #9dccff; outline-offset: 5px; border-radius
 @media (max-width: 500px) {
  .hero-product { grid-template-columns: .85fr 1.15fr; }
  .app-proof img { border-radius: 22px; }
- .hero-art { gap: 18px; margin-right: -18px; }
- .hero-art img { border-width: 3px; border-radius: 16px; }
+ .hero-bounce-cards { margin-inline: -24px -34px; transform: scale(.58); }
  .theme-app { display: flex; flex-direction: column-reverse; gap: 24px; text-align: center; }
  .theme-app .app-proof { width: 220px; }
  .moment-product { grid-template-columns: 1.35fr .85fr; gap: 15px; }
- .moment-portraits { gap: 16px; }
- .moment-portraits figcaption { font-size: 10px; }
+ .moment-bounce-cards { transform: scale(.88); }
  .together-visual { grid-template-columns: 1fr; }
  .friends-image { max-width: 280px; justify-self: center; }
  .invite-screen img { width: 240px; }
@@ -257,7 +252,7 @@ a:focus-visible { outline: 3px solid #9dccff; outline-offset: 5px; border-radius
 /* Keep actual app UI consistently on the right of supporting media. */
 .moment-product { grid-template-columns: 1fr 1.1fr; }
 .moment-product > .app-proof { grid-column: 2; grid-row: 1; }
-.moment-portraits { grid-column: 1; grid-row: 1; }
+.moment-bounce-cards { grid-column: 1; grid-row: 1; }
 .film-result { grid-template-columns: minmax(0, 1fr) minmax(0, 240px); align-items: center; gap: 24px; }
 .film-result .film-screen { grid-column: 2; grid-row: 1; min-width: 0; }
 .film-result .film-screen img { width: 100%; }
@@ -270,7 +265,8 @@ a:focus-visible { outline: 3px solid #9dccff; outline-offset: 5px; border-radius
  .film-result { grid-template-columns: minmax(0, 1fr) minmax(0, 210px); }
 }
 @media (max-width: 500px) {
- .moment-product { grid-template-columns: .85fr 1.35fr; }
+ .moment-product { grid-template-columns: 1fr 1.25fr; }
+ .moment-bounce-cards { transform: scale(.62); }
  .together-visual { grid-template-columns: .75fr 1.25fr; gap: 15px; }
  .invite-screen img { width: 100%; }
  .film-result { grid-template-columns: .85fr 1.15fr; gap: 15px; }

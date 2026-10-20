@@ -14,9 +14,11 @@ struct LoopingClipPlayer: View {
     /// Applied as the frames come off the file. Nothing is written anywhere, so
     /// turning it off gives back exactly what the camera saw.
     var look: PersonalEffectParameters = .none
+    /// For a wall of tiles playing at once, where sound from all of them is noise.
+    var muted = false
 
     var body: some View {
-        LoopingPlayerLayerView(url: url, look: look)
+        LoopingPlayerLayerView(url: url, look: look, muted: muted)
             .id(refreshToken)
     }
 }
@@ -24,6 +26,7 @@ struct LoopingClipPlayer: View {
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
     var look: PersonalEffectParameters = .none
+    var muted = false
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -92,6 +95,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         let item = AVPlayerItem(url: request.url)
         item.videoComposition = composition
         let queuePlayer = AVQueuePlayer()
+        queuePlayer.isMuted = muted
         coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
         view.playerLayer.player = queuePlayer
         queuePlayer.play()

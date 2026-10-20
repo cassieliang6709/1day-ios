@@ -70,14 +70,21 @@ struct FilmView: View {
     /// Whether the last save was refused for want of photo-library access —
     /// the only saveMessage iOS Settings can do something about.
     @State private var photosDenied = false
+    /// This render is in Photos. Cleared by the next render, which is a
+    /// different file and so genuinely not saved yet.
+    @State private var isSaved = false
     /// How far the staged progress animation has got. Cosmetic — the stitcher
     /// gives no progress callbacks, so this paces the copy honestly by naming
     /// what is actually happening rather than claiming a percentage.
     @State private var stage = 0
     @State private var showAdjust = false
-    @State private var includeTitleCard = true
-    @State private var includeCaptions = true
-    @State private var fadeSeconds = 0.35
+    /// What goes into the render. Written only by the Adjust sheet's Apply —
+    /// see `AdjustFilmSheet` for why the sheet edits a copy.
+    @State private var adjustments = FilmAdjustments()
+    /// Whose takes go in and which stand still. Rooms only; written by the
+    /// filter sheet's Apply and saved for this story on this phone.
+    @State private var selection: FilmSelection
+    @State private var filterTarget: FilmFilterTarget?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     /// The film gets whatever you've been watching your clips in. It isn't
@@ -87,6 +94,23 @@ struct FilmView: View {
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
 
+    init(challenge: Challenge, clips: [DayClip]) {
+        self.challenge = challenge
+        self.clips = clips
+        _selection = State(initialValue: challenge.isShared
+            ? FilmSelectionStore.load(for: challenge.id) : FilmSelection())
+    }
+
+    /// Everyone with a take. The filter is a room's: a solo film is all you.
+    private var people: [FilmPerson] {
+        challenge.isShared ? FilmPerson.people(in: clips) : []
+    }
+
+    /// The takes the film is made of.
+    private var filmClips: [DayClip] {
+        challenge.isShared ? selection.applied(to: clips) : clips
+    }
+
     var body: some View {
         ZStack {
             OneDayCanvas(seed: 3)
@@ -94,20 +118,24 @@ struct FilmView: View {
             if let exportURL {
                 FinalFilmTimeline(
                     challenge: challenge,
-                    clips: clips,
+                    clips: filmClips,
                     filmURL: exportURL,
                     isSaving: isSaving,
+                    isSaved: isSaved,
                     saveMessage: saveMessage,
                     onOpenSettings: photosDenied ? openSystemSettings : nil,
-                    onSave: { Task { await saveToPhotos(exportURL) } },
-                    onAdjust: { showAdjust = true })
+                    onSave: { url in Task { await saveToPhotos(url) } },
+                    onAdjust: { showAdjust = true },
+                    people: people,
+                    selection: selection,
+                    onFilter: { filterTarget = $0 })
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else if let errorMessage {
                 failure(errorMessage)
             } else {
                 GeneratingFilm(
                     challenge: challenge,
-                    clips: clips,
+                    clips: filmClips,
                     stage: stage)
                     .transition(.opacity)
             }
@@ -115,21 +143,37 @@ struct FilmView: View {
         .toolbar(.hidden, for: .navigationBar)
         .overlay(alignment: .topLeading) {
             IconBubble(systemName: "chevron.left") { dismiss() }
+                .accessibilityLabel(Text(Strings.back))
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
         }
         .sheet(isPresented: $showAdjust) {
-            AdjustFilmSheet(
-                includeTitleCard: $includeTitleCard,
-                includeCaptions: $includeCaptions,
-                fadeSeconds: $fadeSeconds
-            ) {
-                withAnimation(OneDay.Motion.soft) { exportURL = nil }
-                Task { await render() }
+            // Apply only writes the values back. `renderRevision` includes
+            // them, so the `.task` below notices and re-renders once; the
+            // explicit `render()` this used to call on top of that started a
+            // second export of the same film racing the first.
+            AdjustFilmSheet(initial: adjustments) { adjustments = $0 }
+                .presentationDetents([.medium])
+        }
+        .sheet(item: $filterTarget) { target in
+            // Same rule as Adjust: Apply writes the value, `renderRevision`
+            // carries it, and the `.task` below makes the one new film.
+            FilmFilterSheet(people: people, selection: selection, target: target) { picked in
+                let kept = picked.pruned(to: clips)
+                selection = kept
+                FilmSelectionStore.save(kept, for: challenge.id)
             }
-            .presentationDetents([.medium])
         }
         .task(id: renderRevision) { await render() }
+        // A toast, not a status line: "saved" is news for a moment and then
+        // it's the button's job (已保存) to remember. A permission refusal
+        // stays, because it carries the way to Settings.
+        .task(id: saveMessage) {
+            guard saveMessage != nil, !photosDenied else { return }
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(OneDay.Motion.soft) { saveMessage = nil }
+        }
     }
 
     // MARK: - Failure
@@ -162,14 +206,34 @@ struct FilmView: View {
     /// The exported film is derived data. Re-recording reuses the same file
     /// URL, so the clip URL alone cannot invalidate a render — include every
     /// field that gets burned into the frames.
+    ///
+    /// Only the takes that go in, plus where the held ones stop — a different
+    /// pick is a different film, so a film cached from another pick must not
+    /// come back (`FilmRenderCache` compares this whole list).
     private var renderRevision: [RenderRevision] {
-        clips.map(RenderRevision.init) + [
+        let held = challenge.isShared ? selection.freezeFrames(for: clips) : [:]
+        let holds = held.sorted { $0.key < $1.key }
+            .map { "\($0.key)@\(String(format: "%.3f", $0.value))" }
+            .joined(separator: ",")
+        return filmClips.map(RenderRevision.init) + [
             RenderRevision(
-                options: "\(includeTitleCard)-\(includeCaptions)-\(fadeSeconds)-\(look.rawValue)")
+                options: "\(adjustments.includeTitleCard)-\(adjustments.includeCaptions)"
+                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]")
         ]
     }
 
-    private struct RenderRevision: Equatable {
+    /// Everything else that ends up in the frames: the title card's words,
+    /// which follow the story's name and the app language, and the room
+    /// layout. Not part of `renderRevision`, so changing them doesn't restart a
+    /// render mid-flight — but a cached film made with different ones is a
+    /// different film.
+    private var cacheContext: String {
+        let card = adjustments.includeTitleCard ? "\(titleCard.title)|\(titleCard.subtitle)" : ""
+        return "\(card)|\(challenge.isShared)|\(challenge.isTimeOnly)|\(account.account?.id ?? "")"
+    }
+
+    /// File-private rather than private so `FilmRenderCache` can hold one.
+    fileprivate struct RenderRevision: Equatable {
         var id = ""
         var url: URL?
         var authorName: String?
@@ -179,6 +243,9 @@ struct FilmView: View {
         /// without changing anything else, so a stale film has to be noticed
         /// here or the old one gets handed back.
         var captionSticker: CaptionSticker?
+        /// Every caption, for the same reason: adding a second one changes the
+        /// frames and leaves the first one's words and place alone.
+        var captions: [Caption] = []
         var recordedAt: Date?
         var emoji: [String] = []
         var comments: [String] = []
@@ -191,6 +258,7 @@ struct FilmView: View {
             label = clip.label
             overlayText = clip.overlayText
             captionSticker = clip.captionSticker
+            captions = clip.captions
             recordedAt = clip.recordedAt
             emoji = clip.emoji
             comments = clip.comments
@@ -203,7 +271,23 @@ struct FilmView: View {
 
     private func render() async {
         let requested = renderRevision
+        let context = cacheContext
         errorMessage = nil
+        isSaved = false
+        saveMessage = nil
+
+        // Same story, same footage, same settings as a film this session
+        // already made: show that one. Opening the film used to re-export it
+        // every time, so backing out to check a clip and coming straight back
+        // cost the whole wait again. Never for the sample room, whose scope
+        // owns — and deletes — its files.
+        if previewMedia == nil,
+           let cached = FilmRenderCache.film(
+               for: challenge.id, revision: requested, context: context) {
+            exportURL = cached
+            return
+        }
+
         exportURL = nil
         stage = 0
         let ticker = Task { await advanceStages() }
@@ -211,28 +295,36 @@ struct FilmView: View {
 
         do {
             var options = VideoStitcher.Options()
-            options.crossfadeSeconds = fadeSeconds
-            options.showDayCaptions = includeCaptions && !challenge.isTimeOnly
+            options.crossfadeSeconds = adjustments.fadeSeconds
+            options.showDayCaptions = adjustments.includeCaptions && !challenge.isTimeOnly
             options.layout = challenge.isShared ? .friendsTogether : .sequential
-            options.titleCard = includeTitleCard ? titleCard : nil
+            options.titleCard = adjustments.includeTitleCard ? titleCard : nil
             options.look = look
             // Solo films are all yours, so the grade is unrestricted; in a
             // shared room it stops at your own takes.
             options.lookAuthorID = challenge.isShared ? (account.account?.id ?? "local") : nil
+            if challenge.isShared {
+                options.keptClipIDs = Set(filmClips.map(\.id))
+                options.freezeFrames = selection.freezeFrames(for: clips)
+            }
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             // The scope refuses — and deletes — anything handed to it after it
             // closes, which is what 退出演示 does. Asked before the outcome is
             // computed so the answer is part of the decision rather than an
             // early return around it.
             let rejected = previewMedia.map { !$0.accept(url) } ?? false
+            let superseded = requested != renderRevision
+            if previewMedia == nil, !superseded {
+                FilmRenderCache.store(
+                    url, for: challenge.id, revision: requested, context: context)
+            }
             apply(
                 FilmRenderOutcome.of(
                     stitchFailed: false,
-                    superseded: requested != renderRevision,
+                    superseded: superseded,
                     scopeRejected: rejected,
                     scopeClosed: previewMedia?.isClosed == true),
-                url: url,
-                reason: nil)
+                url: url)
         } catch {
             print("[stitch] failed: \(error)")
             apply(
@@ -241,33 +333,39 @@ struct FilmView: View {
                     superseded: requested != renderRevision,
                     scopeRejected: false,
                     scopeClosed: previewMedia?.isClosed == true),
-                url: nil,
-                reason: error.localizedDescription)
+                url: nil)
         }
     }
 
     /// Puts the outcome on screen. The one place `exportURL` and `errorMessage`
     /// are written after a render, so "always one or the other" is checkable by
     /// reading a single function instead of three `return`s.
-    private func apply(_ outcome: FilmRenderOutcome, url: URL?, reason: String?) {
+    ///
+    /// A failure says the same fixed sentence whatever went wrong. It used to
+    /// print `error.localizedDescription`, which is AVFoundation talking to
+    /// itself ("The operation could not be completed (AVFoundationErrorDomain
+    /// error -11800)"); the raw error is logged in `render()` instead.
+    private func apply(_ outcome: FilmRenderOutcome, url: URL?) {
         switch outcome {
         case .superseded:
             // Another render owns the screen and will land its own result.
             if let url { try? FileManager.default.removeItem(at: url) }
         case .film:
-            guard let url else { errorMessage = Strings.stitchFailed; return }
+            guard let url else { errorMessage = Strings.filmFailedTryAgain; return }
             withAnimation(OneDay.Motion.soft) { exportURL = url }
         case .sessionEnded:
             errorMessage = Strings.filmSessionEnded
         case .failed:
-            errorMessage = reason ?? Strings.stitchFailed
+            errorMessage = Strings.filmFailedTryAgain
         }
     }
 
-    /// Walks the four named steps while the stitcher works. Stops short of the
-    /// last one so the copy never claims to be finished before it is.
+    /// Walks the named steps while the stitcher works, and parks on the last
+    /// one — 导出 — with its spinner still turning. `GeneratingFilm` only ticks
+    /// a step once the *next* one has started, so the export is never shown
+    /// as done; the screen leaving is what says that.
     private func advanceStages() async {
-        for step in 1...3 {
+        for step in 1..<GeneratingFilm.stepCount {
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
             withAnimation(OneDay.Motion.soft) { stage = step }
@@ -284,7 +382,7 @@ struct FilmView: View {
             return VideoStitcher.TitleCard(
                 title: presenter.displayTitle,
                 subtitle: Strings.titleCardSubtitleOneDay(
-                    clips.count, challenge.cards.count,
+                    filmClips.count, challenge.cards.count,
                     secondsLabel: challenge.resolvedClipLength.secondsLabel))
         }
         return VideoStitcher.TitleCard(
@@ -320,38 +418,59 @@ struct FilmView: View {
             // The film leaving the app is the one moment worth feeling. The
             // toast alone is easy to miss on a screen that's already playing.
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            isSaved = true
             saveMessage = Strings.savedToPhotos
         } catch {
-            saveMessage = Strings.saveFailed(error.localizedDescription)
+            print("[film] save to Photos failed: \(error)")
+            saveMessage = Strings.saveFailed
         }
     }
 }
 
 // MARK: - Adjust
 
+/// The three things the Adjust sheet changes, as one value so the sheet can
+/// hold a copy of them.
+struct FilmAdjustments: Equatable {
+    var includeTitleCard = true
+    var includeCaptions = true
+    var fadeSeconds = 0.35
+}
+
 /// What goes into the render. Kept as a plain form — it's a settings sheet,
 /// and dressing it up would only make it harder to scan.
+///
+/// It edits a draft. It used to bind straight to the film's own state, and
+/// the film re-renders whenever that state changes — so every 0.05s notch of
+/// the slider kicked off a fresh export behind the sheet, and Cancel had
+/// nothing to cancel because every change had already happened. Now nothing
+/// leaves the sheet until Apply.
 private struct AdjustFilmSheet: View {
-    @Binding var includeTitleCard: Bool
-    @Binding var includeCaptions: Bool
-    @Binding var fadeSeconds: Double
-    let onApply: () -> Void
+    let onApply: (FilmAdjustments) -> Void
+
+    @State private var draft: FilmAdjustments
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
+    init(initial: FilmAdjustments, onApply: @escaping (FilmAdjustments) -> Void) {
+        self.onApply = onApply
+        _draft = State(initialValue: initial)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section(Strings.overlays) {
-                    Toggle(Strings.openingTitleCard, isOn: $includeTitleCard)
-                    Toggle(Strings.dayCaptions, isOn: $includeCaptions)
+                    Toggle(Strings.openingTitleCard, isOn: $draft.includeTitleCard)
+                    Toggle(Strings.dayCaptions, isOn: $draft.includeCaptions)
                 }
                 Section {
                     HStack {
                         Text(Strings.transition)
-                        Slider(value: $fadeSeconds, in: 0...0.6, step: 0.05)
-                        Text(fadeSeconds == 0 ? Strings.cut : String(format: "%.2fs", fadeSeconds))
+                        Slider(value: $draft.fadeSeconds, in: 0...0.6, step: 0.05)
+                        Text(draft.fadeSeconds == 0
+                            ? Strings.cut : String(format: "%.2fs", draft.fadeSeconds))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)
@@ -371,12 +490,52 @@ private struct AdjustFilmSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.apply) {
+                        onApply(draft)
                         dismiss()
-                        onApply()
                     }
                     .bold()
                 }
             }
         }
+    }
+}
+
+// MARK: - Session cache
+
+/// The last film made for each story in this launch, so opening the film
+/// again with nothing changed shows it instead of exporting it again.
+///
+/// In memory only, and one entry per story: it is a way to skip a wait, not
+/// a library. A newer film for the same story replaces — and deletes — the
+/// older file. A hit is checked against the disk, because iOS may have
+/// cleared the temporary directory since.
+@MainActor
+private enum FilmRenderCache {
+    private struct Entry {
+        let revision: [FilmView.RenderRevision]
+        let context: String
+        let url: URL
+    }
+
+    private static var entries: [UUID: Entry] = [:]
+
+    static func film(
+        for story: UUID, revision: [FilmView.RenderRevision], context: String
+    ) -> URL? {
+        guard let entry = entries[story],
+              entry.revision == revision,
+              entry.context == context,
+              FileManager.default.fileExists(atPath: entry.url.path)
+        else { return nil }
+        return entry.url
+    }
+
+    static func store(
+        _ url: URL, for story: UUID, revision: [FilmView.RenderRevision], context: String
+    ) {
+        if let old = entries[story]?.url, old != url {
+            try? FileManager.default.removeItem(at: old)
+        }
+        entries[story] = Entry(revision: revision, context: context, url: url)
     }
 }

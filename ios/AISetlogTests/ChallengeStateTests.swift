@@ -75,16 +75,16 @@ final class ChallengeStateTests: XCTestCase {
 
         let challenge = store.createQuickStart()
 
+        // 1.5: the first story is 按时间 — no prompts, seven open slots.
         XCTAssertEqual(challenge.title, "My day")
-        XCTAssertEqual(challenge.cards.count, 3)
+        XCTAssertEqual(challenge.cards.count, 7)
         XCTAssertEqual(challenge.resolvedMode, .oneDay)
         XCTAssertEqual(challenge.resolvedClipLength, .tiny)
         XCTAssertEqual(challenge.resolvedOrientation, .portrait)
-        XCTAssertEqual(
-            challenge.momentTitles,
-            ["morning_light", "on_the_move", "golden_hour"])
+        XCTAssertTrue(challenge.isTimeOnly)
+        XCTAssertNil(challenge.momentTitles)
         XCTAssertEqual(try XCTUnwrap(repository.savedChallenges.first).id, challenge.id)
-        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 3)
+        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 7)
     }
 
     func testPresenterUnitNamesFollowMode() {
@@ -119,14 +119,14 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2s", unitPlural: "moments"),
-            "0 of 9 2s moments recorded")
+            "0 of 9 moments recorded · up to 2s each")
         UserDefaults.standard.set(
             AppLanguage.chinese.rawValue,
             forKey: AppLanguage.storageKey)
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2 秒", unitPlural: "个瞬间"),
-            "9 个瞬间中已录 0 段（2 秒）")
+            "9 个瞬间中已录 0 段（每段最长 2 秒）")
     }
 
     func testUpdatingPlanTitlesPersistsWithoutDroppingSlotsOrClips() throws {
@@ -151,27 +151,6 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(updated.momentTitles, ["Wake", "Coffee", "Shower"])
         XCTAssertEqual(updated.cards[0].clipFileName, "day1.mov")
         XCTAssertEqual(repository.savedChallenges.first?.momentTitles?.last, "Shower")
-    }
-
-    func testUpdatingCustomTemplateKeepsItsIdentityAndAllPrompts() throws {
-        let repository = MemoryChallengeRepository()
-        let store = ChallengeStore(
-            repository: repository,
-            fileStore: MigrationClipFileStore())
-        let template = ChallengeTemplate(
-            emoji: "☀️",
-            name: LocalizedText(en: "Morning", zh: "Morning"),
-            momentKeys: (1...9).map { "Step \($0)" },
-            isCustom: true)
-        store.addCustomTemplate(template)
-        var edited = template
-        edited.momentKeys?[8] = "Shower"
-
-        store.updateCustomTemplate(edited)
-
-        XCTAssertEqual(store.customTemplates.first?.id, template.id)
-        XCTAssertEqual(store.customTemplates.first?.momentKeys?.count, 9)
-        XCTAssertEqual(repository.savedTemplates.first?.momentKeys?.last, "Shower")
     }
 
     func testLegacyChallengeMigrationSurvivesRelaunch() throws {
@@ -280,12 +259,9 @@ final class ChallengeStateTests: XCTestCase {
 
 private final class MemoryChallengeRepository: ChallengeRepository {
     private(set) var savedChallenges: [Challenge] = []
-    private(set) var savedTemplates: [ChallengeTemplate] = []
 
     func loadChallenges() -> [Challenge] { [] }
     func saveChallenges(_ challenges: [Challenge]) { savedChallenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { [] }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { savedTemplates = templates }
 }
 
 private final class MigrationClipFileStore: ClipFileStore {

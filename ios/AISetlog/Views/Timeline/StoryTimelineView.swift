@@ -21,40 +21,49 @@ struct StoryTimelineView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomPreviewMediaScope) private var previewMedia
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var sheet: TimelineSheet?
     @State private var showFilm = false
     @State private var showEditPlan = false
     /// Changing the picture that stands for this story — see `StoryCoverSheet`.
-    @State private var showCoverPicker = false
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
+    /// The person whose page is open, from the face on their frame.
+    @State private var personPage: String?
     /// The room whose code is being offered for sharing, once, right after it
     /// was made. See `RoomShareNudge`.
     @State private var nudgeShareCode: String?
-    @State private var showRoomDemo = false
     /// The beat between the last moment landing and the film assembling.
     @State private var celebrate = false
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-    /// Timeline or contact sheet. Persisted, so the choice sticks.
 
     private var challenge: Challenge? { store.challenge(challengeID) }
 
     enum TimelineSheet: Identifiable, Equatable {
-        case record(day: Int)
+        /// `take` is what the new clip does to one already there: 重拍
+        /// (`.replace`, the default) or 再拍一段 (`.append`).
+        case record(day: Int, take: TakeTarget = .replace(nil))
         case preview(day: Int, authorID: String?)
-        /// The whole moment rather than one person's take — everyone who
-        /// filmed it, stacked. The grid opens this: a tile stands for the
-        /// moment, so it should show what the moment ends up looking like.
-        case moment(day: Int)
+        /// One person's one take, full screen, where its captions are edited.
+        /// Every tap on a clip in a room opens this. It replaced `.moment`,
+        /// which opened everybody's takes stitched together — a preview of
+        /// the film, where nothing could be changed.
+        case clip(day: Int, authorID: String?, takeID: UUID?)
+
+        /// The take a tile stands for.
+        static func open(_ clip: DayClip) -> TimelineSheet {
+            .clip(day: clip.day, authorID: clip.authorID, takeID: clip.takeID)
+        }
 
         var id: String {
             switch self {
-            case .record(let day): "record-\(day)"
+            case .record(let day, _): "record-\(day)"
             case .preview(let day, let authorID): "preview-\(day)-\(authorID ?? "local")"
-            case .moment(let day): "moment-\(day)"
+            case .clip(let day, let authorID, let takeID):
+                "clip-\(day)-\(authorID ?? "local")-\(takeID?.uuidString ?? "1")"
             }
         }
     }
@@ -76,6 +85,7 @@ struct StoryTimelineView: View {
                 FilmView(
                     challenge: challenge,
                     clips: store.recordedClips(for: challengeID))
+                    .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
         }
         .sheet(isPresented: $showRoomChat) {
@@ -84,37 +94,14 @@ struct StoryTimelineView: View {
             RoomChatView(challengeID: challengeID) { day in
                 showRoomChat = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    sheet = .moment(day: day)
+                    sheet = .clip(day: day, authorID: nil, takeID: nil)
                 }
             }
-        }
-        .sheet(isPresented: $showRoomDemo) {
-            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-            RoomChatDemoView(chinese: appLanguage.resolved == .chinese)
-            #endif
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
                 EditPlanSheet(challenge: challenge) { title, moments in
                     store.updatePlan(challengeID, title: title, momentTitles: moments)
-                }
-            }
-        }
-        .sheet(isPresented: $showCoverPicker) {
-            if let challenge {
-                // Newest first: the frame somebody wants for a cover is almost
-                // always the one they just filmed.
-                let clips = store.recordedClips(for: challengeID).sorted {
-                    ($0.recordedAt ?? .distantPast, $0.day)
-                        > ($1.recordedAt ?? .distantPast, $1.day)
-                }
-                StoryCoverSheet(
-                    challenge: challenge,
-                    clips: clips,
-                    currentCoverURL: store.storyCoverURL(
-                        for: challenge, latestClipURL: clips.first?.url)
-                ) { choice in
-                    store.setStoryCover(choice, for: challengeID)
                 }
             }
         }
@@ -147,15 +134,41 @@ struct StoryTimelineView: View {
                         : Strings.deleteStoryWarning(challenge.recordedCount))
             }
         }
-        // The magic moment: the last slot lands → a tiny celebration → the
-        // film assembles itself. No button to discover.
-        .onChange(of: challenge?.isComplete) { wasComplete, isComplete in
-            guard wasComplete == false, isComplete == true else { return }
-            withAnimation(OneDay.Motion.pop) { celebrate = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                celebrate = false
-                showFilm = true
-            }
+        // Friends' avatars and today's moods, for every face on this page and
+        // in the sheets it opens (`MemberFace`).
+        .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
+    }
+
+    /// Every moment holds footage from somebody — the same rule the
+    /// `FilmReadyCard` appears by.
+    private var dayIsComplete: Bool {
+        guard let challenge else { return false }
+        return StoryAgenda(
+            momentCount: challenge.cards.count,
+            clips: store.recordedClips(for: challengeID),
+            myID: account.account?.id ?? RoomProgress.soloAuthorID
+        ).isComplete
+    }
+
+    /// The magic moment: the last slot lands → a tiny celebration → the film
+    /// assembles itself. No button to discover.
+    ///
+    /// Only for a save of *mine*. This used to hang off `onChange` of the
+    /// story's completeness, which also fires when the 10-second room sync
+    /// brings in a friend's last clip — so somebody reading the chat or
+    /// scrolling their own day got yanked onto the film screen by a thing
+    /// that happened on another phone. A day finished by someone else just
+    /// grows the `FilmReadyCard`, and the page stays where you left it.
+    ///
+    /// Reduce Motion keeps the beat but drops the movement: a plain fade, and
+    /// the mascot holds still.
+    private func celebrateMyFinish() {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : OneDay.Motion.pop) {
+            celebrate = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            celebrate = false
+            showFilm = true
         }
     }
 
@@ -166,88 +179,19 @@ struct StoryTimelineView: View {
         let members = store.members(for: challengeID)
         let myID = account.account?.id ?? RoomProgress.soloAuthorID
         let agenda = StoryAgenda(momentCount: challenge.cards.count, clips: clips, myID: myID)
-        // Only ever built for a shared room. Everything it draws — the roster,
-        // who filmed, who we're waiting on — is a sentence about other people,
-        // and a solo story has none to write about.
-        let cast = challenge.isShared
-            ? RoomCast(
-                members: members, clips: clips,
-                momentCount: challenge.cards.count,
-                myID: myID, myName: account.account?.displayName)
-            : nil
 
-        return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
-                TimelineHeader(
-                    challenge: challenge,
-                    cast: cast,
-                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
-
-                StoryProgressBar(filmed: agenda.filmedCount, total: agenda.total)
-
-                // Only once, and only when it's the whole answer.
-                if agenda.isComplete {
-                    FilmReadyCard(clipCount: clips.count) { showFilm = true }
-                }
-
-                // One list, in the order the day happens. It was two — 还没拍的
-                // as a card of rows, then 拍过的 as a contact sheet — which cut
-                // the day in half and re-sorted each half by state, so a moment
-                // that is second in the plan and filmed sat below one that is
-                // fifth and empty.
-                //
-                // Two shapes, chosen by whether the moments have names. A rail
-                // gives each name its own line and keeps seven readable; a
-                // 按时间 story has no names — its slots are 「第 N 个瞬间」,
-                // the numbering 1.3 deleted — so a vertical list of them is a
-                // list of nothing, one per line. That story gets a strip of
-                // frames labelled with the times instead, which is the only
-                // real fact it has and the reason somebody picked 按时间.
-                // See `MomentTimeline` and `MomentFilmstrip`.
-                //
-                // A moment in a story only you filmed is one clip, so it opens
-                // as a page in the day. In a shared room it is the whole moment
-                // with everyone stacked in it, which isn't a page — that's what
-                // `.moment` is for.
-                if challenge.isTimeOnly {
-                    MomentFilmstrip(
-                        challenge: challenge,
-                        clips: clips,
-                        members: members,
-                        myID: myID,
-                        agenda: agenda,
-                        onPlay: { day in
-                            sheet = challenge.isShared
-                                ? .moment(day: day)
-                                : .preview(day: day, authorID: nil)
-                        },
-                        onFilm: { day in sheet = .record(day: day) })
-                } else {
-                    MomentTimeline(
-                        challenge: challenge,
-                        clips: clips,
-                        members: members,
-                        myID: myID,
-                        agenda: agenda,
-                        onPlay: { day in
-                            sheet = challenge.isShared
-                                ? .moment(day: day)
-                                : .preview(day: day, authorID: nil)
-                        },
-                        onFilm: { day in sheet = .record(day: day) })
-                }
-
+        return Group {
+            if challenge.isShared {
+                roomPage(challenge, clips: clips, members: members, myID: myID, agenda: agenda)
+            } else {
+                storyPage(challenge, clips: clips, members: members, myID: myID, agenda: agenda)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 6)
-            .padding(.bottom, 24)
         }
-        .scrollIndicators(.hidden)
         .safeAreaInset(edge: .top, spacing: 0) {
             navBar(challenge, agenda: agenda, clipCount: clips.count)
         }
-        // The floating tab bar is drawn over the whole stack, so the scroll
-        // view reserves its own clearance rather than inheriting one.
+        // The floating tab bar is drawn over the whole stack, so the page
+        // reserves its own clearance rather than inheriting one.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear.frame(height: OneDay.tabBarClearance)
         }
@@ -263,6 +207,16 @@ struct StoryTimelineView: View {
                 do { try await Task.sleep(for: .seconds(10)) } catch { break }
             }
         }
+        .navigationDestination(item: $personPage) { id in
+            if let column = RoomFeed.columns(clips: clips, members: members, myID: myID)
+                .first(where: { $0.id == id }) {
+                RoomPersonPage(
+                    column: column,
+                    slotTitle: { slotTitle(for: $0) },
+                    onPlay: { clip in sheet = .open(clip) })
+                    .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
+            }
+        }
         .confirmationDialog(
             Strings.sendTheCodeTitle,
             isPresented: Binding(
@@ -273,12 +227,126 @@ struct StoryTimelineView: View {
             if let code = nudgeShareCode {
                 // A `ShareLink` inside the dialog rather than a button that
                 // opens a second sheet: one tap from "yes" to the share sheet.
+                // A bare `ShareLink`, not `RoomInviteShareLink`: a dialog's
+                // actions are matched by type, and a wrapper view risks being
+                // dropped. Same card, same message.
+                let card = RoomInviteCardImage(content: RoomInviteCardContent(
+                    challenge: challenge, inviter: account.account?.displayName))
                 ShareLink(
-                    item: shareText(code: code, challenge: challenge),
+                    item: card,
+                    subject: Text(card.content.headline),
+                    message: Text(shareText(code: code, challenge: challenge)),
+                    preview: SharePreview(card.content.headline, image: card),
                     label: { Text(Strings.sendTheCodeNow) })
             }
             Button(Strings.sendTheCodeLater, role: .cancel) {}
         }
+    }
+
+    /// A shared room (1.5): the name, then one big frame per person filling
+    /// the rest of the screen — see `RoomFrames`. The column layout,
+    /// `RoomFeed`, is kept but not drawn. 生成 vlog and 聊天 are icons in the
+    /// nav bar now, so the frames get the height.
+    private func roomPage(
+        _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
+        myID: String, agenda: StoryAgenda
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            TimelineHeader(
+                challenge: challenge,
+                isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
+
+            RoomFrames(
+                clips: clips,
+                members: members,
+                myID: myID,
+                nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                slotTitle: { slotTitle(for: $0) },
+                // Opens the tapped take alone, full screen, where its
+                // captions are edited.
+                onPlay: { clip in sheet = .open(clip) },
+                onFilm: { day in sheet = .record(day: day) },
+                onOpenPerson: { column in personPage = column.id },
+                hasPoked: { id in
+                    store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                },
+                onPoke: { id in
+                    store.poke(challengeID: challengeID, targetAuthorID: id)
+                })
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 12)
+    }
+
+    private func storyPage(
+        _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
+        myID: String, agenda: StoryAgenda
+    ) -> some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                TimelineHeader(
+                    challenge: challenge,
+                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
+
+                // A solo story keeps the film card, once, when it's the whole
+                // answer.
+                if agenda.isComplete {
+                    FilmReadyCard(momentCount: agenda.total) { showFilm = true }
+                }
+
+                // One list, in the order the day happens. It was two — 还没拍的
+                // as a card of rows, then 拍过的 as a contact sheet — which cut
+                // the day in half and re-sorted each half by state, so a moment
+                // that is second in the plan and filmed sat below one that is
+                // fifth and empty.
+                //
+                // Two shapes, chosen by whether the moments have names. A rail
+                // gives each name its own line and keeps seven readable; a
+                // 按时间 story has no names — its slots are 「第 N 个瞬间」,
+                // the numbering 1.3 deleted — so a vertical list of them is a
+                // list of nothing, one per line. That story gets a diary
+                // instead — one row per clip, headed by the time it was
+                // filmed — which is the only real fact it has and the reason
+                // somebody picked 按时间.
+                // See `MomentTimeline` and `MomentFilmstrip`.
+                //
+                // A moment in a story only you filmed is one clip, so it opens
+                // as a page in the day.
+                if challenge.isTimeOnly {
+                    MomentFilmstrip(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        agenda: agenda,
+                        onPlay: { day in
+                            sheet = challenge.isShared
+                                ? .clip(day: day, authorID: nil, takeID: nil)
+                                : .preview(day: day, authorID: nil)
+                        },
+                        onFilm: { day in sheet = .record(day: day) })
+                } else {
+                    MomentTimeline(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        agenda: agenda,
+                        onPlay: { day in
+                            sheet = challenge.isShared
+                                ? .clip(day: day, authorID: nil, takeID: nil)
+                                : .preview(day: day, authorID: nil)
+                        },
+                        onFilm: { day in sheet = .record(day: day) })
+                }
+
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 6)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
     }
 
     /// Offer the code once, the first time you land on a room you own that
@@ -299,36 +367,6 @@ struct StoryTimelineView: View {
         nudgeShareCode = code
     }
 
-    /// A header, and optionally the one sentence the section needs to be read
-    /// correctly. "还没拍的" is a list of choices, not a running order, and
-    /// nothing in a list of rows says that on its own.
-    private func section<Content: View>(
-        _ title: String, note: String? = nil, @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                SectionLabel(text: title)
-                if let note {
-                    Text(note)
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(2)
-                }
-            }
-            content()
-        }
-    }
-
-    /// Every moment still open to me, all of them, all the same.
-    ///
-    /// Nothing is held back for a card above and nothing is skipped: the list
-    /// *is* the offer, so whichever moment is actually happening right now is
-    /// one tap away instead of three rows into a queue.
-
-    /// A story recorded by time has no prompts, so its moments are called by
-    /// their place in the day. Falling back to the prompt title would print
-    /// "Day 3" down a story that lasts one day.
-
     // MARK: - Chrome
 
     private func navBar(
@@ -338,47 +376,54 @@ struct StoryTimelineView: View {
 
         return HStack(spacing: 12) {
             IconBubble(systemName: "chevron.left") { dismiss() }
+                .accessibilityLabel(Text(Strings.back))
                 .accessibilityIdentifier("room-back")
 
             Spacer()
 
-            if challenge.isShared, let code = challenge.roomCode {
-                Button {
+            // A room's two actions are icons up here (1.5), beside 邀请, so
+            // the frames below get the whole screen. Their identifiers are
+            // what the UI tests find them by.
+            if challenge.isShared {
+                IconBubble(systemName: "film.stack.fill", label: Strings.makeRoomVlog) {
+                    showFilm = true
+                }
+                .disabled(clipCount == 0)
+                .opacity(clipCount == 0 ? 0.5 : 1)
+                .accessibilityIdentifier("room-make-vlog")
+
+                IconBubble(systemName: "bubble.left.and.bubble.right.fill",
+                           label: Strings.chatLabel) {
                     showRoomChat = true
-                } label: {
-                    Label(appLanguage.resolved == .chinese ? "聊天" : "Chat", systemImage: "bubble.left.and.bubble.right")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .accessibilityIdentifier("room-chat")
+            }
+
+            if challenge.isShared, let code = challenge.roomCode {
                 if previewMedia == nil {
-                ShareLink(item: shareText(code: code, challenge: challenge)) {
-                    Label(Strings.inviteLabel, systemImage: "person.badge.plus")
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 9)
-                        .background(.regularMaterial, in: Capsule())
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
-                        .oneDaySoftShadow(strength: 0.5)
-                }
+                    RoomInviteShareLink(
+                        content: RoomInviteCardContent(
+                            challenge: challenge, inviter: account.account?.displayName),
+                        message: shareText(code: code, challenge: challenge)
+                    ) {
+                        roomCapsule(Strings.inviteLabel, systemImage: "person.badge.plus")
+                    }
+                    .accessibilityIdentifier("room-invite")
                 }
             }
 
+            // The 房间演示 item that used to open this menu is gone with the
+            // chat's 演示 button: both were a second door into the same local
+            // sample room, from inside a real one. The sample is still on the
+            // home screen behind `-demoEntries` (`PlansHomeView`).
             Menu {
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                if challenge.isShared, previewMedia == nil {
-                    Button(appLanguage.resolved == .chinese ? "房间演示" : "Room demo", systemImage: "person.3.sequence") {
-                        showRoomDemo = true
-                    }
-                }
-                #endif
                 // Watching an unfinished day is a real thing to want — a friend
                 // who joins late can see it before filming — but it isn't the
                 // page's answer to "what now", so it stops being a button and
                 // becomes a menu item. Once the day is full the page shows the
                 // film card itself, and a second entry would be the same
                 // action twice.
-                if clipCount > 0, !agenda.isComplete {
+                if !challenge.isShared, clipCount > 0, !agenda.isComplete {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
                     }
@@ -386,12 +431,6 @@ struct StoryTimelineView: View {
 
                 if !challenge.isTimeOnly {
                     Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
-                }
-
-                // Next to 编辑计划 because it is the same kind of thing: what
-                // this story *is*, rather than what to do in it.
-                Button(Strings.storyCoverTitle, systemImage: "photo") {
-                    showCoverPicker = true
                 }
 
                 Button(
@@ -432,6 +471,10 @@ struct StoryTimelineView: View {
                         }
                     }
                     .oneDaySoftShadow(strength: 0.5)
+                    // Drawn at 38, tapped at 44: the circle matches the back
+                    // bubble, the target meets the minimum.
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(Text(syncError ?? Strings.moreLabel))
         }
@@ -439,12 +482,28 @@ struct StoryTimelineView: View {
         .padding(.vertical, 10)
     }
 
+    /// The glass pill 邀请 is drawn in. At least 44pt tall, so it isn't a
+    /// smaller target than the bubbles beside it.
+    private func roomCapsule(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundStyle(OneDay.brandText)
+            .lineLimit(1)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
+            .oneDaySoftShadow(strength: 0.5)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+    }
+
     private var celebration: some View {
         VStack(spacing: 14) {
-            OneDayBuddy(size: 78, isWorking: true)
+            OneDayBuddy(size: 78, isWorking: !reduceMotion)
             Text(Strings.yourFilmIsHere)
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(OneDay.onBrand)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OneDay.brand.opacity(0.96).ignoresSafeArea())
@@ -456,36 +515,25 @@ struct StoryTimelineView: View {
     @ViewBuilder
     private func sheetContent(_ presented: TimelineSheet) -> some View {
         switch presented {
-        case .record(let day):
+        case .record(let day, let take):
             RecordClipView(
                 day: day,
                 slotTitle: slotTitle(for: day),
-                momentCount: challenge?.cards.count ?? 0,
+                momentCount: momentCountOnScreen,
                 clipLength: challenge?.resolvedClipLength ?? .tiny,
-                showsPrompt: challenge?.isTimeOnly != true,
-                orientation: challenge?.resolvedOrientation ?? .portrait
+                showsPrompt: showsPrompt(for: day),
+                orientation: challenge?.resolvedOrientation ?? .portrait,
+                lockedCamera: challenge?.cameraStyle
             ) { url, overlayText in
+                let wasComplete = dayIsComplete
                 store.saveClip(
-                    from: url, day: day, challengeID: challengeID, overlayText: overlayText)
+                    from: url, day: day, challengeID: challengeID, overlayText: overlayText,
+                    take: take)
+                if !wasComplete, dayIsComplete { celebrateMyFinish() }
             }
 
-        case .moment(let day):
-            let slotClips = store.recordedClips(for: challengeID).filter { $0.day == day }
-            StitchedMomentPreview(
-                clips: slotClips,
-                day: day,
-                slotTitle: slotTitle(for: day),
-                momentCount: challenge?.cards.count ?? 0,
-                clipLength: challenge?.resolvedClipLength ?? .tiny,
-                challengeID: challengeID,
-                showsPrompt: challenge?.isTimeOnly != true,
-                myID: account.account?.id ?? "local"
-            ) {
-                sheet = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    sheet = .record(day: day)
-                }
-            }
+        case .clip(let day, let targetAuthorID, let takeID):
+            clipReview(day: day, authorID: targetAuthorID, takeID: takeID)
 
         case .preview(let day, let targetAuthorID):
             // The tapped clip, on its own. The swipe that used to reach the
@@ -503,19 +551,67 @@ struct StoryTimelineView: View {
                     clipLength: challenge?.resolvedClipLength ?? .tiny,
                     showsPrompt: challenge?.isTimeOnly != true,
                     startIndex: start
-                ) { retakeDay in
+                ) { retakeDay, take in
                     sheet = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        sheet = .record(day: retakeDay)
+                        sheet = .record(day: retakeDay, take: take)
                     }
                 }
             }
         }
     }
 
+    /// The full-screen editor on one take, with 重拍 and 再拍一段 wired back
+    /// to the camera.
+    @ViewBuilder
+    private func clipReview(day: Int, authorID: String?, takeID: UUID?) -> some View {
+        let deck = ClipDeck(
+            clips: store.recordedClips(for: challengeID),
+            momentCount: challenge?.cards.count ?? 0,
+            myID: account.account?.id ?? RoomProgress.soloAuthorID)
+        if let start = deck.index(ofDay: day, authorID: authorID, takeID: takeID) {
+            ClipDeckReview(
+                deck: deck,
+                challengeID: challengeID,
+                momentCount: momentCountOnScreen,
+                clipLength: challenge?.resolvedClipLength ?? .tiny,
+                showsPrompt: showsPrompt(for: day),
+                startIndex: start
+            ) { retakeDay, take in
+                sheet = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    sheet = .record(day: retakeDay, take: take)
+                }
+            }
+        } else {
+            // The take went away between the tap and the sheet (a sync, a
+            // delete). Something has to be on screen to close.
+            Color.black.ignoresSafeArea().onTapGesture { sheet = nil }
+        }
+    }
+
+    /// The slot's name as the camera and the player print it. In a shared
+    /// room that is a real name or nothing — a room doesn't number its days on
+    /// screen (1.5), and every one of these used to fall back to 「第 N 天」.
     private func slotTitle(for day: Int) -> String? {
         guard let challenge, !challenge.isTimeOnly else { return nil }
-        return ChallengePresenter(challenge: challenge).title(forSlot: day)
+        return ChallengePresenter(challenge: challenge).slotLabel(forSlot: day)
+    }
+
+    /// Whether the camera and the player put the moment's name on the frame.
+    /// A room slot with no name has nothing to print; without this the camera
+    /// stamped its fallback, 「这个瞬间」, over the picture.
+    private func showsPrompt(for day: Int) -> Bool {
+        guard let challenge, !challenge.isTimeOnly else { return false }
+        return !challenge.isShared || slotTitle(for: day) != nil
+    }
+
+    /// How many slots the camera's bars and the player's 「3 / 7」 chip count
+    /// out of. Zero in a room, which hides both: "3 of 7" is a day number by
+    /// another name.
+    private var momentCountOnScreen: Int {
+        guard let challenge else { return 0 }
+        return challenge.isShared ? 0 : challenge.cards.count
     }
 
     private func shareText(code: String, challenge: Challenge) -> String {

@@ -10,11 +10,23 @@ struct DayClip: Identifiable {
     var authorName: String?
     var authorID: String?
     var label: String?
-    var overlayText: String?
-    /// Where `overlayText` sits on the frame, and how it's drawn. Nil draws it
-    /// at `CaptionSticker.default`, which is where every caption used to go.
-    var captionSticker: CaptionSticker?
+    /// The clip's own words, every one of them, in the order they were added.
+    var captions: [Caption]
+    /// The first caption's words.
+    var overlayText: String? {
+        get { captions.firstText }
+        set { captions.setFirstText(newValue) }
+    }
+    /// Where the first caption sits. Nil draws it at `CaptionSticker.default`,
+    /// which is where every caption used to go.
+    var captionSticker: CaptionSticker? {
+        get { captions.first?.sticker }
+        set { captions.setFirstSticker(newValue) }
+    }
     var recordedAt: Date?
+    /// Which take of this person's moment this is. Nil is take 1 — the card's
+    /// own fields, and the only take a clip from before takes existed has.
+    var takeID: UUID?
     /// Emoji to float onto this clip in the final film (from its reactions).
     var emoji: [String]
     /// "name: text" comments to bubble up in the final film.
@@ -28,21 +40,23 @@ struct DayClip: Identifiable {
         label: String? = nil,
         overlayText: String? = nil,
         captionSticker: CaptionSticker? = nil,
+        captions: [Caption]? = nil,
         recordedAt: Date? = nil,
         emoji: [String] = [],
         comments: [String] = [],
-        key: String? = nil
+        key: String? = nil,
+        takeID: UUID? = nil
     ) {
         self.day = day
         self.url = url
         self.authorName = authorName
         self.authorID = authorID
         self.label = label
-        self.overlayText = overlayText
-        self.captionSticker = captionSticker
+        self.captions = captions ?? .single(overlayText, sticker: captionSticker)
         self.recordedAt = recordedAt
         self.emoji = emoji
         self.comments = comments
+        self.takeID = takeID
         self.id = key ?? "day\(day)"
     }
 
@@ -53,8 +67,8 @@ struct DayClip: Identifiable {
     func replacingURL(_ url: URL) -> DayClip {
         DayClip(
             day: day, url: url, authorName: authorName, authorID: authorID,
-            label: label, overlayText: overlayText, captionSticker: captionSticker,
+            label: label, captions: captions,
             recordedAt: recordedAt,
-            emoji: emoji, comments: comments, key: id)
+            emoji: emoji, comments: comments, key: id, takeID: takeID)
     }
 }

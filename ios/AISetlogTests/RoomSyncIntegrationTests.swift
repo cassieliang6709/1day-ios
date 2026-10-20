@@ -61,12 +61,16 @@ final class RoomSyncIntegrationTests: XCTestCase {
         let hostClip = try XCTUnwrap(hostMade)
         let guestClip = try XCTUnwrap(guestMade)
 
+        // Filmed an hour before it goes up — what a retried upload looks like.
+        // Whole seconds, so CloudKit's millisecond dates compare equal.
+        let hostFilmedAt = Date(
+            timeIntervalSince1970: (Date.now.timeIntervalSince1970 - 3_600).rounded(.down))
         try await CloudKitService.uploadClip(
             code: room.code, day: 1, authorID: hostID, authorName: "Test Host",
-            fileURL: hostClip, overlayText: "from the host")
+            fileURL: hostClip, captions: .single("from the host"), recordedAt: hostFilmedAt)
         try await CloudKitService.uploadClip(
             code: room.code, day: 2, authorID: guestID, authorName: "Test Guest",
-            fileURL: guestClip)
+            fileURL: guestClip, recordedAt: .now)
 
         // Either side pulling the room sees both, ordered by moment. `fetchClips`
         // runs a CKQuery, and CloudKit's query index is eventually consistent —
@@ -77,6 +81,7 @@ final class RoomSyncIntegrationTests: XCTestCase {
         XCTAssertEqual(pulled.map(\.day), [1, 2])
         XCTAssertEqual(pulled.map(\.authorID), [hostID, guestID])
         XCTAssertEqual(pulled.first?.overlayText, "from the host")
+        XCTAssertEqual(pulled.first?.recordedAt, hostFilmedAt, "the take's time, not the upload's")
         for clip in pulled {
             let duration = try await AVURLAsset(url: clip.localURL).load(.duration).seconds
             XCTAssertEqual(duration, 2, accuracy: 0.2, "downloaded asset should be playable")
@@ -116,7 +121,7 @@ final class RoomSyncIntegrationTests: XCTestCase {
             let clip = try XCTUnwrap(made)
             try await CloudKitService.uploadClip(
                 code: room.code, day: 1, authorID: hostID, authorName: "Test Host",
-                fileURL: clip, overlayText: "take \(take)")
+                fileURL: clip, captions: .single("take \(take)"), recordedAt: .now)
         }
 
         let pulled = try await waitForClips(in: room.code, count: 1)

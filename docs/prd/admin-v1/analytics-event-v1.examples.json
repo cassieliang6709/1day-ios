@@ -1,0 +1,367 @@
+{
+  "description": "Synthetic valid fixtures for the design contract, never upload as production data.",
+  "events": [
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 1,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "first_open",
+      "properties": {
+        "install_kind": "new"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000002",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 2,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "app_opened",
+      "properties": {
+        "entry": "normal"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000003",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 3,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "story_creation_started",
+      "properties": {
+        "flow_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "entry": "home"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000004",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 4,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "story_created",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "flow_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "type": "one_day",
+        "mode": "solo",
+        "source": "builtin",
+        "planned_moments": 1,
+        "config_revision": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000005",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 5,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "recording_started",
+      "properties": {
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "slot_index": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000006",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 6,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "recording_finished",
+      "properties": {
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success",
+        "duration_ms": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000007",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 7,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "clip_saved",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "slot_index": 0,
+        "is_retake": false,
+        "duration_ms": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000008",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 8,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "invite_share_opened",
+      "properties": {
+        "room_analytics_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000009",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 9,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "room_join_result",
+      "properties": {
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success",
+        "room_analytics_id": "b1f6b988-97d4-4d66-b03b-9752100b1234"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000a",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 10,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "room_clip_sync_result",
+      "properties": {
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "room_analytics_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000b",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 11,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "film_render_started",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "clip_count": 1,
+        "layout": "sequential"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000c",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 12,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "film_render_finished",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success",
+        "duration_ms": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000d",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 13,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "film_play_started",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "render_operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000e",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 14,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "film_save_result",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "render_operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-00000000000f",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 15,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "film_share_opened",
+      "properties": {
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "render_operation_id": "b1f6b988-97d4-4d66-b03b-9752100b1234"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000010",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 16,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "ai_suggestion_requested",
+      "properties": {
+        "request_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "requested_count": 1
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000011",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 17,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "ai_suggestion_result",
+      "properties": {
+        "request_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "result": "success",
+        "duration_ms": 0,
+        "returned_count": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000012",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 18,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "ai_suggestion_adopted",
+      "properties": {
+        "request_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "story_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+        "offered_count": 1,
+        "edited_count": 0,
+        "calculation_version": 1
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000013",
+      "occurred_at": "2026-09-22T08:12:30.123Z",
+      "actor_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "session_id": "b1f6b988-97d4-4d66-b03b-9752100b1234",
+      "sequence": 19,
+      "app_version": "1.4",
+      "build_number": "24",
+      "os_version": "26.0",
+      "locale": "zh-Hans",
+      "timezone_offset_minutes": 480,
+      "name": "config_applied",
+      "properties": {
+        "revision": 0,
+        "source": "network"
+      }
+    }
+  ]
+}

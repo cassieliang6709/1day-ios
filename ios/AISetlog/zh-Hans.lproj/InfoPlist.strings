@@ -1,3 +1,3 @@
-"NSCameraUsageDescription" = "录制你的每日挑战片段。";
-"NSMicrophoneUsageDescription" = "为你的每日片段录制声音。";
-"NSPhotoLibraryAddUsageDescription" = "保存你制作完成的影片。";
+"NSCameraUsageDescription" = "用来拍下你一天里的每个瞬间。";
+"NSMicrophoneUsageDescription" = "片段里会带上现场的声音。";
+"NSPhotoLibraryAddUsageDescription" = "把做好的短片存到相册。";

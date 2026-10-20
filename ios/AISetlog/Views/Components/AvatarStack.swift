@@ -12,6 +12,10 @@ struct AvatarDot: View {
     var isPending = false
     /// Draws a bright ring around the dot — used for "this is you".
     var isYou = false
+    /// The person's avatar (`AvatarStore`, or a friend's from their `Member`
+    /// record). Nil keeps the initial — which is what everyone without an
+    /// avatar, and every caller that doesn't pass one, still sees.
+    var image: UIImage? = nil
 
     /// Bound, not read: picking your own colour in Settings has to repaint
     /// every avatar of you on the screen behind it — the header, your clips'
@@ -24,12 +28,23 @@ struct AvatarDot: View {
 
     var body: some View {
         Group {
-            if hasName {
+            if let image {
+                // The avatar is a die-cut sticker on a transparent square; a
+                // little inset so its rainbow edge isn't cut by the circle.
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(1.12)
+                    .opacity(isPending ? 0.58 : 1)
+                    .accessibilityHidden(true)
+            } else if hasName {
+                // Fixed, relative to the dot: an initial that grew with
+                // Dynamic Type would burst out of a circle that doesn't.
                 Text(Identity.initial(for: name))
                     .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
                     .foregroundStyle(isPending ? tint : .white)
             } else {
-                Image("OneDayMascot")
+                Image(AppSkin.mascotImageName)
                     .resizable()
                     .scaledToFill()
                     .opacity(isPending ? 0.58 : 1)
@@ -38,10 +53,16 @@ struct AvatarDot: View {
         }
             .frame(width: size, height: size)
             .background {
-                if isPending {
+                if image != nil {
+                    Circle().fill(Color.white)
+                } else if isPending {
                     Circle().fill(tint.opacity(0.14))
-                } else {
+                } else if hasName {
                     Circle().fill(tint.gradient)
+                } else {
+                    // The mascot brings its own colour; behind it, the skin's
+                    // soft fill rather than an identity hue nobody chose.
+                    Circle().fill(Color.oneDayMist)
                 }
             }
             .clipShape(Circle())
@@ -73,7 +94,7 @@ private struct AvatarOverflowDot: View {
     var body: some View {
         Text("+\(count)")
             .font(.system(size: size * 0.34, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.oneDayBrand)
+            .foregroundStyle(OneDay.brandText)
             .frame(width: size, height: size)
             .background(OneDay.surfaceSoft, in: Circle())
             .overlay(Circle().strokeBorder(.white, lineWidth: size * 0.06))
@@ -91,6 +112,9 @@ struct AvatarStack: View {
     /// where the stack is a list of other people and pointing at one of them
     /// would be pointing at nobody.
     var you: String?
+    /// Avatars by name (`ChallengeStore.memberAvatars(for:)`). A name with no
+    /// picture keeps its initial.
+    var images: [String: UIImage] = [:]
 
     var body: some View {
         HStack(spacing: -size * 0.3) {
@@ -99,30 +123,21 @@ struct AvatarStack: View {
                     name: name,
                     size: size,
                     isPending: pending.contains(name),
-                    isYou: name == you)
+                    isYou: name == you,
+                    image: images[name])
             }
             if names.count > maxShown {
                 AvatarOverflowDot(count: names.count - maxShown, size: size)
             }
         }
+        // One element reading the names. Left alone, VoiceOver walked the
+        // dots and read each initial as a letter — "A, L, plus two" — and
+        // skipped the mascot faces of unnamed people entirely.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(spokenNames))
     }
-}
 
-/// Avatar over a name — the roster row at the top of a shared timeline.
-struct AvatarBadge: View {
-    let name: String
-    var isYou = false
-    var isPending = false
-    var size: CGFloat = 44
-
-    var body: some View {
-        VStack(spacing: 6) {
-            AvatarDot(name: name, size: size, isPending: isPending, isYou: isYou)
-            Text(name)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(isPending ? OneDay.inkFaint : OneDay.ink)
-                .lineLimit(1)
-                .frame(maxWidth: size + 18)
-        }
+    private var spokenNames: String {
+        names.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppleLogo, ArrowRight, CalendarBlank, Camera, FilmStrip, LockKey, UsersThree } from '@phosphor-icons/react';
+import BounceCards from './components/BounceCards/BounceCards';
 
 export const APP_STORE_URL = 'https://apps.apple.com/cn/app/1-day/id6794565199?uo=4';
 
@@ -7,6 +8,38 @@ const themes = [
   { id: 'perfect', image: '/assets/blue-perfect.jpg', en: 'Perfect Day', zh: '完美的一天', enDescription: 'Give an ordinary day a little ceremony.', zhDescription: '给平常的一天一点仪式感。', enPrompts: ['A slow first moment', 'Something you chose just for yourself', 'The light you want to remember'], zhPrompts: ['醒来后的第一眼', '专门留给自己的一刻', '想记住的光'] },
   { id: 'reset', image: '/assets/blue-reset.jpg', en: 'Soft Reset', zh: '慢慢重启', enDescription: 'Make room to breathe and begin again.', zhDescription: '留一点空白，再慢慢开始。', enPrompts: ['Open the window', 'A walk without a destination', 'One thing that made today lighter'], zhPrompts: ['打开窗的那一刻', '没有目的地的一段路', '今天让你轻一点的小事'] },
   { id: 'lockin', image: '/assets/blue-focus.jpg', en: 'Lock In', zh: '进入状态', enDescription: 'Follow a rhythm that belongs to you.', zhDescription: '跟着自己的节奏，专注一会儿。', enPrompts: ['Your desk, before you begin', 'The work in progress', 'The moment you call it a day'], zhPrompts: ['开始前的桌面', '正在发生的专注', '今天收尾的瞬间'] },
+];
+
+const momentCardImages = [
+  '/assets/blue-morning.jpg',
+  '/assets/blue-cooking.jpg',
+  '/assets/blue-adventure.jpg',
+  '/assets/blue-friends.jpg',
+  '/assets/blue-perfect.jpg',
+];
+
+const heroCardImages = [
+  '/assets/blue-morning.jpg',
+  '/assets/blue-cooking.jpg',
+  '/assets/blue-perfect.jpg',
+  '/assets/blue-friends.jpg',
+  '/assets/blue-adventure.jpg',
+];
+
+const momentCardTransforms = [
+  'rotate(-10deg) translate(-64px)',
+  'rotate(-5deg) translate(-32px)',
+  'rotate(2deg)',
+  'rotate(7deg) translate(32px)',
+  'rotate(12deg) translate(64px)',
+];
+
+const heroCardTransforms = [
+  'rotate(-12deg) translate(-58px)',
+  'rotate(-6deg) translate(-29px)',
+  'rotate(1deg)',
+  'rotate(7deg) translate(29px)',
+  'rotate(12deg) translate(58px)',
 ];
 
 export const metadata = {
@@ -22,9 +55,9 @@ export function pageMetadata(locale, isPrivacy = false) {
 const copy = {
   zh: {
     nav: ['如何记录', '每日影片', '隐私'], storeAria: '在 App Store 下载 1Day', storeLabel: '下载 1Day', storeCompact: 'App Store', eyebrow: '给今天一个主题',
-    title: <>今天，<br /><em>想怎么过？</em></>, lede: '给今天一个主题，和自己或朋友一起，把它过成一支 Vlog。', learn: '看看今天的主题', heroAlt: '小蓝在一次晴朗的出行中',
+    title: <>今天，<br /><em>想怎么过？</em></>, lede: '给今天一个主题，和自己或朋友一起，把它过成一支 Vlog。', learn: '看看今天的主题', heroCardAlts: ['小蓝的安静清晨', '小蓝一起做早餐', '小蓝的完美一天', '小蓝和朋友一起过今天', '小蓝在一次晴朗的出行中'],
     chooser: '01 · 给今天一个主题', chooserTitle: '从一个主题，开始属于你的一天。', chooserNote: '不用先想好要拍什么。选一个现在的心情，1Day 会给你几个值得留意的瞬间。', previewTitle: '今天可以拍下', timedNote: '也可以随时自由拍摄，或按时间记录当下。',
-    storyLabel: '02 · 跟着瞬间去经历', storyTitle: ['让一天慢慢发生，', '再拍下它。'], storyText: '不用为了拍而拍。主题只是轻轻提醒你：留意醒来的光、路上的风，或一个让人微笑的小小瞬间。', guided: '几个轻轻的拍摄提醒', timed: '自由记录，也按自己的节奏', momentCaptions: ['早晨的第一束光', '一起做点好吃的', '走出去，看看今天'],
+    storyLabel: '02 · 跟着瞬间去经历', storyTitle: ['让一天慢慢发生，', '再拍下它。'], storyText: '不用为了拍而拍。主题只是轻轻提醒你：留意醒来的光、路上的风，或一个让人微笑的小小瞬间。', guided: '几个轻轻的拍摄提醒', timed: '自由记录，也按自己的节奏', momentCardAlts: ['早晨的第一束光', '一起做点好吃的', '走出去看看今天', '和朋友一起留下此刻', '把平常的一天过得特别'],
     togetherLabel: '03 · 一个人，或一起', togetherTitle: <>一个人也很好。<br />朋友来了，更好。</>, togetherText: '小蓝安静地陪你开始。想和朋友一起过这一天，就发出邀请；每个人拍下自己的视角，故事会在同一支影片里相遇。', solo: '一个人，也能开始', friends: '邀请朋友，一起拍同一天', inviteCaption: '真实 App 界面 · 示例朋友与故事', inviteAlt: '1Day 合拍时间轴，小蓝、Mia 和 Sam 的示例片段',
     rewardLabel: '04 · 留下今天的 Vlog', rewardTitle: <>一天结束，<br />故事留下。</>, rewardText: '1Day 把拍下的瞬间串成属于你或你们的 Vlog。调整字幕和转场，预览后保存或分享。', growth: '日子慢慢积累，回头看看，你已经经历了这么多。', privacy: '单人片段保存在设备上；朋友房间和可选的提示建议会使用网络。', appFilmAlt: '1Day 中文版每日影片预览', footer: ['隐私政策', 'App Store', '支持'], portfolio: 'Cassie 的个人主页', back: '← 返回 1Day', privacyTitle: '隐私政策', privacyDate: '生效日期：2026 年 9 月 7 日',
     privacySections: [
@@ -36,9 +69,9 @@ const copy = {
   },
   en: {
     nav: ['How it works', 'Daily film', 'Privacy'], storeAria: 'Download 1Day on the App Store', storeLabel: 'Get 1Day', storeCompact: 'App Store', eyebrow: 'Give today a theme',
-    title: <>How will you<br /><em>spend today?</em></>, lede: 'Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.', learn: 'Explore today’s themes', heroAlt: 'Blue on a sunny small adventure',
+    title: <>How will you<br /><em>spend today?</em></>, lede: 'Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.', learn: 'Explore today’s themes', heroCardAlts: ['Blue in a quiet morning', 'Blue making breakfast', 'Blue in a perfect day', 'Blue spending the day with a friend', 'Blue on a sunny small adventure'],
     chooser: '01 · Give today a theme', chooserTitle: 'One theme. A day that feels like yours.', chooserNote: 'You do not have to know what to film. Choose a feeling for today and 1Day gives you a few moments to notice.', previewTitle: 'A few moments for today', timedNote: 'You can always film freely or capture the day as it unfolds.',
-    storyLabel: '02 · Follow the moments', storyTitle: ['Let the day unfold.', 'Then capture it.'], storyText: 'There is no need to perform for the camera. Your theme simply helps you notice the morning light, air on a walk, or a small thing that makes you smile.', guided: 'A few gentle filming prompts', timed: 'Capture it in your own rhythm', momentCaptions: ['First light in the morning', 'Make something good together', 'Step out and see the day'],
+    storyLabel: '02 · Follow the moments', storyTitle: ['Let the day unfold.', 'Then capture it.'], storyText: 'There is no need to perform for the camera. Your theme simply helps you notice the morning light, air on a walk, or a small thing that makes you smile.', guided: 'A few gentle filming prompts', timed: 'Capture it in your own rhythm', momentCardAlts: ['First light in the morning', 'Make something good together', 'Step out and see the day', 'Keep a moment with friends', 'Make an ordinary day feel special'],
     togetherLabel: '03 · On your own, or together', togetherTitle: <>A day of your own.<br />Better with friends, too.</>, togetherText: 'Blue quietly keeps you company as you begin. Want to share the day? Send an invite; everyone captures their own perspective, then the stories meet in one film.', solo: 'Start on your own', friends: 'Invite friends for the same day', inviteCaption: 'Real app UI · Demo friends and story', inviteAlt: '1Day shared timeline with demo clips from Blue, Mia and Sam',
     rewardLabel: '04 · A vlog to keep', rewardTitle: <>The day ends.<br />The story stays.</>, rewardText: '1Day brings your moments into a vlog of your own or a shared day. Adjust captions and transitions, then preview, save or share.', growth: 'As the days add up, look back at all the little things you have lived.', privacy: 'Solo footage stays on-device; shared rooms and optional prompt suggestions use the network.', appFilmAlt: '1Day English daily film preview', footer: ['Privacy Policy', 'App Store', 'Support'], portfolio: 'Made by Cassie', back: '← Back to 1Day', privacyTitle: 'Privacy Policy', privacyDate: 'Effective September 7, 2026',
     privacySections: [
@@ -76,9 +109,9 @@ export function App({ pathname }) {
   const prompts = locale === 'zh' ? activeTheme.zhPrompts : activeTheme.enPrompts;
   return <main className="site-page">
     <header className="nav shell"><a href="#top" className="brand" aria-label="1Day home"><img className="brand-logo" src="/assets/brand/1day-logo-lockup-v2.png" alt="1Day" /></a><nav aria-label="Main navigation"><a href="#how">{t.nav[0]}</a><a href="#film">{t.nav[1]}</a><a href={`${home}/updates`}>{locale === 'zh' ? '更新日志' : 'Updates'}</a><a href={`${home}/privacy`}>{t.nav[2]}</a></nav><div className="nav-actions"><a className="language" href={locale === 'zh' ? '/' : '/zh'}>{locale === 'zh' ? 'EN' : '中文'}</a><StoreButton locale={locale} compact /></div></header>
-    <section id="top" className="hero shell"><div className="hero-copy"><p className="eyebrow">{t.eyebrow}</p><h1>{t.title}</h1><p className="lede">{t.lede}</p><div className="hero-actions"><StoreButton locale={locale} /><a className="text-link" href="#how">{t.learn} <ArrowRight /></a></div></div><div className="hero-product"><div className="hero-art"><img src="/assets/blue-adventure.jpg" alt={t.heroAlt} /><img src="/assets/blue-friends.jpg" alt="" /></div><AppScreen screen="home" locale={locale} /></div></section>
+    <section id="top" className="hero shell"><div className="hero-copy"><p className="eyebrow">{t.eyebrow}</p><h1>{t.title}</h1><p className="lede">{t.lede}</p><div className="hero-actions"><StoreButton locale={locale} /><a className="text-link" href="#how">{t.learn} <ArrowRight /></a></div></div><div className="hero-product"><BounceCards className="hero-bounce-cards" images={heroCardImages} imageAlts={t.heroCardAlts} containerWidth={320} containerHeight={350} animationDelay={0.25} animationStagger={0.08} easeType="elastic.out(1, 0.55)" transformStyles={heroCardTransforms} enableHover hoverPushDistance={72} /><AppScreen screen="home" locale={locale} /></div></section>
     <section id="how" className="theme-section shell"><div className="section-intro"><p className="eyebrow">{t.chooser}</p><h2>{t.chooserTitle}</h2><p>{t.chooserNote}</p></div><div className="theme-options">{themes.map((theme) => <button type="button" key={theme.id} className={selectedTheme === theme.id ? 'selected' : ''} aria-pressed={selectedTheme === theme.id} onClick={() => setSelectedTheme(theme.id)}><img src={theme.image} alt="" /><span><strong>{theme[locale]}</strong><small>{locale === 'zh' ? theme.zhDescription : theme.enDescription}</small></span></button>)}</div><aside className="theme-preview" aria-live="polite"><div><p>{t.previewTitle}</p><strong>{activeTheme[locale]}</strong></div><ol>{prompts.map((prompt, index) => <li key={prompt}><span>0{index + 1}</span>{prompt}</li>)}</ol><p>{t.timedNote}</p></aside><div className="theme-app"><AppScreen screen="theme" locale={locale} /></div></section>
-    <section className="moment-section shell"><div className="flow-copy"><p className="eyebrow">{t.storyLabel}</p><h2>{t.storyTitle[0]}<br />{t.storyTitle[1]}</h2><p>{t.storyText}</p><div className="flow-notes"><span><Camera weight="fill" />{t.guided}</span><span><CalendarBlank weight="fill" />{t.timed}</span></div></div><div className="moment-product"><AppScreen screen="moments" locale={locale} /><div className="moment-portraits">{['blue-morning.jpg', 'blue-cooking.jpg', 'blue-adventure.jpg'].map((image, index) => <figure key={image}><img src={`/assets/${image}`} alt="" loading="lazy" /><figcaption>{t.momentCaptions[index]}</figcaption></figure>)}</div></div></section>
+    <section className="moment-section shell"><div className="flow-copy"><p className="eyebrow">{t.storyLabel}</p><h2>{t.storyTitle[0]}<br />{t.storyTitle[1]}</h2><p>{t.storyText}</p><div className="flow-notes"><span><Camera weight="fill" />{t.guided}</span><span><CalendarBlank weight="fill" />{t.timed}</span></div></div><div className="moment-product"><AppScreen screen="moments" locale={locale} /><BounceCards className="moment-bounce-cards" images={momentCardImages} imageAlts={t.momentCardAlts} containerWidth={310} containerHeight={300} animationDelay={0.2} animationStagger={0.08} easeType="elastic.out(1, 0.55)" transformStyles={momentCardTransforms} enableHover hoverPushDistance={76} /></div></section>
     <section className="together-section shell"><div className="together-copy"><p className="eyebrow">{t.togetherLabel}</p><h2>{t.togetherTitle}</h2><p>{t.togetherText}</p><div className="modes"><span><UsersThree weight="fill" />{t.solo}</span><span><FilmStrip weight="fill" />{t.friends}</span></div></div><div className="together-visual"><img className="friends-image" src="/assets/blue-friends.jpg" alt="" /><figure className="invite-screen"><img width="660" height="1434" src={`/assets/app-friends-${locale}.png`} alt={t.inviteAlt} loading="lazy" /><figcaption>{t.inviteCaption}</figcaption></figure></div></section>
     <section id="film" className="film-section shell"><div className="film-copy"><p className="eyebrow">{t.rewardLabel}</p><h2>{t.rewardTitle}</h2><p>{t.rewardText}</p><p>{t.growth}</p><p className="privacy"><LockKey weight="bold" />{t.privacy}</p></div><div className="film-result"><figure className="film-screen"><img width="660" height="1434" src={`/assets/app-film-${locale}.png`} alt={t.appFilmAlt} loading="lazy" /><figcaption>{locale === 'zh' ? '真实 App 成片界面 · 示例故事' : 'Real app film screen · Demo story'}</figcaption></figure><figure className="demo-film"><video controls playsInline preload="none" poster="/assets/blue-morning.jpg" aria-label={locale === 'zh' ? '播放小蓝的一天示例影片' : 'Play Blue’s day demo film'} src="/assets/blue-day.mp4"><track key={locale} default kind="captions" src={`/assets/blue-day-${locale}.vtt`} srcLang={locale === 'zh' ? 'zh-CN' : 'en'} label={locale === 'zh' ? '中文' : 'English'} /></video><figcaption>{locale === 'zh' ? '小蓝的一天 · 由 App 串联的插画示例影片' : 'Blue’s day · An illustrated demo film assembled by the app'}</figcaption></figure></div></section>
     <footer className="site-footer shell"><StoreButton locale={locale} /><div><a href={`${home}/updates`}>{locale === 'zh' ? '更新日志' : 'Updates'}</a><a href={`${home}/privacy`}>{t.footer[0]}</a><a href={APP_STORE_URL}>{t.footer[1]}</a><a href="mailto:liangyue3666@gmail.com">{t.footer[2]}</a><a href="https://liangyue.site" target="_blank" rel="noreferrer">{t.portfolio}</a></div></footer>

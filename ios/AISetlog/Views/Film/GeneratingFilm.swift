@@ -9,8 +9,11 @@ import SwiftUI
 struct GeneratingFilm: View {
     let challenge: Challenge
     let clips: [DayClip]
-    /// 0…3 — which named step the stitcher is on.
+    /// 0…`stepCount - 1` — which named step the stitcher is on.
     let stage: Int
+
+    /// How many named steps there are. `FilmView` paces its ticker off this.
+    static let stepCount = 3
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -18,21 +21,28 @@ struct GeneratingFilm: View {
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
     /// How many moments the progress card shows as folded in. Paced off the
-    /// stage so the count moves while the stitcher is quiet.
+    /// stage so the count moves while the stitcher is quiet — and capped one
+    /// short of all of them. This screen is only on while there is no film
+    /// yet, so "7/7 merged" here was always a claim the export hadn't backed:
+    /// it used to read full about two seconds in, over a minute-long export.
+    /// The last one lands when the film does, by the screen going away.
     private var mergedCount: Int {
-        guard !clips.isEmpty else { return 0 }
-        let fraction = Double(stage + 1) / 4
-        return max(1, Int((Double(clips.count) * fraction).rounded()))
+        guard clips.count > 1 else { return 0 }
+        let fraction = Double(stage + 1) / Double(Self.stepCount + 1)
+        let paced = Int((Double(clips.count) * fraction).rounded())
+        return min(max(paced, 1), clips.count - 1)
     }
 
+    /// What the stitcher actually does, in order. There used to be a
+    /// 「同步大家的片段」 step for rooms, but nothing syncs here — the clips
+    /// are whatever the story page already had — so it was a tick for work
+    /// that never ran.
     private var steps: [(text: String, icon: String)] {
-        var list: [(String, String)] = [(Strings.stepCollecting, "square.stack.3d.up.fill")]
-        if challenge.isShared {
-            list.append((Strings.stepSyncing, "person.2.fill"))
-        }
-        list.append((Strings.stepTransitions, "wand.and.sparkles"))
-        list.append((Strings.stepFinishing, "film.fill"))
-        return list
+        [
+            (Strings.stepCollecting, "square.stack.3d.up.fill"),
+            (Strings.stepTransitions, "wand.and.sparkles"),
+            (Strings.stepFinishing, "film.fill"),
+        ]
     }
 
     var body: some View {
@@ -116,7 +126,15 @@ struct GeneratingFilm: View {
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(challenge.isTimeOnly
+                        // A room names the moment or, with no name, says
+                        // when it was filmed — never the 「第 N 天」 that
+                        // `clip.label` falls back to (see `StorySchedule`).
+                        Text(challenge.isShared && !challenge.isTimeOnly
+                            ? (presenter.momentName(forSlot: clip.day)
+                                ?? schedule.railCaption(forSlot: clip.day, recordedAt: clip.recordedAt)
+                                ?? schedule.railLabel(forSlot: clip.day, recordedAt: clip.recordedAt)
+                                ?? "")
+                            : challenge.isTimeOnly
                             ? (schedule.railLabel(
                                 forSlot: clip.day,
                                 recordedAt: clip.recordedAt) ?? Strings.timeOnlyMoment)
@@ -152,23 +170,21 @@ struct GeneratingFilm: View {
     }
 
     /// The named steps, so the wait says what it's doing.
+    ///
+    /// A step is ticked once the next one has started, never on its own: the
+    /// current step — including the last, 导出, which is where the time
+    /// actually goes — shows a spinner and its own icon until it's really
+    /// behind us. The card's 「正在细心缝合 ✨」 heading and its line about
+    /// "the right vibes" are gone; they described care the code doesn't take.
     private var careNote: some View {
         GlassCard(padding: 16, tint: .oneDayLavender) {
             VStack(alignment: .leading, spacing: 11) {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.oneDayLavender)
-                    Text(Strings.stitchingCare)
-                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                }
-
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    let done = index < stage
                     HStack(spacing: 9) {
-                        Image(systemName: index <= stage ? "checkmark.circle.fill" : step.icon)
+                        Image(systemName: done ? "checkmark.circle.fill" : step.icon)
                             .font(.system(size: 13))
-                            .foregroundStyle(index <= stage ? Color.oneDayMint : OneDay.inkFaint)
+                            .foregroundStyle(done ? Color.oneDayMint : OneDay.inkFaint)
                             .frame(width: 18)
                             .contentTransition(.symbolEffect(.replace))
                         Text(step.text)
@@ -181,11 +197,6 @@ struct GeneratingFilm: View {
                     }
                     .animation(OneDay.Motion.soft, value: stage)
                 }
-
-                Text(Strings.stitchingCareBody)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .padding(.top, 2)
             }
         }
     }

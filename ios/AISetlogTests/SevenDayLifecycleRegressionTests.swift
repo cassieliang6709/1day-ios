@@ -7,7 +7,7 @@ final class SevenDayLifecycleRegressionTests: XCTestCase {
         let files = try LocalRoomDemoStorage()
         defer { files.close() }
         let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
-        let store = ChallengeStore(repository: files, fileStore: files, coverStore: files,
+        let store = ChallengeStore(repository: files, fileStore: files,
                                    roomSync: RoomSyncService(fileStore: files, transport: source.transport), effects: .isolated)
         let prompts = (1...7).map { "我的 Day \($0)" }
         let created = store.create(title: "My 七日", mode: .sevenDay, momentTitles: prompts)

@@ -6,12 +6,22 @@ import CloudKit
 /// Design:
 /// - `Room` record: recordName IS the 6-char join code, so joining is a direct
 ///   fetch (no query, no index needed).
-/// - `Clip` record: recordName is deterministic (`code_author_dayN`) so a
-///   re-record overwrites the same record. Video travels as a CKAsset.
+/// - `Clip` record: recordName is deterministic (`code_author_dayN`) for a
+///   person's first take of a moment; every later take gets its own record,
+///   `code_author_dayN_<takeID>`, so filming again adds instead of overwriting.
+///   Video travels as a CKAsset.
+/// - `Member` record: recordName is `code_authorID`, written when someone
+///   joins by code; joining again rewrites the same record.
 ///
 /// Public DB requires the device be signed into iCloud (checked up front).
 enum CloudKitService {
     static let containerID = "iCloud.com.cassie.AISetlog"
+    /// Whether this build is signed against CloudKit Production. Mirrors the
+    /// `icloud-container-environment` entitlement through Info.plist, since
+    /// an app can't read its own entitlements at runtime.
+    static var isProduction: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "OneDayCloudKitEnvironment") as? String != "Development"
+    }
     private static var db: CKDatabase {
         CKContainer(identifier: containerID).publicCloudDatabase
     }
@@ -54,6 +64,8 @@ enum CloudKitService {
         case roomNotFound
         case fieldNotQueryable
         case networkUnavailable
+        case roomCreateFailed
+        case roomJoinFailed
 
         var errorDescription: String? {
             switch self {
@@ -65,7 +77,30 @@ enum CloudKitService {
                 return Strings.errorIndexDeploying
             case .networkUnavailable:
                 return Strings.errorNetwork
+            case .roomCreateFailed:
+                return Strings.errorRoomCreateFailed
+            case .roomJoinFailed:
+                return Strings.errorRoomJoinFailed
             }
+        }
+    }
+
+    /// CloudKit's own `localizedDescription` is "未能完成操作。（CKErrorDomain
+    /// 错误 4。）" — a domain name and a number, shown to somebody who was
+    /// trying to record with a friend. Every path that surfaces a CKError to
+    /// the UI maps it here first; `fallback` is what an unrecognised code says
+    /// instead of leaking the domain.
+    static func serviceError(from error: CKError, fallback: CKServiceError) -> Error {
+        switch error.code {
+        case .unknownItem:
+            return CKServiceError.roomNotFound
+        case .notAuthenticated, .managedAccountRestricted:
+            return CKServiceError.notSignedIntoiCloud
+        case .networkFailure, .networkUnavailable, .serviceUnavailable,
+             .requestRateLimited, .zoneBusy:
+            return CKServiceError.networkUnavailable
+        default:
+            return fallback
         }
     }
     static func ensureAccountAvailable() async throws {
@@ -88,6 +123,7 @@ enum CloudKitService {
         let mode: Challenge.Mode
         let clipLength: Challenge.ClipLength
         let orientation: Challenge.Orientation
+        let cameraStyle: CameraStyle?
         let templateName: String?
         let momentTitles: [String]?
     }
@@ -99,6 +135,7 @@ enum CloudKitService {
         mode: Challenge.Mode = .sevenDay,
         clipLength: Challenge.ClipLength = .tiny,
         orientation: Challenge.Orientation = .portrait,
+        cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
         momentTitles: [String]? = nil
     ) async throws -> RemoteRoom {
@@ -114,6 +151,7 @@ enum CloudKitService {
             record["mode"] = mode.rawValue as CKRecordValue
             record["clipLength"] = clipLength.rawValue as CKRecordValue
             record["orientation"] = orientation.rawValue as CKRecordValue
+            if let cameraStyle { record["cameraStyle"] = cameraStyle.rawValue as CKRecordValue }
             if let templateName { record["templateName"] = templateName as CKRecordValue }
             // Diagnostic (temporary): the code under which the room is saved,
             // so a "no room with that code" report can be matched against it.
@@ -125,12 +163,15 @@ enum CloudKitService {
             } catch let error as CKError where error.code == .serverRecordChanged {
                 print("[room] code \(code) taken, retrying")
                 continue // code taken, try another
+            } catch let error as CKError {
+                print("[room] create room code=\(code) failed: \(error)")
+                throw serviceError(from: error, fallback: .roomCreateFailed)
             } catch {
                 print("[room] create room code=\(code) failed: \(error)")
                 throw error
             }
         }
-        throw CKError(.limitExceeded)
+        throw CKServiceError.roomCreateFailed
     }
 
     static func fetchRoom(code: String) async throws -> RemoteRoom {
@@ -147,16 +188,7 @@ enum CloudKitService {
             // network drop or a signed-out iCloud account failing the fetch
             // must reach the user as what it is, not as a wrong-code hint.
             print("[room] fetch room code=\(code) failed: \(error)")
-            switch error.code {
-            case .unknownItem:
-                throw CKServiceError.roomNotFound
-            case .notAuthenticated:
-                throw CKServiceError.notSignedIntoiCloud
-            case .networkFailure, .networkUnavailable, .serviceUnavailable:
-                throw CKServiceError.networkUnavailable
-            default:
-                throw error
-            }
+            throw serviceError(from: error, fallback: .roomJoinFailed)
         }
     }
 
@@ -170,10 +202,122 @@ enum CloudKitService {
             mode: Challenge.Mode(rawValue: r["mode"] as? String ?? "") ?? .sevenDay,
             clipLength: Challenge.ClipLength(rawValue: r["clipLength"] as? String ?? "") ?? .tiny,
             orientation: Challenge.Orientation(rawValue: r["orientation"] as? String ?? "") ?? .portrait,
+            cameraStyle: (r["cameraStyle"] as? String).flatMap(CameraStyle.init),
             templateName: r["templateName"] as? String,
             momentTitles: (r["momentTitles"] as? String)?
                 .split(separator: "\n", omittingEmptySubsequences: false)
                 .map(String.init))
+    }
+
+    // MARK: - Members
+
+    /// One person's place in a room, written when they join by code.
+    ///
+    /// Deterministic (`code_authorID`) for the same reason clip names are:
+    /// joining again — a second device, a reinstall, a retry — rewrites the
+    /// one record instead of adding another, and account deletion can name
+    /// it without a query.
+    static func memberRecordName(code: String, authorID: String) -> String {
+        "\(code)_\(authorID)"
+    }
+
+    /// Upsert my `Member` record for a room. `joinedAt` is the latest join:
+    /// joining again overwrites it.
+    static func saveMember(
+        code: String, authorID: String, displayName: String, joinedAt: Date
+    ) async throws {
+        try await ensureAccountAvailable()
+        let record = CKRecord(
+            recordType: "Member",
+            recordID: .init(recordName: memberRecordName(code: code, authorID: authorID)))
+        record["roomCode"] = code as CKRecordValue
+        record["userID"] = authorID as CKRecordValue
+        record["displayName"] = displayName as CKRecordValue
+        record["joinedAt"] = joinedAt as CKRecordValue
+        try await upsert(record)
+        print("[room] saved member code=\(code)")
+    }
+
+    /// What I show the people in a room: my avatar and today's mood face.
+    /// Never the mood's note — that stays in the
+    /// private database (`MoodSync`).
+    struct MemberProfileWrite: Equatable {
+        let code: String
+        let authorID: String
+        let displayName: String
+        /// The finished avatar on disk. Nil leaves whatever the record had.
+        let avatarURL: URL?
+        /// Nil leaves the record's mood alone; it stops showing on its own
+        /// once its day is over.
+        let moodKind: String?
+        /// When the mood was picked. A friend shows it only on that same day.
+        let moodDay: Date?
+    }
+
+    /// A room member as their `Member` record describes them.
+    struct RemoteMember: Equatable {
+        let userID: String
+        let displayName: String
+        /// The downloaded avatar, cached on disk.
+        let avatarURL: URL?
+        let moodKind: String?
+        let moodDay: Date?
+    }
+
+    /// Adds my avatar and mood to my `Member` record in one room, creating the
+    /// record when there isn't one yet — a room I made myself never got one
+    /// from joining. Reads first so `joinedAt` survives.
+    static func saveMemberProfile(_ write: MemberProfileWrite) async throws {
+        try await ensureAccountAvailable()
+        let id = CKRecord.ID(recordName: memberRecordName(code: write.code, authorID: write.authorID))
+        let record: CKRecord
+        do {
+            record = try await db.record(for: id)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: "Member", recordID: id)
+            record["roomCode"] = write.code as CKRecordValue
+            record["userID"] = write.authorID as CKRecordValue
+            record["joinedAt"] = Date.now as CKRecordValue
+        }
+        record["displayName"] = write.displayName as CKRecordValue
+        if let avatarURL = write.avatarURL { record["avatar"] = CKAsset(fileURL: avatarURL) }
+        if let mood = write.moodKind, let day = write.moodDay {
+            record["moodKind"] = mood as CKRecordValue
+            record["moodDay"] = day as CKRecordValue
+        }
+        try await upsert(record)
+        print("[room] saved member profile code=\(write.code)")
+    }
+
+    /// Every `Member` record in a room, avatars downloaded into `cacheDir`.
+    /// Needs `roomCode` QUERYABLE (see docs/cloudkit-member-avatar-mood-deploy.md).
+    static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {
+        try await ensureAccountAvailable()
+        let query = CKQuery(recordType: "Member", predicate: NSPredicate(format: "roomCode == %@", code))
+        let records = try await allRecords(matching: query)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        return records.compactMap { r in
+            guard let userID = r["userID"] as? String else { return nil }
+            var local: URL?
+            if let asset = r["avatar"] as? CKAsset, let src = asset.fileURL {
+                let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: userID))
+                try? fm.removeItem(at: dst)
+                if (try? fm.copyItem(at: src, to: dst)) != nil { local = dst }
+            }
+            return RemoteMember(
+                userID: userID,
+                displayName: r["displayName"] as? String ?? "",
+                avatarURL: local,
+                moodKind: r["moodKind"] as? String,
+                moodDay: r["moodDay"] as? Date)
+        }
+    }
+
+    /// Apple user IDs carry dots; keep the file name to safe characters.
+    static func memberAvatarFileName(userID: String) -> String {
+        let safe = userID.map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+        return "avatar_\(safe).png"
     }
 
     // MARK: - Clips
@@ -197,14 +341,44 @@ enum CloudKitService {
         /// Defaulted, so a fixture or a test that doesn't care about captions
         /// doesn't have to say so.
         var captionSticker: CaptionSticker? = nil
+        /// Every caption, as the newer phones write it (`Caption.cloudJSON`).
+        /// Nil on a record from 1.5 (31) or earlier, or one whose second save
+        /// didn't land — see `saveCaptionsJSON`.
+        var captionsJSON: String? = nil
+
+        /// What to draw: the full list when the record has one that still
+        /// agrees with `overlayText`, otherwise the one caption older phones
+        /// wrote. See `Caption.fromCloud`.
+        var captions: [Caption] {
+            Caption.fromCloud(json: captionsJSON, overlayText: overlayText, sticker: captionSticker)
+        }
     }
+
+    /// The `Clip` field that holds every caption as JSON. Added after 1.5 (31);
+    /// see docs/cloudkit-clip-captions-deploy.md.
+    static let captionsJSONField = "captionsJSON"
 
     /// Internal rather than private so the naming rule can be checked without a
     /// network: "writing this again is harmless" is only true while the same
     /// clip keeps deriving the same name, and that is a property of this
     /// string, not of CloudKit.
-    static func clipRecordName(code: String, authorID: String, day: Int) -> String {
-        "\(code)_\(authorID)_day\(day)"
+    ///
+    /// `takeID` nil is take 1, whose name is the one every version has used.
+    /// A later take appends its id. An older phone lists a room's clips by
+    /// query and reads `day`/`authorID` off the record, never off the name, so
+    /// it shows the extra takes too without knowing what they are.
+    static func clipRecordName(code: String, authorID: String, day: Int, takeID: UUID? = nil) -> String {
+        let first = "\(code)_\(authorID)_day\(day)"
+        guard let takeID else { return first }
+        return "\(first)_\(takeID.uuidString)"
+    }
+
+    /// Which take a clip record holds, read back off its name: nil for take 1
+    /// (or a name this app didn't write).
+    static func takeID(fromClipRecordName name: String, code: String, authorID: String, day: Int) -> UUID? {
+        let prefix = clipRecordName(code: code, authorID: authorID, day: day) + "_"
+        guard name.hasPrefix(prefix) else { return nil }
+        return UUID(uuidString: String(name.dropFirst(prefix.count)))
     }
 
     /// Upload (or overwrite) my clip for a given day.
@@ -215,17 +389,15 @@ enum CloudKitService {
     /// of the same take. A clip that isn't up yet is not an error — the next
     /// upload carries whatever the caption says by then.
     static func updateClipCaption(
-        code: String, day: Int, authorID: String, overlayText: String?
+        code: String, day: Int, authorID: String, captions: [Caption], takeID: UUID? = nil
     ) async throws {
         try await ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
+        let id = CKRecord.ID(recordName: clipRecordName(
+            code: code, authorID: authorID, day: day, takeID: takeID))
         guard let record = try? await db.record(for: id) else { return }
-        if let overlayText, !overlayText.isEmpty {
-            record["overlayText"] = overlayText as CKRecordValue
-        } else {
-            record["overlayText"] = nil
-        }
-        _ = try await db.save(record)
+        writeFirstCaption(captions, to: record)
+        let saved = try await db.save(record)
+        await saveCaptionsJSON(captions, on: saved)
     }
 
     static func uploadClip(
@@ -234,11 +406,16 @@ enum CloudKitService {
         authorID: String,
         authorName: String,
         fileURL: URL,
-        overlayText: String? = nil
+        captions: [Caption] = [],
+        recordedAt: Date,
+        takeID: UUID? = nil
     ) async throws {
         try await ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: clipRecordName(code: code, authorID: authorID, day: day))
-        // Fetch-and-update if it exists so a re-record replaces the same record.
+        let id = CKRecord.ID(recordName: clipRecordName(
+            code: code, authorID: authorID, day: day, takeID: takeID))
+        // Fetch-and-update if it exists, so a retried upload of the same take
+        // lands on the same record. A new take has a new name and never finds
+        // one.
         let record: CKRecord
         if let existing = try? await db.record(for: id) {
             record = existing
@@ -249,14 +426,58 @@ enum CloudKitService {
         record["day"] = day as CKRecordValue
         record["authorID"] = authorID as CKRecordValue
         record["authorName"] = authorName as CKRecordValue
-        record["recordedAt"] = Date.now as CKRecordValue
+        // When the take was filmed, not when it reached the room. This used to
+        // be `Date.now`, and an upload is not always the moment after the
+        // take: a failed one is retried on a later sync, and a draft can sit
+        // for an hour before it is filed. Either way friends saw 3:21 on a clip
+        // filmed at 2:06 — the time the network came back, not the time of the
+        // moment the card is about.
+        record["recordedAt"] = recordedAt as CKRecordValue
         record["video"] = CKAsset(fileURL: fileURL)
-        if let overlayText, !overlayText.isEmpty {
-            record["overlayText"] = overlayText as CKRecordValue
+        writeFirstCaption(captions, to: record)
+        let saved = try await db.save(record)
+        // After the clip is safely up, never as part of it: until the field is
+        // deployed to Production this save fails, and that must cost the
+        // extra captions, not the take.
+        await saveCaptionsJSON(captions, on: saved)
+        // Diagnostic: the success half of `[room] upload failed`, so a clip a
+        // friend says they can't see can be matched against what this phone
+        // actually put up, and when it says the take was filmed.
+        print("[room] uploaded clip code=\(code) day=\(day) recordedAt=\(recordedAt) take=\(takeID?.uuidString ?? "1")")
+    }
+
+    /// The part of a caption every version reads: the first caption's words in
+    /// `overlayText`, so 1.5 (31) keeps showing them.
+    ///
+    /// A `captionsJSON` already on the record is cleared here rather than in
+    /// the second save — the record has the field, so the schema has it, so
+    /// this can't fail for the reason the second save can. Left alone, an old
+    /// list would outlive the words it was written with.
+    private static func writeFirstCaption(_ captions: [Caption], to record: CKRecord) {
+        if let first = captions.firstText {
+            record["overlayText"] = first as CKRecordValue
         } else {
             record["overlayText"] = nil
         }
-        _ = try await db.save(record)
+        if record[captionsJSONField] != nil {
+            record[captionsJSONField] = nil
+        }
+    }
+
+    /// Every caption, written as its own save after the clip's.
+    ///
+    /// Separate because `captionsJSON` is new: Debug and Release both talk to
+    /// Production, and until the field is deployed there CloudKit rejects any
+    /// save that sets it. Failing here only logs — the clip and its first
+    /// caption are already up, and readers fall back to `overlayText`.
+    private static func saveCaptionsJSON(_ captions: [Caption], on record: CKRecord) async {
+        guard let json = Caption.cloudJSON(captions) else { return }
+        record[captionsJSONField] = json as CKRecordValue
+        do {
+            _ = try await db.save(record)
+        } catch {
+            print("[room] captionsJSON save failed (field not deployed?): \(error)")
+        }
     }
 
     /// All clips in a room, downloaded to a local cache directory.
@@ -294,7 +515,8 @@ enum CloudKitService {
                 localURL: dest,
                 overlayText: record["overlayText"] as? String,
                 captionSticker: (record["captionSticker"] as? String)
-                    .flatMap(CaptionSticker.init(cloudValue:))))
+                    .flatMap(CaptionSticker.init(cloudValue:)),
+                captionsJSON: record[captionsJSONField] as? String))
         }
         return clips
     }
@@ -437,11 +659,15 @@ enum CloudKitService {
         clips: [(code: String, day: Int)],
         reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)],
         commentIDs: [String],
-        roomCodes: [String]
+        roomCodes: [String],
+        // Records addressed by name rather than rebuilt here: a moment's extra
+        // takes (`clipRecordName(…, takeID:)`), and anything else whose name
+        // only the caller knows.
+        otherRecordNames: [String] = []
     ) async throws {
         try await ensureAccountAvailable()
 
-        var ids: [CKRecord.ID] = []
+        var ids: [CKRecord.ID] = otherRecordNames.map { CKRecord.ID(recordName: $0) }
         for clip in clips {
             ids.append(.init(recordName: clipRecordName(
                 code: clip.code, authorID: authorID, day: clip.day)))

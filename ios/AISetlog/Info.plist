@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>1Day</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,11 +34,15 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Record your 2-second daily challenge clip.</string>
+	<string>To film the moments of your day.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Capture audio for your daily clip.</string>
+	<string>So your clips have sound.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Save your finished weekly vlog.</string>
+	<string>To save your finished film to Photos.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用来把你说的话转成心情日记里的文字。</string>
+	<key>OneDayCloudKitEnvironment</key>
+	<string>$(CLOUDKIT_ENVIRONMENT)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
