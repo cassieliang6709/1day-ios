@@ -50,6 +50,7 @@ final class RoomSyncService {
         remoteMembers[code] = nil
         lastError[code] = nil
         forgetPublishedProfile(code: code)
+        if pendingRoomTitles[code] != nil { setPendingRoomTitle(nil, code: code) }
     }
 
     /// Pull every member's clips for a room into the local cache. Interaction
@@ -230,6 +231,53 @@ final class RoomSyncService {
     func forgetPublishedProfile(code: String) {
         guard publishedProfiles.removeValue(forKey: code) != nil else { return }
         UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
+    }
+
+    // MARK: - Room name
+
+    /// A rename on this phone that hasn't reached my `Member` record yet,
+    /// per room code. Persisted, and while it's here the room keeps my name
+    /// rather than an older one fetched from someone else's record.
+    struct PendingRoomTitle: Codable, Equatable {
+        var title: String
+        var at: Date
+    }
+    @ObservationIgnored private(set) var pendingRoomTitles: [String: PendingRoomTitle] = {
+        guard let data = UserDefaults.standard.data(forKey: RoomSyncService.pendingRoomTitlesKey) else { return [:] }
+        return (try? JSONDecoder().decode([String: PendingRoomTitle].self, from: data)) ?? [:]
+    }()
+    static let pendingRoomTitlesKey = "roomTitle.pending.v1"
+
+    /// Sends a new room name, or the one still waiting when `title` is nil.
+    /// A failure (before the `Member` fields are deployed, every one) keeps it
+    /// waiting for the next sync.
+    @MainActor
+    func publishRoomTitle(code: String, authorID: String, displayName: String, title: String? = nil, at: Date = .now) async {
+        if let title { setPendingRoomTitle(.init(title: title, at: at), code: code) }
+        guard let pending = pendingRoomTitles[code] else { return }
+        do {
+            try await transport.saveRoomTitle(code, authorID, displayName, pending.title, pending.at)
+            if pendingRoomTitles[code] == pending { setPendingRoomTitle(nil, code: code) }
+        } catch {
+            print("[room] room title failed: \(error)")
+        }
+    }
+
+    /// The room's name as its members last set it: the newest `roomTitle`
+    /// across the room. Nil when nobody has renamed it, or while my own
+    /// rename is still on its way up.
+    func latestRoomTitle(code: String) -> String? {
+        guard pendingRoomTitles[code] == nil else { return nil }
+        return (remoteMembers[code] ?? [:]).values
+            .compactMap { m in m.roomTitle.flatMap { t in m.roomTitleAt.map { (t, $0) } } }
+            .max { $0.1 < $1.1 }?.0
+    }
+
+    private func setPendingRoomTitle(_ value: PendingRoomTitle?, code: String) {
+        pendingRoomTitles[code] = value
+        if let data = try? JSONEncoder().encode(pendingRoomTitles) {
+            UserDefaults.standard.set(data, forKey: Self.pendingRoomTitlesKey)
+        }
     }
 
     func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async {

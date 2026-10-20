@@ -11,6 +11,8 @@ final class MemberProfileSyncTests: XCTestCase {
     private var writeFails = false
     private var fetched: [CloudKitService.RemoteMember] = []
     private var fetchFails = false
+    private var titleWrites: [(code: String, title: String, at: Date)] = []
+    private var titleWriteFails = false
     private var account: AccountStore!
 
     override func setUp() {
@@ -19,7 +21,10 @@ final class MemberProfileSyncTests: XCTestCase {
         writeFails = false
         fetched = []
         fetchFails = false
+        titleWrites = []
+        titleWriteFails = false
         UserDefaults.standard.removeObject(forKey: RoomSyncService.publishedProfilesKey)
+        UserDefaults.standard.removeObject(forKey: RoomSyncService.pendingRoomTitlesKey)
         account = AccountStore()
         account.signInAsTester(named: "Guest")
     }
@@ -27,6 +32,7 @@ final class MemberProfileSyncTests: XCTestCase {
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: "account.v1")
         UserDefaults.standard.removeObject(forKey: RoomSyncService.publishedProfilesKey)
+        UserDefaults.standard.removeObject(forKey: RoomSyncService.pendingRoomTitlesKey)
         account = nil
         super.tearDown()
     }
@@ -43,6 +49,10 @@ final class MemberProfileSyncTests: XCTestCase {
             saveMemberProfile: { [self] write in
                 if writeFails { throw CloudKitService.CKServiceError.networkUnavailable }
                 writes.append(write)
+            },
+            saveRoomTitle: { [self] code, _, _, title, at in
+                if titleWriteFails { throw CloudKitService.CKServiceError.networkUnavailable }
+                titleWrites.append((code, title, at))
             },
             fetchMembers: { [self] _, _ in
                 if fetchFails { throw CloudKitService.CKServiceError.networkUnavailable }
@@ -162,6 +172,67 @@ final class MemberProfileSyncTests: XCTestCase {
         isolated.challenges = store.challenges
         await isolated.publishMyProfileToAllRooms()
         XCTAssertTrue(writes.isEmpty)
+    }
+
+    // MARK: - Room name
+
+    func testRenamingARoomChangesItHereAndSendsIt() async {
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.renameRoom(store.challenges[0].id, to: "  周末小队 ")
+        XCTAssertEqual(store.challenges[0].title, "周末小队")
+        XCTAssertEqual(titleWrites.map(\.code), ["AAAAAA"])
+        XCTAssertEqual(titleWrites.map(\.title), ["周末小队"])
+    }
+
+    func testTheNewestNameInTheRoomWinsOnSync() async {
+        let old = Date(timeIntervalSince1970: 1_000)
+        let new = Date(timeIntervalSince1970: 2_000)
+        fetched = [
+            .init(userID: "a", displayName: "A", avatarURL: nil, moodKind: nil, moodDay: nil,
+                  roomTitle: "旧名字", roomTitleAt: old),
+            .init(userID: "b", displayName: "B", avatarURL: nil, moodKind: nil, moodDay: nil,
+                  roomTitle: "新名字", roomTitleAt: new),
+            .init(userID: "c", displayName: "C", avatarURL: nil, moodKind: nil, moodDay: nil),
+        ]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.syncRoom(store.challenges[0].id)
+        XCTAssertEqual(store.challenges[0].title, "新名字")
+    }
+
+    func testNobodyRenamedKeepsTheName() async {
+        fetched = [.init(userID: "a", displayName: "A", avatarURL: nil, moodKind: nil, moodDay: nil)]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.syncRoom(store.challenges[0].id)
+        XCTAssertEqual(store.challenges[0].title, "AAAAAA")
+    }
+
+    func testARenameThatFailedKeepsMyNameAndIsSentNextSync() async {
+        titleWriteFails = true
+        fetched = [.init(userID: "a", displayName: "A", avatarURL: nil, moodKind: nil, moodDay: nil,
+                         roomTitle: "朋友起的", roomTitleAt: .distantPast)]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        let id = store.challenges[0].id
+        await store.renameRoom(id, to: "我起的")
+        await store.syncRoom(id)
+        XCTAssertEqual(store.challenges[0].title, "我起的", "an older name must not undo mine while it's on its way")
+        XCTAssertTrue(titleWrites.isEmpty)
+
+        titleWriteFails = false
+        await store.syncRoom(id)
+        XCTAssertEqual(titleWrites.map(\.title), ["我起的"])
+        XCTAssertTrue(store.roomSync.pendingRoomTitles.isEmpty)
+    }
+
+    func testADemoStoreRenamesOnlyHere() async {
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        let isolated = ChallengeStore(
+            repository: ProfileTestRepository(), fileStore: ProfileTestFileStore(),
+            roomSync: store.roomSync, effects: .isolated)
+        isolated.account = account
+        isolated.challenges = store.challenges
+        await isolated.renameRoom(isolated.challenges[0].id, to: "演示")
+        XCTAssertEqual(isolated.challenges[0].title, "演示")
+        XCTAssertTrue(titleWrites.isEmpty)
     }
 
     // MARK: - Reading

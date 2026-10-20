@@ -254,7 +254,10 @@ struct StoryTimelineView: View {
         VStack(alignment: .leading, spacing: 14) {
             TimelineHeader(
                 challenge: challenge,
-                isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
+                isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
+                onRename: { name in
+                    Task { await store.renameRoom(challengeID, to: name) }
+                })
 
             RoomFrames(
                 clips: clips,

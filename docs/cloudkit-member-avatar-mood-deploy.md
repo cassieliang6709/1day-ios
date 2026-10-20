@@ -1,6 +1,6 @@
 # CloudKit：一次建好 `Member` 记录类型（含头像和心情）
 
-`Member` 是房间成员的记录。上一版只写了 4 个字段（见 `docs/cloudkit-member-deploy.md`），**那一版还没部署**。这一版又加了 3 个字段：头像图、今天的心情、心情是哪天选的。所以不要分两次部署，按这份文档**一次把 7 个字段和索引都建好，一次 Deploy**。`docs/cloudkit-member-deploy.md` 那份可以不用再看。
+`Member` 是房间成员的记录。上一版只写了 4 个字段（见 `docs/cloudkit-member-deploy.md`），**那一版还没部署**。这一版又加了 5 个字段：头像图、今天的心情、心情是哪天选的、房间名、房间名是什么时候改的。所以不要分两次部署，按这份文档**一次把 9 个字段和索引都建好，一次 Deploy**。`docs/cloudkit-member-deploy.md` 那份可以不用再看。
 
 ## 部署前会怎样
 
@@ -26,6 +26,8 @@ Debug 和 Release 默认都连 Production。Production 里没有 `Member` 类型
 | `avatar` | **Asset** | 做好的头像 PNG（768×768，约 200–400 KB）。**只有成品头像，原照片从不上传** |
 | `moodKind` | String | 今天的心情：`happy` / `calm` / `tired` / `sad` / `angry` |
 | `moodDay` | Date/Time | 选这个心情的时间。朋友的手机只在同一天显示，过了这天就不显示 |
+| `roomTitle` | String | 这个人最后一次给房间改的名字。房间里谁都能改；只有建记录的人能写 `Room`，所以名字写在自己的 `Member` 上 |
+| `roomTitleAt` | Date/Time | 改名的时间。所有人的手机都用全房间最新的那个名字 |
 
 心情日记的文字**不在这里**，它只在私有库（`MoodSync`）。
 
@@ -36,7 +38,7 @@ Debug 和 Release 默认都连 Production。Production 里没有 `Member` 类型
 打开 <https://icloud.developer.apple.com/dashboard>，选容器 `iCloud.com.cassie.AISetlog`，环境选 **Development**。
 
 1. 左边 **Schema → Record Types**，点 **+**，名字填 `Member`。
-2. 点 **+ Add Field**，加下面 7 个字段（名字一个字母都不能错，大小写也要一样）：
+2. 点 **+ Add Field**，加下面 9 个字段（名字一个字母都不能错，大小写也要一样）：
    - `roomCode` — String
    - `userID` — String
    - `displayName` — String
@@ -44,6 +46,8 @@ Debug 和 Release 默认都连 Production。Production 里没有 `Member` 类型
    - `avatar` — Asset
    - `moodKind` — String
    - `moodDay` — Date/Time
+   - `roomTitle` — String
+   - `roomTitleAt` — Date/Time
 3. 点 **Save**。
 
 （也可以临时把 `ios/project.yml` 里 Debug 的 `CLOUDKIT_ENVIRONMENT` 改成 `Development`，在 Development 里加入房间、做头像、选心情，让 App 自动建出这些字段。做法见 `docs/cloudkit-member-deploy.md` 第 1 步，测完一定改回 `Production`，这个改动不能提交。手建更省事。）
@@ -65,9 +69,9 @@ Debug 和 Release 默认都连 Production。Production 里没有 `Member` 类型
 ## 第 3 步：部署到 Production
 
 1. Console 左下角点 **Deploy Schema Changes...**。
-2. 在弹出的对比里确认只有这些新增：`Member` 记录类型、7 个字段、3 个索引。**如果出现别的改动，先停下来**，弄清楚是谁加的再部署。
+2. 在弹出的对比里确认只有这些新增：`Member` 记录类型、9 个字段、3 个索引。**如果出现别的改动，先停下来**，弄清楚是谁加的再部署。
 3. 点 **Deploy**。
-4. 环境切到 **Production**，在 **Schema → Record Types** 里确认 `Member` 有 7 个字段，**Schema → Indexes** 里 `roomCode` 是 QUERYABLE。
+4. 环境切到 **Production**，在 **Schema → Record Types** 里确认 `Member` 有 9 个字段，**Schema → Indexes** 里 `roomCode` 是 QUERYABLE。
 
 ## 部署后怎么确认
 
@@ -85,4 +89,4 @@ Debug 和 Release 默认都连 Production。Production 里没有 `Member` 类型
 
 ## 可以和 Clip 的 captionsJSON 一起部署
 
-`Clip` 记录要加的 `captionsJSON` 字段（见 `docs/cloudkit-clip-captions-deploy.md`）可以和这份的 `Member` 放在同一次 **Deploy Schema Changes** 里：先在 Development 把两边都建好，第 3 步的对比里应该看到 `Member`（7 个字段、3 个索引）加上 `Clip.captionsJSON`，确认后一次 Deploy。
+`Clip` 记录要加的 `captionsJSON` 字段（见 `docs/cloudkit-clip-captions-deploy.md`）可以和这份的 `Member` 放在同一次 **Deploy Schema Changes** 里：先在 Development 把两边都建好，第 3 步的对比里应该看到 `Member`（9 个字段、3 个索引）加上 `Clip.captionsJSON`，确认后一次 Deploy。

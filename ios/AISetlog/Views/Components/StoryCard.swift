@@ -204,10 +204,13 @@ struct StoryRowCard: View {
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
 
-                Text(subtitle)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
+                // 朋友's rooms are just their name (1.5).
+                if !challenge.isShared {
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 4)
@@ -238,8 +241,7 @@ struct StoryRowCard: View {
     }
 
     private var subtitle: String {
-        // 朋友's rooms never say 影片完成 (1.5).
-        if progress.isComplete, !challenge.isShared {
+        if progress.isComplete {
             return Strings.filmReadySubtitle(
                 duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }

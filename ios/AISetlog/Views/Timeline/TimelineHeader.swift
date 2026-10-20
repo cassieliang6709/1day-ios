@@ -12,6 +12,12 @@ import SwiftUI
 struct TimelineHeader: View {
     let challenge: Challenge
     var isSyncing = false
+    /// A room's name can be changed by anyone in it (1.5): tapping the title
+    /// asks for a new one. Nil keeps the title plain text.
+    var onRename: ((String) -> Void)? = nil
+
+    @State private var renaming = false
+    @State private var draftTitle = ""
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
@@ -24,7 +30,24 @@ struct TimelineHeader: View {
     }
 
     var body: some View {
-        if showsTitle || isSyncing {
+        if let onRename {
+            Button {
+                draftTitle = showsTitle ? challenge.title : ""
+                renaming = true
+            } label: {
+                title
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("room-title")
+            .alert(Strings.renameRoom, isPresented: $renaming) {
+                TextField(Strings.roomNamePlaceholder, text: $draftTitle)
+                Button(Strings.cancel, role: .cancel) {}
+                Button(Strings.save) {
+                    let name = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !name.isEmpty { onRename(name) }
+                }
+            }
+        } else if showsTitle || isSyncing {
             title
         }
     }
@@ -49,6 +72,12 @@ struct TimelineHeader: View {
                     .font(.system(size: 29, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(2)
+            } else if onRename != nil {
+                // A room still called 和我过一天 has no title to tap; this is it.
+                Text(Strings.roomNamePlaceholder)
+                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.inkFaint)
+                    .lineLimit(1)
             }
 
             if isSyncing {

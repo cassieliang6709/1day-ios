@@ -206,6 +206,33 @@ final class ChallengeStore {
             mergeInteractions(interactions, into: id)
         }
         await roomSync.syncMembers(code: code)
+        await syncRoomTitle(id, code: code)
+    }
+
+    /// Renames a room on this phone at once, then for everyone in it.
+    @MainActor
+    func renameRoom(_ id: UUID, to title: String) async {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, let index = challenges.firstIndex(where: { $0.id == id }),
+              let code = challenges[index].roomCode
+        else { return }
+        challenges[index].title = title
+        guard effects.allowsCloudRoomManagement, let me = account?.account else { return }
+        await roomSync.publishRoomTitle(code: code, authorID: me.id, displayName: me.displayName, title: title)
+    }
+
+    /// Sends a rename that didn't get through, then takes the room's newest
+    /// name from its members' records.
+    @MainActor
+    private func syncRoomTitle(_ id: UUID, code: String) async {
+        if effects.allowsCloudRoomManagement, let me = account?.account {
+            await roomSync.publishRoomTitle(code: code, authorID: me.id, displayName: me.displayName)
+        }
+        guard let latest = roomSync.latestRoomTitle(code: code),
+              let index = challenges.firstIndex(where: { $0.id == id }),
+              challenges[index].title != latest
+        else { return }
+        challenges[index].title = latest
     }
 
     /// Re-sends my takes the room doesn't have.

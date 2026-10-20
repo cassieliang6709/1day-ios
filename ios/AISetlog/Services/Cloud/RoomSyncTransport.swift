@@ -34,6 +34,11 @@ struct RoomSyncTransport {
     var saveMemberProfile: @MainActor (CloudKitService.MemberProfileWrite) async throws -> Void = { _ in
         throw CancellationError()
     }
+    /// The room's new name on my `Member` record: code, authorID,
+    /// displayName, title, when. Defaulted to fail, like `saveMember`.
+    var saveRoomTitle: @MainActor (String, String, String, String, Date) async throws -> Void = { _, _, _, _, _ in
+        throw CancellationError()
+    }
     /// Everyone's `Member` record in a room: code, where to cache avatars.
     var fetchMembers: @MainActor (String, URL) async throws -> [CloudKitService.RemoteMember] = { _, _ in
         throw CancellationError()
@@ -52,6 +57,7 @@ struct RoomSyncTransport {
             fetchRoom: { try await CloudKitService.fetchRoom(code: $0) },
             saveMember: { try await CloudKitService.saveMember(code: $0, authorID: $1, displayName: $2, joinedAt: $3) },
             saveMemberProfile: { try await CloudKitService.saveMemberProfile($0) },
+            saveRoomTitle: { try await CloudKitService.saveRoomTitle(code: $0, authorID: $1, displayName: $2, title: $3, at: $4) },
             fetchMembers: { try await CloudKitService.fetchMembers(code: $0, into: $1) })
     }
 }

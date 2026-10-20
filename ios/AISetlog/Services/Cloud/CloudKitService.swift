@@ -262,6 +262,10 @@ enum CloudKitService {
         let avatarURL: URL?
         let moodKind: String?
         let moodDay: Date?
+        /// The room name this member last gave the room, and when. The
+        /// newest across the room is the room's name for everyone.
+        var roomTitle: String? = nil
+        var roomTitleAt: Date? = nil
     }
 
     /// Adds my avatar and mood to my `Member` record in one room, creating the
@@ -289,6 +293,31 @@ enum CloudKitService {
         print("[room] saved member profile code=\(write.code)")
     }
 
+    /// Renames the room for everyone: the name goes on my own `Member`
+    /// record (only its creator may write a record, so the `Room` record
+    /// itself can't be changed by a member), and whoever renamed last wins.
+    /// Reads first so `joinedAt`, the avatar and the mood survive.
+    static func saveRoomTitle(
+        code: String, authorID: String, displayName: String, title: String, at: Date
+    ) async throws {
+        try await ensureAccountAvailable()
+        let id = CKRecord.ID(recordName: memberRecordName(code: code, authorID: authorID))
+        let record: CKRecord
+        do {
+            record = try await db.record(for: id)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: "Member", recordID: id)
+            record["roomCode"] = code as CKRecordValue
+            record["userID"] = authorID as CKRecordValue
+            record["joinedAt"] = Date.now as CKRecordValue
+        }
+        record["displayName"] = displayName as CKRecordValue
+        record["roomTitle"] = title as CKRecordValue
+        record["roomTitleAt"] = at as CKRecordValue
+        try await upsert(record)
+        print("[room] saved room title code=\(code)")
+    }
+
     /// Every `Member` record in a room, avatars downloaded into `cacheDir`.
     /// Needs `roomCode` QUERYABLE (see docs/cloudkit-member-avatar-mood-deploy.md).
     static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {
@@ -310,7 +339,9 @@ enum CloudKitService {
                 displayName: r["displayName"] as? String ?? "",
                 avatarURL: local,
                 moodKind: r["moodKind"] as? String,
-                moodDay: r["moodDay"] as? Date)
+                moodDay: r["moodDay"] as? Date,
+                roomTitle: r["roomTitle"] as? String,
+                roomTitleAt: r["roomTitleAt"] as? Date)
         }
     }
 
