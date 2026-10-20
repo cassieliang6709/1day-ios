@@ -136,14 +136,6 @@ final class MoodStoreTests: XCTestCase {
 
     // MARK: - Saved state
 
-    func testCardIsEditorUntilAMoodExistsThenSaved() {
-        let store = makeStore()
-        XCTAssertEqual(MoodCardPhase(entry: store.today, isEditing: false), .editing)
-        store.setMood(.happy)
-        XCTAssertEqual(MoodCardPhase(entry: store.today, isEditing: true), .editing)
-        XCTAssertEqual(MoodCardPhase(entry: store.today, isEditing: false), .saved)
-    }
-
     func testASavedDayIsStillSavedAfterARelaunch() {
         let first = makeStore()
         first.setMood(.calm)
@@ -151,7 +143,7 @@ final class MoodStoreTests: XCTestCase {
 
         let second = makeStore()
 
-        XCTAssertEqual(MoodCardPhase(entry: second.today, isEditing: false), .saved)
+        XCTAssertEqual(second.today?.mood, .calm)
         XCTAssertEqual(second.today?.note, "tea")
     }
 

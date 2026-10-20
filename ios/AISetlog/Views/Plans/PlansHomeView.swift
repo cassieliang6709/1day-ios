@@ -50,6 +50,8 @@ struct PlansHomeView: View {
     @State private var joinAttempt = 0
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
+    /// One item of 今天的计划, tapped: film that one.
+    @State private var recordPlanSlot: PlanSlot?
     /// The story a long press is proposing to delete, held until it's confirmed.
     @State private var pendingDeletion: Challenge?
     @State private var notificationRecordRoute: NotificationRecordRoute?
@@ -84,6 +86,11 @@ struct PlansHomeView: View {
         }
         .fullScreenCover(item: $recordChallenge) { challenge in
             recorder(for: challenge)
+        }
+        .fullScreenCover(item: $recordPlanSlot) { item in
+            if let challenge = store.challenge(item.challengeID) {
+                recorder(for: challenge, preferredDay: item.slot)
+            }
         }
         .fullScreenCover(item: $notificationRecordRoute) { route in
             if let challenge = store.challenge(route.challengeID) {
@@ -259,21 +266,13 @@ struct PlansHomeView: View {
                 }
                 #endif
 
-                // 我的, top to bottom: today's mood, today's stories, every clip.
-                MoodTodayCard()
+                // 我的, top to bottom: today's mood beside today's plan,
+                // then every clip. No plan today: the mood has the row.
+                todayCards
 
-                switch stories.hero {
-                case .today(let challenge):
-                    todaySection(todayStories(leading: challenge), label: Strings.todaysStory)
-                case .resume(let challenge):
-                    todaySection([challenge], label: Strings.resumeStory)
-                case .startToday:
-                    // 1.5: no "start today's story" card. With nothing in
-                    // progress the archive is the page, and the round camera
-                    // button is the way to add to it. Only a first run, with
-                    // no stories and no clips, still gets the mascot.
-                    if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
-                }
+                // A first run — no stories, no clips — gets the three-line
+                // guide.
+                if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
 
                 // Replaces the date-grouped story list (`timelineSection`):
                 // every clip, filterable by room, with a calendar.
@@ -663,6 +662,29 @@ struct PlansHomeView: View {
         }
     }
 
+    /// The mood card, and today's plan beside it when there is one: two
+    /// cards of one size, side by side (PRD 5.6).
+    @ViewBuilder
+    private var todayCards: some View {
+        if let plan = store.todaysPlan() {
+            HStack(alignment: .top, spacing: 12) {
+                MoodTodayCard(compact: true)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                TodayPlanCard(
+                    challenge: plan,
+                    progress: cardState(for: plan).progress,
+                    onFilm: { recordPlanSlot = PlanSlot(challengeID: plan.id, slot: $0) },
+                    onOpen: { path.append(plan.id) })
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 20)
+        } else {
+            MoodTodayCard()
+                .padding(.horizontal, 20)
+        }
+    }
+
     /// 今天的故事 as rows, one per story today is for, stacked. `leading` is
     /// the one `HomeHeroChoice` picked and goes first.
     private func todaySection(_ challenges: [Challenge], label: String) -> some View {
@@ -999,4 +1021,11 @@ struct PlansHomeView: View {
             refreshToken: first?.recordedAt)
     }
 
+}
+
+/// An item of 今天的计划 to film.
+struct PlanSlot: Identifiable, Equatable {
+    let challengeID: UUID
+    let slot: Int
+    var id: String { "\(challengeID.uuidString).\(slot)" }
 }

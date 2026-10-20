@@ -63,6 +63,9 @@ struct RoomProgress: Equatable {
     ///
     /// - Returns: a slot number, or the last one when the day is full — there
     ///   is always somewhere to point, and re-filming a moment is allowed.
+    /// Whether a slot has footage — 今天的计划's tick.
+    func isFilled(_ slot: Int) -> Bool { filledDays.contains(slot) }
+
     var nextOpenMoment: Int {
         guard total > 0 else { return 1 }
         return (1...total).first { !filledDays.contains($0) } ?? total
