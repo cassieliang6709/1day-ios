@@ -6,7 +6,7 @@ extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
     static var libraryDraftQuestion: String { zh ? "这段只有你看得到" : "Only you can see this clip" }
-    static var libraryFileIntoStory: String { zh ? "放进选题或发到房间" : "Add to a topic or room" }
+    static var libraryFileIntoStory: String { zh ? "发到房间" : "Send to a room" }
     static var libraryOpenStory: String { zh ? "打开选题" : "Open topic" }
     static var libraryAddCaption: String { zh ? "加字幕" : "Add caption" }
     static var libraryEditCaption: String { zh ? "改字幕" : "Edit caption" }
@@ -32,7 +32,7 @@ extension Strings {
 
     // Filing a draft, without 竖屏/横屏/正方形: cameras decide the shape now.
     // The matching underneath still checks the frame (old stories need it).
-    static var draftNoPlace: String { zh ? "还没有选题能放这段" : "No story can take this clip yet" }
+    static var draftNoPlace: String { zh ? "还没有房间" : "No rooms yet" }
     static var draftNoStoryYet: String {
         zh ? "这段还没有能放进去的选题。在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，就能放进去了。"
             : "There's no story this clip can go into yet. Tap + \(surfaceCompose) on \(surfacePlans) to make one, and it can go in."

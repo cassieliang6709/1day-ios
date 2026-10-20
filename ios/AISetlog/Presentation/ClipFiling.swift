@@ -13,6 +13,15 @@ enum ClipFiling {
     /// into one overwrote whichever day the story happened to be on — a loose
     /// clip quietly destroying a clip that was already in the film. There is no
     /// version of "put this somewhere" that should mean "delete that".
+    /// Rooms a clip can be sent to (1.5): every room shot the same way round.
+    /// A room is filmed whenever, so it is never full — see
+    /// `ChallengeStore.sendToRoom`.
+    static func rooms(
+        in challenges: [Challenge], orientation: Challenge.Orientation
+    ) -> [Challenge] {
+        challenges.filter { $0.isShared && $0.resolvedOrientation == orientation && !$0.cards.isEmpty }
+    }
+
     static func candidates(
         in challenges: [Challenge], orientation: Challenge.Orientation
     ) -> [Challenge] {

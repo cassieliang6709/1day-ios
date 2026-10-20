@@ -5,22 +5,19 @@ import SwiftUI
 /// file are dropped.
 @MainActor
 enum DraftFiler {
+    /// Where a clip in 我的 can go: the rooms (1.5). Stories are filmed
+    /// from their own list now, not filed into.
     static func candidates(for draft: ClipDraft, in store: ChallengeStore) -> [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: draft.orientation)
+        ClipFiling.rooms(in: store.challenges, orientation: draft.orientation)
     }
 
     /// Why 归档 can't run. Only asked when there are no candidates, so
     /// `blocker` never answers nil here — but a made-up explanation would be
     /// worse than none, so the nil case falls back to the symptom.
     static func blocked(for draft: ClipDraft, in store: ChallengeStore) -> DraftFilingBlocked {
-        let message = switch ClipFiling.blocker(
-            in: store.challenges, orientation: draft.orientation
-        ) {
-        case .noStoryWithThisFrame: Strings.draftNoStoryYet
-        case .everyMatchingStoryIsFull: Strings.draftEveryStoryFull
-        case nil: Strings.draftNoPlace
-        }
-        return DraftFilingBlocked(title: Strings.draftNoPlace, message: message)
+        // Only rooms take a clip now, and a room is never full: the one
+        // reason left is that there isn't a room.
+        DraftFilingBlocked(title: Strings.draftNoPlace, message: "")
     }
 
     /// File the draft into every chosen story, then drop it — but only once at
@@ -40,6 +37,14 @@ enum DraftFiler {
     ) -> String {
         var landed: [Challenge] = []
         for challenge in challenges {
+            if challenge.isShared {
+                if store.sendToRoom(
+                    from: drafts.url(for: draft), roomID: challenge.id,
+                    captions: draft.captions, recordedAt: draft.recordedAt) {
+                    landed.append(challenge)
+                }
+                continue
+            }
             // No open slot means no filing: filing into the story's current
             // day overwrote a clip that was already there.
             guard let day = ClipFiling.targetDay(in: challenge) else { continue }

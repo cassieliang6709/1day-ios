@@ -319,14 +319,7 @@ struct CameraTabView: View {
             // In the top bar's empty trailing slot, beside the wordmark, rather
             // than 88pt down: that put it inside the frame, and on a small
             // phone on top of the timer chip. Compact so it fits the slot.
-            .overlay(alignment: .topTrailing) {
-                if !drafts.isEmpty, unfiledGuard?.hasUnfiledClip != true {
-                    DraftsEntryButton(count: drafts.count, compact: true) {
-                        if let onOpenDrafts { onOpenDrafts() } else { showDrafts = true }
-                    }
-                        .padding(.trailing, 12)
-                }
-            }
-            .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+            // No 待归档 count up here any more (1.5): a take is in 我的 the
+            // moment it's filmed, with nothing left to sort.
     }
 }

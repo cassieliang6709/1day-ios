@@ -49,17 +49,12 @@ struct RecordClipView: View {
     @State private var ringProgress: CGFloat = 0
     @State private var overlayText = ""
     @State private var showSavePicker = false
+    /// Rooms ticked under a free take: it goes to each of them as well as
+    /// 我的 (1.5). None ticked — it stays in 我的 only.
+    @State private var sendTo: Set<UUID> = []
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
-    /// Raised when the close button is pressed with a take still in review.
-    ///
-    /// The free-form camera has had this guard since `UnfiledClipGuard` —
-    /// leaving with a clip in review asks first. The per-moment camera, opened
-    /// as a modal from a story, never got the other half: you filmed two
-    /// seconds, tapped X out of habit, and `teardown()` deleted the temp file
-    /// on the way out with nothing on screen to say it had happened.
-    @State private var askBeforeDiscarding = false
     /// Whether the fine zoom row has replaced the preset chips. The chips
     /// cover 0.5x / 1x / 2x; this covers everything between and above them.
     @State private var showsZoomSlider = false
@@ -225,31 +220,6 @@ struct RecordClipView: View {
             ringProgress = 0
             showToast(Strings.recordingFailed)
         }
-        .confirmationDialog(
-            // Not the free-form 「这段还没归档」: this take already has a home,
-            // the moment the camera was opened from, so the first answer
-            // offered is to put it there.
-            isFreeform ? Strings.keepClipQuestion : Strings.unusedClipQuestion,
-            isPresented: $askBeforeDiscarding,
-            titleVisibility: .visible
-        ) {
-            // X out of habit used to offer keep-as-draft or discard — never the
-            // thing the take was filmed for. Same call as the Use button.
-            if !isFreeform, let url = recorder.clipURL {
-                Button(Strings.useClip) {
-                    onSave(url, trimmedOverlayText)
-                    dismiss()
-                }
-            }
-            Button(Strings.keepClip) { keepAsDraft { dismiss() } }
-            Button(Strings.discardClip, role: .destructive) {
-                clearReview()
-                dismiss()
-            }
-            Button(Strings.cancel, role: .cancel) {}
-        } message: {
-            Text(Strings.keepClipFootnote)
-        }
     }
 
     private func observingTake(_ content: some View) -> some View {
@@ -269,7 +239,7 @@ struct RecordClipView: View {
         .onChange(of: recorder.clipURL) { _, url in
             guard isFreeform, let unfiledGuard else { return }
             unfiledGuard.hasUnfiledClip = url != nil
-            unfiledGuard.keep = { keepAsDraft() }
+            unfiledGuard.keep = { finishFreeTake() }
             unfiledGuard.discard = { clearReview() }
         }
     }
@@ -526,20 +496,26 @@ struct RecordClipView: View {
                 }
             }
             .layoutPriority(1)
+            // Swipe the take away to drop it (1.5) — no dialog.
+            .gesture(
+                DragGesture(minimumDistance: 30).onEnded { value in
+                    if value.translation.width < -80, abs(value.translation.height) < 80 {
+                        discardTake()
+                    }
+                })
+
+            if isFreeform { RoomSendList(rooms: sendableRooms, picked: $sendTo) }
 
             HStack(spacing: 10) {
                 Button {
                     if isFreeform {
-                        // 1.5: a free take goes straight into 我的. Filing it
-                        // into a story is still there, from 我的's drafts.
-                        keepAsDraft()
+                        finishFreeTake()
                     } else {
                         onSave(url, trimmedOverlayText)
                         dismiss()
                     }
                 } label: {
-                    Label(isFreeform ? Strings.saveToMine : Strings.useClip,
-                          systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
+                    Label(Strings.done, systemImage: "checkmark")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(OneDay.onBrand)
                         .lineLimit(1)
@@ -603,6 +579,12 @@ struct RecordClipView: View {
     }
 
     // MARK: - Free-form filing
+
+    /// Rooms this take can go to, newest first.
+    private var sendableRooms: [Challenge] {
+        ClipFiling.rooms(in: store.challenges, orientation: effectiveOrientation)
+            .sorted { $0.startDate > $1.startDate }
+    }
 
     private var filingCandidates: [Challenge] {
         ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
@@ -692,13 +674,49 @@ struct RecordClipView: View {
             dismiss()
             return
         }
-        // A free take goes to 我的 without a question; a moment's take still
-        // asks, since its first answer is to use it for that moment.
+        // Filming it is keeping it (1.5): closing never asks. A free take
+        // goes to 我的 and the ticked rooms; a moment's take to its moment.
         if isFreeform {
-            keepAsDraft { dismiss() }
+            finishFreeTake { dismiss() }
             return
         }
-        askBeforeDiscarding = true
+        if let url = recorder.clipURL {
+            onSave(url, trimmedOverlayText)
+        }
+        dismiss()
+    }
+
+    /// A free take, done with: into the ticked rooms, or into 我的 when none
+    /// is ticked. A clip sent to a room is already one of mine in 我的, so
+    /// it isn't kept a second time as a loose clip.
+    private func finishFreeTake(then next: (() -> Void)? = nil) {
+        guard let url = recorder.clipURL else { next?(); return }
+        let rooms = sendTo.filter { id in store.challenge(id)?.isShared == true }
+        guard !rooms.isEmpty else {
+            keepAsDraft(then: next)
+            return
+        }
+        let at = recorder.recordedAt ?? .now
+        for id in rooms {
+            store.sendToRoom(from: url, roomID: id, overlayText: trimmedOverlayText, recordedAt: at)
+        }
+        sendTo = []
+        clearReview()
+        showToast(Strings.sentToRooms)
+        if let next {
+            isLeaving = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                next()
+                isLeaving = false
+            }
+        }
+    }
+
+    /// Swiped left in review: the take is gone, nothing asked.
+    private func discardTake() {
+        sendTo = []
+        clearReview()
     }
 
     private func clearReview() {
@@ -1038,5 +1056,49 @@ struct RecordClipView: View {
         .accessibilityLabel(Strings.flipCamera)
         .disabled(recorder.state != .ready || recorder.clipURL != nil)
         .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+    }
+}
+
+/// Under a free take: one row per room, tick as many as you like (1.5).
+/// Nothing ticked keeps the take in 我的 only. No title, no explanation.
+private struct RoomSendList: View {
+    let rooms: [Challenge]
+    @Binding var picked: Set<UUID>
+
+    var body: some View {
+        if !rooms.isEmpty {
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach(rooms) { room in row(room) }
+                }
+            }
+            .frame(maxHeight: min(CGFloat(rooms.count) * 50, 150))
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private func row(_ room: Challenge) -> some View {
+        let on = picked.contains(room.id)
+        return Button {
+            if on { picked.remove(room.id) } else { picked.insert(room.id) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(on ? Color.oneDayBrand : OneDay.inkFaint)
+                Text(ChallengePresenter(challenge: room).displayTitle)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(OneDay.surface, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("send-room-row")
     }
 }

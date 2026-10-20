@@ -320,9 +320,10 @@ struct LibrarySection: View {
 
     private func sourceLine(_ clip: LibraryClip) -> String {
         let who = clip.isMine ? nil : clip.authorName
-        let place: String = switch clip.source {
+        // A clip in no story is just mine — no 未归档 label (1.5).
+        let place: String? = switch clip.source {
         case .story(_, let title, _): title
-        case .draft: Strings.libraryUnfiled
+        case .draft: nil
         }
         return [who, place].compactMap { $0 }.joined(separator: " · ")
     }

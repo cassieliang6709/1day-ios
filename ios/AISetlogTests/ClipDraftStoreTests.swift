@@ -273,6 +273,32 @@ final class ClipDraftStoreTests: XCTestCase {
             ClipFiling.candidates(in: [full], orientation: .portrait).isEmpty,
             "a full story is not somewhere a clip can go")
     }
+
+    /// A room is filmed whenever (1.5), so it is never full: once its slots
+    /// hold footage, the next clip sent to it is one more take.
+    @MainActor
+    func testARoomIsNeverFullASecondClipIsAnotherTake() throws {
+        let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fileStore = DiskClipFileStore()
+        let store = ChallengeStore(
+            repository: UserDefaultsChallengeRepository(defaults: defaults, fileStore: fileStore),
+            fileStore: fileStore, effects: .isolated)
+        let room = Challenge(id: UUID(), title: "房间", startDate: .now, cards: [DayCard(day: 1)],
+                             roomCode: "ABCDEF", ownerName: "Leo", ownerID: "owner-1")
+        store.challenges = [room]
+        defer { fileStore.deleteClips(challengeID: room.id) }
+
+        XCTAssertTrue(store.sendToRoom(from: try makeTempClip(named: "a.mov", bytes: 64), roomID: room.id))
+        XCTAssertTrue(store.sendToRoom(from: try makeTempClip(named: "b.mov", bytes: 64), roomID: room.id))
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first)
+        XCTAssertNotNil(card.clipFileName)
+        XCTAssertEqual(card.moreTakes.count, 1, "the second clip is a second take, not an overwrite")
+        XCTAssertEqual(ClipFiling.rooms(in: store.challenges, orientation: .portrait).map(\.id), [room.id])
+    }
 }
 
 // MARK: - Doubles
