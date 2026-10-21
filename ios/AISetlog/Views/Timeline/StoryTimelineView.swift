@@ -30,6 +30,8 @@ struct StoryTimelineView: View {
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
+    /// Which of the room's two layouts is on screen; remembered across rooms.
+    @AppStorage("roomLayout") private var roomLayout: RoomLayout = .frames
     /// The person whose page is open, from the face on their frame.
     @State private var personPage: String?
     /// The room whose code is being offered for sharing, once, right after it
@@ -243,10 +245,10 @@ struct StoryTimelineView: View {
         }
     }
 
-    /// A shared room (1.5): the name, then one big frame per person filling
-    /// the rest of the screen — see `RoomFrames`. The column layout,
-    /// `RoomFeed`, is kept but not drawn. 生成 vlog and 聊天 are icons in the
-    /// nav bar now, so the frames get the height.
+    /// A shared room (1.5): the name, who is in it, then the room in one of
+    /// two layouts — one big frame per person filling the rest of the
+    /// screen (`RoomFrames`), or one column per person with all their clips
+    /// (`RoomFeed`). 生成 vlog and 聊天 are in the nav bar's 「…」.
     private func roomPage(
         _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
         myID: String, agenda: StoryAgenda
@@ -259,23 +261,66 @@ struct StoryTimelineView: View {
                     Task { await store.renameRoom(challengeID, to: name) }
                 })
 
-            RoomFrames(
-                clips: clips,
-                members: members,
-                myID: myID,
-                nextToFilm: agenda.suggested ?? agenda.openToMe.first,
-                slotTitle: { slotTitle(for: $0) },
-                // Opens the tapped take alone, full screen, where its
-                // captions are edited.
-                onPlay: { clip in sheet = .open(clip) },
-                onFilm: { day in sheet = .record(day: day) },
-                onOpenPerson: { column in personPage = column.id },
-                hasPoked: { id in
-                    store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                },
-                onPoke: { id in
-                    store.poke(challengeID: challengeID, targetAuthorID: id)
-                })
+            HStack(spacing: 10) {
+                Text(members.map(\.name).filter { !$0.isEmpty }.joined(separator: "、"))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(2)
+                    .accessibilityIdentifier("room-member-names")
+                Spacer(minLength: 0)
+                Picker(selection: $roomLayout) {
+                    Image(systemName: "rectangle.grid.1x2")
+                        .accessibilityLabel(Text(Strings.roomLayoutFrames))
+                        .tag(RoomLayout.frames)
+                    Image(systemName: "rectangle.split.3x1")
+                        .accessibilityLabel(Text(Strings.roomLayoutColumns))
+                        .tag(RoomLayout.columns)
+                } label: {
+                    EmptyView()
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .accessibilityIdentifier("room-layout")
+            }
+
+            if roomLayout == .columns {
+                ScrollView {
+                    RoomFeed(
+                        challenge: challenge,
+                        clips: clips,
+                        members: members,
+                        myID: myID,
+                        nextToFilm: nil,
+                        slotTitle: { slotTitle(for: $0) },
+                        onPlay: { clip in sheet = .open(clip) },
+                        onFilm: { day in sheet = .record(day: day) },
+                        hasPoked: { id in
+                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                        },
+                        onPoke: { id in
+                            store.poke(challengeID: challengeID, targetAuthorID: id)
+                        })
+                }
+                .scrollIndicators(.hidden)
+            } else {
+                RoomFrames(
+                    clips: clips,
+                    members: members,
+                    myID: myID,
+                    nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                    slotTitle: { slotTitle(for: $0) },
+                    // Opens the tapped take alone, full screen, where its
+                    // captions are edited.
+                    onPlay: { clip in sheet = .open(clip) },
+                    onFilm: { day in sheet = .record(day: day) },
+                    onOpenPerson: { column in personPage = column.id },
+                    hasPoked: { id in
+                        store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                    },
+                    onPoke: { id in
+                        store.poke(challengeID: challengeID, targetAuthorID: id)
+                    })
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 6)
@@ -384,24 +429,6 @@ struct StoryTimelineView: View {
 
             Spacer()
 
-            // A room's two actions are icons up here (1.5), beside 邀请, so
-            // the frames below get the whole screen. Their identifiers are
-            // what the UI tests find them by.
-            if challenge.isShared {
-                IconBubble(systemName: "film.stack.fill", label: Strings.makeRoomVlog) {
-                    showFilm = true
-                }
-                .disabled(clipCount == 0)
-                .opacity(clipCount == 0 ? 0.5 : 1)
-                .accessibilityIdentifier("room-make-vlog")
-
-                IconBubble(systemName: "bubble.left.and.bubble.right.fill",
-                           label: Strings.chatLabel) {
-                    showRoomChat = true
-                }
-                .accessibilityIdentifier("room-chat")
-            }
-
             if challenge.isShared, let code = challenge.roomCode {
                 if previewMedia == nil {
                     RoomInviteShareLink(
@@ -430,6 +457,18 @@ struct StoryTimelineView: View {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
                     }
+                }
+
+                // A room's 生成 vlog and 聊天 live here (1.5): as icons beside
+                // 邀请 they made four bubbles in a row at the top of the page.
+                if challenge.isShared {
+                    Button(Strings.makeRoomVlog, systemImage: "film.stack.fill") { showFilm = true }
+                        .disabled(clipCount == 0)
+                        .accessibilityIdentifier("room-make-vlog")
+                    Button(Strings.chatLabel, systemImage: "bubble.left.and.bubble.right.fill") {
+                        showRoomChat = true
+                    }
+                    .accessibilityIdentifier("room-chat")
                 }
 
                 if !challenge.isTimeOnly {
@@ -480,6 +519,7 @@ struct StoryTimelineView: View {
                     .contentShape(Rectangle())
             }
             .accessibilityLabel(Text(syncError ?? Strings.moreLabel))
+            .accessibilityIdentifier("room-more")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
@@ -626,4 +666,10 @@ struct StoryTimelineView: View {
         }
         return Strings.shareMessageInvite(title: presenter.displayTitle, code: code)
     }
+}
+
+/// The room page's two layouts (1.5): one big frame per person, or one
+/// column per person with every clip of theirs.
+enum RoomLayout: String {
+    case frames, columns
 }

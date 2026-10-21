@@ -51,9 +51,10 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.staticTexts["local-room-notice"].exists)
         capture(app, "Formal two-member StoryTimelineView")
+        app.buttons["room-more"].tap()
         app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["chat-local-demo-banner"].exists)
@@ -67,9 +68,10 @@ final class LocalFormalRoomUITests: XCTestCase {
 
         // The shell's member selector remains outside the navigation stack;
         // changing it replaces only this local session and its navigation state.
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
         app.segmentedControls["local-room-members"].buttons.element(boundBy: 1).tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
+        app.buttons["room-more"].tap()
         app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         // The three-member session is a different room: the message typed into
@@ -81,7 +83,7 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         XCTAssertTrue(demo.isHittable)
         demo.tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.segmentedControls["local-room-members"].buttons.element(boundBy: 0).isSelected)
     }
 
@@ -101,9 +103,10 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        let film = app.buttons["room-make-vlog"]
-        XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
-        film.tap()
+        let more = app.buttons["room-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: UITestWait.media))
+        more.tap()
+        app.buttons["room-make-vlog"].tap()
         XCTAssertTrue(app.buttons["film-adjust"].waitForExistence(timeout: UITestWait.media))
         XCTAssertFalse(app.buttons["film-save"].isEnabled)
         XCTAssertFalse(app.buttons["film-share"].isEnabled)
@@ -118,9 +121,10 @@ final class LocalFormalRoomUITests: XCTestCase {
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
-        let film = app.buttons["room-make-vlog"]
-        XCTAssertTrue(film.waitForExistence(timeout: UITestWait.media))
-        film.tap()
+        let more = app.buttons["room-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: UITestWait.media))
+        more.tap()
+        app.buttons["room-make-vlog"].tap()
 
         let person = app.buttons["film-person-0"]
         XCTAssertTrue(person.waitForExistence(timeout: UITestWait.media))

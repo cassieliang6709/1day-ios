@@ -25,9 +25,8 @@ final class RoomFramesUITests: XCTestCase {
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
 
-        // 生成 vlog and 聊天 are nav-bar icons now, found by identifier.
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
-        XCTAssertTrue(app.buttons["room-chat"].exists)
+        // 生成 vlog and 聊天 are in the nav bar's 「…」 now.
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(frames(app).firstMatch.waitForExistence(timeout: 15))
         XCTAssertEqual(frames(app).count, 2)
         capture(app, "room-frames-2")
@@ -39,10 +38,10 @@ final class RoomFramesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-person-back"].waitForExistence(timeout: 15))
         capture(app, "room-person-page")
         app.buttons["room-person-back"].tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
 
         app.segmentedControls["local-room-members"].buttons.element(boundBy: 1).tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         let three = NSPredicate(format: "count == 3")
         expectation(for: three, evaluatedWith: frames(app))
         waitForExpectations(timeout: UITestWait.media)

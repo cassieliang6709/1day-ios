@@ -189,7 +189,11 @@ struct StoryRowCard: View {
     var body: some View {
         HStack(spacing: 14) {
             if showsMembersAsCover {
-                MemberGridCover(names: memberNames, images: memberImages)
+                // Nobody known yet (before the first sync): one blank face,
+                // which `AvatarDot` draws as the mascot.
+                AvatarStack(names: memberNames.isEmpty ? [""] : memberNames,
+                            maxShown: 4, size: 38, you: myName, images: memberImages)
+                    .frame(minWidth: 58, minHeight: 66)
             } else {
                 thumbnail
             }
@@ -344,59 +348,6 @@ struct StoryCoverPlaceholder: View {
             Image(systemName: "video.fill")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(OneDay.brandText.opacity(0.45))
-        }
-    }
-}
-
-/// 朋友's room card cover (PRD 5.5): everyone's avatar in the same grid the
-/// room page uses (`RoomFrames.grid(for:)`) — one, two or three stacked,
-/// then two columns, six at most, five leaving the last place empty. No
-/// avatar: their initial on butter yellow.
-struct MemberGridCover: View {
-    let names: [String]
-    var images: [String: UIImage] = [:]
-    var side: CGFloat = 66
-
-    private static let spacing: CGFloat = 2
-    private static let butter = Color(uiColor: UIColor(hex: 0xF8CE5A))
-
-    var body: some View {
-        let shown = Array(names.prefix(ChallengeStore.roomCapacity))
-        let grid = RoomFrames.grid(for: max(shown.count, 1))
-        let rows = stride(from: 0, to: max(shown.count, 1), by: grid.columns).map { start in
-            (start..<min(start + grid.columns, max(shown.count, 1))).map { $0 }
-        }
-        VStack(spacing: Self.spacing) {
-            ForEach(rows.indices, id: \.self) { r in
-                HStack(spacing: Self.spacing) {
-                    ForEach(rows[r], id: \.self) { i in
-                        cell(shown.indices.contains(i) ? shown[i] : "")
-                    }
-                    ForEach(0..<(grid.columns - rows[r].count), id: \.self) { _ in
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-            }
-        }
-        .frame(width: side, height: side)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(names.filter { !$0.isEmpty }.joined(separator: ", ")))
-    }
-
-    @ViewBuilder
-    private func cell(_ name: String) -> some View {
-        if let image = images[name] {
-            Color.clear
-                .overlay { Image(uiImage: image).resizable().scaledToFill() }
-                .clipped()
-        } else {
-            Self.butter.overlay {
-                Text(name.first.map(String.init) ?? "")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .minimumScaleFactor(0.5)
-            }
         }
     }
 }

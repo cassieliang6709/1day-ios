@@ -12,6 +12,8 @@ extension Strings {
     }
     static var pickRoomTitle: String { zh ? "邀请朋友进哪个房间？" : "Which room to invite to?" }
     static var newRoomRow: String { zh ? "新建房间" : "New room" }
+    static var roomLayoutFrames: String { zh ? "每人一个框" : "One frame each" }
+    static var roomLayoutColumns: String { zh ? "每人一列" : "One column each" }
     static var copyCode: String { zh ? "复制邀请码" : "Copy code" }
     static var codeCopied: String { zh ? "已复制" : "Copied" }
     static var shareCode: String { zh ? "发给朋友" : "Share" }

@@ -17,7 +17,7 @@ final class LocalFormalMomentUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["home-room-demo"].waitForExistence(timeout: 15))
         app.buttons["home-room-demo"].tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: UITestWait.media))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertFalse(app.staticTexts["LOCAL-DEMO"].exists)
         let moment = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "一起出发")).firstMatch
         XCTAssertTrue(moment.exists)
@@ -64,7 +64,7 @@ final class LocalFormalMomentUITests: XCTestCase {
         let close = app.buttons["moment-close"]
         XCTAssertTrue(close.exists, app.debugDescription)
         close.tap()
-        XCTAssertTrue(app.buttons["room-make-vlog"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
         // Reopening must use this owner's still-readable scoped cache.
         moment.tap()
         XCTAssertTrue(caption.waitForExistence(timeout: 15))

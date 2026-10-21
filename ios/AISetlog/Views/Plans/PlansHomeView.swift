@@ -460,8 +460,30 @@ struct PlansHomeView: View {
                 .foregroundStyle(OneDay.ink)
             Spacer(minLength: 6)
             joinButton
+            newRoomButton
         }
         .padding(.horizontal, 20)
+    }
+
+    /// 新建房间, beside 加入: this instance's `onCompose` opens the room form.
+    private var newRoomButton: some View {
+        Button { onCompose() } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .heavy))
+                Text(Strings.newRoomRow)
+                    .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .foregroundStyle(OneDay.onBrand)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(OneDay.brandHorizontal, in: Capsule())
+            .oneDayGlow(strength: 0.5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("friends-new-room")
     }
 
     private var friendsEmptyState: some View {
