@@ -83,6 +83,7 @@ struct MoodFaceButton: View {
         }
         .buttonStyle(.plain)
         .opacity(state == .dimmed ? 0.45 : 1)
+        .zIndex(state == .selected ? 1 : 0)
         .animation(.spring(duration: 0.25), value: state)
         .accessibilityLabel(mood.label)
         .accessibilityAddTraits(state == .selected ? .isSelected : [])
@@ -96,6 +97,9 @@ struct MoodFaceButton: View {
             .frame(width: showsLabel ? 50 : 38, height: showsLabel ? 50 : 38)
             .padding(4)
             .background(Circle().fill(Color.oneDayBrand.opacity(state == .selected ? 0.18 : 0)))
-            .scaleEffect(state == .selected ? 1.08 : 1)
+            // Picked: clearly bigger than the rest, which fade. Drawn over
+            // its neighbours (see `zIndex` on the button), since scaling
+            // doesn't make room in the row.
+            .scaleEffect(state == .selected ? 1.4 : 1)
     }
 }
