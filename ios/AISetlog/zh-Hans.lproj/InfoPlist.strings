@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "用来拍视频。画头像的照片不会上传。";
 "NSMicrophoneUsageDescription" = "片段里会带上现场的声音。";
 "NSPhotoLibraryAddUsageDescription" = "把做好的短片存到相册。";
+"NSRemindersFullAccessUsageDescription" = "把提醒事项抄进今天的清单。只读，不会改动提醒事项。";

@@ -42,11 +42,20 @@ extension Strings {
     static var listHelpWorking: String { isChinese ? "写着呢…" : "Drafting…" }
     static var listSection: String { isChinese ? "清单" : "List" }
     static var listAddRow: String { isChinese ? "加一项" : "Add item" }
-    static var listFromIdeas: String { isChinese ? "从提示库选" : "From ideas" }
     static func listUseCount(_ count: Int) -> String {
         isChinese ? "用这 \(count) 项" : "Use these \(count)"
     }
-    static var listUse: String { isChinese ? "至少写两项" : "Write at least two" }
+
+    // MARK: 从提醒事项导入
+
+    static var remindersImport: String { isChinese ? "从提醒事项导入" : "From Reminders" }
+    static var remindersTitle: String { isChinese ? "提醒事项" : "Reminders" }
+    static func remindersAdd(_ count: Int) -> String {
+        if count == 0 { return isChinese ? "加入" : "Add" }
+        return isChinese ? "加入 \(count) 项" : "Add \(count)"
+    }
+    static var remindersNoAccess: String { isChinese ? "没有提醒事项权限" : "No access to Reminders" }
+    static var remindersEmpty: String { isChinese ? "没有未完成的提醒" : "No open reminders" }
 
     /// 按时间拍's default name: the day it's filmed, 「10月17日」 / 「Oct 17」.
     static func byTimeTitle(_ date: Date) -> String {

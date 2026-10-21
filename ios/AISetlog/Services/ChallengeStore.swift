@@ -62,6 +62,23 @@ final class ChallengeStore {
         challenges[index] = updated
     }
 
+    /// 编辑计划 (1.5): the list rewritten — reordered, added to, trimmed. Each
+    /// item names the slot it came from, so its footage moves with it; a new
+    /// item gets an empty slot. A slot left out loses its card, which is why
+    /// the editor never lets an item with footage be removed.
+    func replacePlan(_ id: UUID, items: [(title: String, fromSlot: Int?)]) {
+        guard let index = challenges.firstIndex(where: { $0.id == id }), !items.isEmpty else { return }
+        var updated = challenges[index]
+        let old = Dictionary(updated.cards.map { ($0.day, $0) }, uniquingKeysWith: { first, _ in first })
+        updated.cards = items.enumerated().map { offset, item in
+            var card = item.fromSlot.flatMap { old[$0] } ?? DayCard(day: offset + 1)
+            card.day = offset + 1
+            return card
+        }
+        updated.momentTitles = items.map(\.title)
+        challenges[index] = updated
+    }
+
     @discardableResult
     func create(
         title: String,

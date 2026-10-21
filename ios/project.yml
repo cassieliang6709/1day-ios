@@ -63,6 +63,7 @@ targets:
         NSMicrophoneUsageDescription: "So your clips have sound."
         NSSpeechRecognitionUsageDescription: "用来把你说的话转成心情日记里的文字。"
         NSPhotoLibraryAddUsageDescription: "To save your finished film to Photos."
+        NSRemindersFullAccessUsageDescription: "To copy your reminders into today's list."
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes: [remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

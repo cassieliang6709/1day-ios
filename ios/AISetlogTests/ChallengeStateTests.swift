@@ -153,6 +153,45 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(repository.savedChallenges.first?.momentTitles?.last, "Shower")
     }
 
+    /// 编辑计划 rewrites the list: footage follows its item when reordered,
+    /// a new item gets an empty slot, and slots are renumbered 1…n.
+    func testReplacingPlanMovesFootageWithItsItem() throws {
+        let store = ChallengeStore(
+            repository: MemoryChallengeRepository(),
+            fileStore: MigrationClipFileStore())
+        let plan = store.create(title: "Day", mode: .oneDay, momentTitles: ["A", "B", "C"])
+        store.challenges[0].cards[2].clipFileName = "c.mov"
+
+        // C moved to the top, B dropped, a new D at the end.
+        store.replacePlan(plan.id, items: [
+            (title: "C", fromSlot: 3), (title: "A", fromSlot: 1), (title: "D", fromSlot: nil),
+        ])
+
+        let updated = try XCTUnwrap(store.challenge(plan.id))
+        XCTAssertEqual(updated.momentTitles, ["C", "A", "D"])
+        XCTAssertEqual(updated.cards.map(\.day), [1, 2, 3])
+        XCTAssertEqual(updated.cards[0].clipFileName, "c.mov")
+        XCTAssertNil(updated.cards[1].clipFileName)
+        XCTAssertNil(updated.cards[2].clipFileName)
+    }
+
+    /// 从提醒事项导入 lists what's due by today first, then undated, then later.
+    func testRemindersDueTodayComeFirst() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let later = calendar.date(byAdding: .day, value: 3, to: now)!
+        let overdue = calendar.date(byAdding: .day, value: -1, to: now)!
+        let items = [
+            RemindersImport.Item(id: "1", title: "Later", due: later),
+            RemindersImport.Item(id: "2", title: "Undated", due: nil),
+            RemindersImport.Item(id: "3", title: "Today", due: now),
+            RemindersImport.Item(id: "4", title: "Overdue", due: overdue),
+        ]
+        XCTAssertEqual(
+            RemindersImport.ordered(items, now: now, calendar: calendar).map(\.title),
+            ["Overdue", "Today", "Undated", "Later"])
+    }
+
     func testLegacyChallengeMigrationSurvivesRelaunch() throws {
         struct LegacyChallenge: Codable {
             var title: String

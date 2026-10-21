@@ -102,8 +102,19 @@ struct StoryTimelineView: View {
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
-                EditPlanSheet(challenge: challenge) { title, moments in
-                    store.updatePlan(challengeID, title: title, momentTitles: moments)
+                // The same page that wrote the list, AI and all. Each item
+                // keeps its slot, so footage moves with it when reordered.
+                GuidedMomentsView(
+                    initialMoments: challenge.cards.map {
+                        challenge.momentValue(forSlot: $0.day) ?? Strings.dayN($0.day)
+                    },
+                    initialSlots: challenge.cards.map(\.day),
+                    filmedSlots: Set(challenge.cards.filter { $0.clipFileName != nil }.map(\.day)),
+                    saveLabel: Strings.save
+                ) { draft in
+                    store.replacePlan(
+                        challengeID,
+                        items: zip(draft.moments, draft.slots).map { (title: $0, fromSlot: $1) })
                 }
             }
         }
@@ -333,9 +344,15 @@ struct StoryTimelineView: View {
     ) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
+                // Tap the name to rename the plan, as in a room; 编辑计划
+                // only edits the list now.
                 TimelineHeader(
                     challenge: challenge,
-                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""))
+                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
+                    onRename: { name in
+                        store.updatePlan(
+                            challengeID, title: name, momentTitles: challenge.momentTitles ?? [])
+                    })
 
                 // A solo story keeps the film card, once, when it's the whole
                 // answer.

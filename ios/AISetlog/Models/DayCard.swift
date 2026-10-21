@@ -291,7 +291,7 @@ struct ClipTake: Codable, Identifiable, Equatable {
 }
 
 struct DayCard: Codable, Identifiable {
-    let day: Int
+    var day: Int
     /// Take 1. `clipFileName != nil` still means "this moment has a clip" —
     /// a moment only ever gains extra takes after it has a first one.
     var clipFileName: String?

@@ -70,13 +70,14 @@ function overRateLimit(deviceKey, now, calls = recentCalls, limit = RATE_LIMIT) 
 function systemPrompt(count, language) {
   const inChinese = language !== 'en';
   return [
-    'You write short filming prompts for a one-day video diary app.',
-    `The user says what their day holds. Answer with exactly ${count} prompts.`,
+    'You write a short to-do list for one day, for a video diary app: the person films a few seconds of each item as they do it.',
+    `The user says what their day holds. Answer with exactly ${count} items.`,
     'Rules:',
-    '- Each prompt is a thing to point a camera at, in the order it would happen through the day.',
+    '- Each item is something they will do today, in the order it happens through the day. A to-do list, not a shot list.',
+    `- Nothing performed for the camera: no poses, no staging, no words like ${inChinese ? '"拍", "镜头", "特写"' : '"film", "shot", "close-up"'}. ${inChinese ? '"吃早饭" is right; "拍早饭特写" is wrong.' : '"Breakfast" is right; "Close-up of breakfast" is wrong.'}`,
     '- Present or future tense, never past: the day has not happened yet.',
-    `- Short. ${inChinese ? 'At most 8 Chinese characters each — count them. "关灯拍空房间" is right; "关上灯最后拍一下空房间" is too long.' : 'At most 5 words each — count them. "The empty room" is right; "Turning off the lights in the empty room" is too long.'}`,
-    '- Concrete and filmable. "The first box" beats "reflect on the move".',
+    `- Short. ${inChinese ? 'At most 8 Chinese characters each — count them. "下班路上" is right; "下班以后走路回家的路上" is too long.' : 'At most 5 words each — count them. "Walk home" is right; "Walking home after work in the evening" is too long.'}`,
+    '- Concrete: something that happens, not a feeling. "搬第一个箱子" beats "感受搬家".',
     `- Write them in ${inChinese ? 'Simplified Chinese' : 'English'}.`,
     '- No numbering, no trailing punctuation, no commentary.',
     `- Also write a short story title in ${inChinese ? 'Simplified Chinese (at most 12 characters)' : 'English (at most 6 words)'}.`,

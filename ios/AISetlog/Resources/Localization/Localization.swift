@@ -1199,7 +1199,7 @@ enum Strings {
         lang == .chinese ? "选题设置" : "Topic settings"
     }
     static var startFilmingCTA: String {
-        lang == .chinese ? "开始拍" : "Start filming"
+        lang == .chinese ? "拍出今天的一天" : "Film today"
     }
     /// The empty 自己写 rack: no saved prompt sets yet.
     static var noCustomTemplatesYet: String {
@@ -1307,7 +1307,6 @@ enum Strings {
     static var chooseFromPromptLibrary: String {
         lang == .chinese ? "从提示库里选" : "Choose from the prompt library"
     }
-    static var promptLibrary: String { lang == .chinese ? "提示库" : "Prompt library" }
     static func customPromptPlaceholder(_ index: Int) -> String {
         let chineseExamples = ["例如：出门前", "例如：今天这一餐", "例如：回家以后"]
         let englishExamples = ["For example: before leaving", "For example: today's meal", "For example: back home"]

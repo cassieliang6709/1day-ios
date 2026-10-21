@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "To film. Photos for your avatar are never uploaded.";
 "NSMicrophoneUsageDescription" = "So your clips have sound.";
 "NSPhotoLibraryAddUsageDescription" = "To save your finished film to Photos.";
+"NSRemindersFullAccessUsageDescription" = "To copy your reminders into today's list. Read only; your reminders stay as they are.";
