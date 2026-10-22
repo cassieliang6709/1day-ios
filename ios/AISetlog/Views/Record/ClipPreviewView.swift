@@ -426,7 +426,7 @@ struct ClipPreviewView: View {
             // Only somebody else's name. Labelling your own face with your own
             // name is the kind of thing an app does when it forgot who's
             // holding it.
-            Text(isMine ? Strings.thisMoment : (authorName ?? Strings.thisMoment))
+            Text(isMine ? "" : (authorName ?? ""))
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white.opacity(0.92))
             Spacer(minLength: 4)
@@ -979,17 +979,18 @@ private struct CaptionStickerView: View {
             .overlay(alignment: .topLeading) {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .black))
+                        .font(.system(size: 12, weight: .black))
                         .foregroundStyle(Color(uiColor: UIColor(hex: 0x0F2E6B)))
-                        .frame(width: 20, height: 20)
+                        .frame(width: 28, height: 28)
                         .background(.white, in: Circle())
                         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                        // Drawn at 20, hit at 44.
+                        // Drawn at 28, hit at 44, centred on the box's
+                        // corner so it doesn't sit out at the screen's edge.
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .offset(x: -31, y: -31)
+                .offset(x: -22, y: -22)
                 .accessibilityLabel(Strings.deleteCaptionAction)
                 .accessibilityIdentifier("caption-delete")
             }

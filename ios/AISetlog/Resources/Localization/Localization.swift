@@ -788,6 +788,9 @@ enum Strings {
     static var addTakeShort: String { lang == .chinese ? "再拍一段" : "Add take" }
     /// The review screen's card of things you can do to one moment, and the
     /// button that gives the clip the whole display when you want it.
+    static func roomOf(_ name: String) -> String {
+        lang == .chinese ? "\(name) 的房间" : "\(name)'s room"
+    }
     static var thisMoment: String { lang == .chinese ? "这个瞬间" : "This moment" }
     /// The filmstrip's button, for a story with no prompts. It cannot name what
     /// to film — that is the whole point of 按时间 — so it names the act.

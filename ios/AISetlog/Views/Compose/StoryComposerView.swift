@@ -245,7 +245,8 @@ struct StoryComposerView: View {
     /// Named for the date until the user types a name of their own.
     private func nameForTheDay() {
         guard !titleEdited else { return }
-        title = Strings.byTimeTitle(.now)
+        let me = account.account?.displayName ?? ""
+        title = withFriends && !me.isEmpty ? Strings.roomOf(me) : Strings.byTimeTitle(.now)
     }
 
     /// Blank rows are dropped. Nil for 按时间拍, which has no list.

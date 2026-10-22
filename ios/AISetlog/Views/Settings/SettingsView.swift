@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var isDeleting = false
     @State private var showSignIn = false
     @State private var showAvatarSetup = false
+    @State private var showAvatarPreview = false
     /// Signing out hides every shared room on this device, which nothing on
     /// the row itself suggests — so it asks first.
     @State private var showSignOutConfirmation = false
@@ -24,7 +25,6 @@ struct SettingsView: View {
 
     /// Written by the picker below, read by every `AvatarDot` — held here too
     /// so this screen repaints its own header the moment a dot is tapped.
-    @AppStorage(Identity.myTintKey) private var myTintIndex = -1
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
@@ -94,6 +94,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showSignIn) {
                 SignInView { showSignIn = false }
             }
+            .sheet(isPresented: $showAvatarPreview) { avatarPreview }
             .fullScreenCover(isPresented: $showAvatarSetup) {
                 AvatarSetupFlow(onFinish: { _ in showAvatarSetup = false }, skipLabel: Strings.cancel)
             }
@@ -167,85 +168,31 @@ struct SettingsView: View {
     private var identityHeader: some View {
         VStack(alignment: .leading, spacing: 11) {
             identityRow
-            // Shown signed out too. The colour is stored against your name, so
-            // it used to need one — and gating it meant somebody who films
-            // alone and never signs in could never change their own avatar.
-            // Labelled: a row of unexplained dots under your name read as
-            // decoration, not as a choice.
-            SectionLabel(text: Strings.avatarColourLabel)
-                .padding(.top, 4)
-            tintPicker
         }
         .padding(.vertical, 4)
     }
 
-    /// Seven dots. Tap one and it's yours — including the one somebody else in
-    /// the room already has.
-    ///
-    /// The colour used to be a hash of your name, with no way to change it,
-    /// which is fine until the name you actually go by hands you the green.
-    /// Uniqueness inside a room was the reason for the hash, and it is not
-    /// worth overriding the person's own choice: every avatar in the app has
-    /// the name next to it or under it.
-    private var tintPicker: some View {
-        VStack(spacing: 8) {
-            ForEach(Array(tintRows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 8) { tintDots(row) }
+    /// Your current photo, full size, with 重拍 under it.
+    private var avatarPreview: some View {
+        VStack(spacing: 24) {
+            AvatarDot(name: account.account?.displayName, size: 240, image: AvatarStore.shared.image)
+            Button(Strings.retake) {
+                showAvatarPreview = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showAvatarSetup = true }
             }
+            .buttonStyle(.primaryAction)
+            .fixedSize()
+            .accessibilityIdentifier("avatar-retake")
         }
-        .accessibilityIdentifier("avatar-tints")
-    }
-
-    /// Two even rows. The palette is eight now, so six per row left a lonely
-    /// two underneath; half the palette per row stays even if it changes again.
-    private var tintRows: [[Int]] {
-        let all = Array(Identity.paletteUIColors.indices)
-        let perRow = max((all.count + 1) / 2, 1)
-        return stride(from: 0, to: all.count, by: perRow).map {
-            Array(all[$0..<min($0 + perRow, all.count)])
-        }
-    }
-
-    @ViewBuilder
-    private func tintDots(_ indices: [Int]) -> some View {
-        ForEach(indices, id: \.self) { index in
-            let ui = Identity.paletteUIColors[index]
-                let chosen = index == Identity.tintIndex(for: tintOwnerName)
-                Button {
-                    Identity.chooseTint(index, forName: tintOwnerName)
-                    myTintIndex = index
-                } label: {
-                    Circle()
-                        .fill(Color(uiColor: ui).gradient)
-                        .frame(height: 26)
-                        .frame(maxWidth: .infinity)
-                        .overlay {
-                            if chosen {
-                                Circle()
-                                    .strokeBorder(OneDay.ink, lineWidth: 2.5)
-                                    .frame(width: 33, height: 33)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Strings.avatarColourN(index + 1))
-            .accessibilityAddTraits(chosen ? .isSelected : [])
-        }
-    }
-
-    /// Whose colour this is. `"local"` for a device with no account on it —
-    /// the same stand-in `ChallengeStore.currentAuthor` uses, so a solo user is
-    /// a consistent person throughout the app rather than a special case here.
-    private var tintOwnerName: String {
-        let name = account.account?.displayName ?? ""
-        return name.isEmpty ? "local" : name
+        .presentationDetents([.medium])
     }
 
     private var identityRow: some View {
         HStack(spacing: 13) {
             // Tapping your own face redraws your avatar.
-            Button { showAvatarSetup = true } label: {
+            Button {
+                if AvatarStore.shared.image != nil { showAvatarPreview = true } else { showAvatarSetup = true }
+            } label: {
                 AvatarDot(name: account.account?.displayName, size: 54, image: AvatarStore.shared.image)
             }
             .buttonStyle(.plain)
