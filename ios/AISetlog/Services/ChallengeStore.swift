@@ -87,12 +87,13 @@ final class ChallengeStore {
         orientation: Challenge.Orientation = .portrait,
         cameraStyle: CameraStyle? = nil,
         templateName: String? = nil,
-        momentTitles: [String]? = nil
+        momentTitles: [String]? = nil,
+        startDate: Date = .now
     ) -> Challenge {
         let challenge = Challenge(
             id: UUID(),
             title: title,
-            startDate: .now,
+            startDate: startDate,
             cards: (1...cardCount(for: momentTitles)).map { DayCard(day: $0) },
             mode: mode,
             clipLength: clipLength,
@@ -391,7 +392,13 @@ final class ChallengeStore {
     /// Today's plan — my own one-day story with a list, made today. There
     /// is at most one a day; this is it.
     func todaysPlan(now: Date = .now, calendar: Calendar = .current) -> Challenge? {
-        challenges.first {
+        plan(on: now, calendar: calendar)
+    }
+
+    /// The plan written for `day`, if there is one.
+    func plan(on day: Date, calendar: Calendar = .current) -> Challenge? {
+        let now = day
+        return challenges.first {
             !$0.isShared && !$0.isTimeOnly && $0.momentTitles?.isEmpty == false
                 && calendar.isDate($0.startDate, inSameDayAs: now)
         }

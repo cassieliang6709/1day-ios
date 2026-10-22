@@ -26,6 +26,12 @@ extension Strings {
         isChinese ? "每天拍一段，七天连成一支片" : "One a day, seven days, one film"
     }
     static var todaysPlanTitle: String { isChinese ? "今天的计划" : "Today's plan" }
+    static func dayPlanTitle(_ date: Date) -> String {
+        isChinese ? "\(Calendar.current.component(.month, from: date))月\(Calendar.current.component(.day, from: date))日的计划"
+            : date.formatted(.dateTime.month(.abbreviated).day()) + " plan"
+    }
+    static var makeDayRecap: String { isChinese ? "生成这天的回顾" : "Make this day's recap" }
+    static var planAhead: String { isChinese ? "提前写计划" : "Plan this day" }
     static var composerName: String { isChinese ? "名字" : "Name" }
     static func composerListSummary(_ count: Int) -> String {
         isChinese ? "清单 · \(count) 项" : "List · \(count) items"

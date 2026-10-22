@@ -10,6 +10,7 @@ struct TodayPlanCard: View {
     let progress: RoomProgress
     let onFilm: (Int) -> Void
     let onOpen: () -> Void
+    var title: String = Strings.todaysPlanTitle
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
@@ -17,7 +18,7 @@ struct TodayPlanCard: View {
         GlassCard(padding: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 Button(action: onOpen) {
-                    Text(Strings.todaysPlanTitle)
+                    Text(title)
                         .font(OneDay.Font.callout)
                         .foregroundStyle(OneDay.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)

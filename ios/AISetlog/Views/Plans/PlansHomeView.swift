@@ -62,6 +62,9 @@ struct PlansHomeView: View {
     @State private var isSelectingClips = false
     @State private var pickedClips: [LibraryClip] = []
     @State private var vlogRequest: VlogRequest?
+    /// The day the strip at the top has picked. Today unless tapped.
+    @State private var selectedDay = Calendar.current.startOfDay(for: .now)
+    @State private var planningAhead = false
     /// 邀请朋友一起拍 with at least one room to invite to. See `inviteFriends`.
     @State private var inviteRequest: InviteRequest?
     /// The debug test room's own alert, so its failures aren't titled 无法加入.
@@ -234,6 +237,21 @@ struct PlansHomeView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .sheet(isPresented: $planningAhead) {
+            GuidedMomentsView(initialMoments: []) { draft in
+                let moments = draft.moments
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                guard !moments.isEmpty else { return }
+                _ = store.create(
+                    title: draft.suggestedName ?? Strings.dayPlanTitle(selectedDay),
+                    mode: .oneDay,
+                    clipLength: .scene,
+                    cameraStyle: CameraStyle.defaultCamera,
+                    momentTitles: moments,
+                    startDate: selectedDay)
+            }
+        }
         .sheet(item: $vlogRequest) { request in
             LibraryVlogSheet(clips: request.clips)
         }
@@ -266,8 +284,11 @@ struct PlansHomeView: View {
                 }
                 #endif
 
-                // 我的, top to bottom: today's mood beside today's plan,
-                // then every clip. No plan today: the mood has the row.
+                // 我的, top to bottom: the week, the picked day's mood and
+                // plan, then every clip. No plan today: the mood has the row.
+                DayStrip(selected: $selectedDay) { day in
+                    store.plan(on: day) != nil || !clips(on: day).isEmpty
+                }
                 todayCards
 
                 // A first run — no stories, no clips — gets the three-line
@@ -688,7 +709,9 @@ struct PlansHomeView: View {
     /// cards of one size, side by side (PRD 5.6).
     @ViewBuilder
     private var todayCards: some View {
-        if let plan = store.todaysPlan() {
+        if !Calendar.current.isDateInToday(selectedDay) {
+            otherDayCards
+        } else if let plan = store.todaysPlan() {
             HStack(alignment: .top, spacing: 12) {
                 MoodTodayCard(compact: true)
                     .frame(maxHeight: .infinity, alignment: .top)
@@ -705,6 +728,51 @@ struct PlansHomeView: View {
             MoodTodayCard()
                 .padding(.horizontal, 20)
         }
+    }
+
+    /// A day that isn't today: its plan if it had one; otherwise a recap of
+    /// what was filmed (past) or a way to plan it (future). A past day with
+    /// nothing in it shows nothing.
+    @ViewBuilder
+    private var otherDayCards: some View {
+        let isFuture = selectedDay > .now
+        let mood = isFuture ? nil : moods?.mood(on: selectedDay)
+        if let plan = store.plan(on: selectedDay) {
+            HStack(alignment: .top, spacing: 12) {
+                if let mood { MoodDayCard(entry: mood).frame(maxHeight: .infinity, alignment: .top) }
+                TodayPlanCard(
+                    challenge: plan,
+                    progress: cardState(for: plan).progress,
+                    onFilm: { recordPlanSlot = PlanSlot(challengeID: plan.id, slot: $0) },
+                    onOpen: { path.append(plan.id) },
+                    title: Strings.dayPlanTitle(selectedDay))
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 20)
+        } else if isFuture {
+            Button(Strings.planAhead, systemImage: "square.and.pencil") { planningAhead = true }
+                .buttonStyle(.primaryAction)
+                .padding(.horizontal, 20)
+                .accessibilityIdentifier("day-plan-ahead")
+        }
+        if !isFuture, store.plan(on: selectedDay) == nil, let mood {
+            MoodDayCard(entry: mood).padding(.horizontal, 20)
+        }
+        if !isFuture, store.plan(on: selectedDay) == nil, !clips(on: selectedDay).isEmpty {
+            Button(Strings.makeDayRecap, systemImage: "film.stack.fill") {
+                vlogRequest = VlogRequest(clips: clips(on: selectedDay).sorted { $0.recordedAt < $1.recordedAt })
+            }
+            .buttonStyle(.primaryAction)
+            .padding(.horizontal, 20)
+            .accessibilityIdentifier("day-recap")
+        }
+    }
+
+    /// My clips filmed on `day`.
+    private func clips(on day: Date) -> [LibraryClip] {
+        library.scoped(includingFriends: false).clips
+            .filter { Calendar.current.isDate($0.recordedAt, inSameDayAs: day) }
     }
 
     /// 今天的故事 as rows, one per story today is for, stacked. `leading` is
