@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// 我的 → 今天的心情: five faces, tap one, that's today's (1.5). Tap
-/// another to change it. No line to write any more, and no 记下了 — the
-/// picked face standing out is what saved looks like.
+/// Pick a face, then show only today's mood. Tap it to choose again.
 ///
 /// `compact` is the half-width card beside 今天的计划: the faces sit three
 /// and two, without their names.
@@ -13,6 +11,7 @@ struct MoodTodayCard: View {
     /// Bumped when the date rolls over or the app comes back, so a card left
     /// on screen overnight shows today (empty) rather than yesterday's mood.
     @State private var dayTick = 0
+    @State private var isChoosing = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -22,7 +21,18 @@ struct MoodTodayCard: View {
                 Text(Strings.moodSectionTitle)
                     .font(OneDay.Font.callout)
                     .foregroundStyle(OneDay.ink)
-                MoodFaceRow(selected: moods.today?.mood, compact: compact) { moods.setMood($0) }
+                Group {
+                    if let mood = moods.today?.mood, !isChoosing {
+                        selectedMood(mood)
+                    } else {
+                        MoodFaceRow(selected: moods.today?.mood, compact: compact) {
+                            moods.setMood($0)
+                            isChoosing = false
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 112)
+                .animation(OneDay.Motion.soft, value: isChoosing)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -30,6 +40,31 @@ struct MoodTodayCard: View {
         .accessibilityIdentifier("mood-today-card")
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in dayTick += 1 }
         .onChange(of: scenePhase) { _, phase in if phase == .active { dayTick += 1 } }
+    }
+
+    private func selectedMood(_ mood: Mood) -> some View {
+        Button {
+            isChoosing = true
+        } label: {
+            VStack(spacing: 6) {
+                Image(mood.imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 64, height: 64)
+                Text(mood.label)
+                    .font(OneDay.Font.callout)
+                    .foregroundStyle(OneDay.ink)
+                Text(Strings.moodEditFaceHint)
+                    .font(OneDay.Font.micro)
+                    .foregroundStyle(OneDay.inkSoft)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mood.label)
+        .accessibilityHint(Strings.moodEditFaceHint)
+        .accessibilityIdentifier("mood-today-selected")
     }
 }
 
@@ -82,7 +117,7 @@ struct MoodFaceButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .opacity(state == .dimmed ? 0.45 : 1)
+        .opacity(state == .dimmed ? 0.65 : 1)
         .zIndex(state == .selected ? 1 : 0)
         .animation(.spring(duration: 0.25), value: state)
         .accessibilityLabel(mood.label)
@@ -96,10 +131,21 @@ struct MoodFaceButton: View {
             .scaledToFit()
             .frame(width: showsLabel ? 50 : 38, height: showsLabel ? 50 : 38)
             .padding(4)
-            .background(Circle().fill(Color.oneDayBrand.opacity(state == .selected ? 0.18 : 0)))
-            // Picked: clearly bigger than the rest, which fade. Drawn over
-            // its neighbours (see `zIndex` on the button), since scaling
-            // doesn't make room in the row.
-            .scaleEffect(state == .selected ? 1.4 : 1)
+            .background(Circle().fill(Color.oneDayBrand.opacity(state == .selected ? 0.12 : 0)))
+            .overlay {
+                Circle()
+                    .strokeBorder(Color.oneDayBrand.opacity(state == .selected ? 0.8 : 0), lineWidth: 1.5)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .heavy))
+                    .foregroundStyle(OneDay.brandText)
+                    .frame(width: 16, height: 16)
+                    .background(Color.oneDayBrand, in: Circle())
+                    .overlay(Circle().strokeBorder(OneDay.surface, lineWidth: 2))
+                    .opacity(state == .selected ? 1 : 0)
+            }
+            // Keep the selected face inside its grid cell, including its badge.
+            .scaleEffect(state == .selected ? 1.16 : 1)
     }
 }
