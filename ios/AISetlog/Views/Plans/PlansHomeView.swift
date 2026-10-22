@@ -756,16 +756,25 @@ struct PlansHomeView: View {
                 .padding(.horizontal, 20)
                 .accessibilityIdentifier("day-plan-ahead")
         }
-        if !isFuture, store.plan(on: selectedDay) == nil, let mood {
-            MoodDayCard(entry: mood).padding(.horizontal, 20)
-        }
-        if !isFuture, store.plan(on: selectedDay) == nil, !clips(on: selectedDay).isEmpty {
-            Button(Strings.makeDayRecap, systemImage: "film.stack.fill") {
-                vlogRequest = VlogRequest(clips: clips(on: selectedDay).sorted { $0.recordedAt < $1.recordedAt })
+        if !isFuture, store.plan(on: selectedDay) == nil {
+            let dayClips = clips(on: selectedDay).sorted { $0.recordedAt < $1.recordedAt }
+            let recap = DayRecapCard(count: dayClips.count) { vlogRequest = VlogRequest(clips: dayClips) }
+            Group {
+                // Mood and recap side by side, like mood and plan. A mood
+                // alone gets the whole row and says it in a sentence.
+                if let mood, !dayClips.isEmpty {
+                    HStack(alignment: .top, spacing: 12) {
+                        MoodDayCard(entry: mood).frame(maxHeight: .infinity, alignment: .top)
+                        recap.frame(maxHeight: .infinity, alignment: .top)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                } else if let mood {
+                    MoodDayCard(entry: mood, wide: true)
+                } else if !dayClips.isEmpty {
+                    recap
+                }
             }
-            .buttonStyle(.primaryAction)
             .padding(.horizontal, 20)
-            .accessibilityIdentifier("day-recap")
         }
     }
 

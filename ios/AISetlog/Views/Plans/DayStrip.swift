@@ -65,30 +65,79 @@ struct DayStrip: View {
 }
 
 /// A past day's mood, to look at: the face and the line written that day.
-/// Not editable — a mood is filled in on the day or not at all.
+/// Not editable — a mood is filled in on the day or not at all. `wide`
+/// when it has the row to itself: face on the left, a sentence beside it.
 struct MoodDayCard: View {
     let entry: MoodEntry
+    var wide = false
 
     var body: some View {
         GlassCard(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(entry.mood.imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 56, height: 56)
-                Text(entry.mood.label)
-                    .font(OneDay.Font.callout)
-                    .foregroundStyle(OneDay.ink)
-                if !entry.note.isEmpty {
-                    Text(entry.note)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
+            if wide {
+                HStack(spacing: 14) {
+                    face(64)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(Strings.moodDayLine(entry.mood))
+                            .font(OneDay.Font.callout)
+                            .foregroundStyle(OneDay.ink)
+                        note
+                    }
+                    Spacer(minLength: 0)
                 }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    face(56)
+                    Text(entry.mood.label)
+                        .font(OneDay.Font.callout)
+                        .foregroundStyle(OneDay.ink)
+                    note
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("mood-day-card")
+    }
+
+    private func face(_ size: CGFloat) -> some View {
+        Image(entry.mood.imageName).resizable().scaledToFit().frame(width: size, height: size)
+    }
+
+    @ViewBuilder private var note: some View {
+        if !entry.note.isEmpty {
+            Text(entry.note)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(OneDay.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// A past day's clips, one tap from a recap film. Same size as the mood
+/// card beside it.
+struct DayRecapCard: View {
+    let count: Int
+    let onMake: () -> Void
+
+    var body: some View {
+        Button(action: onMake) {
+            GlassCard(padding: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "film.stack.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(Color.oneDayBrand)
+                        .frame(height: 56, alignment: .leading)
+                    Text(Strings.makeDayRecap)
+                        .font(OneDay.Font.callout)
+                        .foregroundStyle(OneDay.ink)
+                    Text(Strings.libraryClipCount(count))
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("day-recap")
     }
 }

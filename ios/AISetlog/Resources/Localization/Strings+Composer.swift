@@ -31,6 +31,15 @@ extension Strings {
             : date.formatted(.dateTime.month(.abbreviated).day()) + " plan"
     }
     static var makeDayRecap: String { isChinese ? "生成这天的回顾" : "Make this day's recap" }
+    static func moodDayLine(_ mood: Mood) -> String {
+        switch mood {
+        case .happy: return isChinese ? "这天你很开心" : "You were happy this day"
+        case .calm: return isChinese ? "这天你挺平静" : "You were calm this day"
+        case .tired: return isChinese ? "这天你有点累" : "You were tired this day"
+        case .sad: return isChinese ? "这天你有点难过" : "You were sad this day"
+        case .angry: return isChinese ? "这天你有点生气" : "You were angry this day"
+        }
+    }
     static var planAhead: String { isChinese ? "提前写计划" : "Plan this day" }
     static var composerName: String { isChinese ? "名字" : "Name" }
     static func composerListSummary(_ count: Int) -> String {
