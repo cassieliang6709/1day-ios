@@ -31,7 +31,9 @@ struct StoryTimelineView: View {
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
     /// Which of the room's two layouts is on screen; remembered across rooms.
-    @AppStorage("roomLayout") private var roomLayout: RoomLayout = .frames
+    /// The day the room's week strip has picked. Today unless tapped.
+    @State private var roomDay = Calendar.current.startOfDay(for: .now)
+    @State private var storiesStart: RoomStoriesStart?
     /// The person whose page is open, from the face on their frame.
     @State private var personPage: String?
     /// The room whose code is being offered for sharing, once, right after it
@@ -256,10 +258,10 @@ struct StoryTimelineView: View {
         }
     }
 
-    /// A shared room (1.5): the name, who is in it, then the room in one of
-    /// two layouts — one big frame per person filling the rest of the
-    /// screen (`RoomFrames`), or one column per person with all their clips
-    /// (`RoomFeed`). 生成 vlog and 聊天 are in the nav bar's 「…」.
+    /// A shared room (1.5): the name, who is in it, the week, a row of faces
+    /// for whoever filmed on the picked day (tap to watch, stories style),
+    /// then that day's frames (`RoomFrames`). 生成 vlog and 聊天 are in the
+    /// nav bar's 「…」.
     private func roomPage(
         _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
         myID: String, agenda: StoryAgenda
@@ -278,60 +280,34 @@ struct StoryTimelineView: View {
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(2)
                     .accessibilityIdentifier("room-member-names")
-                Spacer(minLength: 0)
-                Picker(selection: $roomLayout) {
-                    Image(systemName: "rectangle.grid.1x2")
-                        .accessibilityLabel(Text(Strings.roomLayoutFrames))
-                        .tag(RoomLayout.frames)
-                    Image(systemName: "rectangle.split.3x1")
-                        .accessibilityLabel(Text(Strings.roomLayoutColumns))
-                        .tag(RoomLayout.columns)
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .accessibilityIdentifier("room-layout")
             }
 
-            if roomLayout == .columns {
-                ScrollView {
-                    RoomFeed(
-                        challenge: challenge,
-                        clips: clips,
-                        members: members,
-                        myID: myID,
-                        nextToFilm: nil,
-                        slotTitle: { slotTitle(for: $0) },
-                        onPlay: { clip in sheet = .open(clip) },
-                        onFilm: { day in sheet = .record(day: day) },
-                        hasPoked: { id in
-                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                        },
-                        onPoke: { id in
-                            store.poke(challengeID: challengeID, targetAuthorID: id)
-                        })
+            // The week, then who filmed on the picked day, then their frames.
+            DayStrip(selected: $roomDay) { day in clips.contains { Self.isClip($0, on: day) } }
+                .padding(.horizontal, -20)
+            let dayClips = clips.filter { Self.isClip($0, on: roomDay) }
+            let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
+            RoomStoriesRow(columns: dayColumns) { storiesStart = RoomStoriesStart(id: $0) }
+                .fullScreenCover(item: $storiesStart) { start in
+                    RoomStoriesPlayer(columns: dayColumns.filter { !$0.clips.isEmpty }, startID: start.id)
                 }
-                .scrollIndicators(.hidden)
-            } else {
-                RoomFrames(
-                    clips: clips,
-                    members: members,
-                    myID: myID,
-                    nextToFilm: agenda.suggested ?? agenda.openToMe.first,
-                    slotTitle: { slotTitle(for: $0) },
-                    // Opens the tapped take alone, full screen, where its
-                    // captions are edited.
-                    onPlay: { clip in sheet = .open(clip) },
-                    onFilm: { day in sheet = .record(day: day) },
-                    onOpenPerson: { column in personPage = column.id },
-                    hasPoked: { id in
-                        store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                    },
-                    onPoke: { id in
-                        store.poke(challengeID: challengeID, targetAuthorID: id)
-                    })
-            }
+            RoomFrames(
+                clips: dayClips,
+                members: members,
+                myID: myID,
+                nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                slotTitle: { slotTitle(for: $0) },
+                // Opens the tapped take alone, full screen, where its
+                // captions are edited.
+                onPlay: { clip in sheet = .open(clip) },
+                onFilm: { day in sheet = .record(day: day) },
+                onOpenPerson: { column in personPage = column.id },
+                hasPoked: { id in
+                    store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                },
+                onPoke: { id in
+                    store.poke(challengeID: challengeID, targetAuthorID: id)
+                })
         }
         .padding(.horizontal, 20)
         .padding(.top, 6)
@@ -685,8 +661,8 @@ struct StoryTimelineView: View {
     }
 }
 
-/// The room page's two layouts (1.5): one big frame per person, or one
-/// column per person with every clip of theirs.
-enum RoomLayout: String {
-    case frames, columns
+extension StoryTimelineView {
+    static func isClip(_ clip: DayClip, on day: Date) -> Bool {
+        clip.recordedAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
+    }
 }
