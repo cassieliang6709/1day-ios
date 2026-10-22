@@ -393,6 +393,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
            connection.isVideoRotationAngleSupported(captureAngle) {
             connection.videoRotationAngle = captureAngle
         }
+        // A selfie is saved the way the viewfinder shows it: mirrored.
+        if let connection = captureConnection, connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = device.position == .front
+        }
 
         // The viewfinder stays on the portrait-locked screen's angle even in
         // 横拍: the phone itself is turned, so the live picture already reads
