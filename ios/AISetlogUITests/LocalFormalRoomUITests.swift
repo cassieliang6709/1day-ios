@@ -87,6 +87,26 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(app.segmentedControls["local-room-members"].buttons.element(boundBy: 0).isSelected)
     }
 
+    /// Today's faces at the top of the room open the stories player, and ✕
+    /// closes it.
+    func testRoomStoriesOpenAndClose() {
+        let app = launch()
+        let demo = app.buttons["home-room-demo"]
+        XCTAssertTrue(demo.waitForExistence(timeout: 15))
+        demo.tap()
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
+        let face = app.buttons.matching(identifier: "room-story-face")
+            .matching(NSPredicate(format: "isEnabled == true")).firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 15), "somebody filmed today")
+        capture(app, "Room with today's faces")
+        face.tap()
+        let close = app.buttons["room-stories-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 15))
+        capture(app, "Stories player")
+        close.tap()
+        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
+    }
+
     /// The film actually assembling, from the production `FilmView` over a
     /// local demo room's real clips.
     ///

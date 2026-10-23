@@ -45,6 +45,8 @@ struct RoomStoriesRow: View {
 /// Which person's clips the stories player opens on.
 struct RoomStoriesStart: Identifiable {
     let id: String
+    /// Only people with clips that day, in room order.
+    let columns: [RoomFeed.Column]
 }
 
 /// Full screen, one person's clips of the day in the order filmed, then the
@@ -95,7 +97,6 @@ struct RoomStoriesPlayer: View {
         .gesture(DragGesture(minimumDistance: 40).onEnded { if $0.translation.height > 80 { dismiss() } })
         .onAppear { person = columns.firstIndex { $0.id == startID } ?? 0 }
         .statusBarHidden()
-        .accessibilityIdentifier("room-stories-player")
     }
 
     private var bars: some View {

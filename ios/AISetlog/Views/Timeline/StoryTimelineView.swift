@@ -84,6 +84,12 @@ struct StoryTimelineView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .fullScreenCover(item: $sheet, content: sheetContent)
+        .background {
+            // On its own view: two full-screen covers on one view fight.
+            Color.clear.fullScreenCover(item: $storiesStart) { start in
+                RoomStoriesPlayer(columns: start.columns, startID: start.id)
+            }
+        }
         .navigationDestination(isPresented: $showFilm) {
             if let challenge {
                 FilmView(
@@ -287,10 +293,9 @@ struct StoryTimelineView: View {
                 .padding(.horizontal, -20)
             let dayClips = clips.filter { Self.isClip($0, on: roomDay) }
             let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
-            RoomStoriesRow(columns: dayColumns) { storiesStart = RoomStoriesStart(id: $0) }
-                .fullScreenCover(item: $storiesStart) { start in
-                    RoomStoriesPlayer(columns: dayColumns.filter { !$0.clips.isEmpty }, startID: start.id)
-                }
+            RoomStoriesRow(columns: dayColumns) { id in
+                storiesStart = RoomStoriesStart(id: id, columns: dayColumns.filter { !$0.clips.isEmpty })
+            }
             RoomFrames(
                 clips: dayClips,
                 members: members,
