@@ -450,13 +450,30 @@ final class ChallengeStore {
     /// Refreshes every locally joined room when the app becomes active.
     /// Board views also poll while visible so two friends recording at the
     /// same time see each other's clips without manual pull-to-refresh.
+    ///
+    /// A few rooms at a time rather than one after another: each room's sync is
+    /// mostly waiting on CloudKit, and someone in five rooms used to wait for
+    /// all five in a row. Each room still syncs in its own order inside
+    /// `syncRoom`; the cap keeps a long room list from opening every request at
+    /// once.
     @MainActor
     func syncSharedRooms() async {
         let ids = challenges.filter(\.isShared).map(\.id)
-        for id in ids {
-            await syncRoom(id)
+        var pending = ids.makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<Self.sharedRoomSyncWidth {
+                guard let id = pending.next() else { break }
+                group.addTask { @MainActor in await self.syncRoom(id) }
+            }
+            while await group.next() != nil {
+                guard let id = pending.next() else { continue }
+                group.addTask { @MainActor in await self.syncRoom(id) }
+            }
         }
     }
+
+    /// How many rooms `syncSharedRooms` syncs at once.
+    static let sharedRoomSyncWidth = 3
 
     /// Fold remote reactions/comments into local cards by day. Remote is the
     /// source of truth, unioned with my own optimistic writes not yet echoed

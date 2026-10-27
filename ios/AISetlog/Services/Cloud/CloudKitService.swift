@@ -556,6 +556,11 @@ enum CloudKitService {
     }
 
     /// All clips in a room, downloaded to a local cache directory.
+    ///
+    /// The query asks for everything but the video, and only records that are
+    /// new or whose take changed since the last sync have their video fetched
+    /// (see `RoomClipCache`). The rest keep the file already in `cacheDir`, so a
+    /// sync of a room nobody has filmed in since costs one metadata query.
     static func fetchClips(code: String, into cacheDir: URL) async throws -> [RemoteClip] {
         try await ensureAccountAvailable()
         let query = CKQuery(
@@ -565,35 +570,97 @@ enum CloudKitService {
 
         let matched: [CKRecord]
         do {
-            matched = try await allRecords(matching: query)
+            matched = try await allClipRecordsWithoutVideo(matching: query)
         } catch let error as CKError where error.code == .invalidArguments {
             // Field not marked queryable yet (schema still deploying).
             throw CKServiceError.fieldNotQueryable
         }
 
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-        var clips: [RemoteClip] = []
-        for record in matched {
-            guard let asset = record["video"] as? CKAsset,
-                  let assetURL = asset.fileURL else { continue }
-            let dest = cacheDir.appendingPathComponent("\(record.recordID.recordName).mov")
-            try? FileManager.default.removeItem(at: dest)
-            do {
-                try FileManager.default.copyItem(at: assetURL, to: dest)
-            } catch { continue }
-            clips.append(RemoteClip(
-                id: record.recordID.recordName,
+        let remote = matched.map { record in
+            RoomClipCache.RemoteEntry(
+                recordName: record.recordID.recordName,
+                version: RoomClipCache.videoVersion(
+                    recordedAt: record["recordedAt"] as? Date,
+                    changeTag: record.recordChangeTag))
+        }
+        let previous = RoomClipCache.loadManifest(in: cacheDir)
+        let plan = RoomClipCache.plan(
+            remote: remote, manifest: previous,
+            cachedFiles: RoomClipCache.cachedRecordNames(in: cacheDir))
+        let downloaded = await downloadClipVideos(plan.download, into: cacheDir)
+        RoomClipCache.removeFiles(plan.remove, in: cacheDir)
+        try? RoomClipCache.saveManifest(
+            RoomClipCache.manifest(
+                after: plan, remote: remote, downloaded: downloaded, previous: previous),
+            in: cacheDir)
+
+        // A clip whose video couldn't be fetched is left out, as before; its
+        // old file (if any) stays on disk for the next sync to retry over.
+        let available = Set(plan.reuse).union(downloaded)
+        return matched.compactMap { record in
+            let name = record.recordID.recordName
+            guard available.contains(name) else { return nil }
+            return RemoteClip(
+                id: name,
                 day: record["day"] as? Int ?? 0,
                 authorID: record["authorID"] as? String ?? "",
                 authorName: record["authorName"] as? String ?? "Friend",
                 recordedAt: record["recordedAt"] as? Date ?? .now,
-                localURL: dest,
+                localURL: RoomClipCache.fileURL(recordName: name, in: cacheDir),
                 overlayText: record["overlayText"] as? String,
                 captionSticker: (record["captionSticker"] as? String)
                     .flatMap(CaptionSticker.init(cloudValue:)),
-                captionsJSON: record[captionsJSONField] as? String))
+                captionsJSON: record[captionsJSONField] as? String)
         }
-        return clips
+    }
+
+    /// Every field a `RemoteClip` is built from, which is every field but `video`.
+    private static let clipMetadataKeys: [CKRecord.FieldKey] = [
+        "roomCode", "day", "authorID", "authorName", "recordedAt",
+        "overlayText", "captionSticker", captionsJSONField,
+    ]
+
+    /// Videos fetched per request. CloudKit downloads a request's assets in
+    /// parallel; a bounded batch keeps one request from holding a whole room.
+    private static let clipVideoBatchSize = 20
+
+    /// `allRecords(matching:)` with the video left out of every page.
+    private static func allClipRecordsWithoutVideo(matching query: CKQuery) async throws -> [CKRecord] {
+        var records: [CKRecord] = []
+        var response = try await db.records(
+            matching: query, desiredKeys: clipMetadataKeys)
+        for _ in 0..<50 {
+            records.append(contentsOf: response.matchResults.compactMap { try? $0.1.get() })
+            guard let cursor = response.queryCursor else { break }
+            response = try await db.records(
+                continuingMatchFrom: cursor, desiredKeys: clipMetadataKeys)
+        }
+        return records
+    }
+
+    /// Fetch the `video` of each named record into the cache, returning the
+    /// names that made it. A failed batch or record is just missing from the
+    /// result; the cached file it would have replaced is left alone.
+    private static func downloadClipVideos(_ names: [String], into cacheDir: URL) async -> Set<String> {
+        var done = Set<String>()
+        for start in stride(from: 0, to: names.count, by: clipVideoBatchSize) {
+            let ids = names[start..<min(start + clipVideoBatchSize, names.count)]
+                .map { CKRecord.ID(recordName: $0) }
+            guard let results = try? await db.records(for: ids, desiredKeys: ["video"]) else {
+                continue
+            }
+            for (id, result) in results {
+                guard let record = try? result.get(),
+                      let asset = record["video"] as? CKAsset,
+                      let assetURL = asset.fileURL,
+                      (try? RoomClipCache.install(
+                        assetURL, recordName: id.recordName, in: cacheDir)) != nil
+                else { continue }
+                done.insert(id.recordName)
+            }
+        }
+        return done
     }
 
     // MARK: - Reactions & comments (append-only, no merge conflicts)

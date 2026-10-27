@@ -55,8 +55,34 @@ final class RoomSyncService {
 
     /// Pull every member's clips for a room into the local cache. Interaction
     /// sync is handed back to the caller to merge into local state.
+    ///
+    /// Two pulls of the same room never overlap: the open room page polls while
+    /// the foreground refresh may be syncing that room too, and both write the
+    /// same cache directory and its manifest. A second caller waits for the
+    /// running pull and then makes its own, so it never gets a result older
+    /// than its call. Different rooms still run side by side.
     @MainActor
     func syncClips(code: String) async -> [CloudKitService.RemoteClip]? {
+        while let running = clipPulls[code] {
+            _ = await running.value
+        }
+        // The pull clears its own slot before it finishes, so a waiter woken
+        // by it never finds the finished task still parked there. Nothing else
+        // can have taken the slot meanwhile: it is only filled while empty.
+        let pull = Task { @MainActor in
+            let clips = await self.pullClips(code: code)
+            self.clipPulls[code] = nil
+            return clips
+        }
+        clipPulls[code] = pull
+        return await pull.value
+    }
+
+    /// Room code → the clip pull running for it.
+    @ObservationIgnored private var clipPulls: [String: Task<[CloudKitService.RemoteClip]?, Never>] = [:]
+
+    @MainActor
+    private func pullClips(code: String) async -> [CloudKitService.RemoteClip]? {
         syncing.insert(code)
         defer { syncing.remove(code) }
         do {
