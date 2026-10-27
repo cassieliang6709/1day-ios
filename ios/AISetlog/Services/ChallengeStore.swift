@@ -221,6 +221,10 @@ final class ChallengeStore {
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
+        // Who is in the room first: last launch's roster at once, then a fresh
+        // one, before the clip downloads that can take a while.
+        roomSync.restoreCachedMembers(code: code)
+        await roomSync.syncMembers(code: code)
         if let remote = await roomSync.syncClips(code: code),
            await uploadMissingClips(in: challenge, code: code, remote: remote) {
             _ = await roomSync.syncClips(code: code)
@@ -230,7 +234,6 @@ final class ChallengeStore {
             roomSync.remoteComments[code] = interactions.comments
             mergeInteractions(interactions, into: id)
         }
-        await roomSync.syncMembers(code: code)
         await syncRoomTitle(id, code: code)
     }
 

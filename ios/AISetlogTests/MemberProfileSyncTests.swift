@@ -14,6 +14,7 @@ final class MemberProfileSyncTests: XCTestCase {
     private var titleWrites: [(code: String, title: String, at: Date)] = []
     private var titleWriteFails = false
     private var deleted: Set<String> = []
+    private var calls: [String] = []
     private var account: AccountStore!
 
     override func setUp() {
@@ -25,6 +26,7 @@ final class MemberProfileSyncTests: XCTestCase {
         titleWrites = []
         titleWriteFails = false
         deleted = []
+        calls = []
         UserDefaults.standard.removeObject(forKey: RoomSyncService.publishedProfilesKey)
         UserDefaults.standard.removeObject(forKey: RoomSyncService.pendingRoomTitlesKey)
         account = AccountStore()
@@ -41,7 +43,10 @@ final class MemberProfileSyncTests: XCTestCase {
 
     private func transport() -> RoomSyncTransport {
         RoomSyncTransport(
-            fetchClips: { _, _ in [] },
+            fetchClips: { [self] _, _ in
+                calls.append("clips")
+                return []
+            },
             fetchInteractions: { _ in ([], []) },
             uploadClip: { _, _, _, _, _, _, _, _ in },
             updateClipCaption: { _, _, _, _, _ in },
@@ -71,13 +76,15 @@ final class MemberProfileSyncTests: XCTestCase {
                 return names
             },
             fetchMembers: { [self] _, _ in
+                calls.append("members")
                 if fetchFails { throw CloudKitService.CKServiceError.networkUnavailable }
                 return fetched
             })
     }
 
-    private func store(rooms: [String], profile: MyRoomProfile?) -> ChallengeStore {
-        let files = ProfileTestFileStore()
+    private func store(
+        rooms: [String], profile: MyRoomProfile?, files: ProfileTestFileStore = ProfileTestFileStore()
+    ) -> ChallengeStore {
         let store = ChallengeStore(
             repository: ProfileTestRepository(), fileStore: files,
             roomSync: RoomSyncService(fileStore: files, transport: transport()),
@@ -348,6 +355,44 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.memberProfiles(for: store.challenges[0].id)["a"]?.avatarURL, avatar)
     }
 
+    func testARoomAsksWhoIsInItBeforeDownloadingClips() async {
+        fetched = [person("quiet")]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.syncRoom(store.challenges[0].id)
+        XCTAssertEqual(calls.first, "members")
+        XCTAssertTrue(calls.contains("clips"))
+    }
+
+    func testTheRosterIsBackRightAfterARelaunch() async throws {
+        let files = ProfileTestFileStore()
+        let avatarFile = files.remoteCacheDir(roomCode: "AAAAAA")
+            .appendingPathComponent("members", isDirectory: true)
+            .appendingPathComponent("avatar_a.png")
+        try FileManager.default.createDirectory(
+            at: avatarFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([1]).write(to: avatarFile)
+        fetched = [.init(userID: "a", displayName: "A", avatarURL: avatarFile, moodKind: nil, moodDay: nil)]
+        await store(rooms: ["AAAAAA"], profile: nil, files: files).roomSync.syncMembers(code: "AAAAAA")
+
+        // Next launch: a fresh service, and CloudKit not answering yet.
+        fetchFails = true
+        let relaunched = store(rooms: ["AAAAAA"], profile: nil, files: files)
+        relaunched.roomSync.restoreCachedMembers(code: "AAAAAA")
+        let id = relaunched.challenges[0].id
+        XCTAssertTrue(relaunched.members(for: id).contains { $0.id == "a" && $0.name == "A" })
+        XCTAssertEqual(relaunched.memberProfiles(for: id)["a"]?.avatarURL, avatarFile)
+    }
+
+    func testARestoredRosterNeverReplacesAFresherOne() async {
+        let files = ProfileTestFileStore()
+        fetched = [person("old")]
+        let store = store(rooms: ["AAAAAA"], profile: nil, files: files)
+        await store.roomSync.syncMembers(code: "AAAAAA")
+        store.roomSync.remoteMembers["AAAAAA"] = [:]
+        store.roomSync.restoreCachedMembers(code: "AAAAAA")
+        XCTAssertEqual(store.roomSync.remoteMembers["AAAAAA"]?.isEmpty, true)
+    }
+
     func testTheDefaultTransportNeverReachesCloudKitForProfiles() async {
         let bare = RoomSyncTransport(
             fetchClips: { _, _ in [] }, fetchInteractions: { _ in ([], []) },
@@ -386,13 +431,17 @@ private final class ProfileTestRepository: ChallengeRepository {
 }
 
 private final class ProfileTestFileStore: ClipFileStore {
+    /// Its own folder per store, so a roster saved by one test is never
+    /// restored by another.
+    private let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("profile-tests-\(UUID().uuidString)", isDirectory: true)
     func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String? { nil }
     func clipURL(fileName: String, challengeID: UUID) -> URL {
         URL(fileURLWithPath: "/tmp").appendingPathComponent(fileName)
     }
     func deleteClips(challengeID: UUID) {}
     func remoteCacheDir(roomCode: String) -> URL {
-        URL(fileURLWithPath: "/tmp").appendingPathComponent(roomCode)
+        root.appendingPathComponent(roomCode)
     }
     func deleteRemoteCache(roomCode: String) {}
     func migrateLegacyClips(_ fileNames: [String], into challengeID: UUID) {}

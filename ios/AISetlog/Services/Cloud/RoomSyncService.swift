@@ -185,15 +185,72 @@ final class RoomSyncService {
     @MainActor
     func syncMembers(code: String) async {
         do {
-            let members = try await transport.fetchMembers(
-                code, fileStore.remoteCacheDir(roomCode: code).appendingPathComponent("members", isDirectory: true))
+            let members = try await transport.fetchMembers(code, membersDir(code))
             remoteMembers[code] = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
+            saveCachedMembers(members, code: code)
         } catch {
             print("[room] member fetch failed: \(error)")
         }
         #if DEBUG
         DebugMemberMoods.add(to: &remoteMembers, code: code, authors: (remoteClips[code] ?? []).map(\.authorID))
         #endif
+    }
+
+    /// Where a room's avatars and its saved roster live. Inside the room's
+    /// cache, so `clearRoom` and signing out take the roster with them.
+    private func membersDir(_ code: String) -> URL {
+        fileStore.remoteCacheDir(roomCode: code).appendingPathComponent("members", isDirectory: true)
+    }
+
+    private func cachedMembersFile(_ code: String) -> URL {
+        membersDir(code).appendingPathComponent("members.json")
+    }
+
+    /// A `RemoteMember` as written to disk. The avatar is kept by file name:
+    /// the app's container path changes across updates, so a saved absolute
+    /// URL would point nowhere.
+    private struct CachedMember: Codable {
+        var userID: String
+        var displayName: String
+        var avatarFileName: String?
+        var moodKind: String?
+        var moodDay: Date?
+        var roomTitle: String?
+        var roomTitleAt: Date?
+    }
+
+    /// Puts last launch's roster back, so a cold start shows who is in the
+    /// room before CloudKit answers. Does nothing once the room has one.
+    @MainActor
+    func restoreCachedMembers(code: String) {
+        guard remoteMembers[code] == nil,
+              let data = try? Data(contentsOf: cachedMembersFile(code)),
+              let cached = try? JSONDecoder().decode([CachedMember].self, from: data)
+        else { return }
+        let dir = membersDir(code)
+        let fm = FileManager.default
+        let members = cached.map { c in
+            let avatar = c.avatarFileName.map { dir.appendingPathComponent($0) }
+            return CloudKitService.RemoteMember(
+                userID: c.userID, displayName: c.displayName,
+                avatarURL: avatar.flatMap { fm.fileExists(atPath: $0.path) ? $0 : nil },
+                moodKind: c.moodKind, moodDay: c.moodDay,
+                roomTitle: c.roomTitle, roomTitleAt: c.roomTitleAt)
+        }
+        remoteMembers[code] = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    private func saveCachedMembers(_ members: [CloudKitService.RemoteMember], code: String) {
+        let cached = members.map {
+            CachedMember(
+                userID: $0.userID, displayName: $0.displayName,
+                avatarFileName: $0.avatarURL?.lastPathComponent,
+                moodKind: $0.moodKind, moodDay: $0.moodDay,
+                roomTitle: $0.roomTitle, roomTitleAt: $0.roomTitleAt)
+        }
+        guard let data = try? JSONEncoder().encode(cached) else { return }
+        try? FileManager.default.createDirectory(at: membersDir(code), withIntermediateDirectories: true)
+        try? data.write(to: cachedMembersFile(code), options: .atomic)
     }
 
     /// Who is in a room by user ID — every `Member` record plus the owner,
