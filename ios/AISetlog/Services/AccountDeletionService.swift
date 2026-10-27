@@ -74,6 +74,18 @@ final class AccountDeletionService {
         // to be a queryable index in the production schema, and a query that
         // silently matches nothing is the worst possible outcome for something
         // somebody explicitly asked for.
+        //
+        // This phone may know only some of the rooms — a new phone, a
+        // reinstall — so first every room the cloud says is mine, and what
+        // each one holds. Read-only: the account is frozen, nothing uploads.
+        await store.restoreMyRooms()
+        for code in store.challenges.compactMap(\.roomCode) {
+            _ = await store.roomSync.syncClips(code: code)
+            if let interactions = await store.roomSync.fetchInteractions(code: code) {
+                store.roomSync.remoteReactions[code] = interactions.reactions
+                store.roomSync.remoteComments[code] = interactions.comments
+            }
+        }
         let inventory = Self.inventory(of: store, authorID: accountID)
 
         let coordinator: AccountDeletionCoordinator
@@ -162,6 +174,11 @@ final class AccountDeletionService {
             }
             // A moment's second and later takes, which a day alone can't name.
             names.formUnion(store.extraTakeRecordNames(in: challenge, authorID: authorID))
+            // Every take of mine the room holds, by its own record name —
+            // including ones this phone never filmed or never kept.
+            for clip in store.roomSync.remoteClips[code] ?? [] where clip.authorID == authorID {
+                names.insert(clip.id)
+            }
             for reaction in store.roomSync.remoteReactions[code] ?? []
             where reaction.authorID == authorID {
                 names.insert(CloudKitService.reactionRecordName(

@@ -150,6 +150,24 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertEqual(names, names.sorted())
     }
 
+    /// A take of mine the room holds but this phone never kept — filmed on
+    /// another phone, or a later take — is still mine to delete. A friend's
+    /// take in the same room is not.
+    func testTheInventoryCoversMyTakesThisPhoneNeverKept() throws {
+        let store = try makeStore()
+        let me = try XCTUnwrap(store.account?.account?.id)
+        let elsewhere = CloudKitService.clipRecordName(code: "ROOM01", authorID: me, day: 3, takeID: UUID())
+        let friends = CloudKitService.clipRecordName(code: "ROOM01", authorID: "leo", day: 1)
+        let file = URL(fileURLWithPath: "/tmp/x.mov")
+        store.roomSync.remoteClips["ROOM01"] = [
+            .init(id: elsewhere, day: 3, authorID: me, authorName: "Me", recordedAt: .now, localURL: file, overlayText: nil),
+            .init(id: friends, day: 1, authorID: "leo", authorName: "Leo", recordedAt: .now, localURL: file, overlayText: nil),
+        ]
+        let names = AccountDeletionService.inventory(of: store, authorID: me)
+        XCTAssertTrue(names.contains(elsewhere))
+        XCTAssertFalse(names.contains(friends))
+    }
+
     /// Joining a room leaves a `Member` record under my name. It is mine, so
     /// deleting the account deletes it — and it goes to CloudKit with the rest.
     func testDeletingMyAccountDeletesMyMemberRecord() async throws {
