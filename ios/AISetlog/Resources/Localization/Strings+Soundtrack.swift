@@ -8,6 +8,8 @@ extension Strings {
 
     /// On the viewfinder while the phone is held sideways.
     static var filmingSideways: String { sound("横拍", "Landscape") }
+    /// Over the viewfinder once 横拍 is on, until the take starts.
+    static var turnPhoneSideways: String { sound("横过来拍", "Turn your phone sideways") }
 
     static var soundTitle: String { sound("声音", "Sound") }
     static var soundOriginal: String { sound("原声", "Original") }

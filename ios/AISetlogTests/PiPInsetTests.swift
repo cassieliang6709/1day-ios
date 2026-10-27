@@ -152,6 +152,22 @@ final class PiPInsetTests: XCTestCase {
         }
     }
 
+    /// 横拍 holds the phone top to the left: the screen's top right is the
+    /// world's top left, and the inset lands there in the landscape file.
+    func testSidewaysInsetTurnsWithThePhone() {
+        let topRight = CGRect(x: 0.66, y: 0.02, width: 0.3, height: 0.3)
+        let turned = PiPComposer.sidewaysRect(topRight)
+        XCTAssertEqual(turned.minX, 0.02, accuracy: 1e-9)
+        XCTAssertEqual(turned.minY, 0.04, accuracy: 1e-9)
+        XCTAssertEqual(turned.width, 0.3, accuracy: 1e-9)
+        XCTAssertEqual(PiPInsetLayout.clamped(turned), turned, "still inside the frame")
+
+        let bottomLeft = CGRect(x: 0.04, y: 0.68, width: 0.3, height: 0.3)
+        let bottomRight = PiPComposer.sidewaysRect(bottomLeft)
+        XCTAssertEqual(bottomRight.maxX, 0.98, accuracy: 1e-9)
+        XCTAssertEqual(bottomRight.maxY, 0.96, accuracy: 1e-9)
+    }
+
     func testPersistenceRoundTripsAndClamps() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "PiPInsetTests"))
         defaults.removePersistentDomain(forName: "PiPInsetTests")

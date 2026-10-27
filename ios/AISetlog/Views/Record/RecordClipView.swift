@@ -67,10 +67,6 @@ struct RecordClipView: View {
     /// 横拍, switched on by hand. Only the button turns the camera's layout;
     /// turning the phone by itself doesn't (not in 1.5).
     @State private var manualSideways = false
-    /// 「横拍」 is a notice, not a fixture: up for `badgeSeconds` on turning
-    /// sideways, then gone so it doesn't sit on the picture.
-    @State private var showsSidewaysBadge = false
-    private static let badgeSeconds = 1.5
     private var deviceTurn: Double { manualSideways ? 90 : 0 }
     /// What the file is filmed as: 横拍 makes it landscape. The viewfinder
     /// keeps its upright box — held sideways, that box is the landscape frame.
@@ -327,52 +323,56 @@ struct RecordClipView: View {
                         .padding(.bottom, Self.burnInHeight)
                 }
             }
-            .overlay { if showsSidewaysBadge { sidewaysBadge.transition(.opacity) } }
+            .overlay {
+                if isSideways && recorder.state != .recording {
+                    sidewaysHint.transition(.opacity)
+                }
+            }
             .layoutPriority(1)
 
             shutterRow
         }
         .animation(OneDay.Motion.snap, value: deviceTurn)
-        .onChange(of: isSideways) { _, sideways in flashSidewaysBadge(sideways) }
         .onChange(of: manualSideways) { _, on in
             recorder.forcedLandscape = on
             recorder.orientation = captureOrientation
         }
-        .onChange(of: recorder.clipURL) { _, url in if url != nil { reviewTurn = deviceTurn } }
+        // When the take starts, not when it lands: the clip arriving swaps
+        // this view for the review, and a change seen by a view on its way
+        // out never ran — every 横拍 take was reviewed unturned, a landscape
+        // film cropped into the upright box. 横拍 can't change mid-take.
+        .onChange(of: recorder.state) { _, state in
+            if state == .recording { reviewTurn = deviceTurn }
+        }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
     }
 
-    /// 「横拍」 over the middle of the frame, turned to read upright in the
-    /// hand, so a sideways take never looks like a portrait one.
-    private var sidewaysBadge: some View {
-        Label(Strings.filmingSideways, systemImage: "rectangle.landscape.rotate")
-            .font(.system(size: 13, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.black.opacity(0.45), in: Capsule())
-            .rotationEffect(.degrees(deviceTurn))
-            .allowsHitTesting(false)
-            .accessibilityIdentifier("camera-sideways")
+    /// 横拍 is on but the viewfinder still looks the same with the phone
+    /// upright — the picture stays upright on purpose, and only turning the
+    /// phone makes the frame landscape. So the frame says so, in the middle,
+    /// until the take starts. Not turned with the buttons: it is read while
+    /// the phone is still upright.
+    private var sidewaysHint: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "rotate.left")
+                .font(.system(size: 44, weight: .semibold))
+            Text(Strings.turnPhoneSideways)
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("camera-sideways")
     }
 
     private var zoomAlignment: Alignment {
         guard isSideways else { return .bottom }
         return deviceTurn > 0 ? .leading : .trailing
-    }
-
-    private func flashSidewaysBadge(_ sideways: Bool) {
-        guard sideways else {
-            withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = false }
-            return
-        }
-        withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = true }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(Self.badgeSeconds))
-            withAnimation(OneDay.Motion.soft) { showsSidewaysBadge = false }
-        }
     }
 
     /// How much of the frame's bottom edge the burn-in block occupies:
@@ -835,6 +835,7 @@ struct RecordClipView: View {
                     Button { onCloseFreeform() } label: {
                         Image(systemName: "xmark")
                             .cameraGlass()
+                            .rotationEffect(.degrees(deviceTurn))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Strings.closeCamera)
@@ -846,6 +847,7 @@ struct RecordClipView: View {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
                         .cameraGlass()
+                        .rotationEffect(.degrees(deviceTurn))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Strings.closeCamera)
@@ -854,14 +856,20 @@ struct RecordClipView: View {
             Spacer(minLength: 8)
 
             VStack(spacing: 1) {
-                OneDayBrandLogo(width: 92)
+                OneDayBrandLogo(width: isSideways ? 64 : 92)
                 Text(localizedMomentTitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: 170)
+            .frame(maxWidth: isSideways ? 80 : 170)
+            // 横拍 turns everything you read along with the buttons, so the
+            // whole screen reads upright in the sideways hand. Turned, the
+            // row's width becomes height: smaller, and lifted into the empty
+            // space above, so it stays clear of the viewfinder.
+            .rotationEffect(.degrees(deviceTurn))
+            .offset(y: isSideways ? -14 : 0)
 
             Spacer(minLength: 8)
 
@@ -939,8 +947,8 @@ struct RecordClipView: View {
         .padding(.top, 8)
     }
 
-    /// 横拍: lit when on. Turns the camera's buttons and badge for holding
-    /// the phone sideways; the take itself follows how the phone is held.
+    /// 横拍: lit when on. Films landscape whatever the tilt reads, and turns
+    /// the camera's buttons and frame for holding the phone top to the left.
     private var sidewaysButton: some View {
         Button {
             withAnimation(OneDay.Motion.snap) { manualSideways.toggle() }

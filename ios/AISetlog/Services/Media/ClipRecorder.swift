@@ -21,11 +21,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private var position: AVCaptureDevice.Position = .back
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
-    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    /// The coordinator computes its angles asynchronously — reading them once
-    /// straight after `init` yields 0 before it has settled. Observe instead.
-    private var captureAngleObservation: NSKeyValueObservation?
-    private var previewAngleObservation: NSKeyValueObservation?
+    /// Re-applies the fixed angles whenever the session rebuilds its
+    /// connections. Switching camera, adding the second one or restarting the
+    /// session replaces them some time after `commitConfiguration`, and a new
+    /// connection starts at 0° — a portrait take filmed sideways. The angle
+    /// set straight after the commit doesn't survive that.
+    @ObservationIgnored private var connectionObservers: [NSObjectProtocol] = []
 
     // MARK: Dual camera (picture in picture)
     //
@@ -37,8 +38,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private var secondaryInput: AVCaptureDeviceInput?
     private var secondaryConnections: [AVCaptureConnection] = []
     private weak var secondaryPreviewLayer: AVCaptureVideoPreviewLayer?
-    private var secondaryCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var secondaryAngleObservation: NSKeyValueObservation?
 
     /// Both cameras are filming: the main camera full frame, the other one in
     /// the corner inset.
@@ -55,6 +54,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
     /// Files of the take in flight, collected as each output finishes.
     private var pendingPrimary: URL??
+    /// Which camera made each file of the take in flight, by `uniqueID`, so
+    /// the shape it came out in can be learned — see `CameraOrientation`.
+    private var pendingPrimaryCamera: String?
+    private var pendingSecondaryCamera: String?
+    /// Whether the take in flight is 横拍, as it was when it started.
+    private var recordingSideways = false
     private var pendingSecondary: URL??
 
     /// Whether this phone can film both cameras at once.
@@ -70,9 +75,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         didSet { applyOrientation() }
     }
     /// 横拍: film as if the phone is held sideways (top to the left), whatever
-    /// the tilt reads. The rotation coordinator is ignored while this is on —
-    /// with Rotation Lock, or a phone not quite level, it kept answering
-    /// portrait, and the take came out as a portrait crop.
+    /// the tilt reads. Only this switch decides the angle — see `captureAngle`.
     var forcedLandscape = false {
         didSet { applyAngles() }
     }
@@ -234,9 +237,27 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             state = .unavailable
             return
         }
+        if connectionObservers.isEmpty {
+            let center = NotificationCenter.default
+            let reapply: (Notification) -> Void = { [weak self] _ in
+                Task { @MainActor in self?.applyAngles() }
+            }
+            connectionObservers = [
+                center.addObserver(
+                    forName: AVCaptureInput.Port.formatDescriptionDidChangeNotification,
+                    object: nil, queue: nil, using: reapply),
+                center.addObserver(
+                    forName: AVCaptureSession.didStartRunningNotification,
+                    object: session, queue: nil, using: reapply),
+            ]
+        }
         applyOrientation()
         refreshZoom()
         state = .ready
+    }
+
+    deinit {
+        connectionObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
     // MARK: - Torch (闪光灯)
@@ -340,134 +361,126 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Rebuilds the rotation coordinator for the current device and preview,
-    /// then keeps applying its angles as it settles.
-    ///
-    /// An earlier version hardcoded 90° for any physical camera on the theory
-    /// that iPhone sensors are always mounted in landscape. On this device
-    /// that over-rotates: the capture pipeline rotates the buffers *and*
-    /// writes a 90° preferred transform, so the clip comes out turned a
-    /// quarter-turn. `RotationCoordinator` exists to compute this number
-    /// correctly per device and camera — use it rather than guessing.
+    /// Puts the fixed angles back on every connection; the device or the
+    /// preview may be new.
     private func applyOrientation() {
-        guard let device = videoInput?.device else { return }
-        let coordinator = AVCaptureDevice.RotationCoordinator(
-            device: device,
-            previewLayer: previewLayer)
-        rotationCoordinator = coordinator
-
-        // Re-apply whenever the coordinator revises its answer, which it does
-        // shortly after creation and whenever the device is physically turned.
-        captureAngleObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelCapture, options: [.new]
-        ) { [weak self] _, _ in
-            Task { @MainActor in self?.applyAngles() }
-        }
-        previewAngleObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelPreview, options: [.new]
-        ) { [weak self] _, _ in
-            Task { @MainActor in self?.applyAngles() }
-        }
-
         applyAngles()
     }
 
-    /// Pushes the coordinator's current angles onto the capture and preview
-    /// connections. Safe to call repeatedly — the angles are absolute.
-    private func applyAngles() {
-        guard let device = videoInput?.device,
-              let coordinator = rotationCoordinator else { return }
-
-        let captureAngle = forcedLandscape
-            ? Self.sidewaysAngle(for: device.position)
-            : Self.rotationAngle(
-                orientation: orientation,
-                devicePosition: device.position,
-                coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
-        #if DEBUG
-        print("[横拍] forced=\(forcedLandscape) camera=\(device.position == .front ? "front" : "back")",
-              "capture=\(captureAngle) coordinator=\(coordinator.videoRotationAngleForHorizonLevelCapture)")
-        #endif
-        let captureConnection = movieOutput.connection(with: .video)
-        if let connection = captureConnection,
-           connection.isVideoRotationAngleSupported(captureAngle) {
-            connection.videoRotationAngle = captureAngle
-        }
-        // A selfie is saved the way the viewfinder shows it: mirrored.
-        if let connection = captureConnection, connection.isVideoMirroringSupported {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = device.position == .front
-        }
-
-        // The viewfinder stays on the portrait-locked screen's angle even in
-        // 横拍: the phone itself is turned, so the live picture already reads
-        // upright in the hand. Only the file is filmed sideways.
-        let previewAngle = forcedLandscape
-            ? Self.uprightPreviewAngle
-            : Self.rotationAngle(
-                orientation: orientation,
-                devicePosition: device.position,
-                coordinatedAngle: coordinator.videoRotationAngleForHorizonLevelPreview)
-
-        if let connection = previewLayer?.connection,
-           connection.isVideoRotationAngleSupported(previewAngle) {
-            connection.videoRotationAngle = previewAngle
-        }
-
-        guard let secondaryCoordinator else { return }
-        let otherSide: AVCaptureDevice.Position = device.position == .front ? .back : .front
-        let secondaryCapture = forcedLandscape
-            ? Self.sidewaysAngle(for: otherSide)
-            : secondaryCoordinator.videoRotationAngleForHorizonLevelCapture
-        let secondaryPreview = forcedLandscape
-            ? Self.uprightPreviewAngle
-            : secondaryCoordinator.videoRotationAngleForHorizonLevelPreview
-        for connection in secondaryConnections {
-            let angle = connection.videoPreviewLayer == nil ? secondaryCapture : secondaryPreview
-            if connection.isVideoRotationAngleSupported(angle) {
-                connection.videoRotationAngle = angle
-            }
-        }
-    }
-
-    /// The angle to put on a connection.
+    /// Pushes the fixed angles onto the capture and preview connections of
+    /// both cameras. Safe to call repeatedly — the angles are absolute.
     ///
-    /// Both orientations use the coordinator. The app UI is portrait-locked,
-    /// but a landscape clip still needs the device/front-camera angle; forcing
-    /// 0° leaves the sensor's portrait frame inside the landscape composition.
-    /// The coordinator avoids a hard-coded 90° guess.
-    static func rotationAngle(
-        orientation: Challenge.Orientation,
-        devicePosition: AVCaptureDevice.Position,
-        coordinatedAngle: CGFloat
-    ) -> CGFloat {
-        coordinatedAngle
+    /// How the phone is held is not read at all: 竖拍 and 横拍 each have one
+    /// angle per camera, and only the 横拍 switch picks between them. The
+    /// angle depends on which way that camera's sensor hands its frames over
+    /// — see `CameraOrientation`; one number for every camera filmed the
+    /// iPhone 17 front camera a quarter-turn off.
+    ///
+    /// Runs on the session queue, the one that adds and removes connections.
+    /// Set from the main thread, an angle could land on a connection the
+    /// queue was tearing down, and AVFoundation threw (NSRangeException,
+    /// "Cannot remove an observer … for the key path enabled").
+    private func applyAngles() {
+        let sideways = forcedLandscape
+        Self.sessionQueue.async { [self] in
+            guard let device = videoInput?.device else { return }
+            let native = CameraOrientation.nativePortrait(device)
+            Self.setFileAngle(
+                CameraOrientation.captureAngle(
+                    sideways: sideways, nativePortrait: native, front: device.position == .front),
+                mirrored: device.position == .front,
+                on: movieOutput.connection(with: .video))
+            // The viewfinder stays upright on the portrait-locked screen even
+            // in 横拍: the phone itself is turned, so the live picture already
+            // reads upright in the hand. Only the file is filmed sideways.
+            Self.setAngle(
+                CameraOrientation.previewAngle(nativePortrait: native),
+                on: previewLayer?.connection)
+
+            if let other = secondaryInput?.device {
+                let otherNative = CameraOrientation.nativePortrait(other)
+                for connection in secondaryConnections {
+                    if connection.videoPreviewLayer == nil {
+                        // The inset's selfie is filmed mirrored too, the way
+                        // its preview shows it — as the single front camera's is.
+                        Self.setFileAngle(
+                            CameraOrientation.captureAngle(
+                                sideways: sideways, nativePortrait: otherNative,
+                                front: other.position == .front),
+                            mirrored: other.position == .front, on: connection)
+                    } else {
+                        Self.setAngle(
+                            CameraOrientation.previewAngle(nativePortrait: otherNative), on: connection)
+                    }
+                }
+            }
+            #if DEBUG
+            logAngles(sideways: sideways)
+            #endif
+        }
     }
 
-    /// The connection angle for a phone held sideways with its top to the
-    /// left (landscape right, in capture terms). `videoRotationAngle` is
-    /// defined per device orientation, not per sensor, so the front camera
-    /// takes the same angle; its mirroring is applied after the rotation.
-    static func sidewaysAngle(for position: AVCaptureDevice.Position) -> CGFloat {
-        0
+    private static func setAngle(_ angle: CGFloat, on connection: AVCaptureConnection?) {
+        guard let connection, connection.isVideoRotationAngleSupported(angle) else { return }
+        connection.videoRotationAngle = angle
     }
+
+    private static func setFileAngle(
+        _ angle: CGFloat, mirrored: Bool, on connection: AVCaptureConnection?
+    ) {
+        guard let connection else { return }
+        setAngle(angle, on: connection)
+        if connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = mirrored
+        }
+    }
+
+    #if DEBUG
+    /// 诊断: printed and flushed at once — piped to `devicectl --console`,
+    /// stdout is buffered and the lines only arrived when the app quit.
+    nonisolated static func diag(_ items: Any...) {
+        print(items.map { "\($0)" }.joined(separator: " "))
+        fflush(stdout)
+    }
+
+    /// 诊断: which camera, and the shape its sensor hands over before rotation.
+    nonisolated static func diagName(_ device: AVCaptureDevice?) -> String {
+        guard let device else { return "none" }
+        let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+        let side = device.position == .front ? "front" : "back"
+        return "\(side)/\(device.deviceType.rawValue.split(separator: ".").last ?? "")/format=\(dims.width)x\(dims.height)"
+            + "/nativePortrait=\(CameraOrientation.nativePortrait(device))"
+    }
+
+    /// 诊断: what each connection reads back after the angles went on.
+    private func logAngles(sideways: Bool) {
+        let file = movieOutput.connection(with: .video)
+        Self.diag("[诊断] angles sideways=\(sideways) primary=\(Self.diagName(videoInput?.device))",
+              "file=\(file?.videoRotationAngle ?? -1) mirrored=\(file?.isVideoMirrored ?? false)",
+              "preview=\(previewLayer?.connection?.videoRotationAngle ?? -1)")
+        for connection in secondaryConnections {
+            Self.diag("[诊断]   inset=\(Self.diagName(secondaryInput?.device))",
+                  connection.videoPreviewLayer == nil ? "file" : "preview",
+                  "=\(connection.videoRotationAngle) mirrored=\(connection.isVideoMirrored)")
+        }
+    }
+    #endif
+
     #if DEBUG
     /// Prints what a take actually is on disk, to check 横拍 lands landscape.
-    nonisolated static func logTakeGeometry(_ url: URL, sideways: Bool) {
+    nonisolated static func logTakeGeometry(_ url: URL, sideways: Bool, label: String = "final") {
         Task.detached {
             guard let track = try? await AVURLAsset(url: url).loadTracks(withMediaType: .video).first,
                   let natural = try? await track.load(.naturalSize),
                   let transform = try? await track.load(.preferredTransform)
             else { return }
             let shown = natural.applying(transform)
-            print("[横拍] take sideways=\(sideways) natural=\(natural) transform=\(transform)",
+            diag("[诊断] take \(label) sideways=\(sideways) natural=\(natural) transform=\(transform)",
                   "shown=\(abs(shown.width))x\(abs(shown.height))")
         }
     }
     #endif
-    /// Portrait: the angle the viewfinder keeps on the portrait-locked screen.
-    static let uprightPreviewAngle: CGFloat = 90
-
     func flipCamera() {
         guard state == .ready else { return }
         // Both cameras are already on: flipping means trading places.
@@ -476,19 +489,25 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             return
         }
         let newPosition: AVCaptureDevice.Position = position == .front ? .back : .front
-        session.beginConfiguration()
-        if let videoInput { session.removeInput(videoInput) }
-        if let camera = camera(for: newPosition),
-           Self.prepare(camera, for: session),
-           let input = try? AVCaptureDeviceInput(device: camera),
-           session.canAddInput(input) {
-            session.addInput(input)
-            videoInput = input
-            position = newPosition
-        } else if let videoInput, session.canAddInput(videoInput) {
-            session.addInput(videoInput) // revert
+        // On the session queue with every other change to the session's
+        // inputs and connections, so an angle being set can't meet a
+        // connection being torn down. `sync`: the rest of this needs the new
+        // input, and nothing on that queue waits for the main thread.
+        Self.sessionQueue.sync {
+            session.beginConfiguration()
+            if let videoInput { session.removeInput(videoInput) }
+            if let camera = camera(for: newPosition),
+               Self.prepare(camera, for: session),
+               let input = try? AVCaptureDeviceInput(device: camera),
+               session.canAddInput(input) {
+                session.addInput(input)
+                videoInput = input
+                position = newPosition
+            } else if let videoInput, session.canAddInput(videoInput) {
+                session.addInput(videoInput) // revert
+            }
+            session.commitConfiguration()
         }
-        session.commitConfiguration()
         // After the commit, never before: swapping an input rebuilds the
         // session's connections, so an angle set inside the transaction is
         // discarded and the connection falls back to 0° — which records a
@@ -517,6 +536,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             .appendingPathComponent("clip_\(UUID().uuidString).mov")
         recordedAt = .now
         state = .recording
+        let sideways = forcedLandscape
+        recordingSideways = sideways
 
         // Keep capture operations serialized with session startup/teardown.
         // A re-record can arrive while the previous session is still releasing
@@ -534,6 +555,33 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             movieOutput.maxRecordedDuration = CMTime(
                 seconds: seconds,
                 preferredTimescale: 600)
+            // Last word on the file's angle, on the queue that records: a
+            // connection rebuilt since the viewfinder was set would otherwise
+            // film at 0°.
+            if let device = videoInput?.device {
+                Self.setFileAngle(
+                    CameraOrientation.captureAngle(
+                        sideways: sideways, nativePortrait: CameraOrientation.nativePortrait(device),
+                        front: device.position == .front),
+                    mirrored: device.position == .front,
+                    on: movieOutput.connection(with: .video))
+            }
+            if let other = secondaryInput?.device {
+                for connection in secondaryConnections where connection.videoPreviewLayer == nil {
+                    Self.setFileAngle(
+                        CameraOrientation.captureAngle(
+                            sideways: sideways, nativePortrait: CameraOrientation.nativePortrait(other),
+                            front: other.position == .front),
+                        mirrored: other.position == .front, on: connection)
+                }
+            }
+            #if DEBUG
+            let primaryAngle = movieOutput.connection(with: .video)?.videoRotationAngle ?? -1
+            Self.diag("[诊断] record start sideways=\(sideways) primary=\(Self.diagName(videoInput?.device))",
+                  "fileAngle=\(primaryAngle)",
+                  "inset=\(Self.diagName(secondaryInput?.device))",
+                  "insetFileAngle=\(secondaryConnections.first { $0.videoPreviewLayer == nil }?.videoRotationAngle ?? -1)")
+            #endif
             let dual = !secondaryConnections.isEmpty
             Task { @MainActor in
                 self.pendingPrimary = nil
@@ -640,19 +688,54 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
 
         let isPrimary = output === movieOutput
+        let camera = connections
+            .first { $0.inputPorts.contains { $0.mediaType == .video } }?
+            .inputPorts.first { $0.mediaType == .video }?.input as? AVCaptureDeviceInput
+        #if DEBUG
+        Self.logTakeGeometry(
+            outputFileURL, sideways: recordingSideways,
+            label: "raw \(isPrimary ? "primary" : "inset") \(Self.diagName(camera?.device))")
+        #endif
 
         Task { @MainActor in
             let file: URL? = finishedSuccessfully ? outputFileURL : nil
             if !finishedSuccessfully {
                 try? FileManager.default.removeItem(at: outputFileURL)
             }
-            if isPrimary { self.pendingPrimary = .some(file) } else { self.pendingSecondary = .some(file) }
+            if isPrimary {
+                self.pendingPrimary = .some(file)
+                self.pendingPrimaryCamera = camera?.device.uniqueID
+            } else {
+                self.pendingSecondary = .some(file)
+                self.pendingSecondaryCamera = camera?.device.uniqueID
+            }
             // Wait for both outputs of a dual take before doing anything.
-            guard case .some(let primary) = self.pendingPrimary,
-                  case .some(let secondary) = self.pendingSecondary
+            guard case .some(let rawPrimary) = self.pendingPrimary,
+                  case .some(let rawSecondary) = self.pendingSecondary
             else { return }
             self.pendingPrimary = nil
             self.pendingSecondary = nil
+            let primaryCamera = self.pendingPrimaryCamera
+            let secondaryCamera = self.pendingSecondaryCamera
+
+            // Every file leaves here the shape the switch asked for: 横拍
+            // landscape, otherwise upright. A camera met for the first time,
+            // or one whose sensor turned out the other way round, is turned
+            // right here and remembered, so its next take is filmed right.
+            let wantLandscape = self.recordingSideways
+            var learnedSomething = false
+            func checked(_ url: URL?, camera: String?) async -> URL? {
+                guard let url else { return nil }
+                let result = await CameraOrientation.upright(url, landscape: wantLandscape)
+                if let camera, let native = result.nativePortrait,
+                   CameraOrientation.remember(nativePortrait: native, for: camera) {
+                    learnedSomething = true
+                }
+                return result.url
+            }
+            let primary = await checked(rawPrimary, camera: primaryCamera)
+            let secondary = await checked(rawSecondary, camera: secondaryCamera)
+            if learnedSomething { self.applyAngles() }
 
             guard let primary else {
                 if let secondary { try? FileManager.default.removeItem(at: secondary) }
@@ -679,7 +762,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                    primary: primary,
                    secondary: secondary,
                    secondaryIsMain: self.isSwapped,
-                   inset: self.insetRect,
+                   // 横拍: the viewfinder is upright on the screen, but the
+                   // phone is held sideways and the file is landscape, so
+                   // the inset's place turns with it.
+                   inset: wantLandscape
+                       ? PiPComposer.sidewaysRect(self.insetRect)
+                       : self.insetRect,
                    // The shape the viewfinder showed: the camera style's
                    // frame, else square or the full picture. Composed at
                    // the full picture and cropped after, the inset moved
@@ -853,7 +941,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
         secondaryInput = otherInput
         secondaryConnections = added
-        Task { @MainActor in self.makeSecondaryCoordinator() }
+        Task { @MainActor in self.applyAngles() }
         return true
     }
 
@@ -878,23 +966,136 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             }
         }
         session.commitConfiguration()
-        Task { @MainActor in
-            self.secondaryCoordinator = nil
-            self.secondaryAngleObservation = nil
-        }
+    }
+}
+
+/// Which way each camera's sensor hands its frames over, and the fixed
+/// angles that follow from it.
+///
+/// `videoRotationAngle` turns whatever the sensor delivers. The back cameras
+/// deliver landscape frames (1920×1080), so 竖拍 is 90° and 横拍 0°. The
+/// iPhone 17 front camera delivers portrait ones (1080×1920) while its format
+/// still says 1920×1080, so the same 90° filmed every selfie sideways —
+/// measured on Cassie's iPhone 17 Pro Max, 2026-10-27. Older front cameras
+/// are landscape like the back ones.
+///
+/// Nothing in the format tells the two apart, so each camera's answer is
+/// learned from its first take — the file's natural size is the sensor's
+/// shape, whatever angle was set — kept per device, and that first take is
+/// turned upright by `upright` on the way out. Unknown means landscape.
+enum CameraOrientation {
+    static let storageKey = "camera.nativePortrait.v1"
+
+    static func nativePortrait(_ device: AVCaptureDevice, defaults: UserDefaults = .standard) -> Bool {
+        nativePortrait(uniqueID: device.uniqueID, defaults: defaults)
     }
 
-    private func makeSecondaryCoordinator() {
-        guard let device = secondaryInput?.device else { return }
-        let coordinator = AVCaptureDevice.RotationCoordinator(
-            device: device, previewLayer: secondaryPreviewLayer)
-        secondaryCoordinator = coordinator
-        secondaryAngleObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelCapture, options: [.new]
-        ) { [weak self] _, _ in
-            Task { @MainActor in self?.applyAngles() }
+    static func nativePortrait(uniqueID: String, defaults: UserDefaults = .standard) -> Bool {
+        (defaults.dictionary(forKey: storageKey)?[uniqueID] as? Bool) ?? false
+    }
+
+    /// Stores what a take showed. True when it changes what was known.
+    @discardableResult
+    static func remember(
+        nativePortrait: Bool, for uniqueID: String, defaults: UserDefaults = .standard
+    ) -> Bool {
+        var known = defaults.dictionary(forKey: storageKey) ?? [:]
+        let before = Self.nativePortrait(uniqueID: uniqueID, defaults: defaults)
+        known[uniqueID] = nativePortrait
+        defaults.set(known, forKey: storageKey)
+        return before != nativePortrait
+    }
+
+    /// The file's angle. 竖拍: a landscape sensor turns a quarter, a portrait
+    /// one is already upright. 横拍 (phone top to the left) turns a quarter
+    /// from there — back the other way for the front camera, which faces the
+    /// other way: the back camera ends at 0°, the front one at 180° (landscape
+    /// sensor) or 90° (portrait sensor). 270° filmed the iPhone 17's 横拍
+    /// selfies upside down.
+    static func captureAngle(sideways: Bool, nativePortrait: Bool, front: Bool) -> CGFloat {
+        let upright: CGFloat = nativePortrait ? 0 : 90
+        guard sideways else { return upright }
+        let turned = upright + (front ? 90 : -90)
+        return (turned + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    /// The viewfinder's angle: upright on the portrait-locked screen, in
+    /// 竖拍 and 横拍 alike.
+    static func previewAngle(nativePortrait: Bool) -> CGFloat {
+        nativePortrait ? 0 : 90
+    }
+
+    /// The take's transform turned a quarter so it shows `landscape` (or
+    /// upright), or nil when it already does. A wrong shape means the
+    /// sensor was guessed the other way round, and the angle set was a
+    /// quarter-turn off in a known direction: a portrait sensor needed 90°
+    /// less than a landscape one. The turn goes on before the existing
+    /// transform, so a selfie's mirroring stays as it was.
+    static func corrected(
+        natural: CGSize, transform: CGAffineTransform, landscape: Bool
+    ) -> CGAffineTransform? {
+        let shown = CGRect(origin: .zero, size: natural).applying(transform)
+        guard natural.width > 0, natural.height > 0,
+              (abs(shown.width) > abs(shown.height)) != landscape
+        else { return nil }
+        let turn: CGFloat = natural.height > natural.width ? -.pi / 2 : .pi / 2
+        let linear = CGAffineTransform(
+            a: transform.a, b: transform.b, c: transform.c, d: transform.d, tx: 0, ty: 0)
+        let turned = CGAffineTransform(rotationAngle: turn).concatenating(linear)
+        let box = CGRect(origin: .zero, size: natural).applying(turned)
+        // Snap: `rotationAngle` leaves 1e-17 where a 0 belongs.
+        func snap(_ v: CGFloat) -> CGFloat { abs(v - v.rounded()) < 1e-9 ? v.rounded() : v }
+        return CGAffineTransform(
+            a: snap(turned.a), b: snap(turned.b), c: snap(turned.c), d: snap(turned.d),
+            tx: -box.minX.rounded(), ty: -box.minY.rounded())
+    }
+
+    /// `url` the shape asked for — re-muxed with a corrected transform when
+    /// it isn't, no re-encode — plus the sensor's shape it revealed (nil when
+    /// the file couldn't be read). On any failure the take is kept as it was.
+    static func upright(_ url: URL, landscape: Bool) async -> (url: URL, nativePortrait: Bool?) {
+        let asset = AVURLAsset(url: url)
+        guard let video = try? await asset.loadTracks(withMediaType: .video).first,
+              let natural = try? await video.load(.naturalSize),
+              let transform = try? await video.load(.preferredTransform)
+        else { return (url, nil) }
+        let native = natural.height > natural.width
+        guard let fixed = corrected(natural: natural, transform: transform, landscape: landscape)
+        else { return (url, native) }
+
+        let composition = AVMutableComposition()
+        guard let duration = try? await asset.load(.duration),
+              let videoOut = composition.addMutableTrack(
+                  withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else { return (url, native) }
+        let range = CMTimeRange(start: .zero, duration: duration)
+        do {
+            try videoOut.insertTimeRange(range, of: video, at: .zero)
+            if let audio = try await asset.loadTracks(withMediaType: .audio).first,
+               let audioOut = composition.addMutableTrack(
+                   withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                try audioOut.insertTimeRange(range, of: audio, at: .zero)
+            }
+        } catch {
+            return (url, native)
         }
-        applyAngles()
+        videoOut.preferredTransform = fixed
+        guard let export = AVAssetExportSession(
+            asset: composition, presetName: AVAssetExportPresetPassthrough)
+        else { return (url, native) }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("upright-\(UUID().uuidString).mov")
+        export.outputURL = output
+        export.outputFileType = .mov
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            export.exportAsynchronously { cont.resume() }
+        }
+        guard export.status == .completed else {
+            try? FileManager.default.removeItem(at: output)
+            return (url, native)
+        }
+        try? FileManager.default.removeItem(at: url)
+        return (output, native)
     }
 }
 
@@ -1032,6 +1233,15 @@ enum PiPComposer {
             throw SquareCrop.CropError.failed(export.error?.localizedDescription ?? "unknown")
         }
         return output
+    }
+
+    /// The inset's place in a 横拍 file, from where it sat on the viewfinder.
+    /// The viewfinder is upright on the portrait screen while the phone is
+    /// held top to the left, so the screen's x runs up the world and its y
+    /// runs right: what sat at the screen's top right sits at the file's top
+    /// left. Width and height are the same share, so only the corner moves.
+    static func sidewaysRect(_ rect: CGRect) -> CGRect {
+        CGRect(x: rect.minY, y: 1 - rect.maxX, width: rect.height, height: rect.width)
     }
 
     /// The composed frame: the main picture cut to `aspect` (width / height)
