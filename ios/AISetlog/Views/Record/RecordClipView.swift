@@ -46,6 +46,14 @@ struct RecordClipView: View {
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
+    /// The shape of the take in review, measured off the file.
+    ///
+    /// The review frame used to take its shape from the orientation alone and
+    /// aspect-fill the take into it, so any file a little off that ratio was
+    /// cropped here and shown whole everywhere else — `ClipPreviewView` has
+    /// always measured. nil until the file is readable, and then the
+    /// orientation's own ratio stands in, which is what this used to be.
+    @State private var reviewAspect: CGFloat?
     /// Raised when the close button is pressed with a take still in review.
     ///
     /// The free-form camera has had this guard since `UnfiledClipGuard` —
@@ -337,7 +345,7 @@ struct RecordClipView: View {
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: effectiveOrientation.aspectRatio
+                aspectRatio: reviewAspect ?? effectiveOrientation.aspectRatio
             ) {
                 ZStack {
                     // Immediate review is always the camera truth; grading belongs elsewhere.
@@ -396,6 +404,10 @@ struct RecordClipView: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
+        .task(id: url) {
+            reviewAspect = nil
+            reviewAspect = await ClipGeometry.aspect(of: url)
+        }
         .sheet(isPresented: $showSavePicker) {
             ClipFilingSheet(candidates: filingCandidates) { chosen in
                 file(url, to: chosen)
