@@ -23,6 +23,10 @@ final class ChallengeStore {
     /// My avatar and today's mood, as rooms should show them. Set at launch;
     /// read whenever a room needs my `Member` record brought up to date.
     var myRoomProfile: @MainActor () -> MyRoomProfile? = { nil }
+    /// This phone's own avatar: put one back from the cloud, or wipe it when
+    /// someone else signs in. Set at launch; no-ops in tests and previews.
+    var adoptAvatar: @MainActor (URL) -> Void = { _ in }
+    var forgetAvatar: @MainActor () -> Void = {}
 
     /// CloudKit room sync (remote clip cache + syncing spinners live there).
     let roomSync: RoomSyncService
@@ -179,6 +183,34 @@ final class ChallengeStore {
 
     @ObservationIgnored private var restoringRooms = false
 
+    /// Whose the shared rooms on this phone are. Signing out keeps them (and
+    /// any take whose upload hasn't landed yet) for the same person coming
+    /// back; it can't keep them for someone else.
+    static let roomsAccountKey = "rooms.accountID.v1"
+
+    /// Run on sign-in and on every foreground. Someone other than the last
+    /// person signed in here: their shared rooms, takes and avatar leave this
+    /// phone first — left in place, the next sync uploaded every one of their
+    /// takes under the new account and joined it to their rooms. Only this
+    /// phone's copy goes; the rooms and takes stay in the cloud, and come back
+    /// when that person signs in again (`restoreMyRooms`). Personal stories
+    /// stay: they never leave the phone. Then the new person's rooms come back.
+    @MainActor
+    func reconcileAccountRooms(defaults: UserDefaults = .standard) async {
+        guard let me = account?.account else { return }
+        if let previous = defaults.string(forKey: Self.roomsAccountKey), previous != me.id {
+            for challenge in challenges where challenge.isShared {
+                fileStore.deleteClips(challengeID: challenge.id)
+                if let code = challenge.roomCode { roomSync.clearRoom(code) }
+            }
+            challenges.removeAll(where: \.isShared)
+            forgetAvatar()
+            print("[room] another account signed in; this phone's copy of the old rooms is gone")
+        }
+        defaults.set(me.id, forKey: Self.roomsAccountKey)
+        await restoreMyRooms()
+    }
+
     /// Puts back every room the cloud says I'm in that this phone doesn't
     /// have — a new phone, a reinstall, or the Dev build next to the App
     /// Store one. The room list lives on the phone; the cloud only knows it
@@ -192,6 +224,11 @@ final class ChallengeStore {
         restoringRooms = true
         defer { restoringRooms = false }
         guard let mine = await roomSync.findMyRooms(userID: me.id) else { return }
+        // Apple hands the name over only on the very first sign-in, and the
+        // avatar lives in a file on the old phone: a new phone has neither.
+        // My own `Member` records still do.
+        if me.name == nil, let name = mine.displayName { account?.rename(to: name) }
+        if myRoomProfile()?.avatarURL == nil, let avatar = mine.avatarFile { adoptAvatar(avatar) }
 
         let have = Set(challenges.compactMap(\.roomCode))
         var rooms: [CloudKitService.RemoteRoom] = mine.owned.filter {
@@ -505,7 +542,11 @@ final class ChallengeStore {
         for member in (roomSync.remoteMembers[code] ?? [:]).values where !member.displayName.isEmpty {
             seen[member.userID] = member.displayName
         }
-        for clip in roomSync.remoteClips[code] ?? [] { seen[clip.authorID] = clip.authorName }
+        // A take uploaded while its author's name was unknown carries none;
+        // it mustn't blank the name their `Member` record has.
+        for clip in roomSync.remoteClips[code] ?? [] where !clip.authorName.isEmpty || seen[clip.authorID] == nil {
+            seen[clip.authorID] = clip.authorName
+        }
         if let me = account?.account { seen[me.id] = me.displayName }
         // Rooms saved before `ownerID` existed key the owner by name; drop that
         // placeholder once the same person turns up under a real author id.

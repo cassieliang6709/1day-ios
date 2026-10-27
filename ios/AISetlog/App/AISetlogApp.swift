@@ -30,6 +30,10 @@ struct AISetlogApp: App {
         store.myRoomProfile = { [weak moods] in
             MyRoomProfile.make(avatar: .shared, today: moods?.today)
         }
+        store.adoptAvatar = { url in
+            if let data = try? Data(contentsOf: url) { AvatarStore.shared.save(pngData: data) }
+        }
+        store.forgetAvatar = { AvatarStore.shared.remove() }
         _moods = State(initialValue: moods)
         ReminderService.reconcile(for: store.challenges)
         SharedActivityNotificationService.reconcileSubscriptions(for: store.challenges)
@@ -80,7 +84,7 @@ struct AISetlogApp: App {
                         for: store.challenges)
                     NotificationPermissionService.registerForRemoteNotificationsIfNeeded()
                     Task {
-                        await store.restoreMyRooms()
+                        await store.reconcileAccountRooms()
                         await store.syncSharedRooms()
                         await store.publishMyProfileToAllRooms()
                     }
@@ -90,7 +94,7 @@ struct AISetlogApp: App {
                 .onChange(of: account.account?.id) { _, id in
                     guard id != nil else { return }
                     Task {
-                        await store.restoreMyRooms()
+                        await store.reconcileAccountRooms()
                         await store.syncSharedRooms()
                     }
                 }

@@ -235,7 +235,9 @@ enum CloudKitService {
             recordID: .init(recordName: memberRecordName(code: code, authorID: authorID)))
         record["roomCode"] = code as CKRecordValue
         record["userID"] = authorID as CKRecordValue
-        record["displayName"] = displayName as CKRecordValue
+        // An empty name is "not known on this phone", not a new name: left
+        // out, the record keeps the one already there for everyone.
+        if !displayName.isEmpty { record["displayName"] = displayName as CKRecordValue }
         record["joinedAt"] = joinedAt as CKRecordValue
         try await upsert(record)
         print("[room] saved member code=\(code)")
@@ -286,7 +288,7 @@ enum CloudKitService {
             record["userID"] = write.authorID as CKRecordValue
             record["joinedAt"] = Date.now as CKRecordValue
         }
-        record["displayName"] = write.displayName as CKRecordValue
+        if !write.displayName.isEmpty { record["displayName"] = write.displayName as CKRecordValue }
         if let avatarURL = write.avatarURL { record["avatar"] = CKAsset(fileURL: avatarURL) }
         if let mood = write.moodKind, let day = write.moodDay {
             record["moodKind"] = mood as CKRecordValue
@@ -314,7 +316,7 @@ enum CloudKitService {
             record["userID"] = authorID as CKRecordValue
             record["joinedAt"] = Date.now as CKRecordValue
         }
-        record["displayName"] = displayName as CKRecordValue
+        if !displayName.isEmpty { record["displayName"] = displayName as CKRecordValue }
         record["roomTitle"] = title as CKRecordValue
         record["roomTitleAt"] = at as CKRecordValue
         try await upsert(record)
@@ -329,6 +331,11 @@ enum CloudKitService {
     struct MyRooms {
         var memberCodes: [String]
         var owned: [RemoteRoom]
+        /// The name and avatar on my newest `Member` record that has one —
+        /// what a phone that never saw me sign in before puts back, since
+        /// Apple hands the name over only once. Defaulted for test fakes.
+        var displayName: String? = nil
+        var avatarFile: URL? = nil
     }
 
     static func myRooms(userID: String) async throws -> MyRooms {
@@ -337,9 +344,22 @@ enum CloudKitService {
             recordType: "Member", predicate: NSPredicate(format: "userID == %@", userID)))
         let owned = try await allRecords(matching: CKQuery(
             recordType: "Room", predicate: NSPredicate(format: "ownerID == %@", userID)))
+        let newestFirst = members.sorted {
+            ($0.modificationDate ?? .distantPast) > ($1.modificationDate ?? .distantPast)
+        }
+        let name = newestFirst.lazy
+            .compactMap { $0["displayName"] as? String }.first { !$0.isEmpty }
+        var avatar: URL?
+        if let asset = newestFirst.lazy.compactMap({ $0["avatar"] as? CKAsset }).first,
+           let src = asset.fileURL {
+            let dst = FileManager.default.temporaryDirectory
+                .appendingPathComponent("my-avatar-\(UUID().uuidString).png")
+            if (try? FileManager.default.copyItem(at: src, to: dst)) != nil { avatar = dst }
+        }
         return MyRooms(
             memberCodes: members.compactMap { $0["roomCode"] as? String },
-            owned: owned.map(room(from:)))
+            owned: owned.map(room(from:)),
+            displayName: name, avatarFile: avatar)
     }
 
     /// Every `Member` record in a room, avatars downloaded into `cacheDir`.

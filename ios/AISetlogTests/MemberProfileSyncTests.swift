@@ -443,6 +443,77 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.challenges.compactMap(\.roomCode), ["AAAAAA"])
     }
 
+    // MARK: - Another account on this phone
+
+    private func defaults() throws -> UserDefaults {
+        let d = try XCTUnwrap(UserDefaults(suiteName: "AccountRoomsTests"))
+        d.removePersistentDomain(forName: "AccountRoomsTests")
+        return d
+    }
+
+    /// Someone else signs in: the last person's shared rooms and avatar leave
+    /// this phone before anything syncs, so none of their takes go up under
+    /// the new account. Personal stories stay.
+    func testAnotherAccountDoesNotInheritTheLastPersonsRooms() async throws {
+        let d = try defaults()
+        d.set("someone-else", forKey: ChallengeStore.roomsAccountKey)
+        myRooms = .init(memberCodes: [], owned: [])
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        store.challenges.append(Challenge(id: UUID(), title: "mine", startDate: .now, cards: [DayCard(day: 1)]))
+        var forgot = false
+        store.forgetAvatar = { forgot = true }
+        await store.reconcileAccountRooms(defaults: d)
+        XCTAssertEqual(store.challenges.map(\.title), ["mine"])
+        XCTAssertTrue(forgot)
+        XCTAssertEqual(d.string(forKey: ChallengeStore.roomsAccountKey), account.account?.id)
+        d.removePersistentDomain(forName: "AccountRoomsTests")
+    }
+
+    /// The same person signing back in keeps everything, takes still
+    /// waiting to upload included; so does a phone that never recorded whose
+    /// rooms they were.
+    func testTheSamePersonKeepsTheirRooms() async throws {
+        let d = try defaults()
+        myRooms = .init(memberCodes: [], owned: [])
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        var forgot = false
+        store.forgetAvatar = { forgot = true }
+        await store.reconcileAccountRooms(defaults: d)
+        await store.reconcileAccountRooms(defaults: d)
+        XCTAssertEqual(store.challenges.compactMap(\.roomCode), ["AAAAAA"])
+        XCTAssertFalse(forgot)
+        d.removePersistentDomain(forName: "AccountRoomsTests")
+    }
+
+    /// A new phone: no name from Apple, no avatar file. Both come back from
+    /// my own `Member` records; a name I already have is never replaced.
+    func testANewPhoneGetsMyNameAndAvatarBack() async {
+        account.signInAsTester(named: "")
+        myRooms = .init(memberCodes: [], owned: [], displayName: "Cassie", avatarFile: avatar)
+        let store = store(rooms: [], profile: nil)
+        var adopted: URL?
+        store.adoptAvatar = { adopted = $0 }
+        await store.restoreMyRooms()
+        XCTAssertEqual(account.account?.displayName, "Cassie")
+        XCTAssertEqual(adopted, avatar)
+
+        account.rename(to: "Cass")
+        await store.restoreMyRooms()
+        XCTAssertEqual(account.account?.displayName, "Cass")
+    }
+
+    /// A take uploaded while its author had no name doesn't blank the name
+    /// their `Member` record shows.
+    func testANamelessTakeDoesNotBlankAMembersName() async {
+        fetched = [.init(userID: "leo", displayName: "Leo", avatarURL: nil, moodKind: nil, moodDay: nil)]
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.roomSync.syncMembers(code: "AAAAAA")
+        store.roomSync.remoteClips["AAAAAA"] = [CloudKitService.RemoteClip(
+            id: "x", day: 1, authorID: "leo", authorName: "", recordedAt: .now,
+            localURL: avatar, overlayText: nil)]
+        XCTAssertEqual(store.members(for: store.challenges[0].id).first { $0.id == "leo" }?.name, "Leo")
+    }
+
     func testTheDefaultTransportNeverReachesCloudKitForProfiles() async {
         let bare = RoomSyncTransport(
             fetchClips: { _, _ in [] }, fetchInteractions: { _ in ([], []) },
