@@ -52,6 +52,11 @@ struct RoomSyncTransport {
     var fetchMembers: @MainActor (String, URL) async throws -> [CloudKitService.RemoteMember] = { _, _ in
         throw CancellationError()
     }
+    /// The rooms a user is in, by user ID. Defaulted to fail, like
+    /// `saveMember`.
+    var findMyRooms: @MainActor (String) async throws -> CloudKitService.MyRooms = { _ in
+        throw CancellationError()
+    }
 
     static var live: RoomSyncTransport {
         RoomSyncTransport(
@@ -69,7 +74,8 @@ struct RoomSyncTransport {
             saveRoomTitle: { try await CloudKitService.saveRoomTitle(code: $0, authorID: $1, displayName: $2, title: $3, at: $4) },
             myRecordNames: { try await CloudKitService.myRecordNames(inRoom: $0, authorID: $1) },
             deleteRecords: { try await CloudKitService.deleteRecordsConfirmingEachOne($0) },
-            fetchMembers: { try await CloudKitService.fetchMembers(code: $0, into: $1) })
+            fetchMembers: { try await CloudKitService.fetchMembers(code: $0, into: $1) },
+            findMyRooms: { try await CloudKitService.myRooms(userID: $0) })
     }
 }
 

@@ -15,6 +15,7 @@ final class MemberProfileSyncTests: XCTestCase {
     private var titleWriteFails = false
     private var deleted: Set<String> = []
     private var calls: [String] = []
+    private var myRooms: CloudKitService.MyRooms?
     private var account: AccountStore!
 
     override func setUp() {
@@ -27,6 +28,7 @@ final class MemberProfileSyncTests: XCTestCase {
         titleWriteFails = false
         deleted = []
         calls = []
+        myRooms = nil
         UserDefaults.standard.removeObject(forKey: RoomSyncService.publishedProfilesKey)
         UserDefaults.standard.removeObject(forKey: RoomSyncService.pendingRoomTitlesKey)
         account = AccountStore()
@@ -79,6 +81,10 @@ final class MemberProfileSyncTests: XCTestCase {
                 calls.append("members")
                 if fetchFails { throw CloudKitService.CKServiceError.networkUnavailable }
                 return fetched
+            },
+            findMyRooms: { [self] _ in
+                guard let myRooms else { throw CloudKitService.CKServiceError.networkUnavailable }
+                return myRooms
             })
     }
 
@@ -391,6 +397,50 @@ final class MemberProfileSyncTests: XCTestCase {
         store.roomSync.remoteMembers["AAAAAA"] = [:]
         store.roomSync.restoreCachedMembers(code: "AAAAAA")
         XCTAssertEqual(store.roomSync.remoteMembers["AAAAAA"]?.isEmpty, true)
+    }
+
+    // MARK: - Restoring rooms
+
+    private func ownedRoom(_ code: String, startedOn start: Date) -> CloudKitService.RemoteRoom {
+        CloudKitService.RemoteRoom(
+            code: code, title: "我的房间", startDate: start, ownerID: account.account!.id, ownerName: "Me",
+            mode: .oneDay, clipLength: .tiny, orientation: .portrait,
+            cameraStyle: nil, templateName: nil, momentTitles: nil)
+    }
+
+    /// A new phone: the rooms my `Member` records name come back, and one
+    /// already here isn't added twice.
+    func testRoomsIJoinedComeBackOnANewPhone() async {
+        myRooms = .init(memberCodes: ["AAAAAA", "BBBBBB", "CCCCCC"], owned: [])
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.restoreMyRooms()
+        XCTAssertEqual(Set(store.challenges.compactMap(\.roomCode)), ["AAAAAA", "BBBBBB", "CCCCCC"])
+        XCTAssertEqual(store.challenges.count, 3)
+        await store.restoreMyRooms()
+        XCTAssertEqual(store.challenges.count, 3, "a second pass adds nothing")
+    }
+
+    /// A room I made before owners got a `Member` record comes back through
+    /// its owner ID; one I made later and then left (no record) stays gone.
+    func testOwnedRoomsComeBackUnlessILeftThem() async {
+        let before = ChallengeStore.ownerMemberRecordsSince.addingTimeInterval(-86_400)
+        let after = ChallengeStore.ownerMemberRecordsSince.addingTimeInterval(86_400)
+        myRooms = .init(
+            memberCodes: ["KEPTNW"],
+            owned: [ownedRoom("OLDONE", startedOn: before), ownedRoom("LEFTIT", startedOn: after),
+                    ownedRoom("KEPTNW", startedOn: after)])
+        let store = store(rooms: [], profile: nil)
+        await store.restoreMyRooms()
+        XCTAssertEqual(Set(store.challenges.compactMap(\.roomCode)), ["OLDONE", "KEPTNW"])
+        XCTAssertEqual(store.challenges.first { $0.roomCode == "OLDONE" }?.title, "我的房间")
+    }
+
+    /// No answer from the cloud changes nothing — it never removes a room.
+    func testAFailedLookupLeavesTheRoomListAlone() async {
+        myRooms = nil
+        let store = store(rooms: ["AAAAAA"], profile: nil)
+        await store.restoreMyRooms()
+        XCTAssertEqual(store.challenges.compactMap(\.roomCode), ["AAAAAA"])
     }
 
     func testTheDefaultTransportNeverReachesCloudKitForProfiles() async {

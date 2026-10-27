@@ -321,6 +321,27 @@ enum CloudKitService {
         print("[room] saved room title code=\(code)")
     }
 
+    /// The rooms someone is in, from the cloud rather than this phone: the
+    /// codes on their `Member` records, plus every room they made — a room
+    /// made before 1.5 (36) has no `Member` record for its owner.
+    /// Needs `Member.userID` and `Room.ownerID` QUERYABLE
+    /// (see docs/cloudkit-room-restore-deploy.md).
+    struct MyRooms {
+        var memberCodes: [String]
+        var owned: [RemoteRoom]
+    }
+
+    static func myRooms(userID: String) async throws -> MyRooms {
+        try await ensureAccountAvailable()
+        let members = try await allRecords(matching: CKQuery(
+            recordType: "Member", predicate: NSPredicate(format: "userID == %@", userID)))
+        let owned = try await allRecords(matching: CKQuery(
+            recordType: "Room", predicate: NSPredicate(format: "ownerID == %@", userID)))
+        return MyRooms(
+            memberCodes: members.compactMap { $0["roomCode"] as? String },
+            owned: owned.map(room(from:)))
+    }
+
     /// Every `Member` record in a room, avatars downloaded into `cacheDir`.
     /// Needs `roomCode` QUERYABLE (see docs/cloudkit-member-avatar-mood-deploy.md).
     static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {

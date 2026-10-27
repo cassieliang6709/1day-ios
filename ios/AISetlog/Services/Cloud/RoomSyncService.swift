@@ -167,6 +167,18 @@ final class RoomSyncService {
         try await transport.fetchRoom(code)
     }
 
+    /// The rooms I'm in according to the cloud, or nil when it can't say —
+    /// signed out of iCloud, offline, or the indexes not deployed yet.
+    @MainActor
+    func findMyRooms(userID: String) async -> CloudKitService.MyRooms? {
+        do {
+            return try await transport.findMyRooms(userID)
+        } catch {
+            print("[room] finding my rooms failed: \(error)")
+            return nil
+        }
+    }
+
     /// Leave a `Member` record saying I joined. Failure is logged and
     /// swallowed: the room is already mine on this device, and the record is
     /// bookkeeping, not what lets me in.

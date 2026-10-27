@@ -80,8 +80,18 @@ struct AISetlogApp: App {
                         for: store.challenges)
                     NotificationPermissionService.registerForRemoteNotificationsIfNeeded()
                     Task {
+                        await store.restoreMyRooms()
                         await store.syncSharedRooms()
                         await store.publishMyProfileToAllRooms()
+                    }
+                }
+                // Signing in on a phone that has never seen this account:
+                // bring its rooms back now, not on the next foreground.
+                .onChange(of: account.account?.id) { _, id in
+                    guard id != nil else { return }
+                    Task {
+                        await store.restoreMyRooms()
+                        await store.syncSharedRooms()
                     }
                 }
                 // A new mood or a new avatar goes to every room I'm in.

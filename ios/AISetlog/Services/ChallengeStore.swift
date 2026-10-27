@@ -162,9 +162,89 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
-        // The room I made has no `Member` record for me until this writes one.
+        // My `Member` record, as joining writes one: it is how this room
+        // finds its way back to me on another phone (`restoreMyRooms`).
+        await roomSync.recordMembership(
+            code: room.code, authorID: me.id, displayName: me.displayName)
         await publishMyProfile(toRoom: room.code)
         return challenge
+    }
+
+    /// Rooms made before every owner got a `Member` record (1.5 (36)). Only
+    /// these come back through `Room.ownerID`: a later room I made and then
+    /// left has no `Member` record either, and must stay left.
+    static let ownerMemberRecordsSince = DateComponents(
+        calendar: .init(identifier: .gregorian), timeZone: .init(identifier: "Asia/Shanghai"),
+        year: 2026, month: 10, day: 28).date!
+
+    @ObservationIgnored private var restoringRooms = false
+
+    /// Puts back every room the cloud says I'm in that this phone doesn't
+    /// have — a new phone, a reinstall, or the Dev build next to the App
+    /// Store one. The room list lives on the phone; the cloud only knows it
+    /// through my `Member` records and the rooms I own. Rooms I left have
+    /// neither, so they stay gone. Nothing is removed here: a room the
+    /// cloud can't vouch for may just be one the query missed.
+    @MainActor
+    func restoreMyRooms() async {
+        guard effects.allowsCloudRoomManagement, let me = account?.account, !restoringRooms
+        else { return }
+        restoringRooms = true
+        defer { restoringRooms = false }
+        guard let mine = await roomSync.findMyRooms(userID: me.id) else { return }
+
+        let have = Set(challenges.compactMap(\.roomCode))
+        var rooms: [CloudKitService.RemoteRoom] = mine.owned.filter {
+            !have.contains($0.code)
+                && (mine.memberCodes.contains($0.code) || $0.startDate < Self.ownerMemberRecordsSince)
+        }
+        let ownedCodes = Set(rooms.map(\.code))
+        for code in Set(mine.memberCodes) where !have.contains(code) && !ownedCodes.contains(code) {
+            // A room deleted since, or unreadable right now: skip it, the
+            // next launch tries again.
+            if let room = try? await roomSync.fetchRoom(code: code) { rooms.append(room) }
+        }
+        guard !rooms.isEmpty else { return }
+        // Newest first, as the list keeps them. Re-checked: a join may have
+        // landed while the queries ran.
+        for room in rooms.sorted(by: { $0.startDate > $1.startDate })
+        where !challenges.contains(where: { $0.roomCode == room.code }) {
+            challenges.append(challenge(mirroring: room))
+        }
+        print("[room] restored \(rooms.count) room(s) from the cloud")
+    }
+
+    private func challenge(mirroring room: CloudKitService.RemoteRoom) -> Challenge {
+        Challenge(
+            id: UUID(), title: room.title, startDate: room.startDate,
+            cards: (1...cardCount(for: room.momentTitles)).map { DayCard(day: $0) },
+            mode: room.mode, clipLength: room.clipLength,
+            orientation: room.orientation,
+            cameraStyle: room.cameraStyle,
+            templateName: room.templateName,
+            momentTitles: room.momentTitles,
+            roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
+    }
+
+    /// My own takes that are in the room but not on this phone — a new phone,
+    /// a reinstall, a room put back by `restoreMyRooms` — become this phone's
+    /// take 1 again. Left as empty cards, the camera filed the next take into
+    /// the first "empty" moment and uploaded it over the one already there,
+    /// for everyone. Only take 1: extra takes stay in the room as they are.
+    @MainActor
+    private func adoptMyTakes(_ remote: [CloudKitService.RemoteClip], code: String, into id: UUID) {
+        guard let me = account?.account,
+              let ci = challenges.firstIndex(where: { $0.id == id }) else { return }
+        for clip in remote where clip.authorID == me.id
+            && clip.id == CloudKitService.clipRecordName(code: code, authorID: me.id, day: clip.day) {
+            guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == clip.day }),
+                  challenges[ci].cards[idx].clipFileName == nil,
+                  let fileName = fileStore.storeClip(from: clip.localURL, day: clip.day, challengeID: id)
+            else { continue }
+            challenges[ci].cards[idx].clipFileName = fileName
+            challenges[ci].cards[idx].recordedAt = clip.recordedAt
+            challenges[ci].cards[idx].captions = clip.captions
+        }
     }
 
     /// Join an existing room by its code, mirroring it locally.
@@ -225,9 +305,11 @@ final class ChallengeStore {
         // one, before the clip downloads that can take a while.
         roomSync.restoreCachedMembers(code: code)
         await roomSync.syncMembers(code: code)
-        if let remote = await roomSync.syncClips(code: code),
-           await uploadMissingClips(in: challenge, code: code, remote: remote) {
-            _ = await roomSync.syncClips(code: code)
+        if let remote = await roomSync.syncClips(code: code) {
+            adoptMyTakes(remote, code: code, into: id)
+            if await uploadMissingClips(in: challenge, code: code, remote: remote) {
+                _ = await roomSync.syncClips(code: code)
+            }
         }
         if let interactions = await roomSync.fetchInteractions(code: code) {
             roomSync.remoteReactions[code] = interactions.reactions

@@ -89,6 +89,42 @@ final class RoomUploadRetryTests: XCTestCase {
 
     // MARK: - Tests
 
+    /// A room this phone never filmed in — a new phone, a reinstall, a room
+    /// put back from the cloud — takes my own take 1 back from the room, so
+    /// the camera files the next take into a moment that is really empty
+    /// instead of uploading over mine. A friend's take is not mine to adopt.
+    func testMyTakesInTheRoomBecomeThisPhonesAgain() async throws {
+        let room = Challenge(
+            id: UUID(), title: "A perfect day", startDate: filmedAt,
+            cards: [DayCard(day: 1), DayCard(day: 2)],
+            mode: .oneDay, clipLength: .tiny, orientation: .portrait,
+            momentTitles: ["Morning", "Night"],
+            roomCode: code, ownerName: "Leo", ownerID: "owner-1")
+        store.challenges = [room]
+        let file = dir.appendingPathComponent("remote.mov")
+        try Data("take".utf8).write(to: file)
+        server.clips = [
+            CloudKitService.RemoteClip(
+                id: CloudKitService.clipRecordName(code: code, authorID: me.id, day: 1),
+                day: 1, authorID: me.id, authorName: "Me", recordedAt: filmedAt,
+                localURL: file, overlayText: "hi"),
+            CloudKitService.RemoteClip(
+                id: CloudKitService.clipRecordName(code: code, authorID: "leo", day: 2),
+                day: 2, authorID: "leo", authorName: "Leo", recordedAt: filmedAt,
+                localURL: file, overlayText: nil),
+        ]
+
+        await store.syncRoom(room.id)
+
+        let cards = try XCTUnwrap(store.challenge(room.id)).cards
+        XCTAssertEqual(cards[0].clipFileName, "day1.mov")
+        XCTAssertEqual(cards[0].recordedAt, filmedAt)
+        XCTAssertEqual(cards[0].captions.firstText, "hi")
+        XCTAssertNil(cards[1].clipFileName, "Leo's take stays Leo's")
+        XCTAssertEqual(ClipFiling.targetDay(in: try XCTUnwrap(store.challenge(room.id))), 2)
+        XCTAssertTrue(server.uploads.isEmpty, "nothing of mine is sent back over itself")
+    }
+
     func testATakeTheRoomNeverGotIsUploadedOnTheNextSync() async throws {
         let room = try roomWithMyTake()
 
