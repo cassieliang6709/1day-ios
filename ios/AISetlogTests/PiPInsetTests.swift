@@ -128,6 +128,30 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertTrue(outer.contains(box))
     }
 
+    /// A camera style's frame is the viewfinder's shape, so the dual take is
+    /// composed in it — not at the full picture and cropped after, which
+    /// moved the inset and changed its shape.
+    func testComposerCanvasIsTheShapeTheViewfinderShowed() {
+        let main = CGSize(width: 1080, height: 1920)
+        XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: nil), main)
+        XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: 1), CGSize(width: 1080, height: 1080))
+        let camcorder = CameraStyle.camcorder.aspectRatio(for: .portrait)
+        XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: camcorder), CGSize(width: 1080, height: 1440))
+        let film = CameraStyle.film.aspectRatio(for: .portrait)
+        XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: film), CGSize(width: 1080, height: 1620))
+    }
+
+    /// The style bake after composing then has nothing left to cut, so the
+    /// inset stays where it was placed.
+    func testStyleBakeDoesNotCropAComposedDualTakeAgain() {
+        let main = CGSize(width: 1080, height: 1920)
+        for style in [CameraStyle.camcorder, .film, .instant] {
+            let aspect = style.aspectRatio(for: .portrait)
+            let canvas = PiPComposer.canvasSize(main: main, aspect: aspect)
+            XCTAssertNil(CameraStyleBaker.centredCrop(of: canvas, aspect: aspect!), "\(style)")
+        }
+    }
+
     func testPersistenceRoundTripsAndClamps() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "PiPInsetTests"))
         defaults.removePersistentDomain(forName: "PiPInsetTests")

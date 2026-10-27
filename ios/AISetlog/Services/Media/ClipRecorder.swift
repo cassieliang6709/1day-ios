@@ -680,7 +680,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                    secondary: secondary,
                    secondaryIsMain: self.isSwapped,
                    inset: self.insetRect,
-                   square: self.orientation.cropsAfterRecording) {
+                   // The shape the viewfinder showed: the camera style's
+                   // frame, else square or the full picture. Composed at
+                   // the full picture and cropped after, the inset moved
+                   // and changed shape from where it was placed.
+                   aspect: self.cameraStyle.aspectRatio(for: self.orientation)
+                       ?? (self.orientation.cropsAfterRecording ? 1 : nil)) {
                 self.clipURL = await CameraStyleBaker.bake(
                     composed, style: self.cameraStyle,
                     orientation: self.orientation, recordedAt: self.recordedAt)
@@ -906,14 +911,14 @@ enum PiPComposer {
     /// normalized rect from the viewfinder.
     static func compose(
         primary: URL, secondary: URL, secondaryIsMain: Bool,
-        inset: CGRect = PiPInsetLayout.defaultRect(), square: Bool
+        inset: CGRect = PiPInsetLayout.defaultRect(), aspect: CGFloat?
     ) async -> URL? {
         guard let url = try? await build(
             main: secondaryIsMain ? secondary : primary,
             inset: secondaryIsMain ? primary : secondary,
             audio: primary,
             insetRect: inset,
-            square: square)
+            aspect: aspect)
         else { return nil }
         try? FileManager.default.removeItem(at: primary)
         try? FileManager.default.removeItem(at: secondary)
@@ -934,7 +939,7 @@ enum PiPComposer {
     private static func even(_ value: CGFloat) -> CGFloat { (value / 2).rounded(.down) * 2 }
 
     private static func build(
-        main: URL, inset: URL, audio: URL, insetRect: CGRect, square: Bool
+        main: URL, inset: URL, audio: URL, insetRect: CGRect, aspect: CGFloat?
     ) async throws -> URL {
         let mainAsset = AVURLAsset(url: main)
         let insetAsset = AVURLAsset(url: inset)
@@ -966,11 +971,7 @@ enum PiPComposer {
         guard mainSize.width > 0, mainSize.height > 0, insetSize.width > 0, insetSize.height > 0
         else { throw SquareCrop.CropError.noVideoTrack }
 
-        let canvas: CGSize = {
-            guard square else { return CGSize(width: even(mainSize.width), height: even(mainSize.height)) }
-            let side = even(min(mainSize.width, mainSize.height))
-            return CGSize(width: side, height: side)
-        }()
+        let canvas = canvasSize(main: mainSize, aspect: aspect)
 
         // Main: aspect-fill the canvas, centred.
         let mainScale = max(canvas.width / mainSize.width, canvas.height / mainSize.height)
@@ -1031,6 +1032,17 @@ enum PiPComposer {
             throw SquareCrop.CropError.failed(export.error?.localizedDescription ?? "unknown")
         }
         return output
+    }
+
+    /// The composed frame: the main picture cut to `aspect` (width / height)
+    /// around its centre, the shape the viewfinder showed. The inset rect is
+    /// a share of that shape, so the file has to be that shape too — a crop
+    /// after composing moves the inset and changes its shape.
+    static func canvasSize(main: CGSize, aspect: CGFloat?) -> CGSize {
+        let full = CGSize(width: even(main.width), height: even(main.height))
+        guard let aspect, let cut = CameraStyleBaker.centredCrop(of: full, aspect: aspect)
+        else { return full }
+        return cut.size
     }
 
     /// The picture box on the file's canvas, snapped to whole even pixels.
