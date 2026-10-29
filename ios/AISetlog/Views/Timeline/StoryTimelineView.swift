@@ -30,6 +30,8 @@ struct StoryTimelineView: View {
     /// Held between the menu tap and the confirmation.
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
+    /// The room's day picker, opened from the nav bar's calendar button.
+    @State private var showRoomCalendar = false
     /// Which of the room's two layouts is on screen; remembered across rooms.
     /// The day the room's week strip has picked. Today unless tapped.
     @State private var roomDay = Calendar.current.startOfDay(for: .now)
@@ -107,6 +109,30 @@ struct StoryTimelineView: View {
                     sheet = .clip(day: day, authorID: nil, takeID: nil)
                 }
             }
+        }
+        .sheet(isPresented: $showRoomCalendar) {
+            NavigationStack {
+                DatePicker(
+                    Strings.libraryCalendar,
+                    selection: Binding(
+                        get: { roomDay },
+                        set: {
+                            roomDay = Calendar.current.startOfDay(for: $0)
+                            showRoomCalendar = false
+                        }),
+                    in: ...Date.now,
+                    displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .padding(.horizontal)
+                    .navigationTitle(Strings.libraryCalendar)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(Strings.done) { showRoomCalendar = false }
+                        }
+                    }
+            }
+            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
@@ -288,9 +314,8 @@ struct StoryTimelineView: View {
                     .accessibilityIdentifier("room-member-names")
             }
 
-            // The week, then who filmed on the picked day, then their frames.
-            DayStrip(selected: $roomDay) { day in clips.contains { Self.isClip($0, on: day) } }
-                .padding(.horizontal, -20)
+            // Who filmed on the picked day, then their frames. Other days are
+            // behind the calendar button in the nav bar.
             let dayClips = clips.filter { Self.isClip($0, on: roomDay) }
             let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
             RoomStoriesRow(columns: dayColumns) { id in
@@ -438,6 +463,10 @@ struct StoryTimelineView: View {
                     }
                     .accessibilityIdentifier("room-invite")
                 }
+
+                IconBubble(systemName: "calendar") { showRoomCalendar = true }
+                    .accessibilityLabel(Text(Strings.libraryCalendar))
+                    .accessibilityIdentifier("room-calendar")
             }
 
             // The 房间演示 item that used to open this menu is gone with the
