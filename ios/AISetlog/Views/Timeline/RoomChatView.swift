@@ -60,23 +60,21 @@ struct RoomChatView: View {
 
     var body: some View {
         if let code = store.challenge(challengeID)?.roomCode, let me = account.account {
-            VStack(spacing: 0) {
-                if let target = reactionTarget {
-                    reactionRow(target, myID: me.id)
-                }
-                RoomChatConversation(
-                    scope: .init(accountID: me.id, roomCode: code),
-                    authorName: me.displayName,
-                    moment: moment,
-                    source: sessionSource,
-                    clips: RoomChatTimeline.clipEvents(
-                        from: store.recordedClips(for: challengeID),
-                        myID: me.id,
-                        momentTitle: momentTitle),
-                    momentTitle: momentTitle,
-                    onOpenMoment: onOpenMoment)
-                    .id("\(sessionSource.identity):\(me.id):\(code)")
-            }
+            RoomChatConversation(
+                scope: .init(accountID: me.id, roomCode: code),
+                authorName: me.displayName,
+                moment: moment,
+                source: sessionSource,
+                clips: RoomChatTimeline.clipEvents(
+                    from: store.recordedClips(for: challengeID),
+                    myID: me.id,
+                    momentTitle: momentTitle),
+                momentTitle: momentTitle,
+                onOpenMoment: onOpenMoment,
+                // Inside the chat's own navigation stack, under its title.
+                // Above the stack it floated over the title bar.
+                header: reactionTarget.map { AnyView(reactionRow($0, myID: me.id)) })
+                .id("\(sessionSource.identity):\(me.id):\(code)")
         } else {
             VStack(spacing: 20) {
                 Text(Strings.chatSignInToJoin)
@@ -104,6 +102,8 @@ private struct RoomChatConversation: View {
 
     private let momentTitle: (Int) -> String?
     private let onOpenMoment: ((Int) -> Void)?
+    /// Drawn at the top of the page, under the nav bar: the reaction row.
+    private let header: AnyView?
 
     init(
         scope: RoomChatScope,
@@ -112,8 +112,10 @@ private struct RoomChatConversation: View {
         source: RoomChatSessionSource,
         clips: [RoomChatClipEvent] = [],
         momentTitle: @escaping (Int) -> String?,
-        onOpenMoment: ((Int) -> Void)?
+        onOpenMoment: ((Int) -> Void)?,
+        header: AnyView? = nil
     ) {
+        self.header = header
         self.authorName = authorName
         self.preview = source.preview
         self.clips = clips
@@ -168,6 +170,7 @@ private struct RoomChatConversation: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                header
                 if preview != nil {
                     Text(Strings.chatLocalDemoBanner)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -261,6 +264,11 @@ private struct RoomChatConversation: View {
             } message: {
                 Text(Strings.chatDeleteForEveryone)
             }
+        }
+        // A message pushed to this room: show it now, not at the next poll.
+        .onReceive(NotificationCenter.default.publisher(for: .roomActivityArrived)) { note in
+            guard note.userInfo?["roomCode"] as? String == session.state?.scope.roomCode else { return }
+            Task { await session.refresh() }
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }

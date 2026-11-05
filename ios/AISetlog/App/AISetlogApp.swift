@@ -98,6 +98,14 @@ struct AISetlogApp: App {
                         await store.syncSharedRooms()
                     }
                 }
+                // A friend did something in a room while the app is open:
+                // fetch that room now instead of at the next foreground.
+                .onReceive(NotificationCenter.default.publisher(for: .roomActivityArrived)) { note in
+                    guard let code = note.userInfo?["roomCode"] as? String,
+                          let id = store.challenges.first(where: { $0.roomCode == code })?.id
+                    else { return }
+                    Task { await store.syncRoom(id) }
+                }
                 // A new mood or a new avatar goes to every room I'm in.
                 .onChange(of: moods.today) { _, _ in
                     Task { await store.publishMyProfileToAllRooms() }

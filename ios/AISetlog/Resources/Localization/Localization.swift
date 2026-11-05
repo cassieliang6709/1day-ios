@@ -286,6 +286,31 @@ enum Strings {
             ?? "Someone reacted to your shared film."
     }
 
+    // Format strings for the alerts CloudKit sends itself. The app ships no
+    // Localizable.strings, so iOS uses each "key" as the format verbatim and
+    // fills `%n$@` from the record fields the subscription names — which is
+    // also how the alert follows the in-app language rather than the device's.
+    // A literal `%` here would be read as a format specifier.
+    /// Same words as `roomClipActivity`: the moment's number isn't read out.
+    static func roomClipAlertFormat(named: Bool) -> String {
+        if lang == .chinese { return named ? "%1$@ 刚拍了一段" : "有人刚拍了一段" }
+        return named ? "%1$@ just filmed a clip" : "Someone just filmed a clip"
+    }
+    static func roomPokeAlertFormat(named: Bool) -> String {
+        if lang == .chinese { return named ? "%1$@ 拍了拍你" : "有人拍了拍你" }
+        return named ? "%1$@ poked you — come film something" : "Someone poked you — come film something"
+    }
+    /// A chat message shows its own text: "someone commented" is the alert
+    /// that made people open the room only to find out what was said.
+    static func roomMessageAlertFormat(named: Bool) -> String {
+        if lang == .chinese { return named ? "%1$@：%2$@" : "%1$@" }
+        return named ? "%1$@: %2$@" : "%1$@"
+    }
+    static func roomReactionAlertFormat(named: Bool) -> String {
+        if lang == .chinese { return named ? "%1$@ 回应了你们的片段。" : "有人回应了你们的片段。" }
+        return named ? "%1$@ reacted to your shared film." : "Someone reacted to your shared film."
+    }
+
     // MARK: Models
 
     static func dayN(_ day: Int) -> String {

@@ -23,15 +23,33 @@ struct CloudRoomChatTransport: RoomChatTransport {
         var page = try await database.records(matching: query)
         var messages: [RoomChatMessage] = []
         for _ in 0..<50 {
-            for (_, result) in page.matchResults {
-                let record = try result.get() // Partial failures are not an empty conversation.
-                messages.append(try RoomChatRecordCodec.decode(record, roomCode: roomCode))
-            }
+            // A page or cursor that fails still throws: a partial conversation
+            // is not an empty one. One bad record inside a good page does not.
+            messages += Self.decodeMatches(page.matchResults, roomCode: roomCode)
             guard let cursor = page.queryCursor else { return messages }
             try Task.checkCancellation()
             page = try await database.records(continuingMatchFrom: cursor)
         }
         throw TransportError.incompletePage
+    }
+
+    /// Decodes what decodes and logs the rest. One record that failed to load
+    /// or doesn't parse used to fail the whole fetch, so nobody in the room saw
+    /// any new message until that record went away. A skipped message is not
+    /// mistaken for a deleted one: `confirmedMissing` only deletes on an
+    /// explicit unknownItem from a direct lookup.
+    static func decodeMatches(
+        _ matches: [(CKRecord.ID, Result<CKRecord, Error>)],
+        roomCode: String
+    ) -> [RoomChatMessage] {
+        matches.compactMap { id, result in
+            do {
+                return try RoomChatRecordCodec.decode(result.get(), roomCode: roomCode)
+            } catch {
+                print("[chat] skipped record \(id.recordName) in \(roomCode): \(error)")
+                return nil
+            }
+        }
     }
 
     func confirmedMissing(_ ids: Set<UUID>, roomCode: String) async throws -> Set<UUID> {

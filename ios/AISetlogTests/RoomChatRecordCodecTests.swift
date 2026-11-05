@@ -41,4 +41,24 @@ final class RoomChatRecordCodecTests: XCTestCase {
         record["authorID"] = nil
         XCTAssertThrowsError(try RoomChatRecordCodec.decode(record, roomCode: "ABCDEF"))
     }
+
+    /// One record that failed to load or parse used to throw for the whole
+    /// conversation, so nobody in the room saw any new message.
+    func testOneBadRecordDoesNotHideTheRestOfTheConversation() {
+        let good = [message(), message()]
+        let goodRecords = good.map(RoomChatRecordCodec.encode)
+        let malformed = RoomChatRecordCodec.encode(message())
+        malformed["text"] = nil
+        let failedID = CKRecord.ID(recordName: UUID().uuidString)
+        let matches: [(CKRecord.ID, Result<CKRecord, Error>)] = [
+            (goodRecords[0].recordID, .success(goodRecords[0])),
+            (failedID, .failure(CKError(.permissionFailure))),
+            (malformed.recordID, .success(malformed)),
+            (goodRecords[1].recordID, .success(goodRecords[1])),
+        ]
+
+        let decoded = CloudRoomChatTransport.decodeMatches(matches, roomCode: "ABCDEF")
+
+        XCTAssertEqual(decoded, good)
+    }
 }
