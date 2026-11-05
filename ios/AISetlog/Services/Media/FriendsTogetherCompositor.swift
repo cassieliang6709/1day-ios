@@ -84,7 +84,34 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     /// An eighth covers the mismatch between the phone shapes people actually
     /// film on — 4:3 against 16:9 is a fifth, which does not, and that is the
     /// intent: a fifth of somebody's frame is a person's shoulder.
-    private static let cropAllowance: CGFloat = 0.125
+    static let cropAllowance: CGFloat = 0.125
+
+    /// Whether a take of shape `oriented` may simply cover `cell`, cropping
+    /// what hangs over, rather than being shown whole on a bed.
+    ///
+    /// The one rule for both films: the grid asks it per cell, and
+    /// `VideoStitcher`'s sequential film asks it of each take against the whole
+    /// canvas, so a take is cropped or kept whole by the same measure wherever
+    /// it ends up.
+    static func coversByCropping(oriented: CGSize, cell: CGSize) -> Bool {
+        guard oriented.width > 0, oriented.height > 0 else { return true }
+        let fill = max(cell.width / oriented.width, cell.height / oriented.height)
+        let fit = min(cell.width / oriented.width, cell.height / oriented.height)
+        // Filling costs `1 - fit / fill` of the take.
+        return fill > 0 && 1 - fit / fill <= cropAllowance
+    }
+
+    /// Where a take of shape `oriented`, scaled by `scale`, sits when centred
+    /// on `cell`. Centring is symmetric, so this holds in Core Image's
+    /// bottom-left space and in the stitcher's top-left one alike.
+    static func frame(
+        of oriented: CGSize, scaledBy scale: CGFloat, centredIn cell: CGRect
+    ) -> CGRect {
+        let size = CGSize(width: oriented.width * scale, height: oriented.height * scale)
+        return CGRect(
+            x: cell.midX - size.width / 2, y: cell.midY - size.height / 2,
+            width: size.width, height: size.height)
+    }
 
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let queue = DispatchQueue(label: "1day.friends-together-compositor")
@@ -161,10 +188,10 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
         let fill = max(cell.width / oriented.width, cell.height / oriented.height)
         let fit = min(cell.width / oriented.width, cell.height / oriented.height)
 
-        // Filling costs `1 - fit / fill` of the take. When that is affordable,
-        // the take covers the cell on its own and there is no bed to draw —
-        // which is also the fast path, and the common one.
-        if fill > 0, 1 - fit / fill <= Self.cropAllowance {
+        // When the crop is affordable, the take covers the cell on its own and
+        // there is no bed to draw — which is also the fast path, and the
+        // common one.
+        if Self.coversByCropping(oriented: oriented, cell: cell.size) {
             return scaled(image, by: fill, from: oriented, into: cell).cropped(to: cell)
         }
 
@@ -184,12 +211,11 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     private func scaled(
         _ image: CIImage, by scale: CGFloat, from oriented: CGSize, into cell: CGRect
     ) -> CIImage {
-        let size = CGSize(width: oriented.width * scale, height: oriented.height * scale)
+        let placed = Self.frame(of: oriented, scaledBy: scale, centredIn: cell)
         return image.transformed(
             by: CGAffineTransform(scaleX: scale, y: scale)
                 .concatenating(CGAffineTransform(
-                    translationX: cell.midX - size.width / 2,
-                    y: cell.midY - size.height / 2)))
+                    translationX: placed.minX, y: placed.minY)))
     }
 
     func cancelAllPendingVideoCompositionRequests() {}

@@ -140,6 +140,11 @@ enum VideoStitcher {
         /// Baked by a camera that prints its own date (`CameraStyle`), so the
         /// film's date pill stays off this clip.
         var hasCameraStamp = false
+        /// Where the whole take sits on the canvas, in render space with the
+        /// origin at the top left, when it was too different a shape to fill
+        /// it and was laid on a bed instead — see `reframed`. Nil for a take
+        /// that fills the canvas.
+        var shownWhole: CGRect?
 
         var duration: CMTime { videoRange.duration }
 
@@ -181,6 +186,10 @@ enum VideoStitcher {
         let start: Double
         let end: Double
         var hasCameraStamp = false
+        /// What the clip's own captions are measured against. Nil is the whole
+        /// canvas; a take shown whole on a bed sets it to where that take sits,
+        /// so words placed on the footage stay on the footage.
+        var captionFrame: CGRect?
     }
 
     // MARK: - Entry point
@@ -250,6 +259,16 @@ enum VideoStitcher {
             ?? mosaicRenderSize(
                 count: widestMoment, sourceAspect: sourceAspect,
                 longEdge: max(firstSize.width, firstSize.height))
+
+        // The sequential film's canvas is the first take's shape, and every
+        // later take used to be cropped to it: a landscape take in a portrait
+        // diary came out as a narrow strip from its middle. A take too
+        // different to fill the canvas is redrawn whole onto a bed first.
+        var reframeScratch: [URL] = []
+        defer { discard(reframeScratch) }
+        if case .sequential = options.layout {
+            (loaded, reframeScratch) = await reframed(loaded, canvas: renderSize)
+        }
 
         #if targetEnvironment(simulator)
         let titleOffset = CMTime.zero
@@ -515,7 +534,8 @@ enum VideoStitcher {
                 recordedAt: p.clip.recordedAt, emoji: p.clip.emoji, comments: p.clip.comments,
                 start: isFirst ? CMTimeGetSeconds(p.start) : CMTimeGetSeconds(p.start) + fadeSeconds,
                 end: isLast ? CMTimeGetSeconds(p.end) : CMTimeGetSeconds(p.end) - fadeSeconds,
-                hasCameraStamp: p.clip.hasCameraStamp))
+                hasCameraStamp: p.clip.hasCameraStamp,
+                captionFrame: p.clip.shownWhole))
         }
 
         // Audio tracks are added up front but only filled for clips that have
@@ -553,6 +573,155 @@ enum VideoStitcher {
             }
         }
         audioParams.append(contentsOf: params.values)
+    }
+
+    // MARK: - Sequential layout (takes of another shape)
+
+    /// How one take goes onto the sequential film's canvas.
+    enum SequentialFraming: Equatable {
+        /// Covers the canvas, the little that hangs over cropped off — what
+        /// every take got before, and still what a take of the canvas's own
+        /// shape gets.
+        case fill
+        /// All of it, centred at `subject` (render space, origin top left),
+        /// over a blurred copy of itself.
+        case fitOnBed(subject: CGRect)
+    }
+
+    /// Fill or fit-and-bed, by the shared-room grid's own rule
+    /// (`FriendsTogetherCompositor.coversByCropping`), with the whole canvas
+    /// as the one cell.
+    ///
+    /// The tolerance is the grid's too: up to an eighth of the take may go, so
+    /// a take a few pixels off the canvas's shape still simply fills it. A
+    /// landscape take in a portrait diary, or a 3:4 camera-style take in a
+    /// 9:16 one, is well past that.
+    static func sequentialFraming(orientedSize: CGSize, canvas: CGSize) -> SequentialFraming {
+        guard orientedSize.width > 0, orientedSize.height > 0,
+              !FriendsTogetherCompositor.coversByCropping(
+                  oriented: orientedSize, cell: canvas)
+        else { return .fill }
+        let fit = min(canvas.width / orientedSize.width, canvas.height / orientedSize.height)
+        return .fitOnBed(subject: FriendsTogetherCompositor.frame(
+            of: orientedSize, scaledBy: fit,
+            centredIn: CGRect(origin: .zero, size: canvas)))
+    }
+
+    /// The takes, with every one that can't fill `canvas` swapped for a
+    /// canvas-sized copy of itself, whole on its bed. Plus the copies, to
+    /// delete afterwards.
+    ///
+    /// Done as a pass of its own, like the look, rather than by running the
+    /// whole film through the custom compositor. The film's crossfades are
+    /// opacity ramps on layer instructions, which the compositor knows nothing
+    /// about, and it would replace AVFoundation's renderer for every frame of
+    /// every film that had one odd take in it. Instead the copy comes out the
+    /// canvas's exact shape, so `fillTransform` places it with no crop and the
+    /// fades, captions and sound downstream work as they always have. The
+    /// copy's pixels come from `FriendsTogetherCompositor` itself, so a take
+    /// shown whole looks the same in a diary as in a shared-room cell.
+    ///
+    /// Only odd takes pay for it; an all-portrait diary does no extra work.
+    private static func reframed(
+        _ loaded: [LoadedClip], canvas: CGSize
+    ) async -> (clips: [LoadedClip], scratch: [URL]) {
+        var out: [LoadedClip] = []
+        var scratch: [URL] = []
+        for clip in loaded {
+            guard case .fitOnBed(let subject) = sequentialFraming(
+                orientedSize: clip.orientedSize, canvas: canvas)
+            else {
+                out.append(clip)
+                continue
+            }
+            do {
+                let url = try await bedCopy(of: clip, canvas: canvas)
+                scratch.append(url)
+                var copy = try await reloaded(clip, from: url)
+                copy.shownWhole = subject
+                out.append(copy)
+            } catch {
+                // A take cropped is better than a film lost: it goes in the way
+                // it always did.
+                print("[stitch] reframe failed for day \(clip.day): \(error)")
+                out.append(clip)
+            }
+        }
+        return (out, scratch)
+    }
+
+    /// One take, rendered canvas-sized: whole, centred, over a blurred copy of
+    /// itself. Its sound comes along untouched.
+    private static func bedCopy(of clip: LoadedClip, canvas: CGSize) async throws -> URL {
+        let composition = AVMutableComposition()
+        guard let video = composition.addMutableTrack(
+            withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else { throw StitchError.compositionFailed }
+        try video.insertTimeRange(clip.videoRange, of: clip.videoTrack, at: .zero)
+        if let audio = clip.audioTrack,
+           let track = composition.addMutableTrack(
+               withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let duration = CMTimeMinimum(clip.audioRange.duration, clip.duration)
+            try track.insertTimeRange(
+                CMTimeRange(start: clip.audioRange.start, duration: duration),
+                of: audio, at: .zero)
+        }
+
+        // One cell the size of the whole canvas. The take's rotation travels
+        // as an orientation, the way the grid hands it over, because the
+        // compositor reads raw source frames rather than transformed ones.
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = canvas
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.customVideoCompositorClass = FriendsTogetherCompositor.self
+        videoComposition.instructions = [FriendsTogetherInstruction(
+            timeRange: CMTimeRange(start: .zero, duration: clip.duration),
+            placements: [FriendsTogetherPlacement(
+                trackID: video.trackID,
+                cell: CGRect(origin: .zero, size: canvas),
+                orientation: FriendsTogetherPlacement.orientation(
+                    for: clip.preferredTransform))])]
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reframed_\(UUID().uuidString).mov")
+        guard let export = AVAssetExportSession(
+            asset: composition, presetName: AVAssetExportPresetHighestQuality)
+        else { throw StitchError.compositionFailed }
+        export.outputURL = url
+        export.outputFileType = .mov
+        export.videoComposition = videoComposition
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            export.exportAsynchronously { cont.resume() }
+        }
+        guard export.status == .completed else {
+            try? FileManager.default.removeItem(at: url)
+            throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
+        }
+        return url
+    }
+
+    /// `clip` with its footage read from `url` instead, and everything said
+    /// about it — day, captions, stamp — kept.
+    private static func reloaded(_ clip: LoadedClip, from url: URL) async throws -> LoadedClip {
+        let asset = AVURLAsset(url: url)
+        guard let video = try await asset.loadTracks(withMediaType: .video).first
+        else { throw StitchError.compositionFailed }
+        let audio = try await asset.loadTracks(withMediaType: .audio).first
+        return LoadedClip(
+            id: clip.id,
+            day: clip.day, label: clip.label, authorName: clip.authorName,
+            captions: clip.captions,
+            recordedAt: clip.recordedAt,
+            emoji: clip.emoji, comments: clip.comments,
+            asset: asset,
+            videoRange: try await video.load(.timeRange),
+            videoTrack: video,
+            audioTrack: audio,
+            audioRange: audio == nil ? .zero : try await audio!.load(.timeRange),
+            naturalSize: try await video.load(.naturalSize),
+            preferredTransform: try await video.load(.preferredTransform),
+            frameDuration: (try? await video.load(.minFrameDuration)) ?? .invalid,
+            hasCameraStamp: clip.hasCameraStamp)
     }
 
     // MARK: - Shared-room layout
@@ -1280,7 +1449,8 @@ enum VideoStitcher {
 
             let text = captionLayer(
                 text: rawText, sticker: line.placed,
-                in: CGRect(origin: .zero, size: renderSize), renderSize: renderSize)
+                in: caption.captionFrame ?? CGRect(origin: .zero, size: renderSize),
+                renderSize: renderSize)
 
             addCaptionFade(text, for: caption, duration: duration, edge: edge)
             parentLayer.addSublayer(text)

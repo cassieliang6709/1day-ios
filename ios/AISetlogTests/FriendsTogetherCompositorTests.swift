@@ -117,6 +117,43 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         }
     }
 
+    // MARK: - Sequential film
+
+    /// A diary that starts portrait is a portrait film, and a landscape take
+    /// later in it used to be cover-scaled into it — the middle strip, both
+    /// edges gone. It has to come through whole, on a bed rather than black.
+    func testLandscapeTakeKeepsItsEdgesInAPortraitDiary() async throws {
+        let portrait = try await bandedClip()
+        let landscape = try await bandedClip(landscape: true)
+        let film = try await render([portrait, landscape], layout: .sequential)
+
+        // The first take is the canvas's own shape: it still fills it, bands
+        // right at the top and bottom, exactly as before.
+        let first = try await sample(film, at: 0.2)
+        XCTAssertEqual(first.size.width / first.size.height, 9.0 / 16, accuracy: 0.02)
+        let column = first.size.width / 2
+        XCTAssertTrue(
+            first.contains(.red, alongColumn: column, in: 0...0.04),
+            "a take of the canvas's shape no longer fills it")
+        XCTAssertTrue(
+            first.contains(.blue, alongColumn: column, in: 0.96...1),
+            "a take of the canvas's shape no longer fills it")
+
+        // Each fixture is half a second, and there is no crossfade.
+        let second = try await sample(film, at: 0.7)
+        let middle = second.size.height / 2
+        XCTAssertTrue(
+            second.contains(.red, alongRow: middle, in: 0...0.15),
+            "the left edge of a landscape take was cut off in a portrait diary")
+        XCTAssertTrue(
+            second.contains(.blue, alongRow: middle, in: 0.85...1),
+            "the right edge of a landscape take was cut off in a portrait diary")
+        // Above the fitted take is the bed — the take's own green, blurred —
+        // not a black bar.
+        let above = second.pixel(x: second.size.width / 2, y: second.size.height * 0.1)
+        XCTAssertGreaterThan(above.g, 100, "black above a fitted take: \(above)")
+    }
+
     // MARK: - Fixtures
 
     /// A clip banded at both ends: red for the first 8%, blue for the last 8%,
@@ -210,16 +247,19 @@ final class FriendsTogetherCompositorTests: XCTestCase {
     /// takes. Naming one is what a person does in the room demo, and it is the
     /// case where a cell stops matching the take.
     private func render(
-        _ urls: [URL], aspect: VideoStitcher.Aspect? = nil
+        _ urls: [URL], aspect: VideoStitcher.Aspect? = nil,
+        layout: VideoStitcher.Layout = .friendsTogether
     ) async throws -> URL {
         var options = VideoStitcher.Options()
-        options.layout = .friendsTogether
+        options.layout = layout
         options.aspect = aspect
         options.showDayCaptions = false
         options.crossfadeSeconds = 0
+        // One moment for the grid; one day each for a diary, played in turn.
+        let sequential = layout == .sequential
         let clips = urls.enumerated().map { index, url in
             DayClip(
-                day: 1, url: url, authorName: "Sample \(index)",
+                day: sequential ? index + 1 : 1, url: url, authorName: "Sample \(index)",
                 authorID: "sample-\(index)", key: "sample-\(index)")
         }
         let film = try await VideoStitcher.stitch(clips: clips, options: options)
@@ -228,13 +268,13 @@ final class FriendsTogetherCompositorTests: XCTestCase {
     }
 
     /// One frame of the finished film, as pixels.
-    private func sample(_ film: URL) async throws -> Frame {
+    private func sample(_ film: URL, at seconds: Double = 0.2) async throws -> Frame {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: film))
         generator.appliesPreferredTrackTransform = true
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = CMTime(seconds: 0.2, preferredTimescale: 600)
         let cgImage = try await generator.image(
-            at: CMTime(seconds: 0.2, preferredTimescale: 600)).image
+            at: CMTime(seconds: seconds, preferredTimescale: 600)).image
         return try XCTUnwrap(Frame(cgImage))
     }
 

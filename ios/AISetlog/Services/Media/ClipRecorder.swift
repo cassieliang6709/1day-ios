@@ -623,12 +623,20 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         guard state == .recording, let started = recordedAt else { return }
         simulatedTake = nil
         let held = min(max(Date.now.timeIntervalSince(started), 1), simulatedSeconds)
-        let url = await DemoClipFactory.makeClip(
-            moment: Int.random(in: 1...4),
-            label: "Simulator",
-            author: nil,
-            seconds: held,
-            orientation: orientation)
+        // `-storeShots YES` shows the sample footage in the viewfinder, so the
+        // take is cut from that too; a green test card after a real-looking
+        // preview would end up in every screenshot of 我的.
+        let url: URL?
+        if let sampleTake = await Self.sampleFootageTake(seconds: held) {
+            url = sampleTake
+        } else {
+            url = await DemoClipFactory.makeClip(
+                moment: Int.random(in: 1...4),
+                label: "Simulator",
+                author: nil,
+                seconds: held,
+                orientation: orientation)
+        }
         if let url {
             clipURL = await CameraStyleBaker.bake(
                 url, style: cameraStyle, orientation: orientation, recordedAt: started)
@@ -636,6 +644,32 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             clipURL = nil
         }
         state = .ready
+    }
+
+    /// The first `seconds` of the bundled sample film, or nil outside
+    /// `-storeShots` or when the cut fails (the caller falls back to the card).
+    private static func sampleFootageTake(seconds: Double) async -> URL? {
+        guard UserDefaults.standard.bool(forKey: "storeShots"),
+              let source = Bundle.main.url(forResource: "sample-film", withExtension: "mp4")
+        else { return nil }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("simulated-take-\(UUID()).mov")
+        let asset = AVURLAsset(url: source)
+        guard let duration = try? await asset.load(.duration).seconds, duration > 0,
+              // Passthrough: `CameraStyleBaker` re-encodes right after, so a
+              // second encode here only doubled the wait after the shutter.
+              let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough)
+        else { return nil }
+        exporter.outputURL = output
+        exporter.outputFileType = .mov
+        exporter.timeRange = CMTimeRange(
+            start: .zero, duration: CMTime(seconds: min(duration, seconds), preferredTimescale: 600))
+        await exporter.export()
+        guard exporter.status == .completed else {
+            try? FileManager.default.removeItem(at: output)
+            return nil
+        }
+        return output
     }
     #endif
 

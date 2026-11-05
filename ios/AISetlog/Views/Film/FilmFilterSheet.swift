@@ -23,10 +23,8 @@ struct FilmPeopleRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // No 成片里有谁 title: the faces already say it.
             HStack {
-                Text(Strings.filmPeopleHeader)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
                 Spacer()
                 Button {
                     onOpen(FilmFilterTarget(person: nil))
