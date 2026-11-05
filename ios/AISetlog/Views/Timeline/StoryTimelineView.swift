@@ -21,6 +21,7 @@ struct StoryTimelineView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomPreviewMediaScope) private var previewMedia
+    @Environment(\.reservesTabBarClearance) private var reservesTabBarClearance
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var sheet: TimelineSheet?
@@ -32,10 +33,16 @@ struct StoryTimelineView: View {
     @State private var showRoomChat = false
     /// The room's day picker, opened from the nav bar's calendar button.
     @State private var showRoomCalendar = false
+    /// The room's 视图: 默认 (follows the room's 横拍/竖拍) or 瀑布流.
+    /// Remembered across rooms.
+    @AppStorage("roomLayout.v3") private var roomLayout: RoomLayout = .automatic
     /// Which of the room's two layouts is on screen; remembered across rooms.
     /// The day the room's week strip has picked. Today unless tapped.
-    @State private var roomDay = Calendar.current.startOfDay(for: .now)
-    @State private var storiesStart: RoomStoriesStart?
+    /// Nil is every clip, newest first, as the room was before it had days.
+    /// Set only from the calendar button.
+    @State private var roomDay: Date?
+    /// The face tapped in the room: only their frame shows. Nil is everyone.
+    @State private var roomPerson: String?
     /// The person whose page is open, from the face on their frame.
     @State private var personPage: String?
     /// The room whose code is being offered for sharing, once, right after it
@@ -86,12 +93,7 @@ struct StoryTimelineView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .fullScreenCover(item: $sheet, content: sheetContent)
-        .background {
-            // On its own view: two full-screen covers on one view fight.
-            Color.clear.fullScreenCover(item: $storiesStart) { start in
-                RoomStoriesPlayer(columns: start.columns, startID: start.id)
-            }
-        }
+
         .navigationDestination(isPresented: $showFilm) {
             if let challenge {
                 FilmView(
@@ -115,9 +117,10 @@ struct StoryTimelineView: View {
                 DatePicker(
                     Strings.libraryCalendar,
                     selection: Binding(
-                        get: { roomDay },
+                        get: { roomDay ?? .now },
                         set: {
                             roomDay = Calendar.current.startOfDay(for: $0)
+                            roomPerson = nil
                             showRoomCalendar = false
                         }),
                     in: ...Date.now,
@@ -129,6 +132,16 @@ struct StoryTimelineView: View {
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(Strings.done) { showRoomCalendar = false }
+                        }
+                        if roomDay != nil {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(Strings.libraryAllDays) {
+                                    roomDay = nil
+                                    roomPerson = nil
+                                    showRoomCalendar = false
+                                }
+                                .accessibilityIdentifier("room-calendar-all")
+                            }
                         }
                     }
             }
@@ -240,7 +253,9 @@ struct StoryTimelineView: View {
         // The floating tab bar is drawn over the whole stack, so the page
         // reserves its own clearance rather than inheriting one.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: OneDay.tabBarClearance)
+            // The room demo has no tab bar; reserving its space there cut the
+            // frames off flat with an empty strip under them.
+            Color.clear.frame(height: reservesTabBarClearance ? OneDay.tabBarClearance : 0)
         }
         .sensoryFeedback(.success, trigger: challenge.recordedCount)
         .refreshable {
@@ -298,46 +313,68 @@ struct StoryTimelineView: View {
         _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
         myID: String, agenda: StoryAgenda
     ) -> some View {
+        // The name is in the nav bar now (Setlog): the page starts at the faces.
         VStack(alignment: .leading, spacing: 14) {
-            TimelineHeader(
-                challenge: challenge,
-                isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
-                onRename: { name in
-                    Task { await store.renameRoom(challengeID, to: name) }
-                })
-
-            HStack(spacing: 10) {
-                Text(members.map(\.name).filter { !$0.isEmpty }.joined(separator: "、"))
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(2)
-                    .accessibilityIdentifier("room-member-names")
-            }
-
-            // Who filmed on the picked day, then their frames. Other days are
-            // behind the calendar button in the nav bar.
-            let dayClips = clips.filter { Self.isClip($0, on: roomDay) }
+            // No "2/2 人拍了" line: the rings on the faces already say who
+            // filmed, and a tally reads as a progress bar on your friends.
+            let dayClips = roomDay.map { day in clips.filter { Self.isClip($0, on: day) } } ?? clips
             let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
-            RoomStoriesRow(columns: dayColumns) { id in
-                storiesStart = RoomStoriesStart(id: id, columns: dayColumns.filter { !$0.clips.isEmpty })
+
+            // The faces, then the frames. Tap a face and that person's frame
+            // takes the whole space; tap it again for everyone. Other days are
+            // behind the calendar button in the nav bar.
+            RoomStoriesRow(columns: dayColumns, selected: roomPerson) { id in
+                withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
             }
-            RoomFrames(
-                clips: dayClips,
-                members: members,
-                myID: myID,
-                nextToFilm: agenda.suggested ?? agenda.openToMe.first,
-                slotTitle: { slotTitle(for: $0) },
-                // Opens the tapped take alone, full screen, where its
-                // captions are edited.
-                onPlay: { clip in sheet = .open(clip) },
-                onFilm: { day in sheet = .record(day: day) },
-                onOpenPerson: { column in personPage = column.id },
-                hasPoked: { id in
-                    store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                },
-                onPoke: { id in
-                    store.poke(challengeID: challengeID, targetAuthorID: id)
-                })
+            let shownMembers = roomPerson.map { id in members.filter { $0.id == id } } ?? members
+            let shownClips = roomPerson.map { id in dayColumns.first { $0.id == id }?.clips ?? [] } ?? dayClips
+            switch roomLayout {
+            case .automatic:
+                RoomFrames(
+                    clips: shownClips,
+                    members: shownMembers.isEmpty ? members : shownMembers,
+                    myID: myID,
+                    nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                    slotTitle: { slotTitle(for: $0) },
+                    // Opens the tapped take alone, full screen, where its
+                    // captions are edited.
+                    onPlay: { clip in sheet = .open(clip) },
+                    onFilm: { day in sheet = .record(day: day) },
+                    onOpenPerson: { column in personPage = column.id },
+                    hasPoked: { id in
+                        store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                    },
+                    onPoke: { id in
+                        store.poke(challengeID: challengeID, targetAuthorID: id)
+                    },
+                    orientation: challenge.resolvedOrientation,
+                    latestComment: { clip in
+                        store.interactions(
+                            for: challengeID, day: clip.day,
+                            targetAuthorID: clip.authorID ?? myID
+                        ).comments.max { $0.createdAt < $1.createdAt }
+                    })
+            case .columns:
+                ScrollView {
+                    RoomFeed(
+                        challenge: challenge,
+                        clips: shownClips,
+                        members: shownMembers.isEmpty ? members : shownMembers,
+                        myID: myID,
+                        nextToFilm: nil,
+                        slotTitle: { slotTitle(for: $0) },
+                        onPlay: { clip in sheet = .open(clip) },
+                        onFilm: { day in sheet = .record(day: day) },
+                        hasPoked: { id in
+                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                        },
+                        onPoke: { id in
+                            store.poke(challengeID: challengeID, targetAuthorID: id)
+                        },
+                        showsCalendarControls: false)
+                }
+                .scrollIndicators(.hidden)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 6)
@@ -445,28 +482,47 @@ struct StoryTimelineView: View {
     ) -> some View {
         let syncError = store.syncError(for: challengeID)
 
-        return HStack(spacing: 12) {
+        // Setlog's bar: back and 邀请 on the left, the room's name in the
+        // middle, 日历 and 聊天 together in one capsule on the right. 视图
+        // and the rest are in 「…」.
+        return HStack(spacing: 8) {
             IconBubble(systemName: "chevron.left") { dismiss() }
                 .accessibilityLabel(Text(Strings.back))
                 .accessibilityIdentifier("room-back")
 
-            Spacer()
-
-            if challenge.isShared, let code = challenge.roomCode {
-                if previewMedia == nil {
-                    RoomInviteShareLink(
-                        content: RoomInviteCardContent(
-                            challenge: challenge, inviter: account.account?.displayName),
-                        message: shareText(code: code, challenge: challenge)
-                    ) {
-                        roomCapsule(Strings.inviteLabel, systemImage: "person.badge.plus")
-                    }
-                    .accessibilityIdentifier("room-invite")
+            if challenge.isShared, let code = challenge.roomCode, previewMedia == nil {
+                RoomInviteShareLink(
+                    content: RoomInviteCardContent(
+                        challenge: challenge, inviter: account.account?.displayName),
+                    message: shareText(code: code, challenge: challenge)
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(OneDay.ink)
+                        .frame(width: 38, height: 38)
+                        .background(.regularMaterial, in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel(Text(Strings.inviteLabel))
+                .accessibilityIdentifier("room-invite")
+            }
 
-                IconBubble(systemName: "calendar") { showRoomCalendar = true }
-                    .accessibilityLabel(Text(Strings.libraryCalendar))
-                    .accessibilityIdentifier("room-calendar")
+            Spacer(minLength: 4)
+
+            // Between the two sides rather than over the screen's centre: a
+            // long name truncates instead of running under the capsule.
+            if challenge.isShared {
+                TimelineHeader(
+                    challenge: challenge,
+                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
+                    onRename: { name in
+                        Task { await store.renameRoom(challengeID, to: name) }
+                    },
+                    fontSize: 17)
+                    .layoutPriority(-1)
+                Spacer(minLength: 4)
+                roomToolCapsule
             }
 
             // The 房间演示 item that used to open this menu is gone with the
@@ -492,10 +548,15 @@ struct StoryTimelineView: View {
                     Button(Strings.makeRoomVlog, systemImage: "film.stack.fill") { showFilm = true }
                         .disabled(clipCount == 0)
                         .accessibilityIdentifier("room-make-vlog")
-                    Button(Strings.chatLabel, systemImage: "bubble.left.and.bubble.right.fill") {
-                        showRoomChat = true
+                    Picker(selection: $roomLayout) {
+                        ForEach(RoomLayout.allCases, id: \.self) { layout in
+                            Label(layout.title, systemImage: layout.systemImage).tag(layout)
+                        }
+                    } label: {
+                        Label(Strings.roomLayoutMenu, systemImage: roomLayout.systemImage)
                     }
-                    .accessibilityIdentifier("room-chat")
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("room-layout")
                 }
 
                 if !challenge.isTimeOnly {
@@ -552,20 +613,32 @@ struct StoryTimelineView: View {
         .padding(.vertical, 10)
     }
 
-    /// The glass pill 邀请 is drawn in. At least 44pt tall, so it isn't a
-    /// smaller target than the bubbles beside it.
-    private func roomCapsule(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(OneDay.brandText)
-            .lineLimit(1)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-            .background(.regularMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
-            .oneDaySoftShadow(strength: 0.5)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+    /// 日历 and 聊天 in one glass capsule, the way Setlog pairs them. The
+    /// calendar is brand-tinted while a day is picked, so a room showing one
+    /// day doesn't pass for the whole room.
+    private var roomToolCapsule: some View {
+        HStack(spacing: 0) {
+            Button { showRoomCalendar = true } label: {
+                Image(systemName: "calendar")
+                    .foregroundStyle(roomDay == nil ? OneDay.ink : Color.oneDayBrand)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(Text(Strings.libraryCalendar))
+            .accessibilityIdentifier("room-calendar")
+            Button { showRoomChat = true } label: {
+                Image(systemName: "bubble.left")
+                    .foregroundStyle(OneDay.ink)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(Text(Strings.chatLabel))
+            .accessibilityIdentifier("room-chat")
+        }
+        .font(.system(size: 15, weight: .semibold))
+        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .background(.regularMaterial, in: Capsule())
     }
 
     private var celebration: some View {
@@ -698,5 +771,39 @@ struct StoryTimelineView: View {
 extension StoryTimelineView {
     static func isClip(_ clip: DayClip, on day: Date) -> Bool {
         clip.recordedAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
+    }
+}
+
+private struct ReservesTabBarClearanceKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// Whether the floating tab bar is drawn over this page. False where a
+    /// room is shown on its own, like the room demo.
+    var reservesTabBarClearance: Bool {
+        get { self[ReservesTabBarClearanceKey.self] }
+        set { self[ReservesTabBarClearanceKey.self] = newValue }
+    }
+}
+
+/// The room page's two views, picked from 「…」 ▸ 视图. 默认 is the room's
+/// own shape — stacked 16:9 cards for 横拍, side by side for 竖拍 — and
+/// 瀑布流 is everyone's clips as columns (`RoomFeed`).
+enum RoomLayout: String, CaseIterable {
+    case automatic, columns
+
+    var title: String {
+        switch self {
+        case .automatic: Strings.roomLayoutDefault
+        case .columns: Strings.roomLayoutWaterfall
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .automatic: "rectangle.grid.1x2"
+        case .columns: "rectangle.split.3x1"
+        }
     }
 }

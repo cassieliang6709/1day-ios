@@ -74,9 +74,25 @@ final class RoomFeedTests: XCTestCase {
         let date = try XCTUnwrap(calendar.date(
             from: DateComponents(year: 2026, month: 10, day: 19, hour: 2, minute: 7)))
         for id in ["zh-Hans", "en_US"] {
-            var style = Date.FormatStyle.roomClock
+            var style = Date.VerbatimFormatStyle.roomClock
             style.timeZone = calendar.timeZone
-            XCTAssertEqual(date.formatted(style.locale(Locale(identifier: id))), "02:07", id)
+            style.locale = Locale(identifier: id)
+            XCTAssertEqual(date.formatted(style), "02:07", id)
+        }
+    }
+
+    /// 20:22 used to show as "08:22" on a phone set to 12-hour time: the
+    /// format hid 上午/下午 but still counted the hour in twelves.
+    func testRoomClockIsTwentyFourHourEvenOnTwelveHourLocales() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let date = try XCTUnwrap(calendar.date(
+            from: DateComponents(year: 2026, month: 10, day: 19, hour: 20, minute: 22)))
+        for id in ["zh-Hans", "en_US", "zh-Hans@hours=h12"] {
+            var style = Date.VerbatimFormatStyle.roomClock
+            style.timeZone = calendar.timeZone
+            style.locale = Locale(identifier: id)
+            XCTAssertEqual(date.formatted(style), "20:22", id)
         }
     }
 }

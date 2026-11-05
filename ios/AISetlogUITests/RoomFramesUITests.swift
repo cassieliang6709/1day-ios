@@ -12,6 +12,7 @@ final class RoomFramesUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         return app
     }
 

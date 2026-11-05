@@ -16,6 +16,8 @@ struct TimelineHeader: View {
     /// turns it into the text field, in place — no dialog. Return saves;
     /// tapping away leaves it as it was. Nil keeps the title plain text.
     var onRename: ((String) -> Void)? = nil
+    /// 29 at the top of a story; 17 when it sits in a room's nav bar.
+    var fontSize: CGFloat = 29
 
     @State private var renaming = false
     @State private var draftTitle = ""
@@ -35,7 +37,7 @@ struct TimelineHeader: View {
         if let onRename {
             if renaming {
                 TextField("", text: $draftTitle, prompt: Text(Strings.roomNamePlaceholder))
-                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .tint(Color.oneDayBrand)
                     .focused($fieldFocused)
@@ -83,13 +85,13 @@ struct TimelineHeader: View {
         HStack(spacing: 8) {
             if showsTitle {
                 Text(presenter.displayTitle)
-                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                    .lineLimit(2)
+                    .lineLimit(fontSize < 29 ? 1 : 2)
             } else if onRename != nil {
                 // A room still called 和我过一天 has no title to tap; this is it.
                 Text(Strings.roomNamePlaceholder)
-                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.inkFaint)
                     .lineLimit(1)
             }

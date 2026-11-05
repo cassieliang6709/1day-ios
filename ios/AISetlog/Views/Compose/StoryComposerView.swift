@@ -32,7 +32,11 @@ struct StoryComposerView: View {
     /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
     /// and the camera you pick already decides the frame's shape.
     private let clipLength: Challenge.ClipLength = .scene
-    private let orientation: Challenge.Orientation = .portrait
+    /// A plan films portrait. A room picks its shape here (1.5): 横拍 rooms
+    /// look like Setlog — each person a 16:9 card, stacked — and 竖拍 rooms
+    /// put people side by side. Rooms start on 横拍.
+    @State private var roomOrientation: Challenge.Orientation = .landscape
+    private var orientation: Challenge.Orientation { withFriends ? roomOrientation : .portrait }
     /// No longer asked (1.5): there is one camera.
     private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
@@ -96,6 +100,10 @@ struct StoryComposerView: View {
                     .accessibilityIdentifier("composer-question")
                     .padding(.horizontal, ComposerLayout.margin)
                 setup
+                if withFriends {
+                    RoomShapePicker(selection: $roomOrientation)
+                        .padding(.horizontal, ComposerLayout.margin)
+                }
             }
             .padding(.bottom, 16)
         }
@@ -245,8 +253,9 @@ struct StoryComposerView: View {
     /// Named for the date until the user types a name of their own.
     private func nameForTheDay() {
         guard !titleEdited else { return }
-        let me = account.account?.displayName ?? ""
-        title = withFriends && !me.isEmpty ? Strings.roomOf(me) : Strings.byTimeTitle(.now)
+        title = withFriends
+            ? Strings.defaultRoomName(existingTitles: store.challenges.filter(\.isShared).map(\.title))
+            : Strings.byTimeTitle(.now)
     }
 
     /// Blank rows are dropped. Nil for 按时间拍, which has no list.
@@ -256,5 +265,67 @@ struct StoryComposerView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cleaned.isEmpty ? nil : cleaned
+    }
+}
+
+/// 横拍 or 竖拍 for a new room, as two cards that sketch the room page each
+/// one makes: stacked wide cards, or tall ones side by side.
+private struct RoomShapePicker: View {
+    @Binding var selection: Challenge.Orientation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(text: Strings.roomShapeLabel)
+            HStack(spacing: 12) {
+                option(.landscape, title: Strings.roomShapeLandscape)
+                option(.portrait, title: Strings.roomShapePortrait)
+            }
+        }
+    }
+
+    private func option(_ orientation: Challenge.Orientation, title: String) -> some View {
+        let picked = selection == orientation
+        return Button {
+            withAnimation(OneDay.Motion.soft) { selection = orientation }
+        } label: {
+            VStack(spacing: 10) {
+                sketch(orientation)
+                    .frame(height: 74)
+                Text(title)
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(picked ? Color.oneDayBrand : OneDay.hairline, lineWidth: picked ? 2.5 : 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(picked ? .isSelected : [])
+        .accessibilityIdentifier("room-shape-\(orientation.rawValue)")
+    }
+
+    /// Two people's cards, the way the room page will lay them out.
+    @ViewBuilder
+    private func sketch(_ orientation: Challenge.Orientation) -> some View {
+        let fill = (selection == orientation ? Color.oneDayBrand : OneDay.inkFaint).opacity(0.55)
+        if orientation == .landscape {
+            VStack(spacing: 5) {
+                ForEach(0..<2, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(fill)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                }
+            }
+        } else {
+            HStack(spacing: 5) {
+                ForEach(0..<2, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(fill)
+                        .aspectRatio(3 / 4, contentMode: .fit)
+                }
+            }
+        }
     }
 }

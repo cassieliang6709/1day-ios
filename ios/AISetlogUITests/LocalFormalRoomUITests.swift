@@ -42,6 +42,7 @@ final class LocalFormalRoomUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         return app
     }
 
@@ -54,7 +55,6 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(app.staticTexts["local-room-notice"].exists)
         capture(app, "Formal two-member StoryTimelineView")
-        app.buttons["room-more"].tap()
         app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["chat-local-demo-banner"].exists)
@@ -71,7 +71,6 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
         app.segmentedControls["local-room-members"].buttons.element(boundBy: 1).tap()
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
-        app.buttons["room-more"].tap()
         app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         // The three-member session is a different room: the message typed into
@@ -87,9 +86,9 @@ final class LocalFormalRoomUITests: XCTestCase {
         XCTAssertTrue(app.segmentedControls["local-room-members"].buttons.element(boundBy: 0).isSelected)
     }
 
-    /// Today's faces at the top of the room open the stories player, and ✕
-    /// closes it.
-    func testRoomStoriesOpenAndClose() {
+    /// Tapping a face picks that person (only their frame shows); tapping
+    /// it again goes back to everyone.
+    func testRoomFacePicksAndUnpicks() {
         let app = launch()
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
@@ -98,13 +97,11 @@ final class LocalFormalRoomUITests: XCTestCase {
         let face = app.buttons.matching(identifier: "room-story-face")
             .matching(NSPredicate(format: "isEnabled == true")).firstMatch
         XCTAssertTrue(face.waitForExistence(timeout: 15), "somebody filmed today")
-        capture(app, "Room with today's faces")
         face.tap()
-        let close = app.buttons["room-stories-close"]
-        XCTAssertTrue(close.waitForExistence(timeout: 15))
-        capture(app, "Stories player")
-        close.tap()
-        XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
+        XCTAssertTrue(face.isSelected)
+        capture(app, "One person picked")
+        face.tap()
+        XCTAssertFalse(face.isSelected)
     }
 
     /// The film actually assembling, from the production `FilmView` over a

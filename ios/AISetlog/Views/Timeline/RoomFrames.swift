@@ -2,9 +2,13 @@ import SwiftUI
 
 /// A shared room as one big frame per person (1.5).
 ///
-/// The frames fill the screen in the grid `RoomFrames.grid(for:)` picks
-/// for the head count: one column of two or three, then two columns —
-/// 2×2 for four, 2×3 for five and six, the sixth place left empty for five
+/// A 横拍 room is Setlog's layout: each person a full-width 16:9 card,
+/// stacked, centred on the screen when they all fit — the same stack the
+/// room's vlog makes (`VideoStitcher.grid`).
+///
+/// A 竖拍 room fills the screen in the grid `RoomFrames.grid(for:)` picks
+/// for the head count: two side by side for two, one column of three, then
+/// two columns — 2×2 for four, 2×3 for five and six, the sixth place left empty for five
 /// with nothing drawn in it. Footage is cropped to fill each frame from the
 /// centre, never letterboxed.
 ///
@@ -33,6 +37,10 @@ struct RoomFrames: View {
     let onOpenPerson: (RoomFeed.Column) -> Void
     var hasPoked: (String) -> Bool = { _ in false }
     var onPoke: (String) -> Void = { _ in }
+    /// The room's shape: landscape stacks 16:9 cards, portrait uses `grid`.
+    var orientation: Challenge.Orientation = .portrait
+    /// The newest comment on a person's take, for the bubble on their card.
+    var latestComment: (DayClip) -> ClipComment? = { _ in nil }
 
     /// Below this a frame is too short to tell what is in the clip, and the
     /// grid scrolls instead. Six people always fit; only a room from before
@@ -45,7 +53,7 @@ struct RoomFrames: View {
     static func grid(for count: Int) -> (columns: Int, rows: Int) {
         switch count {
         case ...1: return (1, 1)
-        case 2: return (1, 2)
+        case 2: return (2, 1)
         case 3: return (1, 3)
         case 4: return (2, 2)
         default: return (2, (count + 1) / 2)
@@ -57,15 +65,49 @@ struct RoomFrames: View {
     }
 
     var body: some View {
+        if orientation == .landscape {
+            stacked
+        } else {
+            portraitGrid
+        }
+    }
+
+    /// 横拍: one 16:9 card per person, top to bottom. Centred when they fit,
+    /// scrolling when they don't (five or six people on a small phone).
+    private var stacked: some View {
+        let columns = columns
+        return GeometryReader { proxy in
+            let height = proxy.size.width * 9 / 16
+            let total = height * CGFloat(columns.count) + Self.spacing * CGFloat(max(columns.count - 1, 0))
+            ScrollView(.vertical) {
+                VStack(spacing: Self.spacing) {
+                    ForEach(columns) { column in
+                        frame(column).frame(height: height)
+                    }
+                }
+                .frame(minHeight: proxy.size.height)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDisabled(total <= proxy.size.height)
+        }
+    }
+
+    private var portraitGrid: some View {
         let columns = columns
         let grid = Self.grid(for: columns.count)
         let rows = stride(from: 0, to: columns.count, by: grid.columns).map {
             Array(columns[$0..<min($0 + grid.columns, columns.count)])
         }
-        GeometryReader { proxy in
+        return GeometryReader { proxy in
             let count = CGFloat(grid.rows)
             let fit = (proxy.size.height - Self.spacing * (count - 1)) / count
-            let height = max(fit, Self.minimumFrameHeight)
+            let cellWidth = (proxy.size.width - Self.spacing * CGFloat(grid.columns - 1))
+                / CGFloat(grid.columns)
+            // Two people: two 3:4 portrait cards from the top, not two
+            // frames stretched to whatever half the screen happens to be.
+            let height = columns.count == 2
+                ? min(cellWidth * 4 / 3, proxy.size.height)
+                : max(fit, Self.minimumFrameHeight)
             ScrollView(.vertical) {
                 VStack(spacing: Self.spacing) {
                     ForEach(rows.indices, id: \.self) { index in
@@ -99,7 +141,8 @@ struct RoomFrames: View {
             onFilm: onFilm,
             onOpenPerson: { onOpenPerson(column) },
             hasPoked: hasPoked,
-            onPoke: onPoke)
+            onPoke: onPoke,
+            latestComment: latestComment)
     }
 }
 
@@ -113,6 +156,7 @@ private struct PersonFrame: View {
     let onOpenPerson: () -> Void
     let hasPoked: (String) -> Bool
     let onPoke: (String) -> Void
+    let latestComment: (DayClip) -> ClipComment?
 
     /// The clip on screen. Only that one plays; the others are stills, so a
     /// room with thirty clips isn't thirty players decoding at once.
@@ -134,6 +178,7 @@ private struct PersonFrame: View {
         .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
         .overlay(alignment: .topLeading) { person }
         .overlay(alignment: .topTrailing) { topTrailing }
+        .overlay(alignment: .bottom) { pageDots }
         .contextMenu { pokeMenu }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-frame")
@@ -192,8 +237,10 @@ private struct PersonFrame: View {
                         colors: [.black.opacity(0.35), .clear, .clear, .black.opacity(0.5)],
                         startPoint: .top, endPoint: .bottom)
                 }
-                .overlay(alignment: .bottomLeading) {
-                    VStack(alignment: .leading, spacing: 1) {
+                // Setlog's card: the time and the caption in the middle of
+                // the picture, the newest comment as a bubble bottom-left.
+                .overlay {
+                    VStack(spacing: 2) {
                         if let at = clip.recordedAt, !Calendar.current.isDateInToday(at) {
                             Text(at.formatted(.dateTime.month().day()
                                 .locale(AppLanguage.effective.locale)))
@@ -202,16 +249,33 @@ private struct PersonFrame: View {
                         }
                         if let at = clip.recordedAt {
                             Text(at.formatted(.roomClock))
-                                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                                .font(.system(size: 22, weight: .heavy, design: .rounded))
                                 .monospacedDigit()
                         }
-                        if let title {
-                            Text(title)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .lineLimit(1)
+                        if let caption = clip.overlayText ?? title, !caption.isEmpty {
+                            Text(caption)
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
                         }
                     }
-                    .padding(14)
+                    .padding(.horizontal, 24)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if let comment = latestComment(clip) {
+                        HStack(spacing: 6) {
+                            MemberFace(id: comment.authorID, name: comment.authorName, size: 22, showsMood: false)
+                            Text(comment.text)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(OneDay.ink)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(.white.opacity(0.9), in: Capsule())
+                        }
+                        .padding(10)
+                        .frame(maxWidth: 260, alignment: .leading)
+                    }
                 }
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
@@ -245,20 +309,10 @@ private struct PersonFrame: View {
         .accessibilityIdentifier("room-frame-person")
     }
 
-    /// Which page of how many, and on my own frame a way to film another.
+    /// On my own frame, a way to film another.
     @ViewBuilder
     private var topTrailing: some View {
         HStack(spacing: 8) {
-            if column.clips.count > 1 {
-                let index = column.clips.firstIndex { isOnScreen($0) } ?? 0
-                Text("\(index + 1) / \(column.clips.count)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(.black.opacity(0.35), in: Capsule())
-            }
             if column.isMine, !column.clips.isEmpty, let nextToFilm {
                 Button { onFilm(nextToFilm) } label: {
                     Image(systemName: "camera.fill")
@@ -275,6 +329,23 @@ private struct PersonFrame: View {
             }
         }
         .padding(6)
+    }
+
+    /// More than one take: a dot each, the one on screen filled. Not
+    /// 「1 / 3」 — a count reads as a score.
+    @ViewBuilder
+    private var pageDots: some View {
+        if column.clips.count > 1 {
+            HStack(spacing: 5) {
+                ForEach(column.clips.prefix(8)) { clip in
+                    Circle()
+                        .fill(.white.opacity(isOnScreen(clip) ? 1 : 0.45))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .padding(.bottom, 9)
+            .allowsHitTesting(false)
+        }
     }
 
     /// Nothing filmed yet. Mine is a camera button; somebody else's is

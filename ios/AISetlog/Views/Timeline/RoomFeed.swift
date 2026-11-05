@@ -49,6 +49,8 @@ struct RoomFeed: View {
     /// `hasPoked` answers whether today's poke to them is already spent.
     var hasPoked: (String) -> Bool = { _ in false }
     var onPoke: (String) -> Void = { _ in }
+    /// Off in a room page, whose nav bar already has a calendar.
+    var showsCalendarControls = true
 
     /// Pokes sent while this feed is on screen; the limiter itself lives in
     /// UserDefaults, which SwiftUI doesn't observe.
@@ -158,7 +160,7 @@ struct RoomFeed: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
             } else {
-                if !clips.isEmpty { calendarControls }
+                if !clips.isEmpty, showsCalendarControls { calendarControls }
                 waterfall(Self.columns(clips: shownClips, members: members, myID: myID))
             }
         }
@@ -427,10 +429,17 @@ struct RoomFeed: View {
     }
 }
 
-extension FormatStyle where Self == Date.FormatStyle {
-    /// When a room clip was filmed, as a 24-hour clock: 02:07. Both halves
-    /// spelled `.twoDigits` — with only the hour padded, 2:07 came out "02:7".
-    static var roomClock: Date.FormatStyle {
-        .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+extension FormatStyle where Self == Date.VerbatimFormatStyle {
+    /// When a room clip was filmed, as a 24-hour clock: 02:07, 20:22.
+    ///
+    /// Verbatim, not `.dateTime.hour(amPM: .omitted)`: that one follows the
+    /// phone's 12-hour setting and only hides 上午/下午, so 20:22 showed as
+    /// "08:22". Both halves `.twoDigits` — with only the hour padded, 2:07 came
+    /// out "02:7".
+    static var roomClock: Date.VerbatimFormatStyle {
+        Date.VerbatimFormatStyle(
+            format: "\(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits)",
+            timeZone: .current,
+            calendar: Calendar(identifier: .gregorian))
     }
 }

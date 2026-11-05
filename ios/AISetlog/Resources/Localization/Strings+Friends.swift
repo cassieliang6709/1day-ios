@@ -7,13 +7,27 @@ extension Strings {
 
     static var inviteSheetTitle: String { zh ? "把邀请码发给朋友" : "Send the code to a friend" }
     static var inviteSheetBody: String {
-        zh ? "朋友在 1Day 的「朋友 ▸ 加入」里输入这串码，就能进到这个房间。"
-            : "Your friend enters this code under Friends ▸ Join to get into this room."
+        zh ? "朋友在 1Day 的「房间 ▸ 加入」里输入这串码，就能进到这个房间。"
+            : "Your friend enters this code under Rooms ▸ Join to get into this room."
+    }
+    static func defaultRoomName(existingTitles: [String]) -> String {
+        let base = zh ? "一起的日常" : "Our everyday"
+        let existing = Set(existingTitles.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        if !existing.contains(base) { return base }
+        var number = 2
+        while existing.contains("\(base) \(number)") { number += 1 }
+        return "\(base) \(number)"
     }
     static var pickRoomTitle: String { zh ? "邀请朋友进哪个房间？" : "Which room to invite to?" }
     static var newRoomRow: String { zh ? "新建房间" : "New room" }
+    static var roomHasNew: String { zh ? "有新片段" : "New clips" }
+    static var roomShapeLabel: String { zh ? "怎么拍" : "Shape" }
+    static var roomShapeLandscape: String { zh ? "横拍" : "Landscape" }
+    static var roomShapePortrait: String { zh ? "竖拍" : "Portrait" }
     static var roomLayoutFrames: String { zh ? "每人一个框" : "One frame each" }
-    static var roomLayoutColumns: String { zh ? "每人一列" : "One column each" }
+    static var roomLayoutDefault: String { zh ? "默认" : "Default" }
+    static var roomLayoutWaterfall: String { zh ? "瀑布流" : "Waterfall" }
+    static var roomLayoutMenu: String { zh ? "视图" : "View" }
     static var copyCode: String { zh ? "复制邀请码" : "Copy code" }
     static var codeCopied: String { zh ? "已复制" : "Copied" }
     static var shareCode: String { zh ? "发给朋友" : "Share" }
@@ -53,7 +67,7 @@ extension Strings {
             : "Real room in the CloudKit development database, with fake clips from two friends (not on Production)"
     }
     static var debugTestRoomTitle: String { zh ? "测试房间" : "Test room" }
-    static var debugTestRoomCreated: String { zh ? "测试房间已创建，在「朋友」里" : "Test room created — see Friends" }
+    static var debugTestRoomCreated: String { zh ? "测试房间已创建，在「房间」里" : "Test room created — see Rooms" }
     static var debugTestRoomNeedsSignIn: String {
         zh ? "需要先登录（上方头像处），才能创建测试房间。" : "Sign in first (at the top) to create a test room."
     }

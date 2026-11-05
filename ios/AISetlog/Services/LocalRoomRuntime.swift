@@ -19,6 +19,7 @@ import Foundation
 ///     "-demoRoomTitle", "我们的一天",
 ///     "-demoRoomMembers", "小蓝,小白",
 ///     "-demoRoomMoments", "晨光,午饭,傍晚",
+///     "-demoRoomOrientation", "landscape",   // a 横拍 room; portrait if absent
 /// ]
 /// ```
 struct DemoRoomNaming {
@@ -27,12 +28,15 @@ struct DemoRoomNaming {
     /// member gets a clip in every slot — so three names is a six-clip room.
     var moments: [String]
     var members: [String]
+    var orientation: Challenge.Orientation = .portrait
 
     static func fromLaunchArguments(_ defaults: UserDefaults = .standard) -> DemoRoomNaming {
         DemoRoomNaming(
             title: trimmed(defaults.string(forKey: "demoRoomTitle")),
             moments: list(defaults.string(forKey: "demoRoomMoments")),
-            members: list(defaults.string(forKey: "demoRoomMembers")))
+            members: list(defaults.string(forKey: "demoRoomMembers")),
+            orientation: Challenge.Orientation(
+                rawValue: defaults.string(forKey: "demoRoomOrientation") ?? "") ?? .portrait)
     }
 
     private static func list(_ value: String?) -> [String] {
@@ -191,7 +195,7 @@ final class LocalRoomRuntime {
                     } else {
                         guard let made = await DemoClipFactory.makeClip(moment: day,
                             label: chinese ? "本地动态示例" : "Local motion sample", author: name,
-                            seconds: clipSeconds, orientation: .portrait) else { throw Failure.media }
+                            seconds: clipSeconds, orientation: naming.orientation) else { throw Failure.media }
                         generated = made
                         source = made
                     }
@@ -216,7 +220,7 @@ final class LocalRoomRuntime {
             let challenge = Challenge(id: id,
                 title: naming.title ?? (chinese ? "本地房间示例" : "Local room sample"),
                 startDate: Date(), cards: cards,
-                mode: .oneDay, clipLength: .tiny, orientation: .portrait,
+                mode: .oneDay, clipLength: .tiny, orientation: naming.orientation,
                 momentTitles: moments,
                 roomCode: chat.scope.roomCode, ownerName: remote.first?.authorName, ownerID: chat.scope.accountID)
             let source = LocalRoomSyncSource(code: chat.scope.roomCode, clips: remote)
