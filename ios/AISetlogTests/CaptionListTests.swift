@@ -148,4 +148,28 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(clip.overlayText, "a")
         XCTAssertEqual(clip.replacingURL(URL(fileURLWithPath: "/tmp/b.mov")).captions.count, 2)
     }
+
+    /// A caption edit that failed to reach the room is sent again on the next
+    /// sync — and only then: a take the room already agrees with is left alone.
+    func testStaleRoomCaptionsAreNoticed() {
+        func room(_ overlay: String?, _ list: [Caption]?) -> CloudKitService.RemoteClip {
+            CloudKitService.RemoteClip(
+                id: "r", day: 1, authorID: "a", authorName: "A", recordedAt: .now,
+                localURL: URL(fileURLWithPath: "/tmp/r.mov"), overlayText: overlay,
+                captionsJSON: list.flatMap(Caption.cloudJSON))
+        }
+        let mine = [Caption(text: "早上好"), Caption(text: "咖啡", sticker: .default)]
+        XCTAssertFalse(ChallengeStore.captionsDiffer(local: mine, remote: room("早上好", mine)))
+        XCTAssertTrue(ChallengeStore.captionsDiffer(local: mine, remote: room("旧的", nil)))
+        XCTAssertTrue(ChallengeStore.captionsDiffer(local: [], remote: room("旧的", nil)))
+        XCTAssertTrue(ChallengeStore.captionsDiffer(
+            local: mine, remote: room("早上好", [Caption(text: "早上好")])))
+        // Rebuilt from overlayText the ids are new; same words are no change.
+        XCTAssertFalse(ChallengeStore.captionsDiffer(
+            local: [Caption(text: "早上好")], remote: room("早上好", nil)))
+        // Without the list on the record only the first words can be compared,
+        // so a second caption alone must not resend forever.
+        XCTAssertFalse(ChallengeStore.captionsDiffer(local: mine, remote: room("早上好", nil)))
+        XCTAssertFalse(ChallengeStore.captionsDiffer(local: [], remote: room(nil, nil)))
+    }
 }

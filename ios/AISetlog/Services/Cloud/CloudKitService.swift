@@ -366,8 +366,10 @@ enum CloudKitService {
     /// Needs `roomCode` QUERYABLE (see docs/cloudkit-member-avatar-mood-deploy.md).
     static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {
         try await ensureAccountAvailable()
+        try Task.checkCancellation()
         let query = CKQuery(recordType: "Member", predicate: NSPredicate(format: "roomCode == %@", code))
         let records = try await allRecords(matching: query)
+        try Task.checkCancellation()
         let fm = FileManager.default
         try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         return records.compactMap { r in
@@ -563,6 +565,7 @@ enum CloudKitService {
     /// sync of a room nobody has filmed in since costs one metadata query.
     static func fetchClips(code: String, into cacheDir: URL) async throws -> [RemoteClip] {
         try await ensureAccountAvailable()
+        try Task.checkCancellation()
         let query = CKQuery(
             recordType: "Clip",
             predicate: NSPredicate(format: "roomCode == %@", code))
@@ -576,6 +579,7 @@ enum CloudKitService {
             throw CKServiceError.fieldNotQueryable
         }
 
+        try Task.checkCancellation()
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         let remote = matched.map { record in
             RoomClipCache.RemoteEntry(
@@ -588,7 +592,8 @@ enum CloudKitService {
         let plan = RoomClipCache.plan(
             remote: remote, manifest: previous,
             cachedFiles: RoomClipCache.cachedRecordNames(in: cacheDir))
-        let downloaded = await downloadClipVideos(plan.download, into: cacheDir)
+        let downloaded = try await downloadClipVideos(plan.download, into: cacheDir)
+        try Task.checkCancellation()
         RoomClipCache.removeFiles(plan.remove, in: cacheDir)
         try? RoomClipCache.saveManifest(
             RoomClipCache.manifest(
@@ -631,6 +636,7 @@ enum CloudKitService {
         var response = try await db.records(
             matching: query, desiredKeys: clipMetadataKeys)
         for _ in 0..<50 {
+            try Task.checkCancellation()
             records.append(contentsOf: response.matchResults.compactMap { try? $0.1.get() })
             guard let cursor = response.queryCursor else { break }
             response = try await db.records(
@@ -642,14 +648,17 @@ enum CloudKitService {
     /// Fetch the `video` of each named record into the cache, returning the
     /// names that made it. A failed batch or record is just missing from the
     /// result; the cached file it would have replaced is left alone.
-    private static func downloadClipVideos(_ names: [String], into cacheDir: URL) async -> Set<String> {
+    private static func downloadClipVideos(_ names: [String], into cacheDir: URL) async throws -> Set<String> {
         var done = Set<String>()
         for start in stride(from: 0, to: names.count, by: clipVideoBatchSize) {
+            try Task.checkCancellation()
             let ids = names[start..<min(start + clipVideoBatchSize, names.count)]
                 .map { CKRecord.ID(recordName: $0) }
             guard let results = try? await db.records(for: ids, desiredKeys: ["video"]) else {
+                try Task.checkCancellation()
                 continue
             }
+            try Task.checkCancellation()
             for (id, result) in results {
                 guard let record = try? result.get(),
                       let asset = record["video"] as? CKAsset,

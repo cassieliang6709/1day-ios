@@ -26,6 +26,8 @@ final class RoomSyncService {
     /// poll and coming back to the app can all reach `uploadClip` for the same
     /// take at once; one upload is enough.
     @ObservationIgnored private var uploading: Set<String> = []
+    /// Clearing a room invalidates every response started before that clear.
+    @ObservationIgnored private var roomGenerations: [String: UUID] = [:]
     /// Last CloudKit failure per room. Kept visible instead of silently
     /// presenting an empty room when the production schema is unavailable.
     private(set) var lastError: [String: String] = [:]
@@ -43,6 +45,10 @@ final class RoomSyncService {
     }
 
     func clearRoom(_ code: String) {
+        roomGenerations[code] = UUID()
+        clipPulls[code]?.cancel()
+        memberPulls[code]?.cancel()
+        syncing.remove(code)
         fileStore.deleteRemoteCache(roomCode: code)
         remoteClips[code] = nil
         remoteReactions[code] = nil
@@ -63,14 +69,17 @@ final class RoomSyncService {
     /// than its call. Different rooms still run side by side.
     @MainActor
     func syncClips(code: String) async -> [CloudKitService.RemoteClip]? {
+        let generation = roomGenerations[code]
         while let running = clipPulls[code] {
             _ = await running.value
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
         }
+        guard !Task.isCancelled else { return nil }
         // The pull clears its own slot before it finishes, so a waiter woken
         // by it never finds the finished task still parked there. Nothing else
         // can have taken the slot meanwhile: it is only filled while empty.
         let pull = Task { @MainActor in
-            let clips = await self.pullClips(code: code)
+            let clips = await self.pullClips(code: code, generation: generation)
             self.clipPulls[code] = nil
             return clips
         }
@@ -82,7 +91,7 @@ final class RoomSyncService {
     @ObservationIgnored private var clipPulls: [String: Task<[CloudKitService.RemoteClip]?, Never>] = [:]
 
     @MainActor
-    private func pullClips(code: String) async -> [CloudKitService.RemoteClip]? {
+    private func pullClips(code: String, generation: UUID?) async -> [CloudKitService.RemoteClip]? {
         syncing.insert(code)
         defer { syncing.remove(code) }
         do {
@@ -91,10 +100,12 @@ final class RoomSyncService {
             #if DEBUG
             clips += await DebugFakeFriends.clips(for: code)
             #endif
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
             remoteClips[code] = clips
             lastError[code] = nil
             return clips
         } catch {
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
             print("[room] sync failed: \(error)")
             lastError[code] = error.localizedDescription
             #if DEBUG
@@ -107,8 +118,12 @@ final class RoomSyncService {
 
     /// Fetch remote reactions/comments. Degrades to nil (caller keeps local
     /// state) if the CloudKit index isn't deployed — never fails a clip sync.
+    @MainActor
     func fetchInteractions(code: String) async -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])? {
-        try? await transport.fetchInteractions(code)
+        let generation = roomGenerations[code]
+        let fetched = try? await transport.fetchInteractions(code)
+        guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
+        return fetched
     }
 
     /// Push one of my clips to the room. The caller refreshes the complete room
@@ -134,12 +149,15 @@ final class RoomSyncService {
         let key = "\(code)#\(authorID)#\(day)#\(takeID?.uuidString ?? "1")"
         guard uploading.insert(key).inserted else { return false }
         defer { uploading.remove(key) }
+        let generation = roomGenerations[code]
         do {
             try await transport.uploadClip(
                 code, day, authorID, authorName, fileURL, captions, recordedAt, takeID)
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return false }
             lastError[code] = nil
             return true
         } catch {
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return false }
             print("[room] upload failed: \(error)")
             lastError[code] = error.localizedDescription
             return false
@@ -222,11 +240,31 @@ final class RoomSyncService {
     /// fetch fails, and that must not blank anybody's face.
     @MainActor
     func syncMembers(code: String) async {
+        let generation = roomGenerations[code]
+        while let running = memberPulls[code] {
+            await running.value
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return }
+        }
+        guard !Task.isCancelled else { return }
+        let pull = Task { @MainActor in
+            await self.pullMembers(code: code, generation: generation)
+            self.memberPulls[code] = nil
+        }
+        memberPulls[code] = pull
+        await pull.value
+    }
+
+    @ObservationIgnored private var memberPulls: [String: Task<Void, Never>] = [:]
+
+    @MainActor
+    private func pullMembers(code: String, generation: UUID?) async {
         do {
             let members = try await transport.fetchMembers(code, membersDir(code))
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return }
             remoteMembers[code] = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
             saveCachedMembers(members, code: code)
         } catch {
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return }
             print("[room] member fetch failed: \(error)")
         }
         #if DEBUG
@@ -317,8 +355,10 @@ final class RoomSyncService {
     @discardableResult
     func publishProfile(_ write: CloudKitService.MemberProfileWrite, signature: String) async -> Bool {
         guard publishedProfiles[write.code] != signature else { return false }
+        let generation = roomGenerations[write.code]
         do {
             try await transport.saveMemberProfile(write)
+            guard roomGenerations[write.code] == generation, !Task.isCancelled else { return false }
             publishedProfiles[write.code] = signature
             UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
             return true
@@ -379,10 +419,12 @@ final class RoomSyncService {
     /// waiting for the next sync.
     @MainActor
     func publishRoomTitle(code: String, authorID: String, displayName: String, title: String? = nil, at: Date = .now) async {
+        let generation = roomGenerations[code]
         if let title { setPendingRoomTitle(.init(title: title, at: at), code: code) }
         guard let pending = pendingRoomTitles[code] else { return }
         do {
             try await transport.saveRoomTitle(code, authorID, displayName, pending.title, pending.at)
+            guard roomGenerations[code] == generation, !Task.isCancelled else { return }
             if pendingRoomTitles[code] == pending { setPendingRoomTitle(nil, code: code) }
         } catch {
             print("[room] room title failed: \(error)")
@@ -406,8 +448,16 @@ final class RoomSyncService {
         }
     }
 
-    func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async {
-        try? await transport.sendPoke(code, authorID, authorName, targetAuthorID)
+    /// True once the poke is in the room.
+    @discardableResult
+    func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async -> Bool {
+        do {
+            try await transport.sendPoke(code, authorID, authorName, targetAuthorID)
+            return true
+        } catch {
+            print("[room] poke failed: \(error)")
+            return false
+        }
     }
 
 }

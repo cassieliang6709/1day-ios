@@ -15,8 +15,10 @@ struct PokeLimiter {
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
+    /// Keyed by who sent it too: a poke the last person signed in here sent
+    /// is not one the next person has used up.
     private func key(code: String, targetAuthorID: String) -> String {
-        "\(code)|\(targetAuthorID)"
+        "\(AccountStore.persistedUserID ?? "")|\(code)|\(targetAuthorID)"
     }
 
     private var sent: [String: String] {
@@ -36,6 +38,13 @@ struct PokeLimiter {
         all[key(code: code, targetAuthorID: targetAuthorID)] = Self.dayStamp(date, calendar: calendar)
         sent = all
         return true
+    }
+
+    /// Gives back a poke that never reached the room.
+    func release(code: String, targetAuthorID: String) {
+        var all = sent
+        all[key(code: code, targetAuthorID: targetAuthorID)] = nil
+        sent = all
     }
 }
 
