@@ -533,13 +533,13 @@ enum Strings {
     static var surfacePlans: String { lang == .chinese ? "我的" : "Mine" }
     /// The right tab: only the stories filmed with other people, plus the two
     /// ways a room starts — inviting, and a code arriving.
-    static var surfaceFriends: String { lang == .chinese ? "朋友" : "Friends" }
+    static var surfaceFriends: String { lang == .chinese ? "房间" : "Rooms" }
     /// Making a new story. A tab in 1.3–1.4; from 1.5 the labelled button in
     /// the stories header, so the bar's middle slot can be the camera.
     static var surfaceCompose: String { lang == .chinese ? "新建" : "New" }
     /// The round button in the middle of the bar. No visible label — it's the
     /// accessibility name.
-    static var surfaceCamera: String { lang == .chinese ? "拍摄" : "Camera" }
+    static var surfaceCamera: String { lang == .chinese ? "相机" : "Camera" }
     static var friendsEmptyTitle: String {
         lang == .chinese ? "还没有和朋友一起拍的房间" : "No stories with friends yet"
     }
@@ -816,6 +816,17 @@ enum Strings {
     static func roomOf(_ name: String) -> String {
         lang == .chinese ? "\(name) 的房间" : "\(name)'s room"
     }
+    /// 朋友's list, for a room still called by the date it was made:
+    /// 「Cassie 和尼尼」, 「Cassie、尼尼和贝贝」.
+    static func roomOfPeople(_ names: [String]) -> String {
+        guard let last = names.last, names.count > 1 else { return roomOf(names.first ?? "") }
+        let rest = names.dropLast()
+        return lang == .chinese
+            ? "\(rest.joined(separator: "、")) 和 \(last)"
+            : "\(rest.joined(separator: ", ")) and \(last)"
+    }
+    /// 朋友's list: a room nobody has filmed in yet.
+    static var roomNobodyFilmed: String { lang == .chinese ? "还没人拍" : "Nobody's filmed yet" }
     static var thisMoment: String { lang == .chinese ? "这个瞬间" : "This moment" }
     /// The filmstrip's button, for a story with no prompts. It cannot name what
     /// to film — that is the whole point of 按时间 — so it names the act.

@@ -25,6 +25,10 @@ struct LibrarySection: View {
 
     enum Mode: Hashable { case grid, calendar }
 
+    /// The page's 20 plus the mood card's 18 (`MoodTodayCard`): the title,
+    /// the day headers and the grid all start where 今天的心情 does.
+    private static let inset: CGFloat = 38
+
     @State private var mode: Mode = .grid
     @State private var day: Date?
     @State private var month = Calendar.current.startOfMonth(for: .now)
@@ -63,7 +67,7 @@ struct LibrarySection: View {
                             scope.filtered(.mine, cameras: cameraIndex.cameras)),
                         selectedDay: $day,
                         showsMoods: true)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, Self.inset)
                 }
 
                 if let day {
@@ -77,7 +81,7 @@ struct LibrarySection: View {
                             .foregroundStyle(OneDay.brandText)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Self.inset)
                 }
 
                 if mode == .grid || day != nil {
@@ -117,23 +121,6 @@ struct LibrarySection: View {
             Spacer(minLength: 6)
 
             if !scope.clips.isEmpty {
-                Button {
-                    withAnimation(OneDay.Motion.snap) {
-                        mode = mode == .grid ? .calendar : .grid
-                        if mode == .grid { day = nil }
-                    }
-                } label: {
-                    Image(systemName: mode == .grid ? "calendar" : "square.grid.3x3")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(OneDay.ink)
-                        .frame(width: 38, height: 38)
-                        .background(OneDay.surface, in: Circle())
-                        .overlay(Circle().strokeBorder(OneDay.hairline, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(mode == .grid ? Strings.libraryCalendar : Strings.libraryGrid)
-                .accessibilityIdentifier("library-mode")
-
                 Button(isSelecting ? Strings.cancel : Strings.librarySelect) {
                     withAnimation(OneDay.Motion.snap) { isSelecting.toggle() }
                 }
@@ -145,7 +132,7 @@ struct LibrarySection: View {
                 .accessibilityIdentifier("library-select")
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Self.inset)
     }
 
     /// The camera's drafts button: the grid, every date. It used to narrow
@@ -163,7 +150,7 @@ struct LibrarySection: View {
             .foregroundStyle(OneDay.inkSoft)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 28)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Self.inset)
     }
 
     // MARK: - Grid
@@ -188,7 +175,7 @@ struct LibrarySection: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Self.inset)
                 }
             }
         }
@@ -237,7 +224,7 @@ struct LibrarySection: View {
                 .foregroundStyle(OneDay.inkFaint)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Self.inset)
         .accessibilityElement(children: .combine)
     }
 
@@ -497,7 +484,9 @@ struct LibraryCalendar: View {
     }
 
     private var weekdaySymbols: [String] {
-        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        var localized = calendar
+        localized.locale = AppLanguage.effective.locale
+        let symbols = localized.veryShortStandaloneWeekdaySymbols
         let start = calendar.firstWeekday - 1
         return Array(symbols[start...] + symbols[..<start])
     }

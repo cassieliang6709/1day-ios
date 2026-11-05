@@ -141,3 +141,30 @@ struct AvatarStack: View {
         names.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 }
+
+/// Compact room identities: pair, triangle, square, five rings, then a grid.
+struct RoomAvatarCluster: View {
+    let members: [(id: String, name: String)]
+    var you: String?
+    var images: [String: UIImage] = [:]
+
+    private var displayedMembers: [(id: String, name: String)] {
+        members.isEmpty ? [("loading", "")] : members
+    }
+
+    var body: some View {
+        let members = displayedMembers
+        let layout = RoomAvatarLayout(memberCount: members.count)
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                AvatarDot(name: member.name, size: layout.diameter, isYou: member.id == you, image: images[member.id])
+                    .position(layout.centers[index])
+            }
+        }
+        .frame(width: RoomAvatarLayout.width, height: RoomAvatarLayout.height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(([Strings.memberCount(members.count)] + members.map {
+            $0.name.isEmpty ? Strings.defaultMemberName : $0.name
+        }).joined(separator: ", "))
+    }
+}

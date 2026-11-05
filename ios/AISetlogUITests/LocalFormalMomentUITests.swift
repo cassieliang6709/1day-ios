@@ -15,6 +15,7 @@ final class LocalFormalMomentUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         XCTAssertTrue(app.buttons["home-room-demo"].waitForExistence(timeout: 15))
         app.buttons["home-room-demo"].tap()
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))

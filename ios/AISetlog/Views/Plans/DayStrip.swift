@@ -39,7 +39,7 @@ struct DayStrip: View {
             withAnimation(OneDay.Motion.soft) { selected = day }
         } label: {
             VStack(spacing: 4) {
-                Text(day.formatted(.dateTime.weekday(.narrow)))
+                Text(day.formatted(.dateTime.weekday(.narrow).locale(AppLanguage.effective.locale)))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(isSelected ? OneDay.onBrand : OneDay.inkFaint)
                 Text("\(calendar.component(.day, from: day))")

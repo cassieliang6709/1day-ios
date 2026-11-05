@@ -1,13 +1,6 @@
 import SwiftUI
 
-/// The app's surfaces — your stories, the ones with friends, making a new one,
-/// and the free-form camera. 故事 and 朋友 are the floating capsule's tabs, with
-/// the camera as the round button between them (1.5). Both tabs stay mounted so
-/// switching never loses a navigation stack.
-///
-/// 新建 was a tab in 1.3–1.4. In 1.5 it is a labelled button in the stories
-/// header — not the wordless 36pt `plus` it was before 1.3, which was the
-/// smallest target on the first screen.
+/// Requests from onboarding, links, and story creation.
 enum HomeLaunchAction: Equatable {
     /// First-run path: make the three-moment personal story immediately.
     case quickStart
@@ -20,6 +13,7 @@ enum HomeLaunchAction: Equatable {
     case openStory(UUID)
 }
 
+/// Camera and rooms are the two tabs; the personal library opens from rooms.
 struct RootShellView: View {
     @Environment(ChallengeStore.self) private var store
     /// Read here as well as in the camera: a kept clip has to be findable from
@@ -28,20 +22,14 @@ struct RootShellView: View {
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
-    /// 故事 and 朋友 are tabs; compose and camera are full-screen surfaces you
-    /// enter from them and leave back to them, with the bar hidden. The camera
-    /// especially: its shutter sits where the bar's round button is, and two
-    /// round buttons stacked at the bottom of the screen is one too many.
     enum Surface: Hashable { case plans, friends, compose, camera }
-    @State private var surface: Surface = .plans
+    @State private var surface: Surface = .friends
     /// The tab compose or the camera was opened from, and goes back to.
-    @State private var returnTab: Surface = .plans
+    @State private var returnTab: Surface = .friends
     /// Whether the composer opens with 和朋友一起 already on — set by 朋友's
     /// invite button, which is otherwise the same composer.
     @State private var composeTogether = false
-    /// Counts picks of 朋友 in the tab bar, re-picks included, so the friends
-    /// page can open its only room each time. See `PlansHomeView.tabSelections`.
-    @State private var friendsTabSelections = 0
+    @State private var roomLaunchAction: HomeLaunchAction?
     /// Bumped by the camera's drafts button: 我的 scrolls to 所有片段 with
     /// 待归档 picked. See `PlansHomeView.draftsRequest`.
     @State private var draftsRequests = 0
@@ -72,27 +60,33 @@ struct RootShellView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             PlansHomeView(
-                pendingJoinCode: $pendingJoinCode,
+                pendingJoinCode: .constant(nil),
                 launchAction: $launchAction,
                 stories: stories,
                 draftsRequest: draftsRequests,
+                isActive: surface == .plans,
+                onActivate: { activate(.plans) },
+                onBackToRooms: { surface = .friends },
                 onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
+                .accessibilityHidden(surface != .plans)
 
             // A second instance rather than a new screen: every row, the join
             // sheet, sign-in and the story push already live in PlansHomeView.
-            // `.friends` filters it to shared stories and keeps the launch
-            // routing to the first one.
+            // `.friends` filters it to shared stories.
             PlansHomeView(
-                pendingJoinCode: .constant(nil),
-                launchAction: .constant(nil),
+                pendingJoinCode: $pendingJoinCode,
+                launchAction: $roomLaunchAction,
                 stories: stories,
                 scope: .friends,
-                tabSelections: friendsTabSelections,
+                isActive: surface == .friends,
+                onActivate: { activate(.friends) },
+                onOpenPersonal: { surface = .plans },
                 onCompose: { openCompose(together: true) })
                 .opacity(surface == .friends ? 1 : 0)
                 .allowsHitTesting(surface == .friends)
+                .accessibilityHidden(surface != .friends)
 
             // Not kept mounted behind the others the way plans is: it holds a
             // half-filled form, and coming back to 新建 after wandering off
@@ -101,11 +95,14 @@ struct RootShellView: View {
             if surface == .compose {
                 StoryComposerView(
                     onCreate: { id in
-                        // Back to plans, with the new story's timeline pushed:
-                        // the composer's whole job is done and the thing you
-                        // just made is what you want to look at.
-                        surface = .plans
-                        launchAction = .openStory(id)
+                        // Open the result on the stack it belongs to.
+                        if composeTogether {
+                            surface = .friends
+                            roomLaunchAction = .openStory(id)
+                        } else {
+                            surface = .plans
+                            launchAction = .openStory(id)
+                        }
                     },
                     onClose: { surface = returnTab },
                     startsWithFriends: composeTogether)
@@ -125,26 +122,24 @@ struct RootShellView: View {
                     })
             }
 
-            if surface == .plans || surface == .friends {
+            if surface != .compose {
                 FloatingTabBar(
                     items: [
                         .init(
-                            tab: Surface.plans,
-                            label: Strings.surfacePlans,
-                            icon: "rectangle.stack",
-                            activeIcon: "rectangle.stack.fill"),
+                            tab: Surface.camera,
+                            label: Strings.surfaceCamera,
+                            icon: "camera",
+                            activeIcon: "camera.fill",
+                            identifier: "tab-camera"),
                         .init(
                             tab: Surface.friends,
                             label: Strings.surfaceFriends,
                             icon: "person.2",
-                            activeIcon: "person.2.fill"),
+                            activeIcon: "person.2.fill",
+                            identifier: "tab-rooms"),
                     ],
-                    selection: guardedSurface,
-                    center: .init(
-                        label: Strings.surfaceCamera,
-                        icon: "camera.fill",
-                        identifier: "tab-camera",
-                        action: openCamera))
+                    selection: tabSelection)
+                    .disabled(unfiledGuard.isRecording)
                     .padding(.bottom, 6)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -157,7 +152,7 @@ struct RootShellView: View {
             titleVisibility: .visible
         ) {
             Button(Strings.keepClip) {
-                unfiledGuard.keep?()
+                guard unfiledGuard.keepForNavigation() else { return }
                 justKeptADraft = true
                 leaveCamera()
             }
@@ -175,6 +170,12 @@ struct RootShellView: View {
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+        .onChange(of: unfiledGuard.isRecording) { _, recording in
+            if !recording, let next = pendingSurface {
+                pendingSurface = nil
+                _ = activate(next)
+            }
+        }
     }
 
     /// The four seconds after you keep a clip: what just happened, and the way
@@ -231,15 +232,18 @@ struct RootShellView: View {
         Binding(
             get: { surface },
             set: { next in
+                guard !unfiledGuard.isRecording else { return }
                 guard surface == .camera, next != .camera, unfiledGuard.hasUnfiledClip else {
                     surface = next
-                    if next == .friends { friendsTabSelections += 1 }
                     return
                 }
                 // A free take is kept in 我的 (only you see it) rather than
                 // asked about: it can be sent to a room from there later.
                 pendingSurface = next
-                unfiledGuard.keep?()
+                guard unfiledGuard.keepForNavigation() else {
+                    pendingSurface = nil
+                    return
+                }
                 justKeptADraft = true
                 leaveCamera()
             })
@@ -247,8 +251,29 @@ struct RootShellView: View {
 
     private func leaveCamera() {
         surface = pendingSurface ?? returnTab
-        if surface == .friends { friendsTabSelections += 1 }
         pendingSurface = nil
+    }
+
+    /// External links wait for a recording, then keep its take before routing.
+    private func activate(_ next: Surface) -> Bool {
+        if unfiledGuard.isRecording {
+            pendingSurface = next
+            return false
+        }
+        guardedSurface.wrappedValue = next
+        return surface == next
+    }
+
+    private var tabSelection: Binding<Surface> {
+        Binding(
+            get: { surface == .plans ? .friends : surface },
+            set: { next in
+                if next == .camera {
+                    openCamera()
+                } else {
+                    guardedSurface.wrappedValue = next
+                }
+            })
     }
 
     private func openCamera() {
@@ -278,9 +303,17 @@ struct RootShellView: View {
 /// navigation, so it decides when to ask.
 @Observable
 final class UnfiledClipGuard {
+    var isRecording = false
     var hasUnfiledClip = false
-    var keep: (() -> Void)?
+    var keep: (() -> Bool)?
     var discard: (() -> Void)?
+
+    func keepForNavigation() -> Bool {
+        guard hasUnfiledClip else { return true }
+        guard keep?() == true else { return false }
+        hasUnfiledClip = false
+        return true
+    }
 }
 
 /// The free-form camera surface: the same recorder as the per-moment one, in
@@ -288,8 +321,7 @@ final class UnfiledClipGuard {
 struct CameraTabView: View {
     var unfiledGuard: UnfiledClipGuard?
     var onStartStory: (() -> Void)?
-    /// Back to the tab the camera was opened from. The bar is hidden while the
-    /// camera is up, so this ✕ is the way out.
+    /// Back to the browsing surface the camera was opened from.
     var onClose: (() -> Void)?
     /// The drafts button: 我的 with 待归档 picked. Nil opens the drafts list
     /// over the camera instead.

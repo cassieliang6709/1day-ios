@@ -24,13 +24,13 @@ struct PlansHomeView: View {
     /// exist once.
     var scope: Scope = .stories
     enum Scope { case stories, friends }
-    /// Bumped by the shell each time 朋友 is picked in the tab bar. This
-    /// screen stays mounted behind the bar, so `onAppear` runs once; this is
-    /// what tells it the tab was chosen again.
-    var tabSelections = 0
     /// Bumped by the shell when the camera's drafts button is tapped: scroll
     /// to 所有片段 with 待归档 picked. See `LibrarySection.draftsRequest`.
     var draftsRequest = 0
+    var isActive = true
+    var onActivate: (() -> Bool)? = nil
+    var onBackToRooms: (() -> Void)? = nil
+    var onOpenPersonal: (() -> Void)? = nil
     /// Open the composer. The composer used to be a
     /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
     /// every in-page CTA that used to raise the cover asks the shell instead.
@@ -38,6 +38,9 @@ struct PlansHomeView: View {
     let onCompose: () -> Void
 
     @State private var path: [UUID] = []
+    /// When I last had each room open, by room id (seconds since 1970).
+    @State private var roomSeenAt: [String: Double] =
+        UserDefaults.standard.dictionary(forKey: PlansHomeView.roomSeenKey) as? [String: Double] ?? [:]
     @State private var showJoin = false
     @State private var showSettings = false
     @State private var showRoomDemo = false
@@ -48,6 +51,7 @@ struct PlansHomeView: View {
     /// timeout. The in-flight call checks it before doing anything with its
     /// result, so a late success can't navigate somewhere the person left.
     @State private var joinAttempt = 0
+    @State private var joinTask: Task<Void, Never>?
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
     /// One item of 今天的计划, tapped: film that one.
@@ -82,9 +86,13 @@ struct PlansHomeView: View {
                 OneDayCanvas()
                 content
             }
+            .accessibilityHidden(!isActive)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: UUID.self) { id in
+                // Both ends: clips that arrive while I'm inside are seen too.
                 StoryTimelineView(challengeID: id)
+                    .onAppear { markSeen(id) }
+                    .onDisappear { markSeen(id) }
             }
         }
         .fullScreenCover(item: $recordChallenge) { challenge in
@@ -179,14 +187,15 @@ struct PlansHomeView: View {
         // mounted beside it and would otherwise open every notification's
         // camera a second time.
         .onAppear {
+            consumePendingJoinCode()
+            consumeLaunchAction()
+            openPendingNotificationRoute()
             guard scope == .stories else { return }
             if UserDefaults.standard.bool(forKey: AppSkin.reopenSettingsKey) {
                 UserDefaults.standard.removeObject(forKey: AppSkin.reopenSettingsKey)
+                _ = onActivate?()
                 showSettings = true
             }
-            openPendingNotificationRoute()
-            consumePendingJoinCode()
-            consumeLaunchAction()
             #if DEBUG
             createDebugTestRoomIfAsked()
             #endif
@@ -194,7 +203,12 @@ struct PlansHomeView: View {
         .onReceive(NotificationCenter.default.publisher(
             for: .oneDayNotificationRoutePending
         )) { _ in
-            guard scope == .stories else { return }
+            openPendingNotificationRoute()
+        }
+        .onChange(of: isActive) { _, active in
+            guard active else { return }
+            consumePendingJoinCode()
+            consumeLaunchAction()
             openPendingNotificationRoute()
         }
         .onChange(of: pendingJoinCode) { _, _ in consumePendingJoinCode() }
@@ -265,6 +279,17 @@ struct PlansHomeView: View {
     private var storiesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
+                if let onBackToRooms {
+                    Button(action: onBackToRooms) {
+                        Label(Strings.surfaceFriends, systemImage: "chevron.left")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(OneDay.brandText)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .accessibilityIdentifier("personal-back")
+                }
                 header
 
                 // Off unless something asked for it — see `DemoEntries`. It
@@ -340,6 +365,8 @@ struct PlansHomeView: View {
                 // are stuck in.
                 Button(Strings.cancel) {
                     joinAttempt += 1
+                    joinTask?.cancel()
+                    joinTask = nil
                     joining = false
                 }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -352,14 +379,21 @@ struct PlansHomeView: View {
 
     // MARK: - 朋友
 
-    /// Shared stories, newest first.
+    /// Shared stories, the one with the newest clip first; a room nobody has
+    /// filmed in yet goes by when it was made.
     private var sharedStories: [Challenge] {
-        store.challenges.filter(\.isShared).sorted { $0.startDate > $1.startDate }
+        store.challenges.filter(\.isShared)
+            .map { ($0, Self.latestClip(store.recordedClips(for: $0.id))?.recordedAt ?? $0.startDate) }
+            .sorted { $0.1 > $1.1 }
+            .map(\.0)
     }
 
     private var friendsContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 18) {
+                if let onOpenPersonal {
+                    personalEntry(onOpen: onOpenPersonal)
+                }
                 friendsHeader
 
                 if sharedStories.isEmpty {
@@ -369,7 +403,9 @@ struct PlansHomeView: View {
                     // room sends its own code from 邀请 on its page. The
                     // empty state keeps it — there it's how the first room
                     // gets made.
-                    LazyVStack(alignment: .leading, spacing: 9) {
+                    // Rows without cards (`StoryRowCard`), so the gap does the
+                    // separating.
+                    LazyVStack(alignment: .leading, spacing: 14) {
                         ForEach(sharedStories) { challenge in
                             storyRow(challenge, membersAsCover: true)
                         }
@@ -382,23 +418,28 @@ struct PlansHomeView: View {
         }
         .scrollIndicators(.hidden)
         .overlay { joiningOverlay }
-        .onAppear { openSoleRoom() }
-        .onChange(of: sharedStories.count) { _, _ in openSoleRoom() }
-        .onChange(of: tabSelections) { _, _ in openSoleRoom() }
     }
 
-    /// 一进朋友页就是房间: with exactly one room, 朋友 opens on it. Pushed
-    /// rather than embedded so the room's back button leads somewhere — the
-    /// list, where 加入 still is.
-    ///
-    /// Runs when the page is first built, when the room count changes, and
-    /// every time 朋友 is picked in the tab bar — so 朋友 always means the room,
-    /// even after going back to the list. Not on the list's own appearance:
-    /// the room's back button still leads to the list and stays there, which
-    /// is where 加入 is.
-    private func openSoleRoom() {
-        guard scope == .friends, path.isEmpty, sharedStories.count == 1 else { return }
-        path = [sharedStories[0].id]
+    private func personalEntry(onOpen: @escaping () -> Void) -> some View {
+        Button(action: onOpen) {
+            HStack(spacing: 14) {
+                AvatarDot(name: account.account?.displayName, size: 38, image: AvatarStore.shared.image)
+                Text(Strings.surfacePlans)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(OneDay.inkFaint)
+            }
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 10)
+        .overlay(alignment: .bottom) { Rectangle().fill(OneDay.hairline).frame(height: 1) }
+        .padding(.horizontal, 20)
+        .accessibilityIdentifier("rooms-personal")
     }
 
     struct DebugAlert {
@@ -886,7 +927,10 @@ struct PlansHomeView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
+        // The page's 20 plus the mood card's own 18 (`MoodTodayCard`), so the
+        // guide starts where 今天的心情 does rather than at the card's
+        // rounded edge, which reads as the text sticking out.
+        .padding(.horizontal, 38)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("home-guide")
     }
@@ -925,20 +969,25 @@ struct PlansHomeView: View {
     /// a cover picture (1.5).
     private func storyRow(_ challenge: Challenge, membersAsCover: Bool = false) -> some View {
         let state = cardState(for: challenge)
+        let members = store.members(for: challenge.id)
         return Button {
             path.append(challenge.id)
         } label: {
             StoryRowCard(
                 challenge: challenge,
                 progress: state.progress,
-                coverURL: state.coverURL,
-                refreshToken: state.refreshToken,
-                memberNames: store.members(for: challenge.id).map(\.name),
+                coverURL: membersAsCover ? state.latest?.url ?? state.coverURL : state.coverURL,
+                refreshToken: membersAsCover ? state.latest?.recordedAt ?? state.refreshToken : state.refreshToken,
+                memberNames: members.map(\.name),
                 showsMembersAsCover: membersAsCover,
-                myName: account.account?.displayName,
-                memberImages: membersAsCover ? store.memberAvatars(for: challenge.id) : [:])
+                roomMembers: members,
+                memberImages: membersAsCover ? store.memberAvatarsByID(for: challenge.id) : [:],
+                latestLine: membersAsCover ? latestLine(state.latest) : nil,
+                latestCaption: membersAsCover ? state.latest?.captions.firstText : nil,
+                hasNew: membersAsCover && hasNew(challenge, latest: state.latest))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(membersAsCover ? "room-preview-card" : "story-row")
         .contextMenu {
             Button(
                 challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
@@ -1009,6 +1058,7 @@ struct PlansHomeView: View {
 
     private func consumePendingJoinCode() {
         guard let code = pendingJoinCode else { return }
+        guard onActivate?() != false else { return }
         pendingJoinCode = nil
         // Kept in the join field too: if sign-in is cancelled, startJoin's
         // deferred run never fires, and the link's code would be gone.
@@ -1018,6 +1068,7 @@ struct PlansHomeView: View {
 
     private func consumeLaunchAction() {
         guard let action = launchAction else { return }
+        guard onActivate?() != false else { return }
         launchAction = nil
         switch action {
         case .quickStart:
@@ -1039,9 +1090,12 @@ struct PlansHomeView: View {
     }
 
     private func openPendingNotificationRoute() {
-        guard let route = NotificationRouteInbox.consume(),
+        guard let route = NotificationRouteInbox.peek(),
               let challenge = store.challenge(route.challengeID)
         else { return }
+        guard (scope == .friends) == challenge.isShared,
+              onActivate?() != false else { return }
+        _ = NotificationRouteInbox.consume()
         if challenge.isComplete {
             path = [challenge.id]
         } else {
@@ -1055,8 +1109,13 @@ struct PlansHomeView: View {
         let run = {
             joining = true
             let attempt = joinAttempt
-            Task {
-                defer { if attempt == joinAttempt { joining = false } }
+            joinTask = Task {
+                defer {
+                    if attempt == joinAttempt {
+                        joining = false
+                        joinTask = nil
+                    }
+                }
                 do {
                     let challenge = try await store.joinRoom(code: code)
                     // Abandoned while it was in flight — cancelled, or timed
@@ -1064,6 +1123,8 @@ struct PlansHomeView: View {
                     // had already walked away from.
                     guard attempt == joinAttempt else { return }
                     path = [challenge.id]
+                } catch is CancellationError {
+                    return
                 } catch {
                     guard attempt == joinAttempt else { return }
                     errorText = error.localizedDescription
@@ -1076,6 +1137,8 @@ struct PlansHomeView: View {
                 try? await Task.sleep(for: .seconds(20))
                 guard attempt == joinAttempt, joining else { return }
                 joinAttempt += 1
+                joinTask?.cancel()
+                joinTask = nil
                 joining = false
                 errorText = Strings.joinTimedOut
             }
@@ -1101,6 +1164,8 @@ struct PlansHomeView: View {
         /// Re-records reuse the same file name, so a cached frame needs the
         /// clip's `recordedAt` to notice the change.
         let refreshToken: Date?
+        /// The room's newest clip, from anyone.
+        let latest: DayClip?
     }
 
     private func cardState(for challenge: Challenge) -> CardState {
@@ -1117,7 +1182,41 @@ struct PlansHomeView: View {
                 clips: clips,
                 myID: account.account?.id ?? RoomProgress.soloAuthorID),
             coverURL: first?.url,
-            refreshToken: first?.recordedAt)
+            refreshToken: first?.recordedAt,
+            latest: Self.latestClip(clips))
+    }
+
+    private static func latestClip(_ clips: [DayClip]) -> DayClip? {
+        clips.filter { $0.recordedAt != nil }.max { $0.recordedAt! < $1.recordedAt! }
+    }
+
+    /// 「尼尼 · 10月25日」, or the time when it was today.
+    private func latestLine(_ clip: DayClip?) -> String? {
+        guard let clip, let date = clip.recordedAt else { return nil }
+        let name = isMine(clip) ? Strings.youLabel : (clip.authorName ?? "")
+        let when = Calendar.current.isDateInToday(date)
+            ? date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+            : date.formatted(.dateTime.month().day())
+        return name.isEmpty ? when : "\(name) · \(when)"
+    }
+
+    private func isMine(_ clip: DayClip) -> Bool {
+        clip.authorID == nil || clip.authorID == RoomProgress.soloAuthorID
+            || clip.authorID == account.account?.id
+    }
+
+    /// Someone else filmed since I last had this room open.
+    private func hasNew(_ challenge: Challenge, latest: DayClip?) -> Bool {
+        guard let latest, let date = latest.recordedAt, !isMine(latest) else { return false }
+        guard let seen = roomSeenAt[challenge.id.uuidString] else { return true }
+        return date > Date(timeIntervalSince1970: seen)
+    }
+
+    private static let roomSeenKey = "roomSeenAt"
+
+    private func markSeen(_ id: UUID) {
+        roomSeenAt[id.uuidString] = Date.now.timeIntervalSince1970
+        UserDefaults.standard.set(roomSeenAt, forKey: Self.roomSeenKey)
     }
 
 }

@@ -160,6 +160,19 @@ final class ClipLibraryTests: XCTestCase {
         XCTAssertEqual(library.filtered(.all).count, 4)
     }
 
+    /// One take sent to four rooms is one clip in 我的, not four.
+    func testOneTakeSentToSeveralRoomsShowsOnce() {
+        let rooms = (1...4).map { story("Room \($0)", shared: true) }
+        let library = ClipLibrary(
+            stories: rooms.map { ($0, [clip(day: 1, author: me, at: 100)]) }
+                + [(rooms[0], [clip(day: 2, author: me, at: 200)])],
+            drafts: [],
+            myIDs: [me])
+        XCTAssertEqual(library.scoped(includingFriends: false).clips.count, 2)
+        // A room's feed still has each room's own copy.
+        XCTAssertEqual(library.clips.count, 5)
+    }
+
     func testDraftsFilterCombinesWithDay() {
         let s = story("A", shared: false)
         let dayLength: TimeInterval = 86_400

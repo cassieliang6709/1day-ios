@@ -5,6 +5,7 @@ final class IntentFirstCreationUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "english"]
         app.launch()
+        app.openPersonalLibrary()
         // 1.5: the composer opens from the home header's + New, not a tab.
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "New button missing")

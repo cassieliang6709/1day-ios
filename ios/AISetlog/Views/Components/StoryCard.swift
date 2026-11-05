@@ -175,10 +175,14 @@ struct StoryRowCard: View {
     /// 朋友's room list (1.5): everyone's faces, stacked, stand in for the
     /// cover picture. A room is the people in it more than any one frame.
     var showsMembersAsCover = false
-    /// Which of `memberNames` is me, so the stack can ring my own face.
-    var myName: String?
-    /// Their avatars, by name, for the faces-as-cover stack.
+    var roomMembers: [(id: String, name: String)] = []
+    /// Avatars keyed by member ID, including people with the same name.
     var memberImages: [String: UIImage] = [:]
+    /// 朋友's list: who filmed last and when, 「尼尼 · 10月25日」.
+    var latestLine: String?
+    var latestCaption: String?
+    /// Someone else filmed since I last opened the room.
+    var hasNew = false
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     /// Same rule as the hero card: the row names today's moment, and says
@@ -186,45 +190,106 @@ struct StoryRowCard: View {
     private var todaySlot: Int? { challenge.isOneDay ? nil : challenge.currentDay }
     private var offeredSlot: Int { progress.slotToOffer(today: todaySlot) }
 
+    @ViewBuilder
     var body: some View {
-        HStack(spacing: 14) {
-            if showsMembersAsCover {
-                // Nobody known yet (before the first sync): one blank face,
-                // which `AvatarDot` draws as the mascot.
-                AvatarStack(names: memberNames.isEmpty ? [""] : memberNames,
-                            maxShown: 4, size: 38, you: myName, images: memberImages)
-                    .frame(minWidth: 58, minHeight: 66)
-            } else {
-                thumbnail
-            }
+        if showsMembersAsCover {
+            roomPreviewCard
+        } else {
+            compactRow
+        }
+    }
 
+    private var roomPreviewCard: some View {
+        VStack(spacing: 0) {
+            if let coverURL {
+                ClipThumbnail(url: coverURL, refreshToken: refreshToken, bedsInsteadOfCrops: true)
+                    .frame(height: 132)
+                    .clipped()
+                    .overlay(alignment: .bottomLeading) {
+                        if let latestCaption, !latestCaption.isEmpty {
+                            Text(latestCaption)
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 22)
+                                .padding(.bottom, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(LinearGradient(colors: [.clear, .black.opacity(0.65)],
+                                                           startPoint: .top, endPoint: .bottom))
+                        }
+                    }
+            }
+            HStack(spacing: 12) {
+                RoomAvatarCluster(members: roomMembers, images: memberImages)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                        .lineLimit(2)
+                    Text(latestLine ?? Strings.roomNobodyFilmed)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if hasNew {
+                    Circle().fill(Color.oneDayBrand).frame(width: 8, height: 8)
+                        .accessibilityLabel(Strings.roomHasNew)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+        .background(OneDay.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(OneDay.hairline, lineWidth: 1)
+        }
+        .oneDaySoftShadow(strength: 0.45)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var compactRow: some View {
+        HStack(spacing: 14) {
+            thumbnail
             VStack(alignment: .leading, spacing: 5) {
                 Text(presenter.displayTitle)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
-
-                // 朋友's rooms are just their name (1.5).
-                if !challenge.isShared {
-                    Text(subtitle)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
-                }
+                Text(subtitle)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
             }
-
             Spacer(minLength: 4)
-
-            if !showsMembersAsCover, memberNames.count > 1 {
+            if memberNames.count > 1 {
                 AvatarStack(names: memberNames, maxShown: 3, size: 24)
             }
-
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(OneDay.inkFaint)
         }
         .padding(12)
         .glassSurface(radius: OneDay.Radius.card)
+        .contentShape(Rectangle())
+    }
+
+    /// A room still called by the date it was made — the default before
+    /// 「某某的房间」 — is named after the people in it in 朋友's list. The
+    /// stored title is left alone.
+    private var title: String {
+        guard showsMembersAsCover,
+              challenge.title == Strings.byTimeTitle(challenge.startDate),
+              !memberNames.filter({ !$0.isEmpty }).isEmpty
+        else { return presenter.displayTitle }
+        return Strings.roomOfPeople(Array(memberNames.filter { !$0.isEmpty }.prefix(3)))
     }
 
     private var thumbnail: some View {

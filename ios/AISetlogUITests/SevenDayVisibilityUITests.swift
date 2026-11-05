@@ -12,6 +12,7 @@ final class SevenDayVisibilityUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         let compose = app.buttons["home-compose"]
         XCTAssertTrue(compose.waitForExistence(timeout: 15), "新建 button missing")
         compose.tap()
@@ -41,6 +42,7 @@ final class SevenDayVisibilityUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         XCTAssertTrue(demo.isHittable)

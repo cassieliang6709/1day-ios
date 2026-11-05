@@ -131,8 +131,18 @@ struct ClipLibrary {
     /// the calendar's covers, what can be picked for a vlog — so nothing on
     /// that page is ever computed from a friend's clip. Drafts are always
     /// yours, so they stay.
+    ///
+    /// One take sent to several rooms is a copy per room, all stamped with the
+    /// same recording time. 我的 shows it once: four tiles of one clip read as
+    /// "I filmed this four times".
     func scoped(includingFriends: Bool) -> ClipLibrary {
-        includingFriends ? self : ClipLibrary(clips: clips.filter(\.isMine))
+        guard !includingFriends else { return self }
+        var seen: Set<Date> = []
+        return ClipLibrary(clips: clips.filter { clip in
+            guard clip.isMine else { return false }
+            guard clip.storyID != nil, let at = clip.clip.recordedAt else { return true }
+            return seen.insert(at).inserted
+        })
     }
 
     /// How many drafts (clips in no story) there are.

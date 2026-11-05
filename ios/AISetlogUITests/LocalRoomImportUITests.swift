@@ -15,6 +15,7 @@ final class LocalRoomImportUITests: XCTestCase {
             "-demoEntries", "YES",
         ]
         app.launch()
+        app.openPersonalLibrary()
         let demo = app.buttons["home-room-demo"]
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
@@ -31,7 +32,6 @@ final class LocalRoomImportUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: 15))
         XCTAssertTrue(importer.isEnabled)
         XCTAssertFalse(app.staticTexts["local-room-import-error"].exists)
-        app.buttons["room-more"].tap()
         app.buttons["room-chat"].tap()
         XCTAssertTrue(app.staticTexts["今天的故事拍什么？"].waitForExistence(timeout: 15))
         app.buttons["chat-done"].tap()

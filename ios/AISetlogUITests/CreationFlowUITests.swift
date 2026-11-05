@@ -35,6 +35,7 @@ final class CreationFlowUITests: XCTestCase {
     /// between — no 按时间拍, no 自己拍 / 和朋友一起拍 (that's the 朋友 tab).
     func testPlanComposerIsANameAndAList() throws {
         app.launch()
+        app.openPersonalLibrary()
         openComposer()
 
         let summary = app.buttons["composer-list-summary"]
@@ -56,6 +57,7 @@ final class CreationFlowUITests: XCTestCase {
 
     func testWriteListOpensOneEditorWithTwoBlankRows() throws {
         app.launch()
+        app.openPersonalLibrary()
         openComposer()
 
         let list = app.buttons["composer-list-summary"]
@@ -89,6 +91,7 @@ final class CreationFlowUITests: XCTestCase {
     /// there is a plan, 新建 opens it instead of a second one.
     func testTodaysPlanSitsBesideTheMoodAndThereIsOnlyOne() throws {
         app.launch()
+        app.openPersonalLibrary()
         openComposer()
         let list = app.buttons["composer-list-summary"]
         XCTAssertTrue(list.waitForExistence(timeout: 15))

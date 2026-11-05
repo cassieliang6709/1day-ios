@@ -1,4 +1,5 @@
 import Foundation
+import XCTest
 
 /// Wait budgets shared by the UI test suite.
 ///
@@ -46,4 +47,13 @@ import Foundation
 enum UITestWait {
     /// Ceiling for an element that cannot exist until a real render finishes.
     static let media: TimeInterval = 240
+}
+
+extension XCUIApplication {
+    func openPersonalLibrary() {
+        let entry = buttons["rooms-personal"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 15), "Personal library entry missing from Rooms")
+        entry.tap()
+        XCTAssertTrue(buttons["personal-back"].waitForExistence(timeout: 10))
+    }
 }

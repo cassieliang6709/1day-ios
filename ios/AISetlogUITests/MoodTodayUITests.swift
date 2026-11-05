@@ -6,6 +6,7 @@ final class MoodTodayUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "chinese"]
         app.launch()
+        app.openPersonalLibrary()
 
         let selected = app.buttons["mood-today-selected"]
         XCTAssertTrue(app.descendants(matching: .any)["mood-today-card"].waitForExistence(timeout: 15))
@@ -32,6 +33,7 @@ final class MoodTodayUITests: XCTestCase {
 
         app.terminate()
         app.launch()
+        app.openPersonalLibrary()
         XCTAssertTrue(selected.waitForExistence(timeout: 15))
         XCTAssertEqual(selected.label, "平静")
         XCTAssertFalse(app.buttons["mood-happy"].exists)
