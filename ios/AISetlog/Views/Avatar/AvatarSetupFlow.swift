@@ -77,8 +77,8 @@ struct AvatarSetupFlow: View {
                 .padding(.top, 10)
 
             AvatarPlaceholderCard()
-                .frame(width: 210, height: 210)
-                .padding(.top, 32)
+                .frame(width: 240, height: 240)
+                .padding(.top, 40)
 
             // Only a failure says anything here.
             if let error {
@@ -98,11 +98,40 @@ struct AvatarSetupFlow: View {
                 .buttonStyle(.primaryAction)
                 .accessibilityIdentifier("avatar-take-photo")
 
+                // A line under the one button, not a second button as heavy
+                // as 拍一张: there is one thing to do first on this screen.
                 Button { showsPicker = true } label: {
                     Label(Strings.avatarPickPhoto, systemImage: "photo.on.rectangle")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.brandText)
+                        .frame(minHeight: 44)
                 }
-                .buttonStyle(.softAction)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("avatar-pick-photo")
+
+                // No photo: one of the buddies, as is. Not the mood faces —
+                // a room pins today's mood on the avatar's corner. The line
+                // above says so; three faces on their own read as decoration.
+                Text(Strings.avatarOrBuddy)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .padding(.top, 10)
+                HStack(spacing: 18) {
+                    ForEach(Self.builtInAvatars, id: \.self) { name in
+                        Button { pickBuiltIn(name) } label: {
+                            Image(name)
+                                .resizable()
+                                .scaledToFit()
+                                .padding(4)
+                                .frame(width: 56, height: 56)
+                                .background(Circle().fill(AvatarCard<EmptyView>.cardColor))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Strings.avatarUseBuddy)
+                        .accessibilityIdentifier("avatar-builtin-\(name)")
+                    }
+                }
+
 
                 Button { onFinish(false) } label: {
                     Text(skipLabel)
@@ -173,20 +202,23 @@ struct AvatarSetupFlow: View {
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
 
-            AvatarCard {
-                if let result {
-                    Image(decorative: result, scale: 1)
-                        .resizable()
-                        .scaledToFit()
-                        .accessibilityLabel(Strings.avatarAccessibility)
-                        .accessibilityIdentifier("avatar-result")
-                }
+            // Straight on the page, as large as it fits: the sticker has its
+            // own outline, and a pale card around it was a frame in a frame.
+            if let result {
+                Image(decorative: result, scale: 1)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 340, maxHeight: 340)
+                    .padding(.top, 28)
+                    .accessibilityLabel(Strings.avatarAccessibility)
+                    .accessibilityIdentifier("avatar-result")
             }
-            .frame(width: 310, height: 310)
-            .padding(.top, 32)
 
+            // Which drawing path ran, for working on the drawing. Off unless
+            // `-debugAvatarPath YES`: every Debug build is one Cassie uses, and
+            // 「Vision fallback: notSupported」 under her face read as an error.
             #if DEBUG
-            if let path = head?.path {
+            if UserDefaults.standard.bool(forKey: "debugAvatarPath"), let path = head?.path {
                 Text(Self.debugLabel(path))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(OneDay.inkFaint)
@@ -204,6 +236,16 @@ struct AvatarSetupFlow: View {
                 Button(action: redraw) { Text(Strings.avatarRedraw) }
                     .buttonStyle(.softAction)
                     .accessibilityIdentifier("avatar-redraw")
+                // 重画一张 keeps the photo and draws it again; this is the way
+                // back when the photo itself was the problem.
+                Button(action: newPhoto) {
+                    Text(Strings.avatarNewPhoto)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("avatar-new-photo")
             }
             .padding(.bottom, 18)
         }
@@ -245,6 +287,15 @@ struct AvatarSetupFlow: View {
         // new stickers and a new wobble.
         if head?.path == .imageCreator { head = nil }
         run(minimum: head == nil ? Self.minimumDrawSeconds : Self.redrawSeconds)
+    }
+
+    private func newPhoto() {
+        work?.cancel()
+        photo = nil
+        head = nil
+        result = nil
+        frame = nil
+        step = .upload
     }
 
     private func run(minimum: Double) {
@@ -311,6 +362,16 @@ struct AvatarSetupFlow: View {
         }
     }
 
+    static let builtInAvatars = ["OneDayBuddyYellow", "OneDayBuddyBlue", "OneDayBuddyMint"]
+
+    /// Saved like a drawn avatar, so rooms get it the same way.
+    private func pickBuiltIn(_ name: String) {
+        guard let cg = UIImage(named: name)?.cgImage else { return }
+        work?.cancel()
+        result = cg
+        accept()
+    }
+
     // MARK: - Debug
 
     private static var forcesFallback: Bool {
@@ -359,15 +420,18 @@ struct AvatarCard<Content: View>: View {
 }
 
 /// The upload step's picture: an empty face waiting to be drawn.
+/// Straight on the page, no card: a card behind a dashed circle on a
+/// cream page was a box in a box.
 private struct AvatarPlaceholderCard: View {
     var body: some View {
-        AvatarCard {
+        ZStack {
+            Circle()
+                .fill(AvatarCard<EmptyView>.cardColor)
             Circle()
                 .strokeBorder(style: StrokeStyle(lineWidth: 3, dash: [8, 8]))
                 .foregroundStyle(OneDay.inkFaint)
-                .padding(26)
             Image(systemName: "face.smiling")
-                .font(.system(size: 64, weight: .regular))
+                .font(.system(size: 72, weight: .regular))
                 .foregroundStyle(OneDay.inkFaint)
         }
         .accessibilityHidden(true)
@@ -397,7 +461,22 @@ private struct CameraPhotoPicker: UIViewControllerRepresentable {
 
         func imagePickerController(_ picker: UIImagePickerController,
                                    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            onDone(info[.originalImage] as? UIImage)
+            let image = info[.originalImage] as? UIImage
+            // The front camera's preview is a mirror and its photo isn't, so
+            // the avatar came out the other way round from the face you saw.
+            // Flip it to match the preview.
+            onDone(picker.cameraDevice == .front ? image.map(Self.mirrored) : image)
+        }
+
+        private static func mirrored(_ image: UIImage) -> UIImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = image.scale
+            return UIGraphicsImageRenderer(size: image.size, format: format)
+                .image { context in
+                    context.cgContext.translateBy(x: image.size.width, y: 0)
+                    context.cgContext.scaleBy(x: -1, y: 1)
+                    image.draw(at: .zero)
+                }
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onDone(nil) }

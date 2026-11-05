@@ -288,7 +288,7 @@ final class MemberProfileSyncTests: XCTestCase {
 
     func testTheGridFollowsTheHeadCount() {
         XCTAssertTrue(RoomFrames.grid(for: 1) == (1, 1))
-        XCTAssertTrue(RoomFrames.grid(for: 2) == (1, 2), "two people: one above the other")
+        XCTAssertTrue(RoomFrames.grid(for: 2) == (2, 1), "two people: side by side")
         XCTAssertTrue(RoomFrames.grid(for: 3) == (1, 3))
         XCTAssertTrue(RoomFrames.grid(for: 4) == (2, 2))
         XCTAssertTrue(RoomFrames.grid(for: 5) == (2, 3), "five: six places, the last left empty")

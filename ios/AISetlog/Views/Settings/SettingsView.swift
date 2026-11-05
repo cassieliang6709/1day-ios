@@ -16,6 +16,12 @@ struct SettingsView: View {
     @State private var showSignIn = false
     @State private var showAvatarSetup = false
     @State private var showAvatarPreview = false
+    /// 重拍 asks for the setup flow; the sheet's `onDismiss` opens it once the
+    /// preview is really gone. A fixed delay raced the dismissal animation.
+    @State private var retakeAfterPreview = false
+    /// The preview sheet sizes to its content instead of a half-screen detent
+    /// with empty space under the button.
+    @State private var avatarPreviewHeight: CGFloat = 420
     /// Signing out hides every shared room on this device, which nothing on
     /// the row itself suggests — so it asks first.
     @State private var showSignOutConfirmation = false
@@ -61,7 +67,6 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         identityHeader
-                        statsRow
                         group(Strings.displayAndLanguage, rows: displayRows)
                         // Signed out there is nothing here but "sign in",
                         // which the header above already offers — one screen
@@ -69,9 +74,6 @@ struct SettingsView: View {
                         if account.isSignedIn {
                             group(Strings.account, rows: accountRows)
                         }
-                        #if DEBUG
-                        group(Strings.debugSection, rows: DebugTestRoomRows())
-                        #endif
                         smallPrint
                     }
                     .padding(.horizontal, 20)
@@ -94,7 +96,11 @@ struct SettingsView: View {
             .sheet(isPresented: $showSignIn) {
                 SignInView { showSignIn = false }
             }
-            .sheet(isPresented: $showAvatarPreview) { avatarPreview }
+            .sheet(isPresented: $showAvatarPreview, onDismiss: {
+                guard retakeAfterPreview else { return }
+                retakeAfterPreview = false
+                showAvatarSetup = true
+            }) { avatarPreview }
             .fullScreenCover(isPresented: $showAvatarSetup) {
                 AvatarSetupFlow(onFinish: { _ in showAvatarSetup = false }, skipLabel: Strings.cancel)
             }
@@ -173,18 +179,39 @@ struct SettingsView: View {
     }
 
     /// Your current photo, full size, with 重拍 under it.
+    ///
+    /// The cut-out drawn straight on the sheet rather than through
+    /// `AvatarDot`: the dot fills white behind a photo, which at this size was
+    /// a bright disc on the dark sheet. The small dots elsewhere keep it.
     private var avatarPreview: some View {
-        VStack(spacing: 24) {
-            AvatarDot(name: account.account?.displayName, size: 240, image: AvatarStore.shared.image)
+        VStack(spacing: 20) {
+            HStack {
+                Spacer()
+                IconBubble(systemName: "xmark", label: Strings.close) {
+                    showAvatarPreview = false
+                }
+            }
+            if let image = AvatarStore.shared.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 240, height: 240)
+                    .accessibilityLabel(Strings.avatarAccessibility)
+            }
             Button(Strings.retake) {
+                retakeAfterPreview = true
                 showAvatarPreview = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showAvatarSetup = true }
             }
             .buttonStyle(.primaryAction)
-            .fixedSize()
+            .frame(width: 200)
             .accessibilityIdentifier("avatar-retake")
         }
-        .presentationDetents([.medium])
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 28)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { avatarPreviewHeight = $0 }
+        .presentationDetents([.height(avatarPreviewHeight)])
+        .presentationDragIndicator(.visible)
     }
 
     private var identityRow: some View {
@@ -208,16 +235,25 @@ struct SettingsView: View {
                     // The pencil is the only sign a heavy-weight name is a
                     // field; without it nobody thought to tap it.
                     HStack(spacing: 7) {
-                        TextField(Strings.yourNamePlaceholder, text: $draftName)
+                        // `fixedSize` on a TextField doesn't hug its text, so
+                        // the pencil drifted to the middle of the row. A hidden
+                        // Text of the same string sets the width instead.
+                        Text(draftName.isEmpty ? Strings.yourNamePlaceholder : draftName)
                             .font(.system(size: 20, weight: .heavy, design: .rounded))
-                            .foregroundStyle(OneDay.ink)
-                            .tint(Color.oneDayBrand)
-                            .focused($nameFocused)
-                            .submitLabel(.done)
-                            .onSubmit(commitName)
-                            .fixedSize(horizontal: !draftName.isEmpty, vertical: false)
-                            .accessibilityIdentifier("your-name")
-                            .accessibilityHint(Strings.editNameHint)
+                            .lineLimit(1)
+                            .padding(.trailing, 2)
+                            .hidden()
+                            .overlay(alignment: .leading) {
+                                TextField(Strings.yourNamePlaceholder, text: $draftName)
+                                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(OneDay.ink)
+                                    .tint(Color.oneDayBrand)
+                                    .focused($nameFocused)
+                                    .submitLabel(.done)
+                                    .onSubmit(commitName)
+                                    .accessibilityIdentifier("your-name")
+                                    .accessibilityHint(Strings.editNameHint)
+                            }
                         if !nameFocused {
                             Image(systemName: "pencil")
                                 .font(.system(size: 14, weight: .bold))
@@ -250,39 +286,6 @@ struct SettingsView: View {
 
             Spacer(minLength: 0)
         }
-    }
-
-    /// Three numbers the app can actually count.
-    private var statsRow: some View {
-        HStack(spacing: 9) {
-            stat(store.challenges.count, Strings.statStories)
-            stat(
-                store.challenges.reduce(0) { $0 + $1.recordedCount },
-                Strings.statMoments)
-            // `!cards.isEmpty` first: a story with no moments in it satisfies
-            // "every moment filmed" vacuously, and counting it as finished
-            // would be the app congratulating somebody for nothing.
-            stat(
-                store.challenges.filter {
-                    !$0.cards.isEmpty && $0.recordedCount >= $0.cards.count
-                }.count,
-                Strings.statFinished)
-        }
-    }
-
-    private func stat(_ value: Int, _ unit: String) -> some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.system(size: 22, weight: .black, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(OneDay.ink)
-            Text(unit)
-                .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                .foregroundStyle(OneDay.inkFaint)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 11)
-        .glassSurface(radius: 16)
     }
 
     // MARK: - Groups
@@ -326,7 +329,7 @@ struct SettingsView: View {
         // how your films look, with no film on it, is a page you set blind.
         SettingsLinkRow(
             symbol: "circle.lefthalf.filled",
-            accent: .oneDayNavy,
+            accent: OneDay.brandText,
             title: Strings.appearance,
             value: appAppearance.displayName
         ) {

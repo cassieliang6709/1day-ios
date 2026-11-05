@@ -31,8 +31,11 @@ extension Strings {
     static var avatarConfirmHeadline: String { avatar("这是你", "Done. This is you.") }
     static var avatarConfirm: String { avatar("就是这样", "That's me") }
     static var avatarRedraw: String { avatar("重画一张", "Draw another") }
+    static var avatarNewPhoto: String { avatar("换张照片", "Use another photo") }
     static var avatarDone: String { avatar("好了，去记今天。", "All set. Go film today.") }
     static var avatarAccessibility: String { avatar("你的头像", "Your avatar") }
+    static var avatarUseBuddy: String { avatar("用这个小人", "Use this buddy") }
+    static var avatarOrBuddy: String { avatar("不想用照片？选一个", "Rather not use a photo? Pick one") }
 
     // Settings
     static var avatarRedoHint: String { avatar("点一下重画头像", "Tap to redraw your avatar") }

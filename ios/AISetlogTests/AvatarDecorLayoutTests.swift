@@ -95,7 +95,7 @@ final class AvatarDecorLayoutTests: XCTestCase {
 
     func testTheRainbowWobblesButOnlyALittle() {
         let l = layout(seed: 11)
-        let bandWidth = l.canvas * 0.016
+        let bandWidth = l.canvas * 0.008
         for band in l.bands.dropLast() {
             let radii = band.offsets.map { hypot($0.x, $0.y) }
             XCTAssertGreaterThan(radii.max()! - radii.min()!, 0.5, "a ruled line, not crayon")

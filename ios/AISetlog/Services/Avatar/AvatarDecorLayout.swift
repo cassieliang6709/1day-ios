@@ -104,7 +104,7 @@ struct AvatarDecorLayout: Equatable {
     ) -> AvatarDecorLayout {
         var rng = SplitMix64(seed: seed)
         let margin = (canvas * safeMarginFraction).rounded()
-        let bandWidth = canvas * 0.016
+        let bandWidth = canvas * 0.008
         let whiteWidth = canvas * 0.03
         let outline = whiteWidth + bandWidth * CGFloat(rainbow.count)
         // A wobbling sample can reach a little past its band.

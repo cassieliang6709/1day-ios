@@ -93,10 +93,9 @@ extension ChallengeStore {
 }
 
 extension ChallengeStore {
-    /// Avatars by member name, for views that only know names (the 朋友
-    /// tab's faces-as-cover stack). Mine comes from this phone.
+    /// Member IDs keep duplicate or empty names from sharing one avatar.
     @MainActor
-    func memberAvatars(for challengeID: UUID) -> [String: UIImage] {
+    func memberAvatarsByID(for challengeID: UUID) -> [String: UIImage] {
         let profiles = memberProfiles(for: challengeID)
         let myID = account?.account?.id
         var out: [String: UIImage] = [:]
@@ -104,7 +103,7 @@ extension ChallengeStore {
             let image = member.id == myID
                 ? AvatarStore.shared.image
                 : AvatarImageCache.image(at: profiles[member.id]?.avatarURL)
-            if let image { out[member.name] = image }
+            if let image { out[member.id] = image }
         }
         return out
     }

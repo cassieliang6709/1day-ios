@@ -38,10 +38,13 @@ enum AvatarHeadExtractor {
         // The head's box, in pixels, top-left origin.
         let headBox: CGRect = {
             if let face {
+                // A circle on the face, a little high for the hair, so the
+                // sticker comes out round with the face in the middle.
                 let f = face.rect
+                let side = max(f.width, f.height) * 1.8
                 return CGRect(
-                    x: f.midX - f.width * 0.85, y: f.minY - f.height * 0.72,
-                    width: f.width * 1.7, height: f.height * 1.84)
+                    x: f.midX - side / 2, y: f.midY - side * 0.56,
+                    width: side, height: side)
             }
             if let bounds = mask.flatMap({ maskBounds($0, size: size) }) {
                 // No face: the top of whatever stands out, roughly head-shaped.
