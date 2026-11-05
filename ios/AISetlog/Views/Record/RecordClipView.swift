@@ -35,9 +35,7 @@ struct RecordClipView: View {
     var unfiledGuard: UnfiledClipGuard?
     /// Free-form only: "there's nowhere to file this yet — make somewhere".
     var onStartStory: (() -> Void)?
-    /// Free-form only: back to the tab the camera came from. The shell hides
-    /// its bar while the camera is up (1.5), so this is the ✕. The shell's own
-    /// unfiled-clip guard asks before a take in review is lost.
+    /// Free-form only: back to the browsing surface the camera came from.
     var onCloseFreeform: (() -> Void)?
     let onSave: (URL, String?) -> Void
 
@@ -73,9 +71,8 @@ struct RecordClipView: View {
     private var captureOrientation: Challenge.Orientation {
         manualSideways ? .landscape : effectiveOrientation
     }
-    /// The take under review was filmed with 横拍 on; it's shown turned the
-    /// same way, so it reads the right way up in the sideways hand.
-    @State private var reviewTurn: Double = 0
+    @State private var reviewOrientation: Challenge.Orientation = .portrait
+    @State private var measuredReviewAspect: CGFloat?
     private var isSideways: Bool { deviceTurn != 0 }
     /// Set once this screen has decided to go — the toast saying what happened
     /// is on screen and the dismiss is a beat behind it. Blocks the shutter in
@@ -110,9 +107,7 @@ struct RecordClipView: View {
     static let takeSeconds: Double = 2
     private var clipSeconds: Double { Self.takeSeconds }
     private var clipSecondsText: String { Challenge.ClipLength.tiny.secondsLabel }
-    /// The free-form camera used to leave 68pt here for the floating bar
-    /// under it. The bar is hidden while the camera is up as of 1.5.
-    private var bottomInset: CGFloat { 8 }
+    private var bottomInset: CGFloat { isFreeform ? OneDay.tabBarClearance + 8 : 8 }
     /// What this take is filmed with. There is one camera now (DV, 1.5): a
     /// story or room locked to a camera that's no longer offered films with
     /// it too. Clips already filmed keep the look baked into them.
@@ -125,6 +120,9 @@ struct RecordClipView: View {
     /// with landscape or square keeps it.
     private var effectiveOrientation: Challenge.Orientation {
         isFreeform ? freeformOrientation : orientation
+    }
+    private var filingOrientation: Challenge.Orientation {
+        recorder.clipURL == nil ? captureOrientation : reviewOrientation
     }
     private var trimmedOverlayText: String? {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -203,7 +201,10 @@ struct RecordClipView: View {
             guard recorder.state == .unavailable else { return }
             Task { await recorder.configure() }
         }
-        .onDisappear { recorder.teardown() }
+        .onDisappear {
+            recorder.teardown()
+            unfiledGuard?.isRecording = false
+        }
         .allowsHitTesting(!isLeaving)
         // Felt rather than seen: the thumb is still on or near the shutter,
         // covering the ring, at exactly the moments these fire.
@@ -226,8 +227,14 @@ struct RecordClipView: View {
         .onChange(of: cameraStyle) { _, _ in
             recorder.cameraStyle = activeCamera
         }
+        .onChange(of: filingOrientation) { _, _ in
+            sendTo.formIntersection(Set(sendableRooms.map(\.id)))
+        }
         .onChange(of: recorder.state) { _, state in
+            unfiledGuard?.isRecording = state == .recording
             if state == .recording {
+                reviewOrientation = captureOrientation
+                measuredReviewAspect = nil
                 ringProgress = 0
                 withAnimation(.linear(duration: clipSeconds)) { ringProgress = 1 }
             }
@@ -235,7 +242,7 @@ struct RecordClipView: View {
         .onChange(of: recorder.clipURL) { _, url in
             guard isFreeform, let unfiledGuard else { return }
             unfiledGuard.hasUnfiledClip = url != nil
-            unfiledGuard.keep = { finishFreeTake() }
+            unfiledGuard.keep = { keepAsDraft() }
             unfiledGuard.discard = { clearReview() }
         }
     }
@@ -337,13 +344,6 @@ struct RecordClipView: View {
             recorder.forcedLandscape = on
             recorder.orientation = captureOrientation
         }
-        // When the take starts, not when it lands: the clip arriving swaps
-        // this view for the review, and a change seen by a view on its way
-        // out never ran — every 横拍 take was reviewed unturned, a landscape
-        // film cropped into the upright box. 横拍 can't change mid-take.
-        .onChange(of: recorder.state) { _, state in
-            if state == .recording { reviewTurn = deviceTurn }
-        }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
@@ -410,6 +410,7 @@ struct RecordClipView: View {
             secondsLabel: clipSecondsText
         ))
         .accessibilityHint(Strings.tapToFilmTwoSeconds)
+        .accessibilityIdentifier("camera-shutter")
         .accessibilityAction { startCapture() }
     }
 
@@ -461,6 +462,7 @@ struct RecordClipView: View {
     private func reviewView(_ url: URL) -> some View {
         VStack(spacing: 10) {
             topBar
+            Spacer(minLength: 0)
 
             CameraShell(
                 name: myName,
@@ -472,31 +474,25 @@ struct RecordClipView: View {
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: recorder.cameraStyle.aspectRatio(for: effectiveOrientation)
-                    ?? effectiveOrientation.aspectRatio,
-                showsDate: recorder.cameraStyle == .standard,
-                turn: reviewTurn
+                aspectRatio: measuredReviewAspect
+                    ?? recorder.cameraStyle.aspectRatio(for: reviewOrientation)
+                    ?? reviewOrientation.aspectRatio,
+                showsDate: recorder.cameraStyle == .standard
             ) {
-                GeometryReader { proxy in
-                    let sideways = reviewTurn != 0
-                    ZStack {
-                        // Immediate review is always the camera truth; grading belongs elsewhere.
-                        LoopingClipPlayer(url: url, look: .none)
-                        // The caption is typed right where it lands in the film —
-                        // center of the frame, not in a bar below the video.
-                        CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
-                    }
-                    // A 横拍 take is landscape: laid out wide, then turned
-                    // into the upright box, the way it was framed.
-                    .frame(
-                        width: sideways ? proxy.size.height : proxy.size.width,
-                        height: sideways ? proxy.size.width : proxy.size.height)
-                    .rotationEffect(.degrees(reviewTurn))
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+                ZStack {
+                    LoopingClipPlayer(url: url, look: .none)
+                    CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
                 }
             }
             .layoutPriority(1)
+            .task(id: url) {
+                let aspect = await ClipGeometry.aspect(of: url)
+                guard !Task.isCancelled else { return }
+                measuredReviewAspect = aspect
+            }
             // Swipe the take away to drop it (1.5) — no dialog.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("capture-review-frame")
             .gesture(
                 DragGesture(minimumDistance: 30).onEnded { value in
                     if value.translation.width < -80, abs(value.translation.height) < 80 {
@@ -504,6 +500,7 @@ struct RecordClipView: View {
                     }
                 })
 
+            Spacer(minLength: 0)
             if isFreeform { RoomSendList(rooms: sendableRooms, picked: $sendTo) }
 
             HStack(spacing: 10) {
@@ -575,19 +572,19 @@ struct RecordClipView: View {
     private var noPlaceMessage: String {
         store.challenges.isEmpty
             ? Strings.makePlanFirst
-            : Strings.noMatchingPlan(effectiveOrientation)
+            : Strings.noMatchingPlan(filingOrientation)
     }
 
     // MARK: - Free-form filing
 
     /// Rooms this take can go to, newest first.
     private var sendableRooms: [Challenge] {
-        ClipFiling.rooms(in: store.challenges, orientation: effectiveOrientation)
+        ClipFiling.rooms(in: store.challenges, orientation: filingOrientation)
             .sorted { $0.startDate > $1.startDate }
     }
 
     private var filingCandidates: [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
+        ClipFiling.candidates(in: store.challenges, orientation: filingOrientation)
     }
 
     /// Free-form: file the clip into each chosen plan's first open slot.
@@ -630,13 +627,15 @@ struct RecordClipView: View {
     /// On failure this deliberately does **not** retake: the temp file is still
     /// the only copy, so clearing the review would finish the job the bug used
     /// to do. Staying put leaves a retry available.
-    private func keepAsDraft(then next: (() -> Void)? = nil) {
-        guard let url = recorder.clipURL else { return }
+    @discardableResult
+    private func keepAsDraft(then next: (() -> Void)? = nil) -> Bool {
+        guard let url = recorder.clipURL else { return false }
         do {
             try drafts.keep(
                 tempURL: url,
-                orientation: effectiveOrientation,
-                overlayText: trimmedOverlayText)
+                orientation: filingOrientation,
+                overlayText: trimmedOverlayText,
+                recordedAt: recorder.recordedAt ?? .now)
             clearReview()
             showToast(Strings.draftKept)
             // The next step — dismissing, or walking to the composer — unmounts
@@ -650,8 +649,10 @@ struct RecordClipView: View {
                     isLeaving = false
                 }
             }
+            return true
         } catch {
             showToast(Strings.draftSaveFailed)
+            return false
         }
     }
 
@@ -691,7 +692,8 @@ struct RecordClipView: View {
     /// it isn't kept a second time as a loose clip.
     private func finishFreeTake(then next: (() -> Void)? = nil) {
         guard let url = recorder.clipURL else { next?(); return }
-        let rooms = sendTo.filter { id in store.challenge(id)?.isShared == true }
+        let eligible = Set(sendableRooms.map(\.id))
+        let rooms = sendTo.intersection(eligible)
         guard !rooms.isEmpty else {
             keepAsDraft(then: next)
             return
@@ -829,17 +831,20 @@ struct RecordClipView: View {
     /// left is the two things you read rather than press, so the row shrank
     /// from 44pt to the height of its own text.
     private var topBar: some View {
-        HStack {
+        let turn = recorder.clipURL == nil ? deviceTurn : 0
+        let sideways = turn != 0
+        return HStack {
             if isFreeform {
                 if let onCloseFreeform {
                     Button { onCloseFreeform() } label: {
                         Image(systemName: "xmark")
                             .cameraGlass()
-                            .rotationEffect(.degrees(deviceTurn))
+                            .rotationEffect(.degrees(turn))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Strings.closeCamera)
                     .accessibilityIdentifier("camera-close")
+                    .disabled(recorder.state == .recording)
                 } else {
                     Color.clear.frame(width: 44, height: 1)
                 }
@@ -847,29 +852,30 @@ struct RecordClipView: View {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
                         .cameraGlass()
-                        .rotationEffect(.degrees(deviceTurn))
+                        .rotationEffect(.degrees(turn))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Strings.closeCamera)
+                .disabled(recorder.state == .recording)
             }
 
             Spacer(minLength: 8)
 
             VStack(spacing: 1) {
-                OneDayBrandLogo(width: isSideways ? 64 : 92)
+                OneDayBrandLogo(width: sideways ? 64 : 92)
                 Text(localizedMomentTitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: isSideways ? 80 : 170)
+            .frame(maxWidth: sideways ? 80 : 170)
             // 横拍 turns everything you read along with the buttons, so the
             // whole screen reads upright in the sideways hand. Turned, the
             // row's width becomes height: smaller, and lifted into the empty
             // space above, so it stays clear of the viewfinder.
-            .rotationEffect(.degrees(deviceTurn))
-            .offset(y: isSideways ? -14 : 0)
+            .rotationEffect(.degrees(turn))
+            .offset(y: sideways ? -14 : 0)
 
             Spacer(minLength: 8)
 

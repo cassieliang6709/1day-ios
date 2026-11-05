@@ -71,8 +71,9 @@ extension View {
 }
 
 struct CameraShell<Content: View>: View {
-    /// Whose camera this is. Only the frame's tint uses it now — the picture
-    /// itself no longer gets labelled with your own name.
+    /// Whose camera this is. Unused: the frame is always the brand yellow
+    /// now, not a per-person colour, and the picture is never labelled with
+    /// your own name. Kept so the call sites don't change.
     let name: String?
     /// The moment's name, or nil when this take isn't a moment in a story yet.
     let momentTitle: String?
@@ -98,7 +99,7 @@ struct CameraShell<Content: View>: View {
     var turn: Double = 0
     @ViewBuilder var content: Content
 
-    private var tint: Color { Identity.tint(for: name) }
+    private var tint: Color { Color.oneDayBrand }
 
     var body: some View {
         GeometryReader { proxy in

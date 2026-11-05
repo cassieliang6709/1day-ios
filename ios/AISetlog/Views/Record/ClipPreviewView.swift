@@ -236,7 +236,7 @@ struct ClipPreviewView: View {
             if !focused, editingCaption { saveCaption() }
         }
         .onSubmit { commitCaption() }
-        .onChange(of: captionDraft) { _, new in limitCaptionLines(new) }
+        .onChange(of: captionDraft) { old, new in limitCaptionLines(old: old, new: new) }
     }
 
     /// While typing, a tap anywhere off the picture means "done".
@@ -255,13 +255,39 @@ struct ClipPreviewView: View {
     /// `Color.clear` sized by the aspect ratio rather than the player itself:
     /// a player reports the size it filled to, and an overlay can't feed back
     /// into the layout around it.
+    @ViewBuilder
     private var stage: some View {
-        Color.clear
-            .aspectRatio(aspectRatio, contentMode: .fit)
-            .overlay { videoStage }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
-            .accessibilityIdentifier("moment-stage")
+        if isMine {
+            Color.clear
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .overlay { videoStage }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+                .accessibilityIdentifier("moment-stage")
+        }
+        // Somebody else's take is drawn by `friendLayout`, inside `chrome`.
+    }
+
+    /// Somebody else's take: a card with its buttons just above it and the
+    /// name and time just below, grouped in the middle of the screen. Pinned
+    /// to the screen's corners they were a long reach from the picture.
+    ///
+    /// Yours stays full size — the captions are edited on it, and its tint
+    /// rows come and go, which would resize a card every time one is picked.
+    private var friendLayout: some View {
+        VStack(spacing: 12) {
+            Spacer(minLength: 0)
+            top
+            Color.clear
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .overlay { videoStage }
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .accessibilityIdentifier("moment-stage")
+            bottomControls
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 
     /// The player plus the caption layer.
@@ -390,15 +416,20 @@ struct ClipPreviewView: View {
     /// The top bar and the bottom controls, floating over the picture. The
     /// `Spacer` between them takes no taps, so the captions underneath it stay
     /// reachable.
+    @ViewBuilder
     private var chrome: some View {
-        VStack(spacing: 0) {
-            top
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-            Spacer(minLength: 0)
-            bottomControls
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
+        if isMine {
+            VStack(spacing: 0) {
+                top
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                Spacer(minLength: 0)
+                bottomControls
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
+        } else {
+            friendLayout
         }
     }
 
@@ -569,15 +600,8 @@ struct ClipPreviewView: View {
                         accented: false, identifier: "moment-add-take", action: onAddTake)
                 }
             }
-            if isShared {
-                // Accented in a room: what isn't obvious there is that a moment
-                // has a thread on it at all.
-                actionButton(
-                    "bubble.left.fill", Strings.chatShort,
-                    accented: true, identifier: "moment-chat",
-                    badge: comments.isEmpty ? nil : comments.count
-                ) { showComments = true }
-            }
+            // 聊天 is in the top bar (`topTrailing`), not here: a full-width
+            // yellow bar under the picture was the loudest thing on screen.
             ForEach(extraActions.filter { !$0.isDestructive }) { extra in
                 actionButton(
                     extra.symbol, extra.title, accented: false,
@@ -632,7 +656,9 @@ struct ClipPreviewView: View {
         ZStack {
             positionChip
             HStack {
-                IconBubble(systemName: "xmark", overVideo: true) { dismiss() }
+                // Save a caption still being typed first: dismissing tears the
+                // view down before the focus change that would have saved it.
+                IconBubble(systemName: "xmark", overVideo: true) { commitCaption(); dismiss() }
                     .accessibilityLabel(Strings.close)
                     .accessibilityIdentifier("moment-close")
                 Spacer(minLength: 0)
@@ -658,6 +684,25 @@ struct ClipPreviewView: View {
             .accessibilityIdentifier("caption-done")
         } else {
             HStack(spacing: 8) {
+                if isShared {
+                    IconBubble(systemName: "bubble.left.fill", label: Strings.chatShort, overVideo: true) {
+                        showComments = true
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if !comments.isEmpty {
+                            Text("\(comments.count)")
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(OneDay.onBrand)
+                                .padding(.horizontal, 5)
+                                .frame(minWidth: 17, minHeight: 17)
+                                .background(Capsule().fill(Color.oneDayBrand))
+                                .offset(x: 2, y: -2)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityIdentifier("moment-chat")
+                }
                 if !isMine {
                     IconBubble(
                         systemName: look.isIdentity ? "camera.filters" : "sparkles",
@@ -732,8 +777,7 @@ struct ClipPreviewView: View {
             if let challengeID {
                 RoomChatView(
                     challengeID: challengeID,
-                    moment: day,
-                    reactionTarget: .init(day: day, authorID: targetAuthorID ?? myID))
+                    moment: day)
             }
         }
         .presentationDetents([.large])
@@ -802,16 +846,26 @@ struct ClipPreviewView: View {
         return CaptionSticker(x: 0.5, y: y, style: last.style, tint: last.tint)
     }
 
-    /// The one way out of the editor: 完成, a tap off the caption, Return on
-    /// the second line, and focus leaving all end here.
+    /// The one way out of the editor: 完成, a tap off the caption, Return,
+    /// and focus leaving all end here.
     private func commitCaption() {
         captionFocused = false
         if editingCaption { saveCaption() }
     }
 
-    /// Two lines at most, the same cap the burned caption has.
-    private func limitCaptionLines(_ text: String) {
+    /// Return means 写完了, on any line. The key shows ✓, and when it made a
+    /// line break on the first line and saved on the second there was no
+    /// telling which it would do. Long captions still wrap to two lines.
+    /// A pasted line break stays, up to the same two-line cap the burned
+    /// caption has.
+    private func limitCaptionLines(old: String, new text: String) {
         guard editingCaption else { return }
+        let breaks = { (s: String) in s.filter { $0 == "\n" }.count }
+        if text.count == old.count + 1, breaks(text) > breaks(old) {
+            captionDraft = old
+            commitCaption()
+            return
+        }
         let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
         guard parts.count > 2 else { return }
         captionDraft = String(parts[0]) + "\n" + parts[1...].joined()
