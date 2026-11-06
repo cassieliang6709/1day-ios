@@ -257,24 +257,15 @@ struct ClipPreviewView: View {
     /// into the layout around it.
     @ViewBuilder
     private var stage: some View {
-        if isMine {
-            Color.clear
-                .aspectRatio(aspectRatio, contentMode: .fit)
-                .overlay { videoStage }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
-                .accessibilityIdentifier("moment-stage")
-        }
-        // Somebody else's take is drawn by `friendLayout`, inside `chrome`.
+        // Every take is drawn by `cardLayout`, inside `chrome`.
+        EmptyView()
     }
 
-    /// Somebody else's take: a card with its buttons just above it and the
-    /// name and time just below, grouped in the middle of the screen. Pinned
-    /// to the screen's corners they were a long reach from the picture.
-    ///
-    /// Yours stays full size — the captions are edited on it, and its tint
-    /// rows come and go, which would resize a card every time one is picked.
-    private var friendLayout: some View {
+    /// Any take, mine or a friend's (one look since 2026-11-07): a card with
+    /// its buttons just above it and the name, time and editing rows just
+    /// below, grouped in the middle of the screen. Pinned to the screen's
+    /// corners they were a long reach from the picture.
+    private var cardLayout: some View {
         VStack(spacing: 12) {
             Spacer(minLength: 0)
             top
@@ -286,8 +277,8 @@ struct ClipPreviewView: View {
             bottomControls
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     /// The player plus the caption layer.
@@ -312,7 +303,8 @@ struct ClipPreviewView: View {
             .overlay { ClipThumbnail(url: url, refreshToken: recordedAt) }
             .clipped()
             .blur(radius: 44)
-            .overlay(Color.black.opacity(0.5))
+            // Light enough to read as the clip's own colours, not as black.
+            .overlay(Color.black.opacity(0.28))
             .ignoresSafeArea()
             .allowsHitTesting(false)
     }
@@ -418,19 +410,7 @@ struct ClipPreviewView: View {
     /// reachable.
     @ViewBuilder
     private var chrome: some View {
-        if isMine {
-            VStack(spacing: 0) {
-                top
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                Spacer(minLength: 0)
-                bottomControls
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 10)
-            }
-        } else {
-            friendLayout
-        }
+        cardLayout
     }
 
     /// Who and when, the selected caption's colour and backing, then the
@@ -439,7 +419,9 @@ struct ClipPreviewView: View {
     /// Faded rather than removed while typing, so nothing above it moves.
     private var bottomControls: some View {
         VStack(spacing: 9) {
-            byline
+            // My own take has the time burned into its camera stamp already;
+            // a second 01:00 under it said nothing new.
+            if !isMine { byline }
             if isMine, let target {
                 tintRows(for: target)
                 plateRow(for: target)
@@ -584,7 +566,7 @@ struct ClipPreviewView: View {
             if isMine, canWrite {
                 actionButton(
                     "text.badge.plus", Strings.captionAction,
-                    accented: !isShared,
+                    accented: !isShared && sendActions.isEmpty,
                     identifier: "moment-caption",
                     action: startNewCaption)
             }
@@ -602,13 +584,17 @@ struct ClipPreviewView: View {
             }
             // 聊天 is in the top bar (`topTrailing`), not here: a full-width
             // yellow bar under the picture was the loudest thing on screen.
-            ForEach(extraActions.filter { !$0.isDestructive }) { extra in
+            // 发到房间 is what a finished take is for, so it is the filled
+            // button and 加字幕 steps back.
+            ForEach(sendActions) { extra in
                 actionButton(
-                    extra.symbol, extra.title, accented: false,
+                    extra.symbol, extra.title, accented: extra.id == sendActions.first?.id,
                     identifier: extra.id, action: extra.action)
             }
         }
     }
+
+    private var sendActions: [ExtraAction] { extraActions.filter { !$0.isDestructive } }
 
     private func actionButton(
         _ symbol: String, _ title: String, accented: Bool, identifier: String,

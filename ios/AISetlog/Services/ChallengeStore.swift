@@ -342,15 +342,19 @@ final class ChallengeStore {
         // reaches this line, so it leaves no record behind.
         await roomSync.recordMembership(
             code: room.code, authorID: me.id, displayName: me.displayName)
-        // Joining wrote the record from scratch; put my avatar and mood back.
         try Task.checkCancellation()
         guard isCurrentAccount(me.id, revision: revision), self.challenge(challenge.id) != nil
         else { throw CancellationError() }
-        roomSync.forgetPublishedProfile(code: room.code)
-        await publishMyProfile(toRoom: room.code)
-        try Task.checkCancellation()
-        guard isCurrentAccount(me.id, revision: revision) else { throw CancellationError() }
-        await syncRoom(challenge.id)
+        // The room is joined; open it now. Putting my avatar and mood back
+        // and pulling every clip (a busy room is dozens of videos) happen
+        // behind it, so joining doesn't wait on downloads.
+        Task { @MainActor [weak self] in
+            guard let self, self.isCurrentAccount(me.id, revision: revision) else { return }
+            self.roomSync.forgetPublishedProfile(code: room.code)
+            await self.publishMyProfile(toRoom: room.code)
+            guard self.isCurrentAccount(me.id, revision: revision) else { return }
+            await self.syncRoom(challenge.id)
+        }
         return challenge
     }
 

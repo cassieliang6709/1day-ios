@@ -17,7 +17,20 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         : AVCaptureSession()
     private static let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
     private let movieOutput = AVCaptureMovieFileOutput()
-    private var videoInput: AVCaptureDeviceInput?
+    /// The session queue swaps the inputs (flip, dual camera, setup) while
+    /// the main thread reads them for zoom and the torch. Unguarded, a read
+    /// landing mid-swap can retain a reference that is being released.
+    @ObservationIgnored private let inputLock = NSLock()
+    @ObservationIgnored private var _videoInput: AVCaptureDeviceInput?
+    private var videoInput: AVCaptureDeviceInput? {
+        get {
+            access(keyPath: \.videoInput)
+            return inputLock.withLock { _videoInput }
+        }
+        set {
+            withMutation(keyPath: \.videoInput) { inputLock.withLock { _videoInput = newValue } }
+        }
+    }
     private var position: AVCaptureDevice.Position = .back
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
@@ -35,7 +48,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     // Each take writes two files; `PiPComposer` folds them into the one clip
     // everything after the camera already expects.
     private let secondaryOutput = AVCaptureMovieFileOutput()
-    private var secondaryInput: AVCaptureDeviceInput?
+    @ObservationIgnored private var _secondaryInput: AVCaptureDeviceInput?
+    private var secondaryInput: AVCaptureDeviceInput? {
+        get {
+            access(keyPath: \.secondaryInput)
+            return inputLock.withLock { _secondaryInput }
+        }
+        set {
+            withMutation(keyPath: \.secondaryInput) { inputLock.withLock { _secondaryInput = newValue } }
+        }
+    }
     private var secondaryConnections: [AVCaptureConnection] = []
     private weak var secondaryPreviewLayer: AVCaptureVideoPreviewLayer?
 
@@ -388,7 +410,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             Self.setFileAngle(
                 CameraOrientation.captureAngle(
                     sideways: sideways, nativePortrait: native, front: device.position == .front),
-                mirrored: device.position == .front,
+                mirrored: Self.mirrorsLikePreview(previewLayer?.connection, front: device.position == .front),
                 on: movieOutput.connection(with: .video))
             // The viewfinder stays upright on the portrait-locked screen even
             // in 横拍: the phone itself is turned, so the live picture already
@@ -401,13 +423,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 let otherNative = CameraOrientation.nativePortrait(other)
                 for connection in secondaryConnections {
                     if connection.videoPreviewLayer == nil {
-                        // The inset's selfie is filmed mirrored too, the way
-                        // its preview shows it — as the single front camera's is.
+                        // Never mirrored, like the main camera's file.
                         Self.setFileAngle(
                             CameraOrientation.captureAngle(
                                 sideways: sideways, nativePortrait: otherNative,
                                 front: other.position == .front),
-                            mirrored: other.position == .front, on: connection)
+                            mirrored: Self.mirrorsLikePreview(secondaryConnections.first { $0.videoPreviewLayer != nil }, front: other.position == .front), on: connection)
                     } else {
                         Self.setAngle(
                             CameraOrientation.previewAngle(nativePortrait: otherNative), on: connection)
@@ -420,9 +441,21 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
+    /// Preview connections are left to AVFoundation's own mirroring: the
+    /// front camera's viewfinder reads like a mirror, as everywhere else on
+    /// the phone. Setting it by hand on the inset's connection made removing
+    /// that connection throw (turning 双摄 off crashed, 2026-11-07).
     private static func setAngle(_ angle: CGFloat, on connection: AVCaptureConnection?) {
         guard let connection, connection.isVideoRotationAngleSupported(angle) else { return }
         connection.videoRotationAngle = angle
+    }
+
+    /// The file is never mirrored, front camera included — the iPhone
+    /// Camera app's default (2026-11-07): the viewfinder reads like a mirror
+    /// while filming, the clip shows the scene as someone facing you sees it,
+    /// so writing in it reads the right way round.
+    private static func mirrorsLikePreview(_ preview: AVCaptureConnection?, front: Bool) -> Bool {
+        false
     }
 
     private static func setFileAngle(
@@ -544,7 +577,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         // the camera; restart here before asking the movie output to record.
         Self.sessionQueue.async { [self] in
             if !session.isRunning { session.startRunning() }
-            guard session.isRunning else {
+            // A running session can still have no live video connection — a
+            // flip whose revert also failed leaves no camera input — and
+            // `startRecording` raises on an output with nothing feeding it.
+            guard session.isRunning,
+                  movieOutput.connection(with: .video)?.isActive == true else {
                 Task { @MainActor in
                     self.recordedAt = nil
                     self.state = .unavailable
@@ -563,7 +600,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                     CameraOrientation.captureAngle(
                         sideways: sideways, nativePortrait: CameraOrientation.nativePortrait(device),
                         front: device.position == .front),
-                    mirrored: device.position == .front,
+                    mirrored: Self.mirrorsLikePreview(previewLayer?.connection, front: device.position == .front),
                     on: movieOutput.connection(with: .video))
             }
             if let other = secondaryInput?.device {
@@ -572,7 +609,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                         CameraOrientation.captureAngle(
                             sideways: sideways, nativePortrait: CameraOrientation.nativePortrait(other),
                             front: other.position == .front),
-                        mirrored: other.position == .front, on: connection)
+                        mirrored: Self.mirrorsLikePreview(secondaryConnections.first { $0.videoPreviewLayer != nil }, front: other.position == .front), on: connection)
                 }
             }
             #if DEBUG
@@ -582,7 +619,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                   "inset=\(Self.diagName(secondaryInput?.device))",
                   "insetFileAngle=\(secondaryConnections.first { $0.videoPreviewLayer == nil }?.videoRotationAngle ?? -1)")
             #endif
+            // Same for the inset: without a live connection the take goes on
+            // as a single-camera one instead of raising.
             let dual = !secondaryConnections.isEmpty
+                && secondaryOutput.connection(with: .video)?.isActive == true
             Task { @MainActor in
                 self.pendingPrimary = nil
                 self.pendingSecondary = dual ? nil : .some(nil)
