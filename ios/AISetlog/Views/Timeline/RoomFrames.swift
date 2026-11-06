@@ -41,6 +41,10 @@ struct RoomFrames: View {
     var orientation: Challenge.Orientation = .portrait
     /// The newest comment on a person's take, for the bubble on their card.
     var latestComment: (DayClip) -> ClipComment? = { _ in nil }
+    /// Signed out the room doesn't sync: a friend's empty frame says so and
+    /// signs in, rather than looking like they never filmed.
+    var signedOut = false
+    var onSignIn: () -> Void = {}
 
     /// Below this a frame is too short to tell what is in the clip, and the
     /// grid scrolls instead. Six people always fit; only a room from before
@@ -142,7 +146,9 @@ struct RoomFrames: View {
             onOpenPerson: { onOpenPerson(column) },
             hasPoked: hasPoked,
             onPoke: onPoke,
-            latestComment: latestComment)
+            latestComment: latestComment,
+            signedOut: signedOut,
+            onSignIn: onSignIn)
     }
 }
 
@@ -157,6 +163,8 @@ private struct PersonFrame: View {
     let hasPoked: (String) -> Bool
     let onPoke: (String) -> Void
     let latestComment: (DayClip) -> ClipComment?
+    let signedOut: Bool
+    let onSignIn: () -> Void
 
     /// The clip on screen. Only that one plays; the others are stills, so a
     /// room with thirty clips isn't thirty players decoding at once.
@@ -363,6 +371,20 @@ private struct PersonFrame: View {
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.roomFeedFilm)
             .accessibilityIdentifier("room-feed-film")
+        } else if !column.isMine, signedOut {
+            VStack(spacing: 10) {
+                Image(systemName: "lock")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(OneDay.inkFaint)
+                Button(Strings.signedOutFrame, action: onSignIn)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.black, in: Capsule())
+                    .accessibilityIdentifier("room-frame-sign-in")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Color.clear
         }

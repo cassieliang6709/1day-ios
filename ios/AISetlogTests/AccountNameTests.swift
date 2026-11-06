@@ -1,4 +1,5 @@
 import XCTest
+import AuthenticationServices
 @testable import AISetlog
 
 /// The name a room shows next to your clips. Apple hands one over exactly
@@ -65,5 +66,15 @@ final class AccountNameTests: XCTestCase {
 
         XCTAssertNil(store.account)
         XCTAssertFalse(store.isSignedIn)
+    }
+
+    /// Only a revoked credential ends the session. 1Day Dev is its own bundle,
+    /// and Apple answered `.notFound` for an account signed in there, which
+    /// signed Cassie out after every launch and emptied her rooms of friends.
+    func testOnlyARevokedCredentialSignsOut() {
+        XCTAssertTrue(AccountStore.signsOut(on: .revoked))
+        XCTAssertFalse(AccountStore.signsOut(on: .notFound))
+        XCTAssertFalse(AccountStore.signsOut(on: .transferred))
+        XCTAssertFalse(AccountStore.signsOut(on: .authorized))
     }
 }

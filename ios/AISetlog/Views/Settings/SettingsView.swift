@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var deleteFailed = false
     @State private var isDeleting = false
     @State private var showSignIn = false
+    @State private var signInError: String?
     @State private var showAvatarSetup = false
     @State private var showAvatarPreview = false
     /// 重拍 asks for the setup flow; the sheet's `onDismiss` opens it once the
@@ -171,11 +172,57 @@ struct SettingsView: View {
 
     // MARK: - Who you are
 
+    @ViewBuilder
     private var identityHeader: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            identityRow
+        if account.isSignedIn {
+            VStack(alignment: .leading, spacing: 11) {
+                identityRow
+            }
+            .padding(.vertical, 4)
+        } else {
+            signedOutCard
         }
-        .padding(.vertical, 4)
+    }
+
+    /// Signed out, the top of settings is a whole card saying what that costs,
+    /// with the Apple button itself on it. It used to be 「未登录」 and a small
+    /// 「登录」 link, easy to miss after the app signed itself out.
+    private var signedOutCard: some View {
+        VStack(spacing: 0) {
+            Image("OneDayMascotCream")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .padding(.bottom, 10)
+                .accessibilityHidden(true)
+            Text(Strings.signedOutTitle)
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .padding(.bottom, 4)
+            Text(Strings.signedOutSettingsBody)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(OneDay.inkSoft)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 14)
+            AppleSignInButton(height: 46) { signInError = nil } onError: { signInError = $0 }
+                .clipShape(Capsule())
+                .accessibilityIdentifier("settings-sign-in")
+            GoogleAccountButton { signInError = nil } onError: { signInError = $0 }
+                .padding(.top, 10)
+            if let signInError {
+                Text(signInError)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .glassSurface(radius: 22)
     }
 
     /// Your current photo, full size, with 重拍 under it.
@@ -268,19 +315,6 @@ struct SettingsView: View {
                 }
                 .onChange(of: nameFocused) { _, focused in
                     if !focused { commitName() }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(Strings.notSignedIn)
-                        .font(.system(size: 15.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    // Signing out used to be one-way from this screen: the
-                    // only other sign-in gate is in front of a shared story,
-                    // so getting back in meant starting one.
-                    Button(Strings.signIn) { showSignIn = true }
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.brandText)
                 }
             }
 

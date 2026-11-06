@@ -1,158 +1,100 @@
 import Foundation
-import CloudKit
 
-/// 心情日记 backup, on the user's **private** CloudKit database. Only the
-/// owner can read it; nothing here ever reaches a room or a friend.
+/// 心情日记 backup on the Worker (`/moods`). Only the owner can read it;
+/// nothing here ever reaches a room or a friend.
 ///
-/// Design:
-/// - `MoodEntry` record, recordName `mood-yyyy-MM-dd`: one per day, a
-///   re-save overwrites it (`.allKeys`, same reason as
-///   `CloudKitService.upsert`). Last write wins by `updatedAt`, decided by
-///   `MoodStore.merge`.
-/// - Records live in a custom zone (`Moods`) rather than the default zone so
-///   fetching is a zone-changes read with a change token. A query would need
-///   a queryable index deployed in the CloudKit Console first — the same trap
-///   behind `CKServiceError.fieldNotQueryable` for rooms.
-/// - No iCloud account → `isAvailable` is false and the store stays local.
+/// - One row per day; a re-save overwrites it. Last write wins by
+///   `updatedAt`, decided by `MoodStore.merge` here and by the Worker there.
+/// - Fetching reads "everything after the last `seq` I saw" — the cursor is
+///   kept per signed-in person, so the next one to sign in on this phone
+///   starts from the beginning of their own diary.
+/// - The first sync for a person sends every entry on the phone once: what
+///   went to CloudKit before never counted as pending.
+/// - Not signed in → `isAvailable` is false and the store stays local.
 struct MoodSync: MoodSyncing {
-    static let recordType = "MoodEntry"
-    static let zoneID = CKRecordZone.ID(zoneName: "Moods", ownerName: CKCurrentUserDefaultName)
+    private static let cursorKey = "moodSync.cursor.v2"
 
-    private static let tokenKey = "moodSync.changeToken.v1"
-    private static let zoneReadyKey = "moodSync.zoneReady.v1"
-
-    private var container: CKContainer { CKContainer(identifier: CloudKitService.containerID) }
-    private var db: CKDatabase { container.privateCloudDatabase }
+    var api: OneDayAPI = .shared
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, api: OneDayAPI = .shared) {
         self.defaults = defaults
+        self.api = api
     }
 
-    // MARK: Record mapping
+    // MARK: Wire mapping
 
-    static func recordID(forDay day: String) -> CKRecord.ID {
-        CKRecord.ID(recordName: "mood-\(day)", zoneID: zoneID)
+    struct Row: Codable, Equatable {
+        let day: String
+        let mood: String
+        let note: String
+        let updatedAt: Int64
     }
 
-    static func record(for entry: MoodEntry) -> CKRecord {
-        let record = CKRecord(recordType: recordType, recordID: recordID(forDay: entry.day))
-        record["day"] = entry.day as CKRecordValue
-        record["mood"] = entry.mood.rawValue as CKRecordValue
-        record["note"] = entry.note as CKRecordValue
-        record["updatedAt"] = entry.updatedAt as CKRecordValue
-        return record
+    static func row(for entry: MoodEntry) -> Row {
+        Row(day: entry.day, mood: entry.mood.rawValue, note: entry.note, updatedAt: entry.updatedAt.apiMillis)
     }
 
-    /// `nil` for a record this build can't read (unknown mood from a newer
-    /// version, missing fields) — skipped rather than crashing the merge.
-    static func entry(from record: CKRecord) -> MoodEntry? {
-        guard record.recordType == recordType,
-              let day = record["day"] as? String,
-              let raw = record["mood"] as? String, let mood = Mood(rawValue: raw),
-              let updatedAt = record["updatedAt"] as? Date
-        else { return nil }
-        return MoodEntry(day: day, mood: mood,
-                         note: record["note"] as? String ?? "", updatedAt: updatedAt)
+    /// `nil` for a row this build can't read (a mood from a newer version) —
+    /// skipped rather than failing the merge.
+    static func entry(from row: Row) -> MoodEntry? {
+        guard let mood = Mood(rawValue: row.mood) else { return nil }
+        return MoodEntry(day: row.day, mood: mood, note: row.note, updatedAt: Date(apiMillis: row.updatedAt))
     }
 
     // MARK: MoodSyncing
 
     func isAvailable() async -> Bool {
-        // Checked before CloudKit is touched at all: a build without the iCloud
-        // entitlement (CI's unsigned simulator build) throws an Objective-C
-        // exception the moment a container is created, which no `do`/`catch`
-        // can stop — the app died at launch and every UI test lost its screen.
-        // No token also simply means no iCloud account, so it's local-only.
-        guard FileManager.default.ubiquityIdentityToken != nil else { return false }
-        do {
-            return try await container.accountStatus() == .available
-        } catch {
-            print("[mood] iCloud account status failed: \(error)")
-            return false
-        }
+        api.isSignedIn
     }
 
     func push(_ entries: [MoodEntry]) async throws {
         guard !entries.isEmpty else { return }
-        try await ensureZone()
-        do {
-            try await save(entries)
-        } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
-            // Zone was removed (e.g. the user cleared iCloud data): recreate once.
-            resetZoneState()
-            try await ensureZone()
-            try await save(entries)
-        } catch let error as CKError {
-            throw CloudKitService.serviceError(from: error, fallback: .networkUnavailable)
+        struct Body: Encodable { let entries: [Row] }
+        for start in stride(from: 0, to: entries.count, by: 500) {
+            let chunk = entries[start..<min(start + 500, entries.count)].map(Self.row(for:))
+            do {
+                try await api.send("PUT", ["moods"], json: Body(entries: chunk))
+            } catch {
+                throw CloudKitService.serviceError(from: error, fallback: .networkUnavailable)
+            }
         }
     }
 
     func fetchChanges() async throws -> [MoodEntry] {
-        try await ensureZone()
-        var token = loadToken()
+        struct Page: Decodable { let entries: [Lossy<Row>]; let cursor: Int; let more: Bool }
+        let key = cursorDefaultsKey
+        var cursor = defaults.integer(forKey: key)
         var result: [MoodEntry] = []
         do {
-            // Guard against a token that never stops saying "more coming".
+            // Guard against a cursor that never stops saying "more coming".
             for _ in 0..<50 {
-                let changes = try await db.recordZoneChanges(inZoneWith: Self.zoneID, since: token)
-                for (_, modification) in changes.modificationResultsByID {
-                    if let record = try? modification.get().record,
-                       let entry = Self.entry(from: record) {
-                        result.append(entry)
-                    }
-                }
-                token = changes.changeToken
-                guard changes.moreComing else { break }
+                let page = try await api.get(
+                    Page.self, ["moods"], query: [URLQueryItem(name: "after", value: String(cursor))])
+                result += page.entries.compactMap { $0.value.flatMap(Self.entry(from:)) }
+                cursor = page.cursor
+                guard page.more else { break }
             }
-        } catch let error as CKError where error.code == .changeTokenExpired {
-            // Start over from scratch next time.
-            defaults.removeObject(forKey: Self.tokenKey)
-            return []
-        } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
-            resetZoneState()
-            return []
-        } catch let error as CKError {
+        } catch {
             throw CloudKitService.serviceError(from: error, fallback: .networkUnavailable)
         }
-        saveToken(token)
+        defaults.set(cursor, forKey: key)
         return result
     }
 
-    // MARK: Helpers
-
-    private func save(_ entries: [MoodEntry]) async throws {
-        let (saved, _) = try await db.modifyRecords(
-            saving: entries.map(Self.record(for:)), deleting: [], savePolicy: .allKeys)
-        for (_, result) in saved { _ = try result.get() }
+    func wantsFullUpload() -> Bool {
+        !defaults.bool(forKey: fullUploadDefaultsKey)
     }
 
-    private func ensureZone() async throws {
-        guard !defaults.bool(forKey: Self.zoneReadyKey) else { return }
-        do {
-            let (saved, _) = try await db.modifyRecordZones(
-                saving: [CKRecordZone(zoneID: Self.zoneID)], deleting: [])
-            for (_, result) in saved { _ = try result.get() }
-            defaults.set(true, forKey: Self.zoneReadyKey)
-        } catch let error as CKError {
-            throw CloudKitService.serviceError(from: error, fallback: .networkUnavailable)
-        }
+    func didFullUpload() {
+        defaults.set(true, forKey: fullUploadDefaultsKey)
     }
 
-    private func resetZoneState() {
-        defaults.removeObject(forKey: Self.zoneReadyKey)
-        defaults.removeObject(forKey: Self.tokenKey)
+    private var fullUploadDefaultsKey: String {
+        "moodSync.fullUpload.v1.\(api.keychain.load()?.userId ?? "")"
     }
 
-    private func loadToken() -> CKServerChangeToken? {
-        guard let data = defaults.data(forKey: Self.tokenKey) else { return nil }
-        return try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: data)
-    }
-
-    private func saveToken(_ token: CKServerChangeToken?) {
-        guard let token,
-              let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true)
-        else { return }
-        defaults.set(data, forKey: Self.tokenKey)
+    private var cursorDefaultsKey: String {
+        "\(Self.cursorKey).\(api.keychain.load()?.userId ?? "")"
     }
 }

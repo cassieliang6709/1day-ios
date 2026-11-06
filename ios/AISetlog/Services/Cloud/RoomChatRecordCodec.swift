@@ -1,32 +1,36 @@
 import Foundation
-import CloudKit
 
-/// Pure mapping of existing Comment fields, testable without an iCloud account.
-/// Scope is always the room; day/targetAuthorID on older records are not filters.
+/// Pure mapping between a room message and the Worker's comment rows,
+/// testable without a network. Scope is always the room; `day` and
+/// `targetAuthorID` on older per-clip comments are context, not filters.
 enum RoomChatRecordCodec {
-    static func decode(_ record: CKRecord, roomCode: String) throws -> RoomChatMessage {
-        guard record.recordType == "Comment",
-              let id = UUID(uuidString: record.recordID.recordName),
-              let code = record["roomCode"] as? String, code == roomCode,
-              let author = record["authorID"] as? String, !author.isEmpty,
-              let text = record["text"] as? String else {
-            throw CloudRoomChatTransport.TransportError.malformedRecord
-        }
-        let day = record["day"] as? Int
-        return RoomChatMessage(id: id, roomCode: code, authorID: author,
-            authorName: record["authorName"] as? String ?? "",
-            text: text, createdAt: record["createdAt"] as? Date ?? record.creationDate ?? .distantPast,
-            moment: day.flatMap { $0 > 0 ? $0 : nil })
+    static func decode(_ body: CloudKitService.CommentBody, roomCode: String) throws -> RoomChatMessage {
+        guard let id = UUID(uuidString: body.id),
+              body.roomCode == roomCode,
+              !body.authorID.isEmpty
+        else { throw CloudRoomChatTransport.TransportError.malformedRecord }
+        return RoomChatMessage(
+            id: id, roomCode: body.roomCode, authorID: body.authorID,
+            authorName: body.authorName, text: body.text,
+            createdAt: Date(apiMillis: body.createdAt),
+            moment: body.day.flatMap { $0 > 0 ? $0 : nil })
     }
 
-    static func encode(_ message: RoomChatMessage) -> CKRecord {
-        let record = CKRecord(recordType: "Comment", recordID: .init(recordName: message.id.uuidString))
-        record["roomCode"] = message.roomCode as CKRecordValue
-        record["authorID"] = message.authorID as CKRecordValue
-        record["authorName"] = message.authorName as CKRecordValue
-        record["text"] = message.text as CKRecordValue
-        record["createdAt"] = message.createdAt as CKRecordValue
-        if let moment = message.moment { record["day"] = moment as CKRecordValue }
-        return record
+    /// A room message leaves `day` and `targetAuthorID` out, and carries its
+    /// own `createdAt` so a retry keeps the time it was written.
+    static func encode(_ message: RoomChatMessage) -> CloudKitService.CommentWrite {
+        CloudKitService.CommentWrite(
+            roomCode: message.roomCode, day: message.moment, text: message.text,
+            authorName: message.authorName, targetAuthorID: nil,
+            createdAt: message.createdAt.apiMillis)
+    }
+}
+
+/// One element of a JSON array that may not decode, so one bad row doesn't
+/// fail the whole list.
+struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
     }
 }

@@ -33,6 +33,7 @@ struct StoryTimelineView: View {
     @State private var showRoomChat = false
     /// The room's day picker, opened from the nav bar's calendar button.
     @State private var showRoomCalendar = false
+    @State private var showSignIn = false
     /// The room's 视图: 默认 (follows the room's 横拍/竖拍) or 瀑布流.
     /// Remembered across rooms.
     @AppStorage("roomLayout.v3") private var roomLayout: RoomLayout = .automatic
@@ -101,6 +102,10 @@ struct StoryTimelineView: View {
                     clips: store.recordedClips(for: challengeID))
                     .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
+        }
+        .sheet(isPresented: $showSignIn) {
+            SignInView { showSignIn = false }
+                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showRoomChat) {
             // The timeline can reach any moment, so a quoted one is a link
@@ -309,6 +314,31 @@ struct StoryTimelineView: View {
     /// for whoever filmed on the picked day (tap to watch, stories style),
     /// then that day's frames (`RoomFrames`). 生成 vlog and 聊天 are in the
     /// nav bar's 「…」.
+    /// Signed out, the room shows only what's on this phone; the friends it
+    /// can't see wouldn't get a frame at all, so this line says why.
+    private var signedOutLine: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(OneDay.inkFaint)
+            Text(Strings.signedOutRoomBody)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+            Spacer(minLength: 6)
+            Button(Strings.signIn) { showSignIn = true }
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Color.black, in: Capsule())
+                .accessibilityIdentifier("room-sign-in")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .glassSurface(radius: 16)
+    }
+
     private func roomPage(
         _ challenge: Challenge, clips: [DayClip], members: [(id: String, name: String)],
         myID: String, agenda: StoryAgenda
@@ -319,6 +349,9 @@ struct StoryTimelineView: View {
             // filmed, and a tally reads as a progress bar on your friends.
             let dayClips = roomDay.map { day in clips.filter { Self.isClip($0, on: day) } } ?? clips
             let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
+            let signedOut = challenge.isShared && !account.isSignedIn
+
+            if signedOut { signedOutLine }
 
             // The faces, then the frames. Tap a face and that person's frame
             // takes the whole space; tap it again for everyone. Other days are
@@ -353,7 +386,9 @@ struct StoryTimelineView: View {
                             for: challengeID, day: clip.day,
                             targetAuthorID: clip.authorID ?? myID
                         ).comments.max { $0.createdAt < $1.createdAt }
-                    })
+                    },
+                    signedOut: signedOut,
+                    onSignIn: { showSignIn = true })
             case .columns:
                 ScrollView {
                     RoomFeed(

@@ -1,5 +1,4 @@
 import XCTest
-import CloudKit
 @testable import AISetlog
 
 /// 心情日记: one entry per day, changeable all day, survives a relaunch, and
@@ -117,21 +116,19 @@ final class MoodStoreTests: XCTestCase {
 
     func testRecordRoundTrip() throws {
         let entry = MoodEntry(day: "2026-10-16", mood: .calm, note: "tea", updatedAt: clock)
-        let record = MoodSync.record(for: entry)
+        let row = MoodSync.row(for: entry)
 
-        XCTAssertEqual(record.recordType, "MoodEntry")
-        XCTAssertEqual(record.recordID.recordName, "mood-2026-10-16")
-        XCTAssertEqual(record["day"] as? String, "2026-10-16")
-        XCTAssertEqual(record["mood"] as? String, "calm")
-        XCTAssertEqual(record["note"] as? String, "tea")
-        XCTAssertEqual(record["updatedAt"] as? Date, clock)
-        XCTAssertEqual(MoodSync.entry(from: record), entry)
+        XCTAssertEqual(row.day, "2026-10-16")
+        XCTAssertEqual(row.mood, "calm")
+        XCTAssertEqual(row.note, "tea")
+        XCTAssertEqual(row.updatedAt, clock.apiMillis)
+        XCTAssertEqual(MoodSync.entry(from: row)?.mood, entry.mood)
+        XCTAssertEqual(MoodSync.entry(from: row)?.updatedAt.apiMillis, clock.apiMillis)
     }
 
     func testRecordWithUnknownMoodIsSkipped() {
-        let record = MoodSync.record(for: MoodEntry(day: "2026-10-16", mood: .happy, note: "", updatedAt: clock))
-        record["mood"] = "ecstatic" as CKRecordValue
-        XCTAssertNil(MoodSync.entry(from: record))
+        let row = MoodSync.Row(day: "2026-10-16", mood: "ecstatic", note: "", updatedAt: 1)
+        XCTAssertNil(MoodSync.entry(from: row))
     }
 
     // MARK: - Saved state

@@ -57,8 +57,17 @@ protocol MoodSyncing {
     func push(_ entries: [MoodEntry]) async throws
     /// Every entry changed remotely since the last successful fetch.
     func fetchChanges() async throws -> [MoodEntry]
-    /// False when there's no iCloud account; the store then stays local.
+    /// False when nobody is signed in; the store then stays local.
     func isAvailable() async -> Bool
+    /// True until every local entry has been sent once to this backend —
+    /// entries synced to an older one (CloudKit) were never pending here.
+    func wantsFullUpload() -> Bool
+    func didFullUpload()
+}
+
+extension MoodSyncing {
+    func wantsFullUpload() -> Bool { false }
+    func didFullUpload() {}
 }
 
 /// Today's mood plus a one-line note, one entry per day.
@@ -159,10 +168,13 @@ final class MoodStore {
     private func syncPass(_ sync: MoodSyncing) async {
         guard await sync.isAvailable() else { return }
 
-        let outgoing = pending.compactMap { entries[$0] }
+        let full = sync.wantsFullUpload()
+        let outgoing = full ? Array(entries.values) : pending.compactMap { entries[$0] }
+        if full && outgoing.isEmpty { sync.didFullUpload() }
         if !outgoing.isEmpty {
             do {
                 try await sync.push(outgoing)
+                if full { sync.didFullUpload() }
                 // Only clear what we sent and that hasn't changed since.
                 for sent in outgoing where entries[sent.day] == sent {
                     pending.remove(sent.day)

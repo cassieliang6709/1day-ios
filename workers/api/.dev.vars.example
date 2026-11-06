@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `wrangler dev`. Any 32+ random characters, e.g.
+#   openssl rand -base64 48
+SESSION_SECRET=

@@ -5,6 +5,22 @@ import Foundation
 extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
+    // Signed out: said where something is missing because of it, each with
+    // a way to sign in. A room that quietly showed only my own clips read as
+    // friends' clips being lost.
+    static var signedOutTitle: String { zh ? "还没登录" : "Not signed in" }
+    static var signedOutSettingsBody: String {
+        zh ? "登录后才能和朋友一起拍、看到他们的片段" : "Sign in to film with friends and see their clips"
+    }
+    static var signedOutRoomsTitle: String { zh ? "没登录" : "Not signed in" }
+    static var signedOutRoomsBody: String {
+        zh ? "朋友的新片段不会同步过来" : "Friends' new clips won't come through"
+    }
+    static var signedOutRoomBody: String {
+        zh ? "没登录，看不到朋友的片段" : "Sign in to see your friends' clips"
+    }
+    static var signedOutFrame: String { zh ? "登录后看得到" : "Sign in to see" }
+
     static var inviteSheetTitle: String { zh ? "把邀请码发给朋友" : "Send the code to a friend" }
     static var inviteSheetBody: String {
         zh ? "朋友在 1Day 的「房间 ▸ 加入」里输入这串码，就能进到这个房间。"

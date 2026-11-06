@@ -1,0 +1,39 @@
+name = "oneday-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# *.workers.dev is blocked in mainland China, and on 2026-11-06 this account's
+# workers.dev URLs answered 1101 for every Worker anyway. The app talks to the
+# custom domain only.
+workers_dev = true
+routes = [{ pattern = "auth.liangyue.site", custom_domain = true }]
+
+# The session secret is a secret, not a var — set it with:
+#   wrangler secret put SESSION_SECRET      (at least 32 random characters)
+[vars]
+# Sign in with Apple: the app's bundle IDs. Release, then Debug ("1Day Dev").
+APPLE_AUDIENCES = "com.cassie.AISetlog,com.cassie.AISetlog.dev"
+# Google: the iOS OAuth client IDs in Cloud project `inlaid-reactor-513911-g5`.
+# Release, then Debug. Client IDs are not secrets.
+GOOGLE_AUDIENCES = "513162743274-5p1dgi8km91pchmbh9q2l6piiesuouug.apps.googleusercontent.com,513162743274-s9mjujjgqf588097792ctueka46gfkhc.apps.googleusercontent.com"
+
+# Push, APNs token auth. Team and key id are not secret; the .p8 is:
+#   wrangler secret put APNS_PRIVATE_KEY    (paste the whole .p8 file)
+APNS_TEAM_ID = "M7BPQ88622"
+APNS_KEY_ID = "C9YZCT5TTX"
+
+# Rooms, members, clips, chat, moods, push devices. Created with
+#   wrangler d1 create oneday
+# then the id it prints goes here, and the schema goes in with
+#   wrangler d1 migrations apply oneday --remote
+[[d1_databases]]
+binding = "DB"
+database_name = "oneday"
+database_id = "876a4f54-004c-4278-83f1-6a6f31f18600"
+migrations_dir = "migrations"
+
+# Videos and avatars. Created with
+#   wrangler r2 bucket create oneday-media
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "oneday-media"

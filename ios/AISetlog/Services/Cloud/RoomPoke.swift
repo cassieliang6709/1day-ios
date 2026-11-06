@@ -1,8 +1,7 @@
-import CloudKit
 import Foundation
 
 /// 拍一拍: one nudge per friend per day, remembered on this device so the
-/// grey tile can show it was sent. The CloudKit record name carries the same
+/// grey tile can show it was sent. The poke's record name carries the same
 /// day, so a second send from another install still lands on one record.
 struct PokeLimiter {
     static let defaultsKey = "rooms.pokes.sent"
@@ -53,24 +52,18 @@ extension CloudKitService {
         "\(code)_poke_\(authorID)_\(targetAuthorID)_\(dayStamp)"
     }
 
-    /// Writes one `Poke` record in the room. The recipient's query
-    /// subscription on `Poke` turns it into a local notification.
+    /// One poke row per sender, target and day. The Worker pushes it to the
+    /// target only; a second send today lands on the same row.
     static func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async throws {
-        try await ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: pokeRecordName(
+        struct Body: Encodable { let roomCode: String; let authorName: String; let targetAuthorID: String }
+        let id = pokeRecordName(
             code: code, authorID: authorID, targetAuthorID: targetAuthorID,
-            dayStamp: PokeLimiter.dayStamp(.now)))
-        let record = CKRecord(recordType: "Poke", recordID: id)
-        record["roomCode"] = code as CKRecordValue
-        record["day"] = 1 as CKRecordValue
-        record["authorID"] = authorID as CKRecordValue
-        record["authorName"] = authorName as CKRecordValue
-        record["targetAuthorID"] = targetAuthorID as CKRecordValue
-        record["createdAt"] = Date.now as CKRecordValue
-        // Same `.allKeys` upsert as the reaction path: a second send today
-        // rewrites the one record instead of failing as a duplicate insert.
-        let (saved, _) = try await CKContainer(identifier: containerID).publicCloudDatabase
-            .modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
-        for (_, result) in saved { _ = try result.get() }
+            dayStamp: PokeLimiter.dayStamp(.now))
+        do {
+            try await OneDayAPI.shared.send("PUT", ["pokes", id], json: Body(
+                roomCode: code, authorName: authorName, targetAuthorID: targetAuthorID))
+        } catch {
+            throw serviceError(from: error, fallback: .networkUnavailable)
+        }
     }
 }

@@ -8,6 +8,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 10.1.0
 targets:
   AISetlog:
     type: application
@@ -27,36 +31,36 @@ targets:
         # the app still launches on iOS 17, where `AvatarMaker` falls back.
         OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "ImagePlayground"]
       configs:
-        # Debug installs beside the App Store build as "1Day Dev" and reads the
-        # same Production CloudKit database, so rooms made in either app open in
-        # both. Switch Debug's CLOUDKIT_ENVIRONMENT to Development while changing
-        # the CloudKit schema — Production rejects fields it hasn't been deployed.
+        # Debug installs beside the App Store build as "1Day Dev" and talks to
+        # the same Worker (workers/api), so rooms made in either app open in
+        # both.
         Debug:
           APS_ENVIRONMENT: development
           PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog.dev
           APP_DISPLAY_NAME: 1Day Dev
-          CLOUDKIT_ENVIRONMENT: Production
+          # Google OAuth iOS client for this bundle ID (Cloud project
+          # inlaid-reactor-513911-g5). Not secret. The scheme is the client
+          # ID reversed, which is where Google sends the browser back to.
+          GOOGLE_CLIENT_ID: 513162743274-s9mjujjgqf588097792ctueka46gfkhc.apps.googleusercontent.com
+          GOOGLE_URL_SCHEME: com.googleusercontent.apps.513162743274-s9mjujjgqf588097792ctueka46gfkhc
         Release:
           APS_ENVIRONMENT: production
           PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog
           APP_DISPLAY_NAME: 1Day
-          CLOUDKIT_ENVIRONMENT: Production
+          GOOGLE_CLIENT_ID: 513162743274-5p1dgi8km91pchmbh9q2l6piiesuouug.apps.googleusercontent.com
+          GOOGLE_URL_SCHEME: com.googleusercontent.apps.513162743274-5p1dgi8km91pchmbh9q2l6piiesuouug
     entitlements:
       path: AISetlog/AISetlog.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
         com.apple.developer.applesignin: [Default]
-        com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.cassie.AISetlog
-        com.apple.developer.icloud-services:
-          - CloudKit
-        com.apple.developer.icloud-container-environment: $(CLOUDKIT_ENVIRONMENT)
     info:
       path: AISetlog/Info.plist
       properties:
         UILaunchScreen: {}
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
-        OneDayCloudKitEnvironment: $(CLOUDKIT_ENVIRONMENT)
+        # Which APNs the Worker should send this build's alerts through.
+        OneDayAPNsEnvironment: $(APS_ENVIRONMENT)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSCameraUsageDescription: "To film the moments of your day."
@@ -70,6 +74,14 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.cassie.oneday.join
             CFBundleURLSchemes: [oneday]
+          - CFBundleURLName: com.cassie.oneday.google-sign-in
+            CFBundleURLSchemes: [$(GOOGLE_URL_SCHEME)]
+        GIDClientID: $(GOOGLE_CLIENT_ID)
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
   AISetlogTests:
     type: bundle.unit-test
     platform: iOS

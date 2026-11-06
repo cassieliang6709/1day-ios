@@ -136,88 +136,57 @@ final class NotificationTests: XCTestCase {
         XCTAssertEqual(route, NotificationRecordRoute(challengeID: id, day: 4))
     }
 
-    // MARK: Room activity subscriptions
+    // MARK: Room pushes
 
-    func testRoomAlertIsShownByAPNsAndSkipsTheSendersOwnRecords() {
+    func testRegistrationCarriesTheAppsOwnCopyForEveryKind() {
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
-        let subscription = SharedActivityNotificationService.alertSubscription(
-            code: "ABCDEF", kind: .comment, title: "Our Week", userID: "me", showNames: true)
-        let info = subscription.notificationInfo
+        let registration = SharedActivityNotificationService.registration(
+            token: "ab", rooms: ["ZZZZZZ": "Other", "ABCDEF": "Our Week"],
+            showNames: true, topic: "com.cassie.AISetlog", sandbox: false)
 
-        XCTAssertEqual(subscription.recordType, "Comment")
-        XCTAssertEqual(subscription.predicate.predicateFormat,
-                       NSPredicate(format: "roomCode == %@ AND authorID != %@", "ABCDEF", "me").predicateFormat)
-        XCTAssertEqual(info?.title, "Our Week")
-        XCTAssertEqual(info?.alertLocalizationKey, "%1$@: %2$@")
-        XCTAssertEqual(info?.alertLocalizationArgs, ["authorName", "text"])
-        XCTAssertEqual(info?.soundName, "default")
-        XCTAssertEqual(info?.shouldSendContentAvailable, true)
-        // Every chat line is its own alert; nothing collapses or throttles it.
-        XCTAssertNil(info?.collapseIDKey)
-        XCTAssertEqual(
-            SharedActivityNotificationService.context(for: subscription.subscriptionID),
-            .init(roomCode: "ABCDEF", kind: .comment, delivery: .alert))
+        XCTAssertEqual(registration.rooms.map(\.code), ["ABCDEF", "ZZZZZZ"])
+        XCTAssertEqual(registration.rooms.first?.title, "Our Week")
+        XCTAssertEqual(registration.alerts["comment"],
+                       .init(format: "%1$@: %2$@", args: ["authorName", "text"]))
+        XCTAssertEqual(Set(registration.alerts.keys), ["clip", "comment", "reaction", "poke"])
     }
 
-    func testHiddenNamesLeaveTheAuthorOutOfTheServerAlert() {
+    func testHiddenNamesLeaveTheAuthorOutOfTheAlert() {
         for kind in SharedActivityNotificationService.ActivityKind.allCases {
-            let info = SharedActivityNotificationService.alertSubscription(
-                code: "ABCDEF", kind: kind, title: "Room", userID: "me", showNames: false
-            ).notificationInfo
-            XCTAssertFalse(info?.alertLocalizationArgs?.contains("authorName") ?? false, "\(kind)")
-            let placeholders = info?.alertLocalizationKey?.components(separatedBy: "$@").count ?? 1
-            XCTAssertEqual(placeholders - 1, info?.alertLocalizationArgs?.count ?? 0, "\(kind)")
+            let copy = SharedActivityNotificationService.alertCopy(kind: kind, showNames: false)
+            XCTAssertFalse(copy.args.contains("authorName"), "\(kind)")
+            let placeholders = copy.format.components(separatedBy: "$@").count - 1
+            XCTAssertEqual(placeholders, copy.args.count, "\(kind)")
         }
     }
 
-    /// Anything the server bakes into the alert is in the ID, so a changed
-    /// title, account or language replaces the installed subscription.
-    func testAlertSubscriptionIDTracksWhatTheServerBakesIn() {
-        func id(title: String = "Room", user: String = "me", names: Bool = false) -> String {
-            SharedActivityNotificationService.alertSubscription(
-                code: "ABCDEF", kind: .clip, title: title, userID: user, showNames: names
-            ).subscriptionID
-        }
-        XCTAssertEqual(id(), id())
-        XCTAssertNotEqual(id(), id(title: "Renamed"))
-        XCTAssertNotEqual(id(), id(user: "someone-else"))
-        XCTAssertNotEqual(id(), id(names: true))
-        XCTAssertNotEqual(
-            id(), SharedActivityNotificationService.silentSubscriptionID(code: "ABCDEF", kind: .clip))
+    func testRoomPushPayloadIsRecognised() {
+        let userInfo: [AnyHashable: Any] = [
+            "aps": ["alert": ["title": "Room"]],
+            "oneday": ["roomCode": "ABCDEF", "kind": "comment", "day": NSNumber(value: 3)],
+        ]
+        XCTAssertEqual(
+            SharedActivityNotificationService.context(forRemote: userInfo),
+            .init(roomCode: "ABCDEF", kind: .comment, day: 3))
+        XCTAssertEqual(SharedActivityNotificationService.roomCode(forRemote: userInfo), "ABCDEF")
+        XCTAssertNil(SharedActivityNotificationService.context(forRemote: ["aps": [:]]))
     }
 
-    func testOldAndFallbackSubscriptionIDsStayOnTheSilentPath() {
-        XCTAssertEqual(
-            SharedActivityNotificationService.context(for: "roomActivity.ABCDEF.clip"),
-            .init(roomCode: "ABCDEF", kind: .clip, delivery: .silent))
-        XCTAssertEqual(
-            SharedActivityNotificationService.context(
-                for: SharedActivityNotificationService.silentSubscriptionID(code: "ABCDEF", kind: .reaction)),
-            .init(roomCode: "ABCDEF", kind: .reaction, delivery: .silent))
-        let silent = SharedActivityNotificationService.silentSubscription(code: "ABCDEF", kind: .comment)
-        XCTAssertNil(silent.notificationInfo?.alertLocalizationKey)
-        XCTAssertNil(SharedActivityNotificationService.context(for: "somethingElse.ABCDEF.clip"))
-        XCTAssertNil(SharedActivityNotificationService.context(for: "roomActivity.v2.ABCDEF.bogus.abc"))
-    }
-
-    func testTappingACloudKitAlertOpensItsRoom() throws {
+    func testTappingARoomAlertOpensItsRoom() throws {
         let now = try date(2026, 7, 25, 12, 0)
         let room = makeChallenge(
             title: "Together", startDate: now, mode: .sevenDay, cardCount: 7, roomCode: "ABCDEF")
         let other = makeChallenge(
             title: "Other", startDate: now, mode: .sevenDay, cardCount: 7, roomCode: "ZZZZZZ")
-        let id = SharedActivityNotificationService.alertSubscription(
-            code: "ABCDEF", kind: .comment, title: "Together", userID: "me", showNames: false
-        ).subscriptionID
 
         XCTAssertEqual(
-            SharedActivityNotificationService.route(subscriptionID: id, day: nil, challenges: [other, room]),
+            SharedActivityNotificationService.route(roomCode: "ABCDEF", day: nil, challenges: [other, room]),
             NotificationRecordRoute(challengeID: room.id, day: 1))
         XCTAssertEqual(
-            SharedActivityNotificationService.route(subscriptionID: id, day: 4, challenges: [room]),
+            SharedActivityNotificationService.route(roomCode: "ABCDEF", day: 4, challenges: [room]),
             NotificationRecordRoute(challengeID: room.id, day: 4))
-        XCTAssertNil(SharedActivityNotificationService.route(subscriptionID: id, day: 4, challenges: [other]))
+        XCTAssertNil(SharedActivityNotificationService.route(roomCode: "ABCDEF", day: 4, challenges: [other]))
     }
 
     private func makeChallenge(

@@ -201,8 +201,8 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
         if response.actionIdentifier == NotificationConstants.snoozeAction {
             ReminderService.snooze(response.notification.request.content)
         } else if response.actionIdentifier != UNNotificationDismissActionIdentifier {
-            // Local notifications carry the challenge ID; alerts CloudKit
-            // delivered itself carry only its own payload.
+            // Local notifications carry the challenge ID; room alerts from
+            // the Worker carry the room code instead.
             let userInfo = response.notification.request.content.userInfo
             if let route = NotificationRecordRoute(userInfo: userInfo)
                 ?? SharedActivityNotificationService.route(forRemote: userInfo) {
@@ -210,6 +210,22 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
             }
         }
         completionHandler()
+    }
+
+    /// APNs' address for this install. The Worker needs it to send room
+    /// alerts; CloudKit used to collect it on its own.
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        SharedActivityNotificationService.didRegister(deviceToken: deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[notifications] APNs registration failed: \(error)")
     }
 
     func application(

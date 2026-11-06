@@ -95,16 +95,18 @@ struct FirstRunOnboardingView: View {
                 SignInWithAppleButton(.continue) { request in
                     account.configure(request)
                 } onCompletion: { result in
-                    do {
-                        try account.completeSignIn(result)
-                        if PermissionPrimerView.isNeeded {
-                            showsPermissions = true
-                        } else {
-                            afterPermissions()
+                    Task { @MainActor in
+                        do {
+                            try await account.completeSignIn(result)
+                            if PermissionPrimerView.isNeeded {
+                                showsPermissions = true
+                            } else {
+                                afterPermissions()
+                            }
+                        } catch {
+                            if (error as? ASAuthorizationError)?.code == .canceled || error is CancellationError { return }
+                            signInError = Strings.signInFailure(error)
                         }
-                    } catch {
-                        if (error as? ASAuthorizationError)?.code == .canceled { return }
-                        signInError = Strings.signInFailed
                     }
                 }
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)

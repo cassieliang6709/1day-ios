@@ -1,5 +1,4 @@
 import XCTest
-import CloudKit
 @testable import AISetlog
 
 final class RoomChatRecordCodecTests: XCTestCase {
@@ -8,57 +7,70 @@ final class RoomChatRecordCodecTests: XCTestCase {
               text: "你好 👋", createdAt: Date(timeIntervalSince1970: 123), moment: moment)
     }
 
-    func testRoomMessageNeedsNoNewSchemaFieldsOrFakeMoment() throws {
+    /// What the Worker would send back for a message this phone wrote.
+    private func row(for message: RoomChatMessage, targetAuthorID: String? = nil) -> CloudKitService.CommentBody {
+        let write = RoomChatRecordCodec.encode(message)
+        return .init(id: message.id.uuidString, roomCode: write.roomCode, day: write.day,
+                     text: write.text, authorID: message.authorID, authorName: write.authorName,
+                     targetAuthorID: targetAuthorID, createdAt: write.createdAt ?? 0)
+    }
+
+    func testRoomMessageCarriesNoFakeMomentOrTarget() throws {
         let original = message()
-        let record = RoomChatRecordCodec.encode(original)
-        XCTAssertEqual(record.recordType, "Comment")
-        XCTAssertNil(record["day"])
-        XCTAssertNil(record["targetAuthorID"])
-        XCTAssertEqual(Set(record.allKeys()), Set(["roomCode", "authorID", "authorName", "text", "createdAt"]))
-        XCTAssertEqual(try RoomChatRecordCodec.decode(record, roomCode: "ABCDEF"), original)
+        let write = RoomChatRecordCodec.encode(original)
+        XCTAssertNil(write.day)
+        XCTAssertNil(write.targetAuthorID)
+        XCTAssertEqual(try RoomChatRecordCodec.decode(row(for: original), roomCode: "ABCDEF"), original)
     }
 
     func testOldTargetedCommentsRemainReadableAcrossMoments() throws {
         for moment in [1, 7] {
             let original = message(moment: moment)
-            let record = RoomChatRecordCodec.encode(original)
-            record["targetAuthorID"] = "bob" as CKRecordValue
-            XCTAssertEqual(try RoomChatRecordCodec.decode(record, roomCode: "ABCDEF"), original)
+            XCTAssertEqual(
+                try RoomChatRecordCodec.decode(row(for: original, targetAuthorID: "bob"), roomCode: "ABCDEF"),
+                original)
         }
     }
 
-    func testRetryKeepsRecordIdentityAndOriginalTimestamp() {
+    func testRetryKeepsOriginalTimestamp() {
         let original = message()
-        let first = RoomChatRecordCodec.encode(original)
-        let retry = RoomChatRecordCodec.encode(original)
-        XCTAssertEqual(first.recordID, retry.recordID)
-        XCTAssertEqual(first["createdAt"] as? Date, retry["createdAt"] as? Date)
+        XCTAssertEqual(RoomChatRecordCodec.encode(original).createdAt, 123_000)
+        XCTAssertEqual(RoomChatRecordCodec.encode(original).createdAt, RoomChatRecordCodec.encode(original).createdAt)
     }
 
-    func testWrongRoomAndMalformedRecordFailExplicitly() {
-        let record = RoomChatRecordCodec.encode(message())
-        XCTAssertThrowsError(try RoomChatRecordCodec.decode(record, roomCode: "OTHER"))
-        record["authorID"] = nil
-        XCTAssertThrowsError(try RoomChatRecordCodec.decode(record, roomCode: "ABCDEF"))
+    func testWrongRoomAndMalformedRowFailExplicitly() {
+        let good = row(for: message())
+        XCTAssertThrowsError(try RoomChatRecordCodec.decode(good, roomCode: "OTHER"))
+        let noAuthor = CloudKitService.CommentBody(
+            id: good.id, roomCode: good.roomCode, day: nil, text: "x", authorID: "",
+            authorName: "", targetAuthorID: nil, createdAt: 0)
+        XCTAssertThrowsError(try RoomChatRecordCodec.decode(noAuthor, roomCode: "ABCDEF"))
     }
 
-    /// One record that failed to load or parse used to throw for the whole
-    /// conversation, so nobody in the room saw any new message.
-    func testOneBadRecordDoesNotHideTheRestOfTheConversation() {
+    /// One row that didn't parse used to throw for the whole conversation, so
+    /// nobody in the room saw any new message.
+    func testOneBadRowDoesNotHideTheRestOfTheConversation() throws {
         let good = [message(), message()]
-        let goodRecords = good.map(RoomChatRecordCodec.encode)
-        let malformed = RoomChatRecordCodec.encode(message())
-        malformed["text"] = nil
-        let failedID = CKRecord.ID(recordName: UUID().uuidString)
-        let matches: [(CKRecord.ID, Result<CKRecord, Error>)] = [
-            (goodRecords[0].recordID, .success(goodRecords[0])),
-            (failedID, .failure(CKError(.permissionFailure))),
-            (malformed.recordID, .success(malformed)),
-            (goodRecords[1].recordID, .success(goodRecords[1])),
-        ]
+        let json = """
+        {"comments": [
+          \(try encodeRow(row(for: good[0]))),
+          {"id": "not-a-uuid-and-missing-fields"},
+          \(try encodeRow(row(for: good[1])))
+        ]}
+        """
+        struct Body: Decodable { let comments: [Lossy<CloudKitService.CommentBody>] }
+        let body = try JSONDecoder().decode(Body.self, from: Data(json.utf8))
 
-        let decoded = CloudRoomChatTransport.decodeMatches(matches, roomCode: "ABCDEF")
+        let decoded = CloudRoomChatTransport.decodeMatches(body.comments.map(\.value), roomCode: "ABCDEF")
 
         XCTAssertEqual(decoded, good)
+    }
+
+    private func encodeRow(_ row: CloudKitService.CommentBody) throws -> String {
+        """
+        {"id":"\(row.id)","roomCode":"\(row.roomCode)","day":null,"text":"\(row.text)",\
+        "authorID":"\(row.authorID)","authorName":"\(row.authorName)","targetAuthorID":null,\
+        "createdAt":\(row.createdAt)}
+        """
     }
 }

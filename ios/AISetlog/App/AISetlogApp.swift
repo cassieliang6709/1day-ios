@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct AISetlogApp: App {
@@ -166,6 +167,8 @@ struct RootView: View {
             }
         }
         .onOpenURL { url in
+            // Google's sign-in coming back from the browser.
+            if GIDSignIn.sharedInstance.handle(url) { return }
             guard let code = InviteCode.fromDeepLink(url) else { return }
             hasCompletedOnboarding = true
             pendingJoinCode = code

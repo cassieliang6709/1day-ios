@@ -972,31 +972,21 @@ enum Strings {
             ? "先用 Apple 登录，才能和朋友一起拍摄。"
             : "Sign in with Apple first to record with friends."
     }
-    static var errorICloud: String {
+    static var errorSignedOut: String {
         lang == .chinese
-            ? "请登录 iCloud（设置 ▸ 你的名字）才能和朋友一起拍摄。"
-            : "Sign into iCloud (Settings ▸ your name) to record with friends."
+            ? "登录已失效，请重新登录后再和朋友一起拍。"
+            : "You're signed out. Sign in again to film with friends."
+    }
+    /// What a failed sign-in says: the network when that's what it was, so
+    /// nobody retypes a password that was never the problem.
+    static func signInFailure(_ error: Error) -> String {
+        if (error as? AuthService.Failure) == .unavailable { return errorNetwork }
+        return signInFailed
     }
     static var errorNoRoom: String {
-        let base = lang == .chinese
+        lang == .chinese
             ? "没有这个邀请码的房间，请和朋友确认一下。"
             : "No room with that code. Double-check it with your friend."
-        #if DEBUG
-        // A Debug build switched to CloudKit Development can't see rooms made
-        // in Production (TestFlight/App Store) — they come back as the same
-        // `.unknownItem` — so say which side this is.
-        guard !CloudKitService.isProduction else { return base }
-        return base + (lang == .chinese
-            ? "\n（Debug 版连的是 CloudKit Development 环境，查不到 TestFlight 版建的房间。）"
-            : "\n(Debug build uses CloudKit Development and can't see rooms made in TestFlight.)")
-        #else
-        return base
-        #endif
-    }
-    static var errorIndexDeploying: String {
-        lang == .chinese
-            ? "房间还没准备好 — CloudKit 索引还在部署中。"
-            : "Room isn't set up yet — the CloudKit index is still deploying."
     }
     static var errorNetwork: String {
         lang == .chinese
