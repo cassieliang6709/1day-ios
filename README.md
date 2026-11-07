@@ -1,5 +1,7 @@
 # 1Day
 
+**English** · [中文](README.zh-CN.md)
+
 **Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.**
 
 1Day starts with a question: **How do you want to spend today?** Choose a theme,
