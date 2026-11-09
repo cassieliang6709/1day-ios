@@ -97,7 +97,19 @@ final class AuthServiceTests: XCTestCase {
 
     // MARK: - Keychain
 
-    func testTheSessionSurvivesAndCanBeRemoved() {
+    func testTheSessionSurvivesAndCanBeRemoved() throws {
+        // An unsigned test host (CI runs with CODE_SIGNING_ALLOWED=NO) has no
+        // keychain entitlement, so SecItemAdd fails silently and load() is nil.
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.testService + ".probe",
+            kSecAttrAccount as String: "probe",
+            kSecValueData as String: Data([0]),
+        ]
+        let status = SecItemAdd(probe as CFDictionary, nil)
+        SecItemDelete(probe as CFDictionary)
+        try XCTSkipUnless(status == errSecSuccess, "keychain unavailable in this test host (status \(status))")
+
         let keychain = SessionKeychain(service: Self.testService)
         let first = AuthService.Session(token: "one", userId: "apple:1", expiresAt: Date(timeIntervalSince1970: 1))
         let second = AuthService.Session(token: "two", userId: "google:2", expiresAt: Date(timeIntervalSince1970: 2))
