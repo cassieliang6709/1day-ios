@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>1Day 房间 UI 方案 · 第二批</title>
+<style>
+  :root { --bg:#FFF6DF; --ink:#3A2A12; --soft:#8A7550; --faint:#BBA982; --brand:#FFC93C; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:6px; }
+  .sub { color:var(--soft); font-size:13px; margin-bottom:24px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; }
+  .opt { width:300px; }
+  .opt h2 { font-size:16px; margin:10px 0 4px; }
+  .opt .ref { font-size:11px; color:#B07A00; font-weight:700; }
+  .opt p { font-size:12.5px; color:var(--soft); line-height:1.5; margin-top:4px; }
+  .phone { width:300px; height:620px; border-radius:40px; background:var(--bg); border:8px solid #222; overflow:hidden; position:relative; padding:44px 16px 16px; }
+  .title { font-weight:900; font-size:22px; }
+  .week { display:flex; justify-content:space-between; margin:10px 0 12px; }
+  .week div { width:34px; text-align:center; font-size:10px; color:var(--faint); padding:5px 0; border-radius:10px; }
+  .week b { display:block; font-size:14px; color:var(--ink); }
+  .week .on { background:var(--brand); }
+  .v { border-radius:18px; position:absolute; overflow:hidden; color:#fff; font-weight:800; box-shadow:0 8px 20px #0002; }
+  .v .t { position:absolute; left:12px; bottom:10px; font-size:18px; text-shadow:0 1px 3px #0006; }
+  .v .n { position:absolute; left:12px; top:10px; font-size:11px; text-shadow:0 1px 3px #0006; }
+  .g1 { background:linear-gradient(160deg,#7FD6A0,#2E9E5B); }
+  .g2 { background:linear-gradient(160deg,#7CC6F2,#2B7FB8); }
+  .g3 { background:linear-gradient(160deg,#FFB3C7,#E5688C); }
+  .g4 { background:linear-gradient(160deg,#CDB8F2,#7E5CC8); }
+  .g5 { background:linear-gradient(160deg,#FFD6A5,#E09A45); }
+  .stage { position:relative; height:440px; }
+  .hint { position:absolute; bottom:18px; left:0; right:0; text-align:center; font-size:11px; color:var(--faint); }
+  @keyframes swap { 0%,40% { transform:translate(0,0) rotate(-3deg); } 50%,100% { transform:translate(0,-30px) rotate(-3deg) scale(.92); opacity:.6; } }
+  @keyframes spin { to { transform:rotateY(360deg); } }
+  @keyframes drift { to { transform:translateX(-50%); } }
+</style>
+</head>
+<body>
+<h1>1Day 房间 · 第二批 6 个方案</h1>
+<div class="sub">参考 React Bits（reactbits.dev）的组件。同一个房间：你、小王、阿May、Leo，今天拍了 6 段。顶部都是一周日历。</div>
+<div class="row">
+
+  <!-- F Stack -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div class="stage">
+        <div class="v g4" style="left:34px;top:30px;width:200px;height:320px;transform:rotate(7deg)"></div>
+        <div class="v g2" style="left:30px;top:24px;width:200px;height:320px;transform:rotate(-4deg)"></div>
+        <div class="v g3" style="left:34px;top:16px;width:200px;height:330px;transform:rotate(1deg)"><span class="n">阿May · 18:05</span><span class="t">晚饭</span></div>
+        <div class="hint">往旁边甩一张，看下一张 · 还剩 5 段</div>
+      </div>
+    </div>
+    <h2>F · 一叠卡片</h2>
+    <div class="ref">React Bits: Stack</div>
+    <p>今天大家的片段叠成一叠，最上面那张在播，甩走看下一张。好玩、上手零成本，像翻朋友的拍立得。</p>
+  </div>
+
+  <!-- G Circular gallery -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div class="stage">
+        <div class="v g1" style="left:-40px;top:90px;width:110px;height:180px;transform:rotate(-14deg)"></div>
+        <div class="v g5" style="left:170px;top:90px;width:110px;height:180px;transform:rotate(14deg)"></div>
+        <div class="v g2" style="left:64px;top:60px;width:140px;height:230px"><span class="n">小王</span><span class="t">12:40</span></div>
+        <div style="position:absolute;top:310px;left:0;right:0;text-align:center;font-size:13px;font-weight:800">小王 · 3 段</div>
+        <div class="hint">左右拖，一圈是一个人</div>
+      </div>
+    </div>
+    <h2>G · 弧形转盘，一人一张</h2>
+    <div class="ref">React Bits: Circular Gallery</div>
+    <p>每人一张卡排成一道弧，左右拖着转，转到中间的那个人开始播。适合 3–6 人，比 stories 更有仪式感。</p>
+  </div>
+
+  <!-- H Masonry -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div class="stage">
+        <div class="v g1" style="left:0;top:0;width:122px;height:200px"><span class="n">你</span><span class="t">09:12</span></div>
+        <div class="v g2" style="left:130px;top:0;width:122px;height:130px"><span class="n">小王</span></div>
+        <div class="v g3" style="left:130px;top:138px;width:122px;height:220px"><span class="n">阿May</span><span class="t">18:05</span></div>
+        <div class="v g5" style="left:0;top:208px;width:122px;height:150px"><span class="n">Leo</span></div>
+        <div class="v g4" style="left:0;top:366px;width:122px;height:80px"></div>
+      </div>
+    </div>
+    <h2>H · 瀑布流，竖的就长横的就短</h2>
+    <div class="ref">React Bits: Masonry</div>
+    <p>按片段原本的长宽排，不裁切。像小红书首页，一眼看到当天所有人的画面，横拍竖拍都好看。</p>
+  </div>
+
+  <!-- I Card swap -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div style="font-size:15px;font-weight:900;margin:6px 0 2px">今天 4 个人都拍了</div>
+      <div style="font-size:12px;color:var(--soft)">最后一段是阿May 18:05 的晚饭</div>
+      <div class="stage">
+        <div class="v g2" style="left:110px;top:40px;width:150px;height:240px;transform:skewY(6deg)"></div>
+        <div class="v g1" style="left:80px;top:70px;width:150px;height:240px;transform:skewY(6deg)"></div>
+        <div class="v g3" style="left:50px;top:100px;width:150px;height:240px;transform:skewY(6deg);animation:swap 3s infinite"><span class="t">18:05</span></div>
+      </div>
+    </div>
+    <h2>I · 自动轮换的卡片</h2>
+    <div class="ref">React Bits: Card Swap</div>
+    <p>不用点，几张卡自己轮流换到最前面播放，上面一句话说今天怎么样。像房间的门面，打开就有东西在动。</p>
+  </div>
+
+  <!-- J Folder -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
+        <div style="position:relative;height:170px">
+          <div class="v g1" style="left:24px;top:0;width:80px;height:110px;transform:rotate(-8deg)"></div>
+          <div class="v g5" style="left:50px;top:6px;width:80px;height:110px;transform:rotate(8deg)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:22px;height:80px;border-radius:14px;background:#FFC93C"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:12px;font-weight:800">你 · 2 段</div>
+        </div>
+        <div style="position:relative;height:170px">
+          <div class="v g2" style="left:36px;top:10px;width:80px;height:110px;transform:rotate(-5deg)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:22px;height:80px;border-radius:14px;background:#7CC6F2"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:12px;font-weight:800">小王 · 1 段</div>
+        </div>
+        <div style="position:relative;height:170px">
+          <div class="v g3" style="left:24px;top:0;width:80px;height:110px;transform:rotate(-8deg)"></div>
+          <div class="v g4" style="left:50px;top:6px;width:80px;height:110px;transform:rotate(8deg)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:22px;height:80px;border-radius:14px;background:#FFB3C7"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:12px;font-weight:800">阿May · 2 段</div>
+        </div>
+        <div style="position:relative;height:170px;opacity:.5">
+          <div style="position:absolute;left:0;right:0;bottom:22px;height:80px;border-radius:14px;background:#E3D7BC"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:12px;font-weight:800">Leo · 还没拍</div>
+        </div>
+      </div>
+    </div>
+    <h2>J · 每人一个文件夹</h2>
+    <div class="ref">React Bits: Folder</div>
+    <p>每人一个彩色文件夹，片段从口里探出来，点开散成一排。空文件夹就是没拍，很直观也很可爱。</p>
+  </div>
+
+  <!-- K Rolling film -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week"><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div><div>日<b>25</b></div></div>
+      <div style="position:relative;height:150px;margin:8px -16px;background:#2A2118;overflow:hidden">
+        <div style="display:flex;gap:8px;padding:16px 8px;width:200%;animation:drift 12s linear infinite">
+          <div class="v g1" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g2" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g5" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g3" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g4" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g2" style="position:relative;flex:none;width:80px;height:118px"></div>
+          <div class="v g1" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g2" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g5" style="position:relative;flex:none;width:80px;height:118px"></div><div class="v g3" style="position:relative;flex:none;width:80px;height:118px"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--soft);margin-top:8px">今天 · 6 段 · 41 秒</div>
+      <div class="v g3" style="position:relative;height:200px;margin-top:10px"><span class="n">阿May · 18:05</span><span class="t">晚饭</span></div>
+      <div style="position:absolute;bottom:16px;left:16px;right:16px;height:44px;border-radius:22px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">生成今天的 vlog</div>
+    </div>
+    <h2>K · 一条一直滚的胶卷</h2>
+    <div class="ref">React Bits: Infinite Scroll / Rolling Gallery</div>
+    <p>今天所有片段串成一条胶卷慢慢滚，点哪格放大播哪格，下面直接生成 vlog。把「一起拍一天」做成一卷胶片的感觉。</p>
+  </div>
+
+</div>
+</body>
+</html>

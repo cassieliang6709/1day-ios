@@ -89,6 +89,10 @@ final class VlogPlayback {
 }
 
 struct VlogPlayer: View {
+    /// Re-renders the transport's spoken labels when the language changes
+    /// (see the `Strings` convention).
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+
     let url: URL
     /// What shape to lay out before the file has been read. The film's own
     /// shape wins as soon as it's known: a shared-room film is a mosaic, and a
@@ -151,49 +155,71 @@ struct VlogPlayer: View {
 
     private var bigPlayButton: some View {
         Button { playback.toggle() } label: {
+            // Fixed size: the glyph is centred in a fixed 62pt disc.
             Image(systemName: "play.fill")
                 .font(.system(size: 24))
-                .foregroundStyle(Color.oneDayBrand)
+                .foregroundStyle(OneDay.brandText)
                 .frame(width: 62, height: 62)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))
                 .oneDaySoftShadow()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Strings.play)
         .transition(.scale.combined(with: .opacity))
     }
 
+    /// The transport bar. Both buttons draw small — a 30pt disc, a bare
+    /// glyph — and are hit as 44pt squares: the bar is a thin strip along the
+    /// bottom of a film, and a 12pt fullscreen glyph with nothing around it
+    /// was a target you had to aim for. Negative padding claws back the extra
+    /// so the capsule stays as slim as it was.
     private var controls: some View {
         HStack(spacing: 12) {
             Button { playback.toggle() } label: {
+                // Fixed size: centred in a fixed 30pt disc.
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
                     .background(.white.opacity(0.2), in: Circle())
                     .contentTransition(.symbolEffect(.replace))
+                    .frame(width: Self.hitTarget, height: Self.hitTarget)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(-(Self.hitTarget - 30) / 2)
+            .accessibilityLabel(playback.isPlaying ? Strings.pause : Strings.play)
 
             Scrubber(playback: playback)
 
             Text("\(VlogPlayback.timecode(playback.current)) / \(VlogPlayback.timecode(playback.duration))")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(OneDay.Font.micro)
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
+                // The scrubber already speaks the position; reading the
+                // timecode again straight after is noise.
+                .accessibilityHidden(true)
 
             Button { expanded = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(OneDay.Font.rounded(.caption, weight: .bold))
                     .foregroundStyle(.white)
+                    .frame(width: Self.hitTarget, height: Self.hitTarget)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // ~16pt glyph inside the 44pt target.
+            .padding(-(Self.hitTarget - 16) / 2)
+            .accessibilityLabel(Strings.fullScreen)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(.ultraThinMaterial, in: Capsule())
         .environment(\.colorScheme, .dark)
     }
+
+    private static let hitTarget: CGFloat = 44
 }
 
 /// A capsule progress track you can drag. Grows under the finger so the thumb
@@ -231,6 +257,23 @@ private struct Scrubber: View {
             .animation(OneDay.Motion.snap, value: isDragging)
         }
         .frame(height: 22)
+        // A drag gesture is invisible to VoiceOver. As an adjustable element
+        // it reads "Playback position, 0:12 of 0:45" and a swipe up or down
+        // moves a second either way — the same thing the thumb does.
+        .accessibilityElement()
+        .accessibilityLabel(Strings.playbackPosition)
+        .accessibilityValue(
+            "\(VlogPlayback.timecode(playback.current)) / \(VlogPlayback.timecode(playback.duration))")
+        .accessibilityAdjustableAction { direction in
+            guard playback.duration > 0 else { return }
+            let step: Double
+            switch direction {
+            case .increment: step = 1
+            case .decrement: step = -1
+            @unknown default: return
+            }
+            playback.seek(to: min(max(playback.current + step, 0), playback.duration))
+        }
     }
 }
 
@@ -271,7 +314,7 @@ private struct FullscreenFilm: View {
             Color.black.ignoresSafeArea()
             VideoPlayer(player: player)
                 .ignoresSafeArea()
-            IconBubble(systemName: "xmark", tint: .white, action: onClose)
+            IconBubble(systemName: "xmark", label: Strings.close, overVideo: true, action: onClose)
                 .padding(18)
         }
         .onAppear {

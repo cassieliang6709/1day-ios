@@ -74,6 +74,18 @@ final class AccountDeletionService {
         // to be a queryable index in the production schema, and a query that
         // silently matches nothing is the worst possible outcome for something
         // somebody explicitly asked for.
+        //
+        // This phone may know only some of the rooms — a new phone, a
+        // reinstall — so first every room the cloud says is mine, and what
+        // each one holds. Read-only: the account is frozen, nothing uploads.
+        await store.restoreMyRooms()
+        for code in store.challenges.compactMap(\.roomCode) {
+            _ = await store.roomSync.syncClips(code: code)
+            if let interactions = await store.roomSync.fetchInteractions(code: code) {
+                store.roomSync.remoteReactions[code] = interactions.reactions
+                store.roomSync.remoteComments[code] = interactions.comments
+            }
+        }
         let inventory = Self.inventory(of: store, authorID: accountID)
 
         let coordinator: AccountDeletionCoordinator
@@ -150,12 +162,22 @@ final class AccountDeletionService {
         var names: Set<String> = []
         for challenge in store.challenges {
             guard let code = challenge.roomCode else { continue }
+            // Written on join. A room I created has none, and deleting a
+            // record that isn't there counts as done.
+            names.insert(CloudKitService.memberRecordName(code: code, authorID: authorID))
             for card in challenge.cards {
                 names.insert(CloudKitService.clipRecordName(
                     code: code, authorID: authorID, day: card.day))
                 for comment in card.comments where comment.authorID == authorID {
                     names.insert(comment.id.uuidString)
                 }
+            }
+            // A moment's second and later takes, which a day alone can't name.
+            names.formUnion(store.extraTakeRecordNames(in: challenge, authorID: authorID))
+            // Every take of mine the room holds, by its own record name —
+            // including ones this phone never filmed or never kept.
+            for clip in store.roomSync.remoteClips[code] ?? [] where clip.authorID == authorID {
+                names.insert(clip.id)
             }
             for reaction in store.roomSync.remoteReactions[code] ?? []
             where reaction.authorID == authorID {

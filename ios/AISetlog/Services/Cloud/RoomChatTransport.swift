@@ -1,81 +1,77 @@
 import Foundation
-import CloudKit
 
 protocol RoomChatTransport {
     func fetch(roomCode: String) async throws -> [RoomChatMessage]
     func send(_ message: RoomChatMessage) async throws
     func delete(_ message: RoomChatMessage, accountID: String) async throws
-    /// Returns only IDs whose direct lookup explicitly reports unknownItem.
+    /// Returns only IDs the server explicitly reports it has no record of.
     func confirmedMissing(_ ids: Set<UUID>, roomCode: String) async throws -> Set<UUID>
 }
 
-/// Uses the existing Comment schema. Room messages omit day/targetAuthorID;
-/// legacy comments keep their optional moment as context. No new record type.
+/// Room chat on the Worker's comment rows, the same rows older per-clip
+/// comments live in.
 struct CloudRoomChatTransport: RoomChatTransport {
     enum TransportError: Error { case incompletePage, malformedRecord, missingAcknowledgement, notAuthor }
-    private var database: CKDatabase {
-        CKContainer(identifier: CloudKitService.containerID).publicCloudDatabase
-    }
+    var api: OneDayAPI = .shared
 
     func fetch(roomCode: String) async throws -> [RoomChatMessage] {
-        try await CloudKitService.ensureAccountAvailable()
-        let query = CKQuery(recordType: "Comment", predicate: NSPredicate(format: "roomCode == %@", roomCode))
-        var page = try await database.records(matching: query)
-        var messages: [RoomChatMessage] = []
-        for _ in 0..<50 {
-            for (_, result) in page.matchResults {
-                let record = try result.get() // Partial failures are not an empty conversation.
-                messages.append(try RoomChatRecordCodec.decode(record, roomCode: roomCode))
+        struct Body: Decodable { let comments: [Lossy<CloudKitService.CommentBody>] }
+        // A request that fails still throws: a partial conversation is not an
+        // empty one. One bad row inside a good answer does not.
+        let body = try await api.get(Body.self, ["rooms", roomCode, "comments"])
+        return Self.decodeMatches(body.comments.map(\.value), roomCode: roomCode)
+    }
+
+    /// Decodes what decodes and logs the rest. One row that doesn't parse used
+    /// to fail the whole fetch, so nobody in the room saw any new message
+    /// until it went away. A skipped message is not mistaken for a deleted
+    /// one: `confirmedMissing` asks the server directly.
+    static func decodeMatches(_ rows: [CloudKitService.CommentBody?], roomCode: String) -> [RoomChatMessage] {
+        rows.compactMap { row in
+            guard let row else {
+                print("[chat] skipped an unreadable row in \(roomCode)")
+                return nil
             }
-            guard let cursor = page.queryCursor else { return messages }
-            try Task.checkCancellation()
-            page = try await database.records(continuingMatchFrom: cursor)
+            do {
+                return try RoomChatRecordCodec.decode(row, roomCode: roomCode)
+            } catch {
+                print("[chat] skipped record \(row.id) in \(roomCode): \(error)")
+                return nil
+            }
         }
-        throw TransportError.incompletePage
     }
 
     func confirmedMissing(_ ids: Set<UUID>, roomCode: String) async throws -> Set<UUID> {
+        struct Request: Encodable { let ids: [String] }
+        struct Response: Decodable { let missing: [String]; let elsewhere: [String] }
         var missing: Set<UUID> = []
         let values = Array(ids)
-        for offset in stride(from: 0, to: values.count, by: 100) {
+        for offset in stride(from: 0, to: values.count, by: 500) {
             try Task.checkCancellation()
-            let batch = Array(values[offset..<min(offset + 100, values.count)])
-            let results = try await database.records(for: batch.map { CKRecord.ID(recordName: $0.uuidString) })
-            for id in batch {
-                guard let result = results[CKRecord.ID(recordName: id.uuidString)] else {
-                    throw TransportError.missingAcknowledgement
-                }
-                do {
-                    let record = try result.get()
-                    guard record["roomCode"] as? String == roomCode else { throw TransportError.malformedRecord }
-                } catch let error as CKError where error.code == .unknownItem {
-                    missing.insert(id)
-                }
-            }
+            let batch = values[offset..<min(offset + 500, values.count)].map(\.uuidString)
+            let data = try await api.send(
+                "POST", ["rooms", roomCode, "comments", "missing"], json: Request(ids: batch))
+            let response = try api.decode(Response.self, from: data)
+            // An id that lives in another room is not this room's message, and
+            // certainly not one to forget.
+            guard response.elsewhere.isEmpty else { throw TransportError.malformedRecord }
+            missing.formUnion(response.missing.compactMap(UUID.init(uuidString:)))
         }
         return missing
     }
 
     func delete(_ message: RoomChatMessage, accountID: String) async throws {
         guard message.authorID == accountID else { throw TransportError.notAuthor }
-        try await CloudKitService.ensureAccountAvailable()
-        let id = CKRecord.ID(recordName: message.id.uuidString)
+        // The Worker, not this check, enforces that only the author deletes;
+        // an id already gone succeeds, so a retry is harmless.
         do {
-            let record = try await database.record(for: id)
-            guard record["authorID"] as? String == accountID,
-                  record["roomCode"] as? String == message.roomCode else { throw TransportError.notAuthor }
-            // CloudKit permissions, not this client check, enforce server authorization.
-            _ = try await database.deleteRecord(withID: id)
-        } catch let error as CKError where error.code == .unknownItem {
-            return // Already deleted, so retry is idempotent.
+            try await api.send("DELETE", ["comments", message.id.uuidString])
+        } catch OneDayAPI.Failure.forbidden {
+            throw TransportError.notAuthor
         }
     }
 
     func send(_ message: RoomChatMessage) async throws {
-        try await CloudKitService.ensureAccountAvailable()
-        let record = RoomChatRecordCodec.encode(message)
-        let (saved, _) = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
-        guard let result = saved[record.recordID] else { throw TransportError.missingAcknowledgement }
-        _ = try result.get()
+        try await api.send("PUT", ["comments", message.id.uuidString], json: RoomChatRecordCodec.encode(message))
     }
 }

@@ -8,6 +8,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 10.1.0
 targets:
   AISetlog:
     type: application
@@ -19,38 +23,65 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
         TARGETED_DEVICE_FAMILY: "1"
-        MARKETING_VERSION: "1.4"
-        CURRENT_PROJECT_VERSION: "23"
+        MARKETING_VERSION: "1.5"
+        CURRENT_PROJECT_VERSION: "35"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconBlue
+        # ImagePlayground (avatar drawing) only exists from iOS 18.1; weak so
+        # the app still launches on iOS 17, where `AvatarMaker` falls back.
+        OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "ImagePlayground"]
       configs:
+        # Debug installs beside the App Store build as "1Day Dev" and talks to
+        # the same Worker (workers/api), so rooms made in either app open in
+        # both.
         Debug:
           APS_ENVIRONMENT: development
+          PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog.dev
+          APP_DISPLAY_NAME: 1Day Dev
+          # Google OAuth iOS client for this bundle ID (Cloud project
+          # inlaid-reactor-513911-g5). Not secret. The scheme is the client
+          # ID reversed, which is where Google sends the browser back to.
+          GOOGLE_CLIENT_ID: 513162743274-s9mjujjgqf588097792ctueka46gfkhc.apps.googleusercontent.com
+          GOOGLE_URL_SCHEME: com.googleusercontent.apps.513162743274-s9mjujjgqf588097792ctueka46gfkhc
         Release:
           APS_ENVIRONMENT: production
+          PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog
+          APP_DISPLAY_NAME: 1Day
+          GOOGLE_CLIENT_ID: 513162743274-5p1dgi8km91pchmbh9q2l6piiesuouug.apps.googleusercontent.com
+          GOOGLE_URL_SCHEME: com.googleusercontent.apps.513162743274-5p1dgi8km91pchmbh9q2l6piiesuouug
     entitlements:
       path: AISetlog/AISetlog.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
         com.apple.developer.applesignin: [Default]
-        com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.cassie.AISetlog
-        com.apple.developer.icloud-services:
-          - CloudKit
     info:
       path: AISetlog/Info.plist
       properties:
         UILaunchScreen: {}
-        CFBundleDisplayName: 1Day
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        # Which APNs the Worker should send this build's alerts through.
+        OneDayAPNsEnvironment: $(APS_ENVIRONMENT)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSCameraUsageDescription: "Record your 2-second daily challenge clip."
-        NSMicrophoneUsageDescription: "Capture audio for your daily clip."
-        NSPhotoLibraryAddUsageDescription: "Save your finished weekly vlog."
+        NSCameraUsageDescription: "To film the moments of your day."
+        NSMicrophoneUsageDescription: "So your clips have sound."
+        NSSpeechRecognitionUsageDescription: "用来把你说的话转成心情日记里的文字。"
+        NSPhotoLibraryAddUsageDescription: "To save your finished film to Photos."
+        NSRemindersFullAccessUsageDescription: "To copy your reminders into today's list."
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes: [remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         CFBundleURLTypes:
           - CFBundleURLName: com.cassie.oneday.join
             CFBundleURLSchemes: [oneday]
+          - CFBundleURLName: com.cassie.oneday.google-sign-in
+            CFBundleURLSchemes: [$(GOOGLE_URL_SCHEME)]
+        GIDClientID: $(GOOGLE_CLIENT_ID)
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
   AISetlogTests:
     type: bundle.unit-test
     platform: iOS

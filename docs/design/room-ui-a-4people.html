@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>方案 A · 4 个人</title>
+<style>
+  :root { --bg:#FFF6DF; --ink:#3A2A12; --soft:#8A7550; --faint:#BBA982; --brand:#FFC93C; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  .row { display:flex; gap:28px; }
+  .opt h2 { font-size:16px; margin:10px 0 4px; } .opt p { font-size:12.5px; color:var(--soft); width:300px; line-height:1.5; }
+  .phone { width:300px; height:620px; border-radius:40px; background:var(--bg); border:8px solid #222; overflow:hidden; padding:44px 16px 16px; display:flex; flex-direction:column; }
+  .title { font-weight:900; font-size:22px; }
+  .names { font-size:11px; color:var(--soft); margin:4px 0 10px; }
+  .week { display:flex; justify-content:space-between; margin-bottom:12px; }
+  .week div { width:34px; text-align:center; font-size:10px; color:var(--faint); padding:5px 0; border-radius:10px; }
+  .week b { display:block; font-size:14px; color:var(--ink); } .week .on { background:var(--brand); }
+  .faces { display:flex; gap:12px; margin-bottom:12px; }
+  .face { width:36px; height:36px; border-radius:50%; border:2.5px solid var(--brand); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#fff; }
+  .face.off { border-color:#E3D7BC; opacity:.5; }
+  .grid { flex:1; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:10px; }
+  .v { border-radius:16px; position:relative; color:#fff; font-weight:800; }
+  .v .t { position:absolute; left:10px; bottom:8px; font-size:17px; text-shadow:0 1px 3px #0006; }
+  .v .n { position:absolute; left:10px; top:8px; font-size:11px; text-shadow:0 1px 3px #0006; }
+  .v .c { position:absolute; right:10px; top:8px; font-size:10px; background:#0004; padding:1px 6px; border-radius:8px; }
+  .empty { border-radius:16px; border:1.5px dashed #D9CBA8; background:#F7EEDA; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; color:var(--faint); font-weight:700; gap:6px; }
+  .g1 { background:linear-gradient(160deg,#7FD6A0,#2E9E5B); } .g2 { background:linear-gradient(160deg,#7CC6F2,#2B7FB8); }
+  .g3 { background:linear-gradient(160deg,#FFB3C7,#E5688C); } .g5 { background:linear-gradient(160deg,#FFD6A5,#E09A45); }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="names">今天 3/4 人拍了</div>
+      <div class="week"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="faces"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g5">你</div><span style="font-size:10px;font-weight:700;color:var(--soft)">你</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g2">王</div><span style="font-size:10px;font-weight:700;color:var(--soft)">小王</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g3">May</div><span style="font-size:10px;font-weight:700;color:var(--soft)">阿May</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face off g1">Leo</div><span style="font-size:10px;font-weight:700;color:var(--soft)">Leo</span></div></div>
+      <div class="grid">
+        <div class="v g5"><span class="n">你</span><span class="c">2 段</span><span class="t">09:12</span></div>
+        <div class="v g2"><span class="n">小王</span><span class="c">1 段</span><span class="t">12:40</span></div>
+        <div class="v g3"><span class="n">阿May</span><span class="c">3 段</span><span class="t">18:05</span></div>
+        <div class="empty">Leo<br>今天还没拍<span style="font-size:10px">长按拍一拍</span></div>
+      </div>
+    </div>
+    <h2>4 个人：2×2</h2>
+    <p>4 个人正好排成 2×2，一屏装下不用滑。每格播放这个人今天最新的一段，左右滑看他的其他段。Leo 没拍：头像是灰的，他的格子是空的，长按可以拍一拍他。</p>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="names">今天 4/5 人拍了</div>
+      <div class="week"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="faces"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g5">你</div><span style="font-size:10px;font-weight:700;color:var(--soft)">你</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g2">王</div><span style="font-size:10px;font-weight:700;color:var(--soft)">小王</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g3">May</div><span style="font-size:10px;font-weight:700;color:var(--soft)">阿May</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g1">Leo</div><span style="font-size:10px;font-weight:700;color:var(--soft)">Leo</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face off g2">Kiki</div><span style="font-size:10px;font-weight:700;color:var(--soft)">Kiki</span></div></div>
+      <div class="grid" style="grid-template-rows:1fr 1fr 1fr">
+        <div class="v g5"><span class="n">你</span><span class="t">09:12</span></div>
+        <div class="v g2"><span class="n">小王</span><span class="t">12:40</span></div>
+        <div class="v g3"><span class="n">阿May</span><span class="t">18:05</span></div>
+        <div class="v g1"><span class="n">Leo</span><span class="t">20:30</span></div>
+        <div class="empty">Kiki<br>今天还没拍</div>
+        <div></div>
+      </div>
+    </div>
+    <h2>对比：5 个人是 2×3</h2>
+    <p>5、6 个人是 2×3，格子变扁一点。第 6 格留空不画东西。房间最多 6 个人。</p>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="names">今天 3/4 人拍了</div>
+      <div class="week"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="faces"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g5" style="opacity:.45;border-color:#E3D7BC">你</div><span style="font-size:10px;font-weight:700;color:var(--soft)">你</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g2" style="opacity:.45;border-color:#E3D7BC">王</div><span style="font-size:10px;font-weight:700;color:var(--soft)">小王</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face g3" style="box-shadow:0 0 0 2px #fff,0 0 0 4px var(--brand)">May</div><span style="font-size:10px;font-weight:700;color:var(--soft)">阿May</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div class="face off g1">Leo</div><span style="font-size:10px;font-weight:700;color:var(--soft)">Leo</span></div></div>
+      <div class="v g3" style="flex:1"><span class="n">阿May · 3 段</span><span class="t">18:05</span>
+        <div style="position:absolute;left:10px;right:10px;top:30px;display:flex;gap:4px"><i style="flex:1;height:3px;border-radius:2px;background:#fff"></i><i style="flex:1;height:3px;border-radius:2px;background:#fff8"></i><i style="flex:1;height:3px;border-radius:2px;background:#fff8"></i></div>
+        <div style="position:absolute;right:10px;bottom:10px;font-size:18px;text-align:center;line-height:1.6">♡<br>↩</div></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <div class="v g5" style="flex:1;height:64px"><span class="n">你</span></div>
+        <div class="v g2" style="flex:1;height:64px"><span class="n">小王</span></div>
+        <div class="empty" style="flex:1;height:64px">Leo</div>
+      </div>
+    </div>
+    <h2>选中阿May：她的格子放大</h2>
+    <p>点头像不跳全屏，而是在原地把她的格子放大到整块，上面一条进度条，她的 3 段自动连着播，右下角点赞和回复。其他人缩成下面一排小格，点哪个换哪个；再点一次她的头像回到 2×2。选中的头像放大加一圈黄边，其他头像变淡。</p>
+  </div>
+</div>
+</body>
+</html>

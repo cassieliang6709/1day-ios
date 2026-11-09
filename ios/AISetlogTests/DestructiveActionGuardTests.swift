@@ -57,21 +57,20 @@ final class DestructiveActionGuardTests: XCTestCase {
 
     // MARK: Leaving a room
 
-    /// The assertion that keeps the two apart. Leaving a room does not delete
-    /// anything shared — `ChallengeStore.delete` only calls `clearRoom` — so
-    /// the warning must not read like the story-deletion one, and must say the
-    /// clips survive.
-    func testLeavingARoomPromisesTheClipsStayForEveryoneElse() {
+    /// Leaving a room deletes your own clips, reactions, comments and member
+    /// record (commit e1b304f), so the warning must say they go for good, and
+    /// must still not be the same sentence as the story-deletion one.
+    func testLeavingARoomWarnsTheClipsAreDeleted() {
         inChinese()
         let zh = Strings.leaveRoomWarning
-        XCTAssertTrue(zh.contains("还留在") || zh.contains("其他人"))
-        XCTAssertFalse(zh.contains("找不回来"))
+        XCTAssertTrue(zh.contains("删掉"))
+        XCTAssertTrue(zh.contains("找不回来"))
         XCTAssertNotEqual(zh, Strings.deleteStoryWarning(3))
 
         inEnglish()
         let en = Strings.leaveRoomWarning
-        XCTAssertTrue(en.lowercased().contains("stay"))
-        XCTAssertFalse(en.lowercased().contains("can't be undone"))
+        XCTAssertTrue(en.lowercased().contains("deleted"))
+        XCTAssertTrue(en.lowercased().contains("for good"))
         XCTAssertNotEqual(en, Strings.deleteStoryWarning(3))
     }
 
@@ -81,9 +80,9 @@ final class DestructiveActionGuardTests: XCTestCase {
     /// The footnote is the part that makes the choice answerable.
     func testTheKeepOrDiscardFootnoteSaysWhereKeepPutsIt() {
         inChinese()
-        XCTAssertTrue(Strings.keepClipFootnote.contains("草稿"))
+        XCTAssertTrue(Strings.keepClipFootnote.contains("我的"))
         inEnglish()
-        XCTAssertTrue(Strings.keepClipFootnote.lowercased().contains("draft"))
+        XCTAssertTrue(Strings.keepClipFootnote.contains("Mine"))
     }
 
     // MARK: Camera permission

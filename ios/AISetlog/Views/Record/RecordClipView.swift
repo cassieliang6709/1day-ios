@@ -16,10 +16,9 @@ struct RecordClipView: View {
     /// about this story rather than decoration. 0 = no story behind this take
     /// (free-form), and then no indicator is drawn at all.
     var momentCount = 0
-    /// The story's length is where this take starts, not where it's stuck: the
-    /// timer chip switches it for this recording only. `@State` so the chip can
-    /// write to it — the value the caller passes seeds the camera the first
-    /// time it opens for a slot and is never written back to the challenge.
+    /// The story's clip length. Kept so callers can still pass it, but no
+    /// longer read by the shutter: every take is `takeSeconds` long since
+    /// tap-to-film, and the timer chip that cycled this is gone.
     @State var clipLength: Challenge.ClipLength = .tiny
     var showsPrompt = true
     /// Free-form mode (the camera tab): no cover to dismiss; after review the
@@ -28,11 +27,16 @@ struct RecordClipView: View {
     /// The challenge's locked frame. Free-form mode ignores this and uses its
     /// own toggleable orientation instead.
     var orientation: Challenge.Orientation = .portrait
+    /// The story's camera (1.5). Set, everyone in the story films with it and
+    /// the picker is hidden; nil (free-form, older stories) uses your own pick.
+    var lockedCamera: CameraStyle? = nil
     /// Free-form only: lets the shell block a tab switch that would throw an
     /// unfiled clip away.
     var unfiledGuard: UnfiledClipGuard?
     /// Free-form only: "there's nowhere to file this yet — make somewhere".
     var onStartStory: (() -> Void)?
+    /// Free-form only: back to the browsing surface the camera came from.
+    var onCloseFreeform: (() -> Void)?
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -43,23 +47,37 @@ struct RecordClipView: View {
     @State private var ringProgress: CGFloat = 0
     @State private var overlayText = ""
     @State private var showSavePicker = false
+    /// Rooms ticked under a free take: it goes to each of them as well as
+    /// 我的 (1.5). None ticked — it stays in 我的 only.
+    @State private var sendTo: Set<UUID> = []
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
-    /// Raised when the close button is pressed with a take still in review.
-    ///
-    /// The free-form camera has had this guard since `UnfiledClipGuard` —
-    /// leaving with a clip in review asks first. The per-moment camera, opened
-    /// as a modal from a story, never got the other half: you filmed two
-    /// seconds, tapped X out of habit, and `teardown()` deleted the temp file
-    /// on the way out with nothing on screen to say it had happened.
-    @State private var askBeforeDiscarding = false
     /// Whether the fine zoom row has replaced the preset chips. The chips
     /// cover 0.5x / 1x / 2x; this covers everything between and above them.
     @State private var showsZoomSlider = false
     /// A pinch reports a running multiple of where it began, so where it began
     /// has to be remembered for the length of the gesture. nil = not pinching.
     @State private var pinchStartZoom: CGFloat?
+    /// How far the phone is turned from upright: 0, or ±90 held sideways.
+    /// The screen stays portrait (as the system Camera does); the buttons turn
+    /// by this much so they read upright, and the frame says it's 横拍.
+    /// 横拍, switched on by hand. Only the button turns the camera's layout;
+    /// turning the phone by itself doesn't (not in 1.5).
+    @State private var manualSideways = false
+    private var deviceTurn: Double { manualSideways ? 90 : 0 }
+    /// What the file is filmed as: 横拍 makes it landscape. The viewfinder
+    /// keeps its upright box — held sideways, that box is the landscape frame.
+    private var captureOrientation: Challenge.Orientation {
+        manualSideways ? .landscape : effectiveOrientation
+    }
+    @State private var reviewOrientation: Challenge.Orientation = .portrait
+    @State private var measuredReviewAspect: CGFloat?
+    private var isSideways: Bool { deviceTurn != 0 }
+    /// Set once this screen has decided to go — the toast saying what happened
+    /// is on screen and the dismiss is a beat behind it. Blocks the shutter in
+    /// that beat, so a take can't start on a camera that's about to close.
+    @State private var isLeaving = false
     @FocusState private var overlayTextFocused: Bool
 
     /// Bound only so a language change re-renders the view.
@@ -75,21 +93,47 @@ struct RecordClipView: View {
     /// account, so this (and the identity tint it drives) falls back to a
     /// fixed default.
     private var myName: String? { account.account?.displayName }
-    private var myTint: Color { Identity.tint(for: myName) }
+    /// Only for what's *about* you: the frame around the picture and the
+    /// countdown ring of the take you're filming. Buttons are actions, and
+    /// actions are brand blue everywhere in the app — an identity-tinted "Use"
+    /// made the camera the one screen where the primary button changed colour
+    /// with whoever was signed in.
+    private var myTint: Color { Color.oneDayBrand }
+    @AppStorage(CameraStyle.storageKey) private var cameraStyle: CameraStyle = CameraStyle.defaultCamera
 
-    private var clipSeconds: Double { clipLength.seconds }
-    private var clipSecondsText: String { clipLength.secondsLabel }
-    /// Extra bottom room so the free-form controls clear the floating pill.
-    private var bottomInset: CGFloat { isFreeform ? 68 : 8 }
+    /// Every take is two seconds: one tap, the camera stops itself. Hold-to-
+    /// record gave clips of every length, which made the stitched film uneven
+    /// and asked people to judge timing while also framing the shot.
+    static let takeSeconds: Double = 2
+    private var clipSeconds: Double { Self.takeSeconds }
+    private var clipSecondsText: String { Challenge.ClipLength.tiny.secondsLabel }
+    private var bottomInset: CGFloat { isFreeform ? OneDay.tabBarClearance + 8 : 8 }
+    /// What this take is filmed with. There is one camera now (DV, 1.5): a
+    /// story or room locked to a camera that's no longer offered films with
+    /// it too. Clips already filmed keep the look baked into them.
+    private var activeCamera: CameraStyle {
+        let camera = lockedCamera ?? cameraStyle
+        return CameraStyle.selectable.contains(camera) ? camera : CameraStyle.defaultCamera
+    }
+
+    /// Portrait from 1.5 on: the camera decides the shape now. A story saved
+    /// with landscape or square keeps it.
     private var effectiveOrientation: Challenge.Orientation {
         isFreeform ? freeformOrientation : orientation
+    }
+    private var filingOrientation: Challenge.Orientation {
+        recorder.clipURL == nil ? captureOrientation : reviewOrientation
     }
     private var trimmedOverlayText: String? {
         let text = overlayText.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : text
     }
+    /// Falls back to 「这个瞬间」, not 「第 N 天」: a time-only story passes no
+    /// slot title, and its moments are not days — the top bar of a camera
+    /// opened at 3pm said 「第 1 天」. The stamp on the frame never shows this
+    /// for those stories (`showsPrompt` is off for them), only the header.
     private var localizedMomentTitle: String {
-        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.dayN(day)
+        slotTitle.map { MomentCatalog.localize($0) } ?? Strings.thisMoment
     }
 
     /// What to stamp on the picture as the moment's name — nil in free-form,
@@ -101,7 +145,13 @@ struct RecordClipView: View {
         isFreeform ? nil : localizedMomentTitle
     }
 
+    // Split in three so each chain type-checks on its own: as one expression
+    // it ran past the compiler's time limit on CI's slower runners.
     var body: some View {
+        observingTake(withCaptureLifecycle(screen))
+    }
+
+    private var screen: some View {
         ZStack {
             OneDay.canvas.ignoresSafeArea()
             CuteCameraBackdrop()
@@ -133,8 +183,16 @@ struct RecordClipView: View {
                 .transition(.opacity)
             }
         }
+    }
+
+    private func withCaptureLifecycle(_ content: some View) -> some View {
+        content
         .task {
-            recorder.orientation = effectiveOrientation
+            recorder.orientation = captureOrientation
+            if !CameraStyle.selectable.contains(cameraStyle) {
+                cameraStyle = CameraStyle.defaultCamera
+            }
+            recorder.cameraStyle = activeCamera
             await recorder.configure()
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -143,29 +201,40 @@ struct RecordClipView: View {
             guard recorder.state == .unavailable else { return }
             Task { await recorder.configure() }
         }
-        .onDisappear { recorder.teardown() }
-        .confirmationDialog(
-            Strings.keepClipQuestion,
-            isPresented: $askBeforeDiscarding,
-            titleVisibility: .visible
-        ) {
-            // Same three words as the free-form guard, deliberately: it is the
-            // same question, and answering it should not feel like a different
-            // decision depending on which camera you opened.
-            Button(Strings.keepClip) { keepAsDraft { dismiss() } }
-            Button(Strings.discardClip, role: .destructive) {
-                clearReview()
-                dismiss()
-            }
-            Button(Strings.cancel, role: .cancel) {}
-        } message: {
-            Text(Strings.keepClipFootnote)
+        .onDisappear {
+            recorder.teardown()
+            unfiledGuard?.isRecording = false
         }
+        .allowsHitTesting(!isLeaving)
+        // Felt rather than seen: the thumb is still on or near the shutter,
+        // covering the ring, at exactly the moments these fire.
+        .sensoryFeedback(.impact(weight: .medium), trigger: recorder.state) { _, now in
+            now == .recording
+        }
+        .sensoryFeedback(.success, trigger: recorder.clipURL) { _, now in now != nil }
+        .sensoryFeedback(.error, trigger: recorder.failureCount)
+        .onChange(of: recorder.failureCount) { _, _ in
+            ringProgress = 0
+            showToast(Strings.recordingFailed)
+        }
+    }
+
+    private func observingTake(_ content: some View) -> some View {
+        content
         .onChange(of: effectiveOrientation) { _, newValue in
-            recorder.orientation = newValue
+            recorder.orientation = manualSideways ? .landscape : newValue
+        }
+        .onChange(of: cameraStyle) { _, _ in
+            recorder.cameraStyle = activeCamera
+        }
+        .onChange(of: filingOrientation) { _, _ in
+            sendTo.formIntersection(Set(sendableRooms.map(\.id)))
         }
         .onChange(of: recorder.state) { _, state in
+            unfiledGuard?.isRecording = state == .recording
             if state == .recording {
+                reviewOrientation = captureOrientation
+                measuredReviewAspect = nil
                 ringProgress = 0
                 withAnimation(.linear(duration: clipSeconds)) { ringProgress = 1 }
             }
@@ -195,30 +264,40 @@ struct RecordClipView: View {
                 overlayText: nil,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: effectiveOrientation.aspectRatio
+                aspectRatio: activeCamera.aspectRatio(for: effectiveOrientation)
+                    ?? effectiveOrientation.aspectRatio,
+                cameraStyle: activeCamera,
+                turn: deviceTurn
             ) {
-                CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
-            }
-            .overlay(alignment: .topLeading) {
-                Button {
-                    guard recorder.state != .recording, recorder.clipURL == nil else { return }
-                    clipLength = switch clipLength {
-                    case .tiny: .story
-                    case .story: .scene
-                    case .scene: .tiny
-                    }
-                } label: {
-                    Label("每段 \(clipSecondsText)", systemImage: "timer")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(.regularMaterial, in: Capsule())
+                #if DEBUG && targetEnvironment(simulator)
+                if ClipRecorder.isSimulated {
+                    SimulatedCameraPreview()
+                } else {
+                    livePreview
                 }
-                .buttonStyle(.plain)
-                .disabled(recorder.state == .recording || recorder.clipURL != nil)
-                .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.5 : 1)
-                .padding(12)
+                #else
+                livePreview
+                #endif
+            }
+            // Top-left, inside the frame: a refused microphone
+            // films silent clips, and a silent preview looks exactly like a
+            // working one. iOS won't ask twice, so the only fix is Settings.
+            .overlay(alignment: .topLeading) {
+                if !recorder.hasAudioAccess {
+                    Button {
+                        guard let url = URL(string: UIApplication.openSettingsURLString)
+                        else { return }
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Label(Strings.noSoundOpenSettings, systemImage: "mic.slash.fill")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .cameraGlass(.capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                }
             }
             // Pinch the picture itself, which is where the hand already is.
             // The chips are the quick answer; this is the whole range, and it
@@ -237,17 +316,63 @@ struct RecordClipView: View {
             // progress bars sit in the bottom ~56pt of the frame and are
             // promises about the export, so the offset is what keeps this
             // legal — see `ZoomControlRow`.
-            .overlay(alignment: .bottom) {
-                zoomControls
-                    .padding(.bottom, Self.burnInHeight)
+            .overlay(alignment: zoomAlignment) {
+                if isSideways {
+                    // Along the edge that is the bottom of the landscape take,
+                    // turned with the phone, clear of the burn-in there.
+                    zoomControls
+                        .fixedSize()
+                        .rotationEffect(.degrees(deviceTurn))
+                        .frame(width: 56)
+                        .padding(deviceTurn > 0 ? .leading : .trailing, Self.burnInHeight - 16)
+                } else {
+                    zoomControls
+                        .padding(.bottom, Self.burnInHeight)
+                }
+            }
+            .overlay {
+                if isSideways && recorder.state != .recording {
+                    sidewaysHint.transition(.opacity)
+                }
             }
             .layoutPriority(1)
 
             shutterRow
         }
+        .animation(OneDay.Motion.snap, value: deviceTurn)
+        .onChange(of: manualSideways) { _, on in
+            recorder.forcedLandscape = on
+            recorder.orientation = captureOrientation
+        }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
+    }
+
+    /// 横拍 is on but the viewfinder still looks the same with the phone
+    /// upright — the picture stays upright on purpose, and only turning the
+    /// phone makes the frame landscape. So the frame says so, in the middle,
+    /// until the take starts. Not turned with the buttons: it is read while
+    /// the phone is still upright.
+    private var sidewaysHint: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "rotate.left")
+                .font(.system(size: 44, weight: .semibold))
+            Text(Strings.turnPhoneSideways)
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("camera-sideways")
+    }
+
+    private var zoomAlignment: Alignment {
+        guard isSideways else { return .bottom }
+        return deviceTurn > 0 ? .leading : .trailing
     }
 
     /// How much of the frame's bottom edge the burn-in block occupies:
@@ -266,58 +391,69 @@ struct RecordClipView: View {
         }
     }
 
-    /// The whole control surface starts recording. The centered layout makes
-    /// the primary camera action obvious and gives it a forgiving tap target.
-    ///
-    /// The 轻点拍摄 caption that used to sit under the ring is gone: a 66pt
-    /// brand-blue circle alone in a bar is not a control anybody needs a
-    /// sentence for, and the sentence was one of the lines making the picture
-    /// above it smaller. It is still the button's accessibility label.
+    /// One tap films a two-second take that stops on its own. A `Button`
+    /// again: with nothing to hold, firing on release is what a tap means.
+    /// No line under it (1.5) — 点一下，拍 2 秒 is VoiceOver's hint only.
     private var idleRecordingControl: some View {
-        Button {
-            recorder.startRecording(seconds: clipSeconds)
-        } label: {
-            recordButtonVisual
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
+        CenteredCaptureControl(instruction: nil) {
+            Button { startCapture() } label: {
+                recordButtonVisual
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(Strings.captureState(
             recording: false,
             secondsLabel: clipSecondsText
         ))
+        .accessibilityHint(Strings.tapToFilmTwoSeconds)
+        .accessibilityIdentifier("camera-shutter")
+        .accessibilityAction { startCapture() }
     }
 
-    /// Match the idle shutter's center axis; translated instructions sit below
-    /// rather than pushing the countdown sideways.
+    /// Match the idle shutter's center axis. No 正在拍，2 秒自动停 under it
+    /// (1.5): the ring filling up already says so.
     private var recordingControls: some View {
-        CenteredCaptureControl(instruction: Strings.tapToStop) {
+        CenteredCaptureControl(instruction: nil) {
             countdownRing
         }
     }
 
+    private func startCapture() {
+        guard !isLeaving, recorder.state == .ready, recorder.clipURL == nil else { return }
+        recorder.startRecording(seconds: clipSeconds)
+    }
+
+    /// A countdown, not a control: the take stops itself at two seconds and a
+    /// tap here does nothing. Cutting a two-second take shorter only ever made
+    /// a clip too short to see.
     private var countdownRing: some View {
-        Button {
-            recorder.stopRecording()
-        } label: {
-            ZStack {
-                Circle()
-                    .stroke(Color(.systemGray5), lineWidth: 4)
-                    .frame(width: 68, height: 68)
-                Circle()
-                    .trim(from: 0, to: ringProgress)
-                    .stroke(myTint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 68, height: 68)
-                TimelineView(.periodic(from: .now, by: 0.1)) { context in
-                    let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
-                    let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
-                    Text("\(remaining)")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(myTint)
-                        .monospacedDigit()
-                }
-            }
+        ZStack {
+            Circle()
+                .stroke(Color(.systemGray5), lineWidth: 4)
+                .frame(width: 68, height: 68)
+            Circle()
+                .trim(from: 0, to: ringProgress)
+                .stroke(myTint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 68, height: 68)
+            countdownNumber
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.captureState(recording: true, secondsLabel: clipSecondsText))
+    }
+
+    private var countdownNumber: some View {
+        TimelineView(.periodic(from: .now, by: 0.1)) { context in
+            let elapsed = context.date.timeIntervalSince(recorder.recordedAt ?? context.date)
+            let remaining = max(Int((clipSeconds - elapsed).rounded(.up)), 0)
+            Text("\(remaining)")
+                .font(.system(size: 28, weight: .black, design: .rounded))
+                .foregroundStyle(myTint)
+                .monospacedDigit()
         }
     }
 
@@ -326,6 +462,7 @@ struct RecordClipView: View {
     private func reviewView(_ url: URL) -> some View {
         VStack(spacing: 10) {
             topBar
+            Spacer(minLength: 0)
 
             CameraShell(
                 name: myName,
@@ -337,43 +474,55 @@ struct RecordClipView: View {
                 overlayText: overlayTextFocused ? nil : trimmedOverlayText,
                 clipSeconds: clipSeconds,
                 showsPrompt: showsPrompt,
-                aspectRatio: effectiveOrientation.aspectRatio
+                aspectRatio: measuredReviewAspect
+                    ?? recorder.cameraStyle.aspectRatio(for: reviewOrientation)
+                    ?? reviewOrientation.aspectRatio,
+                showsDate: recorder.cameraStyle == .standard
             ) {
                 ZStack {
-                    // Immediate review is always the camera truth; grading belongs elsewhere.
                     LoopingClipPlayer(url: url, look: .none)
-                    // The caption is typed right where it lands in the film —
-                    // center of the frame, not in a bar below the video.
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
                 }
             }
             .layoutPriority(1)
+            .task(id: url) {
+                let aspect = await ClipGeometry.aspect(of: url)
+                guard !Task.isCancelled else { return }
+                measuredReviewAspect = aspect
+            }
+            // Swipe the take away to drop it (1.5) — no dialog.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("capture-review-frame")
+            .gesture(
+                DragGesture(minimumDistance: 30).onEnded { value in
+                    if value.translation.width < -80, abs(value.translation.height) < 80 {
+                        discardTake()
+                    }
+                })
+
+            Spacer(minLength: 0)
+            if isFreeform { RoomSendList(rooms: sendableRooms, picked: $sendTo) }
 
             HStack(spacing: 10) {
                 Button {
                     if isFreeform {
-                        // Both dead ends used to end at a toast, which left
-                        // retake-or-leave as the only moves — and leaving meant
-                        // losing the clip. Now they end at a choice instead.
-                        if filingCandidates.isEmpty {
-                            showNoPlaceExits = true
-                        } else {
-                            showSavePicker = true
-                        }
+                        finishFreeTake()
                     } else {
                         onSave(url, trimmedOverlayText)
                         dismiss()
                     }
                 } label: {
-                    Label(isFreeform ? Strings.fileToPlan : Strings.useClip,
-                          systemImage: isFreeform ? "tray.and.arrow.down.fill" : "checkmark")
+                    Label(Strings.done, systemImage: "checkmark")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(OneDay.onBrand)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(myTint, in: Capsule())
+                        // The brand gradient `.primaryAction` uses, at this
+                        // row's height: the full style is 17pt type and 17pt
+                        // padding, which would stand taller than 重拍 beside it.
+                        .background(OneDay.brandHorizontal, in: Capsule())
                 }
                 .buttonStyle(.plain)
 
@@ -396,6 +545,10 @@ struct RecordClipView: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, bottomInset)
+        // Same rule as `ClipPreviewView`: the keyboard covers the buttons
+        // rather than squeezing the frame. Typing a caption used to shrink the
+        // picture the caption was being placed on.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(isPresented: $showSavePicker) {
             ClipFilingSheet(candidates: filingCandidates) { chosen in
                 file(url, to: chosen)
@@ -419,13 +572,19 @@ struct RecordClipView: View {
     private var noPlaceMessage: String {
         store.challenges.isEmpty
             ? Strings.makePlanFirst
-            : Strings.noMatchingPlan(effectiveOrientation)
+            : Strings.noMatchingPlan(filingOrientation)
     }
 
     // MARK: - Free-form filing
 
+    /// Rooms this take can go to, newest first.
+    private var sendableRooms: [Challenge] {
+        ClipFiling.rooms(in: store.challenges, orientation: filingOrientation)
+            .sorted { $0.startDate > $1.startDate }
+    }
+
     private var filingCandidates: [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: effectiveOrientation)
+        ClipFiling.candidates(in: store.challenges, orientation: filingOrientation)
     }
 
     /// Free-form: file the clip into each chosen plan's first open slot.
@@ -468,18 +627,32 @@ struct RecordClipView: View {
     /// On failure this deliberately does **not** retake: the temp file is still
     /// the only copy, so clearing the review would finish the job the bug used
     /// to do. Staying put leaves a retry available.
-    private func keepAsDraft(then next: (() -> Void)? = nil) {
-        guard let url = recorder.clipURL else { return }
+    @discardableResult
+    private func keepAsDraft(then next: (() -> Void)? = nil) -> Bool {
+        guard let url = recorder.clipURL else { return false }
         do {
             try drafts.keep(
                 tempURL: url,
-                orientation: effectiveOrientation,
-                overlayText: trimmedOverlayText)
+                orientation: filingOrientation,
+                overlayText: trimmedOverlayText,
+                recordedAt: recorder.recordedAt ?? .now)
             clearReview()
             showToast(Strings.draftKept)
-            next?()
+            // The next step — dismissing, or walking to the composer — unmounts
+            // this screen and the toast with it, so it used to say 已存起来 to
+            // nobody. A beat first, with the camera held still meanwhile.
+            if let next {
+                isLeaving = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    next()
+                    isLeaving = false
+                }
+            }
+            return true
         } catch {
             showToast(Strings.draftSaveFailed)
+            return false
         }
     }
 
@@ -502,7 +675,50 @@ struct RecordClipView: View {
             dismiss()
             return
         }
-        askBeforeDiscarding = true
+        // Filming it is keeping it (1.5): closing never asks. A free take
+        // goes to 我的 and the ticked rooms; a moment's take to its moment.
+        if isFreeform {
+            finishFreeTake { dismiss() }
+            return
+        }
+        if let url = recorder.clipURL {
+            onSave(url, trimmedOverlayText)
+        }
+        dismiss()
+    }
+
+    /// A free take, done with: into the ticked rooms, or into 我的 when none
+    /// is ticked. A clip sent to a room is already one of mine in 我的, so
+    /// it isn't kept a second time as a loose clip.
+    private func finishFreeTake(then next: (() -> Void)? = nil) {
+        guard let url = recorder.clipURL else { next?(); return }
+        let eligible = Set(sendableRooms.map(\.id))
+        let rooms = sendTo.intersection(eligible)
+        guard !rooms.isEmpty else {
+            keepAsDraft(then: next)
+            return
+        }
+        let at = recorder.recordedAt ?? .now
+        for id in rooms {
+            store.sendToRoom(from: url, roomID: id, overlayText: trimmedOverlayText, recordedAt: at)
+        }
+        sendTo = []
+        clearReview()
+        showToast(Strings.sentToRooms)
+        if let next {
+            isLeaving = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                next()
+                isLeaving = false
+            }
+        }
+    }
+
+    /// Swiped left in review: the take is gone, nothing asked.
+    private func discardTake() {
+        sendTo = []
+        clearReview()
     }
 
     private func clearReview() {
@@ -538,18 +754,13 @@ struct RecordClipView: View {
             if cameraAccessDenied {
                 Text(Strings.cameraDeniedTitle)
                     .font(.headline)
-                Text(Strings.cameraDeniedFootnote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
                 Button(Strings.openSettings) {
                     guard let url = URL(string: UIApplication.openSettingsURLString)
                     else { return }
                     UIApplication.shared.open(url)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(myTint)
+                .tint(Color.oneDayBrand)
             } else {
                 Text(Strings.cameraUnavailable)
                     .font(.headline)
@@ -557,7 +768,7 @@ struct RecordClipView: View {
                     Task { await recorder.configure() }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(myTint)
+                .tint(Color.oneDayBrand)
             }
             // Same gate as the home screen's demo button, for the same
             // reason: the Simulator has no camera, so this is the only way to
@@ -587,7 +798,7 @@ struct RecordClipView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(myTint)
+            .tint(Color.oneDayBrand)
             }
             #endif
             Spacer()
@@ -604,9 +815,6 @@ struct RecordClipView: View {
             ProgressView()
                 .controlSize(.large)
                 .tint(.cyan)
-            Text(Strings.openingCamera)
-                .font(.headline)
-                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 18)
@@ -623,37 +831,55 @@ struct RecordClipView: View {
     /// left is the two things you read rather than press, so the row shrank
     /// from 44pt to the height of its own text.
     private var topBar: some View {
-        HStack {
+        let turn = recorder.clipURL == nil ? deviceTurn : 0
+        let sideways = turn != 0
+        return HStack {
             if isFreeform {
-                // No cover to dismiss in the tab, and nothing else needs the
-                // left slot now that the frame toggle moved down.
-                Color.clear.frame(width: 38, height: 1)
+                if let onCloseFreeform {
+                    Button { onCloseFreeform() } label: {
+                        Image(systemName: "xmark")
+                            .cameraGlass()
+                            .rotationEffect(.degrees(turn))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Strings.closeCamera)
+                    .accessibilityIdentifier("camera-close")
+                    .disabled(recorder.state == .recording)
+                } else {
+                    Color.clear.frame(width: 44, height: 1)
+                }
             } else {
                 Button { closeRequested() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .bold))
-                        .frame(width: 38, height: 38)
-                        .background(.white.opacity(0.92), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                        .cameraGlass()
+                        .rotationEffect(.degrees(turn))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Strings.closeCamera)
+                .disabled(recorder.state == .recording)
             }
 
             Spacer(minLength: 8)
 
             VStack(spacing: 1) {
-                OneDayBrandLogo(width: 92)
+                OneDayBrandLogo(width: sideways ? 64 : 92)
                 Text(localizedMomentTitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: 170)
+            .frame(maxWidth: sideways ? 80 : 170)
+            // 横拍 turns everything you read along with the buttons, so the
+            // whole screen reads upright in the sideways hand. Turned, the
+            // row's width becomes height: smaller, and lifted into the empty
+            // space above, so it stays clear of the viewfinder.
+            .rotationEffect(.degrees(turn))
+            .offset(y: sideways ? -14 : 0)
 
             Spacer(minLength: 8)
 
-            Color.clear.frame(width: 38, height: 1)
+            Color.clear.frame(width: 44, height: 1)
         }
     }
 
@@ -671,7 +897,7 @@ struct RecordClipView: View {
             ZoomControlRow(
                 presets: presets,
                 capabilities: recorder.zoomCapabilities,
-                tint: myTint,
+                tint: Color.oneDayBrand,
                 zoom: zoomBinding,
                 showsSlider: $showsZoomSlider)
         }
@@ -699,19 +925,17 @@ struct RecordClipView: View {
     /// wordmark and the moment's name — the two things you read rather than
     /// press.
     ///
-    /// `recordingControls` keeps its caption: mid-take, 轻点停止 is not
-    /// decoration, it is the only thing on screen that says the take can be cut
-    /// short, and the ring it sits under is counting rather than inviting.
+    /// `recordingControls` keeps a caption: mid-take it says the camera will
+    /// stop itself, since the ring it sits under is counting, not a button.
     private var shutterRow: some View {
         HStack(spacing: 0) {
-            if isFreeform {
-                orientationButton
-                    .frame(maxWidth: .infinity)
-            } else {
-                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            HStack(spacing: 6) {
+                sidewaysButton
+                if recorder.supportsDualCamera { dualCameraButton.rotationEffect(.degrees(deviceTurn)) }
             }
+            .frame(maxWidth: .infinity)
 
-            Group {
+            ZStack {
                 if recorder.state == .recording {
                     recordingControls
                 } else {
@@ -719,11 +943,32 @@ struct RecordClipView: View {
                 }
             }
 
-            flipButton
-                .frame(maxWidth: .infinity)
+            HStack(spacing: 6) {
+                flipButton.rotationEffect(.degrees(deviceTurn))
+                flashButton.rotationEffect(.degrees(deviceTurn))
+            }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+    }
+
+    /// 横拍: lit when on. Films landscape whatever the tilt reads, and turns
+    /// the camera's buttons and frame for holding the phone top to the left.
+    private var sidewaysButton: some View {
+        Button {
+            withAnimation(OneDay.Motion.snap) { manualSideways.toggle() }
+        } label: {
+            Image(systemName: "rectangle.landscape.rotate")
+                .foregroundStyle(isSideways ? Color.oneDayBrand : .white)
+                .cameraGlass()
+                .rotationEffect(.degrees(deviceTurn))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.filmingSideways)
+        .accessibilityAddTraits(isSideways ? .isSelected : [])
+        .accessibilityIdentifier("camera-sideways-toggle")
+        .disabled(recorder.state == .recording)
     }
 
     private var orientationButton: some View {
@@ -738,11 +983,7 @@ struct RecordClipView: View {
             }
         } label: {
             Image(systemName: SetupStep.orientationIcon(freeformOrientation))
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.black.opacity(0.78))
-                .frame(width: 38, height: 38)
-                .background(.white.opacity(0.92), in: Circle())
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .cameraGlass()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.switchOrientation)
@@ -750,13 +991,72 @@ struct RecordClipView: View {
         .opacity(recorder.state == .recording || recorder.clipURL != nil ? 0.45 : 1)
     }
 
+    /// The main camera full frame and, in dual mode, the other one in the
+    /// white-bordered inset — laid out where `PiPComposer` will put it in the
+    /// file. The inset moves and resizes only between takes: the file is
+    /// composed from `recorder.insetRect` after the take, so a drag mid-take
+    /// would put the inset somewhere the viewfinder never showed it.
+    private var livePreview: some View {
+        DualCameraStage(
+            showsInset: recorder.isDualCamera,
+            swapped: recorder.isSwapped,
+            inset: recorder.insetRect,
+            isEditable: recorder.state == .ready,
+            onInsetChange: { recorder.insetRect = $0 },
+            onTapInset: { recorder.flipCamera() }
+        ) {
+            CameraPreview(session: recorder.session) { recorder.attachPreview($0) }
+        } secondary: {
+            SecondaryCameraPreview(session: recorder.session) {
+                recorder.attachSecondaryPreview($0)
+            }
+        }
+    }
+
+    private var dualCameraButton: some View {
+        Button { recorder.setDualCamera(!recorder.isDualCamera) } label: {
+            DualCameraGlyph(isOn: recorder.isDualCamera)
+                .cameraGlass()
+                .overlay(dualCameraOnRing)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.dualCamera)
+        .accessibilityAddTraits(recorder.isDualCamera ? .isSelected : [])
+        .disabled(recorder.state != .ready || recorder.clipURL != nil)
+        .opacity(recorder.state == .ready && recorder.clipURL == nil ? 1 : 0.45)
+    }
+
+    /// A brand ring around the glass when dual mode is on, so on and off
+    /// differ by more than the small rectangle's fill.
+    private var dualCameraOnRing: some View {
+        Circle()
+            .strokeBorder(Color.oneDayBrand, lineWidth: 2)
+            .frame(width: 38, height: 38)
+            .opacity(recorder.isDualCamera ? 1 : 0)
+            .allowsHitTesting(false)
+    }
+
+    /// 闪光灯, where 换相机 used to be: there is one camera now. Lit while it's
+    /// on, dimmed on the front camera, which has no light — the choice is kept
+    /// and comes back when you flip to the back camera again.
+    private var flashButton: some View {
+        Button { recorder.toggleTorch() } label: {
+            Image(systemName: recorder.isTorchOn ? "bolt.fill" : "bolt.slash.fill")
+                .foregroundStyle(recorder.isTorchOn && recorder.canUseTorch ? Color.oneDayButter : .white)
+                .cameraGlass()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.cameraFlash)
+        .accessibilityAddTraits(recorder.isTorchOn ? .isSelected : [])
+        .accessibilityIdentifier("camera-flash")
+        .disabled(!recorder.canUseTorch)
+        .opacity(recorder.canUseTorch ? 1 : 0.45)
+    }
+
     private var flipButton: some View {
         Button { recorder.flipCamera() } label: {
             Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
-                .font(.system(size: 17, weight: .bold))
-                .frame(width: 38, height: 38)
-                .background(.white.opacity(0.92), in: Circle())
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .cameraGlass()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.flipCamera)
@@ -765,20 +1065,46 @@ struct RecordClipView: View {
     }
 }
 
-/// Decorative symmetric waveform bars flanking the countdown ring while
-/// recording — pure ornament, not a live level meter.
-private struct WaveformBars: View {
-    let tint: Color
-    private let heights: [CGFloat] = [4, 9, 14, 7, 12, 18, 8, 5]
+/// Under a free take: one row per room, tick as many as you like (1.5).
+/// Nothing ticked keeps the take in 我的 only. No title, no explanation.
+private struct RoomSendList: View {
+    let rooms: [Challenge]
+    @Binding var picked: Set<UUID>
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
-                Capsule()
-                    .fill(tint.opacity(0.28))
-                    .frame(width: 3, height: height)
+        if !rooms.isEmpty {
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach(rooms) { room in row(room) }
+                }
             }
+            .frame(maxHeight: min(CGFloat(rooms.count) * 50, 150))
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .accessibilityHidden(true)
+    }
+
+    private func row(_ room: Challenge) -> some View {
+        let on = picked.contains(room.id)
+        return Button {
+            if on { picked.remove(room.id) } else { picked.insert(room.id) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(on ? Color.oneDayBrand : OneDay.inkFaint)
+                Text(ChallengePresenter(challenge: room).displayTitle)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(OneDay.surface, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("send-room-row")
     }
 }

@@ -46,6 +46,7 @@ struct LocalRoomDemoView: View {
                 .environment(runtime.drafts)
                 .environment(\.roomChatSessionSource, .local(runtime.chat))
                 .environment(\.roomPreviewMediaScope, media)
+                .environment(\.reservesTabBarClearance, false)
                 .defaultAppStorage(runtime.preferences)
                 .id("\(runtime.challengeID)-\(clipRevision)")
                 .accessibilityIdentifier("local-formal-room")

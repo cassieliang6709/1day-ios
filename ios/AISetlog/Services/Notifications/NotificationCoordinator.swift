@@ -80,8 +80,11 @@ enum NotificationPreferences {
         set { defaults.set(newValue, forKey: primerSeenKey) }
     }
 
+    /// On unless someone turned it off. The switch that set it went with 1.3,
+    /// and the default `false` left every later install without a single room
+    /// alert — friends' messages arrived only if the chat happened to be open.
     static var sharedEnabled: Bool {
-        get { defaults.bool(forKey: sharedEnabledKey) }
+        get { defaults.object(forKey: sharedEnabledKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: sharedEnabledKey) }
     }
 
@@ -128,10 +131,15 @@ enum NotificationRouteInbox {
         }
     }
 
-    static func consume() -> NotificationRecordRoute? {
+    static func peek() -> NotificationRecordRoute? {
         guard let data = UserDefaults.standard.data(forKey: key),
               let route = try? JSONDecoder().decode(NotificationRecordRoute.self, from: data)
         else { return nil }
+        return route
+    }
+
+    static func consume() -> NotificationRecordRoute? {
+        guard let route = peek() else { return nil }
         UserDefaults.standard.removeObject(forKey: key)
         return route
     }
@@ -178,6 +186,10 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        if let code = SharedActivityNotificationService.roomCode(
+            forRemote: notification.request.content.userInfo) {
+            SharedActivityNotificationService.postActivityArrived(roomCode: code)
+        }
         completionHandler([.banner, .list, .sound])
     }
 
@@ -188,12 +200,32 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
     ) {
         if response.actionIdentifier == NotificationConstants.snoozeAction {
             ReminderService.snooze(response.notification.request.content)
-        } else if response.actionIdentifier != UNNotificationDismissActionIdentifier,
-                  let route = NotificationRecordRoute(
-                    userInfo: response.notification.request.content.userInfo) {
-            NotificationRouteInbox.enqueue(route)
+        } else if response.actionIdentifier != UNNotificationDismissActionIdentifier {
+            // Local notifications carry the challenge ID; room alerts from
+            // the Worker carry the room code instead.
+            let userInfo = response.notification.request.content.userInfo
+            if let route = NotificationRecordRoute(userInfo: userInfo)
+                ?? SharedActivityNotificationService.route(forRemote: userInfo) {
+                NotificationRouteInbox.enqueue(route)
+            }
         }
         completionHandler()
+    }
+
+    /// APNs' address for this install. The Worker needs it to send room
+    /// alerts; CloudKit used to collect it on its own.
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        SharedActivityNotificationService.didRegister(deviceToken: deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[notifications] APNs registration failed: \(error)")
     }
 
     func application(

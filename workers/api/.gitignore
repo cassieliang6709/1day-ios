@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+
+# Local secrets for `wrangler dev`. The real secret lives in
+# `wrangler secret put`, never in a file.
+.dev.vars
+migration-out/

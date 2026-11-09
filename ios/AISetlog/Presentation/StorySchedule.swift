@@ -20,7 +20,12 @@ struct StorySchedule {
     /// The rail label. Nil for a 1-day moment that hasn't been filmed —
     /// the caller leaves the column blank rather than inventing a time.
     func railLabel(forSlot slot: Int, recordedAt: Date?) -> String? {
-        guard challenge.isOneDay else { return Strings.dayN(slot) }
+        // A shared room is stamped by time even when it runs seven days
+        // (1.5): the room page shows each clip with when it was filmed and
+        // never a day number, so the vlog screens it opens can't bring
+        // 「第 3 天」 back on their rail. `railCaption` still adds the date,
+        // which is what tells a week of afternoons apart.
+        guard challenge.isOneDay || challenge.isShared else { return Strings.dayN(slot) }
         guard let recordedAt else { return nil }
         return Self.timeFormatter.string(from: recordedAt)
     }

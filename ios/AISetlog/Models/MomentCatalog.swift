@@ -10,6 +10,21 @@ import Foundation
 /// display resolves them here. Legacy data that stored raw display strings is
 /// tolerated via `reverseIndex`.
 enum MomentCatalog {
+    /// The moments the list editor offers to add, in the order the old
+    /// built-in templates listed them. Those templates are gone (1.5); their
+    /// moments stayed, because they are good things to point a camera at.
+    static let suggestionPool: [String] = [
+        "wake_up", "coffee", "get_ready", "out_the_door", "midday",
+        "golden_hour", "wind_down", "messy_start", "clear_one_thing", "reset_corner",
+        "step_outside", "small_treat", "cozy_detail", "after", "desk_setup",
+        "first_sprint", "the_wall", "refuel", "breakthrough", "almost_there",
+        "shut_the_laptop", "morning_light", "fit_check", "on_the_move", "what_i_ate",
+        "little_win", "mirror_moment", "night", "ingredients", "prep",
+        "the_sizzle", "taste_test", "plate_it", "first_bite", "clean_up",
+        "heading_out", "first_stop", "street_snack", "found_a_spot", "people_watching",
+        "golden_light", "back_home",
+    ]
+
     struct Entry {
         let text: LocalizedText
         let icon: String

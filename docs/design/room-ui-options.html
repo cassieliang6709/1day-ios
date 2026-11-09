@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>1Day 房间 UI 方案</title>
+<style>
+  :root { --bg:#FFF6DF; --ink:#3A2A12; --soft:#8A7550; --faint:#BBA982; --brand:#FFC93C; --card:#FFFFFFCC; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:6px; }
+  .sub { color:var(--soft); font-size:13px; margin-bottom:24px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; }
+  .opt { width:300px; }
+  .opt h2 { font-size:16px; margin:10px 0 4px; }
+  .opt p { font-size:12.5px; color:var(--soft); line-height:1.5; }
+  .phone { width:300px; height:620px; border-radius:40px; background:var(--bg); border:8px solid #222; overflow:hidden; position:relative; padding:44px 16px 16px; }
+  .title { font-weight:900; font-size:22px; }
+  .names { font-size:11px; color:var(--soft); margin:4px 0 10px; }
+  .week { display:flex; justify-content:space-between; margin-bottom:12px; }
+  .week div { width:34px; text-align:center; font-size:10px; color:var(--faint); padding:5px 0; border-radius:10px; }
+  .week b { display:block; font-size:14px; color:var(--ink); }
+  .week .on { background:var(--brand); } .week .on b { color:var(--ink); }
+  .faces { display:flex; gap:12px; margin-bottom:12px; }
+  .face { width:46px; height:46px; border-radius:50%; border:2.5px solid var(--brand); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; }
+  .face.off { border-color:#E3D7BC; opacity:.5; }
+  .v { border-radius:16px; position:relative; overflow:hidden; color:#fff; font-weight:800; }
+  .v .t { position:absolute; left:10px; bottom:8px; font-size:18px; text-shadow:0 1px 3px #0006; }
+  .v .n { position:absolute; left:10px; top:8px; font-size:11px; text-shadow:0 1px 3px #0006; }
+  .g1 { background:linear-gradient(160deg,#7FD6A0,#2E9E5B); }
+  .g2 { background:linear-gradient(160deg,#7CC6F2,#2B7FB8); }
+  .g3 { background:linear-gradient(160deg,#FFB3C7,#E5688C); }
+  .g4 { background:linear-gradient(160deg,#CDB8F2,#7E5CC8); }
+  .g5 { background:linear-gradient(160deg,#FFD6A5,#E09A45); }
+  .pill { position:absolute; bottom:16px; left:16px; right:16px; height:44px; border-radius:22px; background:var(--brand); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; }
+  .tl { display:flex; gap:8px; font-size:10px; color:var(--faint); }
+  .tl .h { width:30px; padding-top:4px; }
+  .bubble { display:flex; gap:8px; align-items:flex-end; margin-bottom:10px; }
+  .bubble.me { flex-direction:row-reverse; }
+  .mini { width:26px; height:26px; border-radius:50%; flex:none; }
+  .rec { background:#FFF; border-radius:14px; padding:10px 12px; font-size:12px; color:var(--soft); margin-bottom:10px; }
+</style>
+</head>
+<body>
+<h1>1Day 房间 · 5 个 UI 方案</h1>
+<div class="sub">同一个房间：你、小王、阿May 三个人，今天拍了 5 段。每个方案顶部都是一周日历。</div>
+<div class="row">
+
+  <!-- A -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="names">你、小王、阿May</div>
+      <div class="week"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="faces"><div class="face g5">你</div><div class="face g2">王</div><div class="face off g4">May</div></div>
+      <div class="v g1" style="height:180px;margin-bottom:10px"><span class="n">你</span><span class="t">09:12</span></div>
+      <div class="v g2" style="height:180px"><span class="n">小王</span><span class="t">12:40</span></div>
+    </div>
+    <h2>A · Stories + 每人一框（现在这版）</h2>
+    <p>头像一排看谁拍了，点头像全屏连播；下面每人一个大框。熟悉、改动最小。</p>
+  </div>
+
+  <!-- B -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week" style="margin-top:10px"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="v g3" style="height:420px"><span class="n">阿May · 18:05</span><span class="t">晚饭 🍜</span>
+        <div style="position:absolute;right:10px;bottom:10px;font-size:18px">♡<br>↩</div></div>
+    </div>
+    <h2>B · 一屏一段，上下滑</h2>
+    <p>所有人的片段按时间混排，一段占满一屏，上下滑像刷视频。沉浸感最强，片段多时滑得久。</p>
+  </div>
+
+  <!-- C -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week" style="margin-top:10px"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div style="display:flex;gap:6px;margin:0 0 6px 38px;font-size:11px;font-weight:800"><span style="flex:1">你</span><span style="flex:1">小王</span><span style="flex:1">阿May</span></div>
+      <div class="tl"><div class="h">9:00</div><div class="v g1" style="flex:1;height:90px"></div><div style="flex:1"></div><div style="flex:1"></div></div>
+      <div class="tl" style="margin-top:6px"><div class="h">12:00</div><div style="flex:1"></div><div class="v g2" style="flex:1;height:90px"></div><div style="flex:1"></div></div>
+      <div class="tl" style="margin-top:6px"><div class="h">15:00</div><div class="v g5" style="flex:1;height:90px"></div><div class="v g2" style="flex:1;height:90px"></div><div style="flex:1"></div></div>
+      <div class="tl" style="margin-top:6px"><div class="h">18:00</div><div style="flex:1"></div><div style="flex:1"></div><div class="v g3" style="flex:1;height:90px"></div></div>
+    </div>
+    <h2>C · 按时间对齐的时间轴</h2>
+    <p>左边是钟点，每人一列，片段放在拍的那个时刻。一眼看出同一时间大家在干嘛。人多了会挤。</p>
+  </div>
+
+  <!-- D -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="names">10 月 · 三个人拍了 14 天</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+        <div class="v g1" style="height:52px"></div><div class="v g2" style="height:52px"></div><div style="height:52px;border-radius:10px;background:#F2E8CF"></div><div class="v g3" style="height:52px"></div><div class="v g4" style="height:52px"></div><div class="v g5" style="height:52px"></div><div style="height:52px;border-radius:10px;background:#F2E8CF"></div>
+        <div class="v g2" style="height:52px"></div><div class="v g1" style="height:52px"></div><div class="v g5" style="height:52px"></div><div style="height:52px;border-radius:10px;background:#F2E8CF"></div><div class="v g3" style="height:52px"></div><div class="v g1" style="height:52px"></div><div class="v g4" style="height:52px"></div>
+        <div class="v g3" style="height:52px"></div><div style="height:52px;border-radius:10px;background:#F2E8CF"></div><div class="v g2" style="height:52px"></div><div class="v g5" style="height:52px;outline:3px solid var(--brand)"></div><div style="height:52px;border-radius:10px;background:#F7F0DD"></div><div style="height:52px;border-radius:10px;background:#F7F0DD"></div><div style="height:52px;border-radius:10px;background:#F7F0DD"></div>
+      </div>
+      <div class="v g5" style="height:200px;margin-top:14px"><span class="n">22 日 · 3 人 · 5 段</span><span class="t">点开看这天</span></div>
+    </div>
+    <h2>D · 一个月一格一天</h2>
+    <p>每天一格，用那天的一帧当封面，空格就是没人拍。适合回看一整个月，不适合看今天。</p>
+  </div>
+
+  <!-- E -->
+  <div class="opt">
+    <div class="phone">
+      <div class="title">周末一起拍</div>
+      <div class="week" style="margin-top:10px"><div>日<b>18</b></div><div>一<b>19</b></div><div>二<b>20</b></div><div>三<b>21</b></div><div class="on">四<b>22</b></div><div>五<b>23</b></div><div>六<b>24</b></div></div>
+      <div class="bubble"><div class="mini g2"></div><div class="v g2" style="width:130px;height:170px"><span class="t">12:40</span></div></div>
+      <div class="bubble me"><div class="mini g5"></div><div class="v g1" style="width:130px;height:170px"><span class="t">15:02</span></div></div>
+      <div class="rec" style="width:170px">小王：这家咖啡我也想去！</div>
+      <div class="pill">拍一段</div>
+    </div>
+    <h2>E · 像聊天一样</h2>
+    <p>片段和留言混在一条对话里，我的在右边，别人的在左边。最像和朋友互动，聊天按钮可以去掉。</p>
+  </div>
+
+</div>
+</body>
+</html>

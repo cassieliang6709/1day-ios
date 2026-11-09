@@ -143,6 +143,59 @@ final class PromptSuggestionServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Retry and warm-up
+
+    /// A stuck connection is the usual way a call is slow; a fresh one
+    /// usually goes through, so one failure shouldn't send the user to the
+    /// blank list.
+    func testATransientFailureIsRetriedOnce() async throws {
+        StubURLProtocol.respond(status: 200, body: #"{"prompts":["出门前","第一个箱子"]}"#)
+        StubURLProtocol.failuresBeforeSuccess = 1
+
+        let prompts = try await service().suggest(
+            intent: "今天要搬家", count: 7, language: .chinese)
+
+        XCTAssertEqual(prompts, ["出门前", "第一个箱子"])
+        XCTAssertEqual(StubURLProtocol.requestCount, 2)
+    }
+
+    func testItGivesUpAfterTheRetry() async {
+        StubURLProtocol.fail(with: URLError(.timedOut))
+
+        await assertThrows(.unavailable) {
+            try await self.service().suggest(intent: "今天要搬家", count: 7, language: .chinese)
+        }
+        XCTAssertEqual(StubURLProtocol.requestCount, RemotePromptSuggestionService.attempts)
+    }
+
+    /// Asking again would only spend more of the limit.
+    func testARateLimitIsNotRetried() async {
+        StubURLProtocol.respond(status: 429, body: #"{"error":"rate_limited"}"#)
+
+        await assertThrows(.rateLimited) {
+            try await self.service().suggest(intent: "今天要搬家", count: 7, language: .chinese)
+        }
+        XCTAssertEqual(StubURLProtocol.requestCount, 1)
+    }
+
+    func testAMalformedAnswerIsNotRetried() async {
+        StubURLProtocol.respond(status: 200, body: "<html>gateway</html>")
+
+        await assertThrows(.malformed) {
+            try await self.service().suggest(intent: "今天要搬家", count: 7, language: .chinese)
+        }
+        XCTAssertEqual(StubURLProtocol.requestCount, 1)
+    }
+
+    func testWarmUpIsAHeadThatNeverThrows() async {
+        StubURLProtocol.fail(with: URLError(.notConnectedToInternet))
+
+        await service().warmUp()
+
+        XCTAssertEqual(StubURLProtocol.lastMethod, "HEAD")
+        XCTAssertNil(StubURLProtocol.lastBody)
+    }
+
     // MARK: - The install id
 
     func testTheInstallIDIsMintedOnceAndKept() throws {
@@ -178,6 +231,10 @@ private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var error: Error?
     nonisolated(unsafe) static var lastBody: Data?
+    nonisolated(unsafe) static var lastMethod: String?
+    nonisolated(unsafe) static var requestCount = 0
+    /// Fail this many requests with a timeout before answering normally.
+    nonisolated(unsafe) static var failuresBeforeSuccess = 0
 
     static func respond(status: Int, body: String) {
         reset()
@@ -195,6 +252,9 @@ private final class StubURLProtocol: URLProtocol {
         body = Data()
         error = nil
         lastBody = nil
+        lastMethod = nil
+        requestCount = 0
+        failuresBeforeSuccess = 0
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -204,7 +264,13 @@ private final class StubURLProtocol: URLProtocol {
         // `httpBody` is stripped by the loading system, so read it back out of
         // the stream the way a real transport would.
         Self.lastBody = request.httpBody ?? request.httpBodyStream.map(Self.drain)
+        Self.lastMethod = request.httpMethod
+        Self.requestCount += 1
 
+        if Self.requestCount <= Self.failuresBeforeSuccess {
+            client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
+            return
+        }
         if let error = Self.error {
             client?.urlProtocol(self, didFailWithError: error)
             return

@@ -165,8 +165,7 @@ final class ClipDraftStoreTests: XCTestCase {
         let store = ChallengeStore(
             repository: UserDefaultsChallengeRepository(
                 defaults: defaults, fileStore: fileStore),
-            fileStore: fileStore,
-            coverStore: NoCoverStore())
+            fileStore: fileStore)
 
         let targets = ["Mine", "The room", "Third"].map {
             store.create(
@@ -202,6 +201,45 @@ final class ClipDraftStoreTests: XCTestCase {
             "filing copies; the take is still there to file again")
     }
 
+    /// Filing a draft is not filming it. A take kept as a draft at 2:06 and
+    /// filed at 3:21 happened at 2:06 — the card used to say 3:21, and so did
+    /// every friend's copy of it.
+    @MainActor
+    func testFilingADraftKeepsTheDraftsTime() throws {
+        let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fileStore = DiskClipFileStore()
+        let store = ChallengeStore(
+            repository: UserDefaultsChallengeRepository(
+                defaults: defaults, fileStore: fileStore),
+            fileStore: fileStore)
+        let story = store.create(
+            title: "Filed later",
+            mode: .oneDay,
+            clipLength: .tiny,
+            orientation: .portrait,
+            templateName: nil,
+            momentTitles: ["one", "two"])
+        defer { fileStore.deleteClips(challengeID: story.id) }
+
+        let drafts = makeStore()
+        let filmedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let draft = try drafts.keep(
+            tempURL: try makeTempClip(named: "kept-earlier.mov", bytes: 64),
+            orientation: .portrait,
+            recordedAt: filmedAt)
+
+        _ = DraftFiler.archive(
+            draft, to: [try XCTUnwrap(store.challenge(story.id))],
+            store: store, drafts: drafts)
+
+        let card = try XCTUnwrap(store.challenge(story.id)?.cards.first { $0.day == 1 })
+        XCTAssertNotNil(card.clipFileName, "the draft landed")
+        XCTAssertEqual(card.recordedAt, filmedAt)
+    }
+
     /// The sheet only ever offers stories with room in them, and the batch loop
     /// skips any that filled up in between. A story with every slot taken must
     /// not be a candidate — filing into one used to overwrite whatever was in
@@ -215,8 +253,7 @@ final class ClipDraftStoreTests: XCTestCase {
         let store = ChallengeStore(
             repository: UserDefaultsChallengeRepository(
                 defaults: defaults, fileStore: fileStore),
-            fileStore: fileStore,
-            coverStore: NoCoverStore())
+            fileStore: fileStore)
 
         let challenge = store.create(
             title: "One slot only",
@@ -236,17 +273,35 @@ final class ClipDraftStoreTests: XCTestCase {
             ClipFiling.candidates(in: [full], orientation: .portrait).isEmpty,
             "a full story is not somewhere a clip can go")
     }
+
+    /// A room is filmed whenever (1.5), so it is never full: once its slots
+    /// hold footage, the next clip sent to it is one more take.
+    @MainActor
+    func testARoomIsNeverFullASecondClipIsAnotherTake() throws {
+        let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fileStore = DiskClipFileStore()
+        let store = ChallengeStore(
+            repository: UserDefaultsChallengeRepository(defaults: defaults, fileStore: fileStore),
+            fileStore: fileStore, effects: .isolated)
+        let room = Challenge(id: UUID(), title: "房间", startDate: .now, cards: [DayCard(day: 1)],
+                             roomCode: "ABCDEF", ownerName: "Leo", ownerID: "owner-1")
+        store.challenges = [room]
+        defer { fileStore.deleteClips(challengeID: room.id) }
+
+        XCTAssertTrue(store.sendToRoom(from: try makeTempClip(named: "a.mov", bytes: 64), roomID: room.id))
+        XCTAssertTrue(store.sendToRoom(from: try makeTempClip(named: "b.mov", bytes: 64), roomID: room.id))
+
+        let card = try XCTUnwrap(store.challenge(room.id)?.cards.first)
+        XCTAssertNotNil(card.clipFileName)
+        XCTAssertEqual(card.moreTakes.count, 1, "the second clip is a second take, not an overwrite")
+        XCTAssertEqual(ClipFiling.rooms(in: store.challenges, orientation: .portrait).map(\.id), [room.id])
+    }
 }
 
 // MARK: - Doubles
-
-/// The batch-filing tests build a real `ChallengeStore`, which needs one of
-/// these; nothing they assert touches a template cover.
-private final class NoCoverStore: TemplateCoverStore {
-    func storeCover(_ imageData: Data, ownerID: UUID) -> String? { nil }
-    func coverURL(fileName: String) -> URL? { nil }
-    func deleteCover(fileName: String) {}
-}
 
 private final class InMemoryDraftRepository: ClipDraftRepository {
     private var stored: [ClipDraft] = []

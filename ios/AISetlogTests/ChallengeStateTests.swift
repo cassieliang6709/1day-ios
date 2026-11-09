@@ -75,16 +75,16 @@ final class ChallengeStateTests: XCTestCase {
 
         let challenge = store.createQuickStart()
 
+        // 1.5: the first story is 按时间 — no prompts, seven open slots.
         XCTAssertEqual(challenge.title, "My day")
-        XCTAssertEqual(challenge.cards.count, 3)
+        XCTAssertEqual(challenge.cards.count, 7)
         XCTAssertEqual(challenge.resolvedMode, .oneDay)
         XCTAssertEqual(challenge.resolvedClipLength, .tiny)
         XCTAssertEqual(challenge.resolvedOrientation, .portrait)
-        XCTAssertEqual(
-            challenge.momentTitles,
-            ["morning_light", "on_the_move", "golden_hour"])
+        XCTAssertTrue(challenge.isTimeOnly)
+        XCTAssertNil(challenge.momentTitles)
         XCTAssertEqual(try XCTUnwrap(repository.savedChallenges.first).id, challenge.id)
-        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 3)
+        XCTAssertEqual(repository.savedChallenges.first?.cards.count, 7)
     }
 
     func testPresenterUnitNamesFollowMode() {
@@ -119,14 +119,14 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2s", unitPlural: "moments"),
-            "0 of 9 2s moments recorded")
+            "0 of 9 moments recorded · up to 2s each")
         UserDefaults.standard.set(
             AppLanguage.chinese.rawValue,
             forKey: AppLanguage.storageKey)
         XCTAssertEqual(
             Strings.recordedProgress(
                 0, total: 9, secondsLabel: "2 秒", unitPlural: "个瞬间"),
-            "9 个瞬间中已录 0 段（2 秒）")
+            "9 个瞬间中已录 0 段（每段最长 2 秒）")
     }
 
     func testUpdatingPlanTitlesPersistsWithoutDroppingSlotsOrClips() throws {
@@ -153,25 +153,43 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(repository.savedChallenges.first?.momentTitles?.last, "Shower")
     }
 
-    func testUpdatingCustomTemplateKeepsItsIdentityAndAllPrompts() throws {
-        let repository = MemoryChallengeRepository()
+    /// 编辑计划 rewrites the list: footage follows its item when reordered,
+    /// a new item gets an empty slot, and slots are renumbered 1…n.
+    func testReplacingPlanMovesFootageWithItsItem() throws {
         let store = ChallengeStore(
-            repository: repository,
+            repository: MemoryChallengeRepository(),
             fileStore: MigrationClipFileStore())
-        let template = ChallengeTemplate(
-            emoji: "☀️",
-            name: LocalizedText(en: "Morning", zh: "Morning"),
-            momentKeys: (1...9).map { "Step \($0)" },
-            isCustom: true)
-        store.addCustomTemplate(template)
-        var edited = template
-        edited.momentKeys?[8] = "Shower"
+        let plan = store.create(title: "Day", mode: .oneDay, momentTitles: ["A", "B", "C"])
+        store.challenges[0].cards[2].clipFileName = "c.mov"
 
-        store.updateCustomTemplate(edited)
+        // C moved to the top, B dropped, a new D at the end.
+        store.replacePlan(plan.id, items: [
+            (title: "C", fromSlot: 3), (title: "A", fromSlot: 1), (title: "D", fromSlot: nil),
+        ])
 
-        XCTAssertEqual(store.customTemplates.first?.id, template.id)
-        XCTAssertEqual(store.customTemplates.first?.momentKeys?.count, 9)
-        XCTAssertEqual(repository.savedTemplates.first?.momentKeys?.last, "Shower")
+        let updated = try XCTUnwrap(store.challenge(plan.id))
+        XCTAssertEqual(updated.momentTitles, ["C", "A", "D"])
+        XCTAssertEqual(updated.cards.map(\.day), [1, 2, 3])
+        XCTAssertEqual(updated.cards[0].clipFileName, "c.mov")
+        XCTAssertNil(updated.cards[1].clipFileName)
+        XCTAssertNil(updated.cards[2].clipFileName)
+    }
+
+    /// 从提醒事项导入 lists what's due by today first, then undated, then later.
+    func testRemindersDueTodayComeFirst() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let later = calendar.date(byAdding: .day, value: 3, to: now)!
+        let overdue = calendar.date(byAdding: .day, value: -1, to: now)!
+        let items = [
+            RemindersImport.Item(id: "1", title: "Later", due: later),
+            RemindersImport.Item(id: "2", title: "Undated", due: nil),
+            RemindersImport.Item(id: "3", title: "Today", due: now),
+            RemindersImport.Item(id: "4", title: "Overdue", due: overdue),
+        ]
+        XCTAssertEqual(
+            RemindersImport.ordered(items, now: now, calendar: calendar).map(\.title),
+            ["Overdue", "Today", "Undated", "Later"])
     }
 
     func testLegacyChallengeMigrationSurvivesRelaunch() throws {
@@ -205,67 +223,77 @@ final class ChallengeStateTests: XCTestCase {
         XCTAssertEqual(secondLaunch.map(\.id), firstLaunch.map(\.id))
         XCTAssertEqual(fileStore.migratedFileNames, ["day1.mov"])
     }
-    /// Portrait takes whatever the rotation coordinator says, for every camera.
-    ///
-    /// This used to assert a hardcoded 90° for physical cameras. That was the
-    /// bug: on an iPhone 17 Pro Max the front camera's pipeline already rotates
-    /// its buffers, so forcing another 90° turned every free-form clip a
-    /// quarter-turn. The coordinator knows how each camera is mounted; the
-    /// function's job is to pass its answer through, not to second-guess it.
-    func testPortraitTakesTheCoordinatorsAngleForEveryCamera() {
-        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
-            for angle: CGFloat in [0, 90, 180, 270] {
-                XCTAssertEqual(
-                    ClipRecorder.rotationAngle(
-                        orientation: .portrait,
-                        devicePosition: position,
-                        coordinatedAngle: angle),
-                    angle,
-                    "portrait/\(position.rawValue) should pass \(angle) through")
-            }
-        }
+    /// 竖拍 and 横拍 each have one angle per camera; only the switch and the
+    /// camera's sensor decide it, never how the phone is held.
+    func testAnglesFollowTheSwitchAndTheSensor() {
+        // Back cameras: landscape sensor (1920×1080).
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: false, nativePortrait: false, front: false), 90)
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: true, nativePortrait: false, front: false), 0)
+        XCTAssertEqual(CameraOrientation.previewAngle(nativePortrait: false), 90)
+        // iPhone 17 front camera: portrait sensor (1080×1920). It faces the
+        // other way, so 横拍 turns it the other way: 90°, not 270°, which
+        // filmed it upside down.
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: false, nativePortrait: true, front: true), 0)
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: true, nativePortrait: true, front: true), 90)
+        XCTAssertEqual(CameraOrientation.previewAngle(nativePortrait: true), 0)
+        // Older front cameras: landscape sensor, 横拍 at 180°.
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: false, nativePortrait: false, front: true), 90)
+        XCTAssertEqual(CameraOrientation.captureAngle(sideways: true, nativePortrait: false, front: true), 180)
     }
 
-    /// Landscape takes the coordinator's angle too, like every other orientation.
-    ///
-    /// This used to assert a hardcoded 0 — "landscape means the sensor's own
-    /// frame, so nothing rotates". That reads right and films wrong: the app UI
-    /// is portrait-locked, so leaving the connection at 0° puts the sensor's
-    /// portrait frame inside a landscape composition. The coordinator already
-    /// knows how this camera is mounted, so landscape passes it through as well.
-    func testLandscapeTakesTheCoordinatorsAngleForEveryCamera() {
-        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
-            for angle: CGFloat in [0, 90, 180, 270] {
-                XCTAssertEqual(
-                    ClipRecorder.rotationAngle(
-                        orientation: .landscape,
-                        devicePosition: position,
-                        coordinatedAngle: angle),
-                    angle,
-                    "landscape/\(position.rawValue) should pass \(angle) through")
-            }
-        }
+    /// Measured on an iPhone 17 Pro Max: the front camera at 90° wrote a
+    /// 1080×1920 frame turned a quarter (shown landscape) in 竖拍. Turned
+    /// back it is the mirrored upright frame the same camera wrote at 0°.
+    func testASidewaysSelfieIsTurnedUpright() {
+        let fixed = CameraOrientation.corrected(
+            natural: CGSize(width: 1080, height: 1920),
+            transform: CGAffineTransform(a: 0, b: 1, c: 1, d: 0, tx: 0, ty: 0),
+            landscape: false)
+        XCTAssertEqual(fixed, CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 1080, ty: 0))
     }
 
-    /// A square take is filmed upright and cropped afterwards, so it records at
-    /// the same angle portrait does. At the sensor's angle instead, the crop
-    /// would cut its square out of a sideways frame — the same square, turned a
-    /// quarter turn, which is exactly what nobody filmed.
-    func testSquareRecordsUprightLikePortrait() {
-        for position: AVCaptureDevice.Position in [.back, .front, .unspecified] {
-            for angle: CGFloat in [0, 90, 180, 270] {
-                XCTAssertEqual(
-                    ClipRecorder.rotationAngle(
-                        orientation: .square,
-                        devicePosition: position,
-                        coordinatedAngle: angle),
-                    ClipRecorder.rotationAngle(
-                        orientation: .portrait,
-                        devicePosition: position,
-                        coordinatedAngle: angle),
-                    "square/\(position.rawValue) at \(angle) should match portrait")
-            }
-        }
+    /// A front camera not yet known to be portrait gets 180° in 横拍 and comes
+    /// out upright; turned, it is landscape, still mirrored, and the same as
+    /// the 90° the table now gives it.
+    func testAFirstSelfieInLandscapeIsTurnedTheRightWay() {
+        let natural = CGSize(width: 1080, height: 1920)
+        let at180 = CGAffineTransform(rotationAngle: .pi).concatenating(
+            CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 0, ty: 0))
+        let fixed = CameraOrientation.corrected(
+            natural: natural,
+            transform: CGAffineTransform(
+                a: at180.a.rounded(), b: at180.b.rounded(), c: at180.c.rounded(), d: at180.d.rounded(),
+                tx: 0, ty: 1920),
+            landscape: true)
+        // 90° plus the selfie mirror, as the measured 90° take had it.
+        XCTAssertEqual(fixed, CGAffineTransform(a: 0, b: 1, c: 1, d: 0, tx: 0, ty: 0))
+        let shown = CGRect(origin: .zero, size: natural).applying(fixed!)
+        XCTAssertEqual(shown, CGRect(x: 0, y: 0, width: 1920, height: 1080))
+    }
+
+    /// A take already the right shape is left alone — the back camera's,
+    /// as measured.
+    func testATakeOfTheRightShapeIsLeftAlone() {
+        XCTAssertNil(CameraOrientation.corrected(
+            natural: CGSize(width: 1920, height: 1080),
+            transform: CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 1080, ty: 0),
+            landscape: false))
+        XCTAssertNil(CameraOrientation.corrected(
+            natural: CGSize(width: 1920, height: 1080), transform: .identity, landscape: true))
+    }
+
+    /// A camera is landscape until a take shows otherwise, and only a real
+    /// change asks for the angles to be set again.
+    func testASensorsShapeIsRememberedPerCamera() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "CameraOrientationTests"))
+        defaults.removePersistentDomain(forName: "CameraOrientationTests")
+        XCTAssertFalse(CameraOrientation.nativePortrait(uniqueID: "front", defaults: defaults))
+        XCTAssertTrue(CameraOrientation.remember(nativePortrait: true, for: "front", defaults: defaults))
+        XCTAssertFalse(CameraOrientation.remember(nativePortrait: true, for: "front", defaults: defaults))
+        XCTAssertFalse(CameraOrientation.remember(nativePortrait: false, for: "back", defaults: defaults))
+        XCTAssertTrue(CameraOrientation.nativePortrait(uniqueID: "front", defaults: defaults))
+        XCTAssertFalse(CameraOrientation.nativePortrait(uniqueID: "back", defaults: defaults))
+        defaults.removePersistentDomain(forName: "CameraOrientationTests")
     }
 
     /// Only square is cropped after recording. The other two are whatever the
@@ -280,12 +308,9 @@ final class ChallengeStateTests: XCTestCase {
 
 private final class MemoryChallengeRepository: ChallengeRepository {
     private(set) var savedChallenges: [Challenge] = []
-    private(set) var savedTemplates: [ChallengeTemplate] = []
 
     func loadChallenges() -> [Challenge] { [] }
     func saveChallenges(_ challenges: [Challenge]) { savedChallenges = challenges }
-    func loadTemplates() -> [ChallengeTemplate] { [] }
-    func saveTemplates(_ templates: [ChallengeTemplate]) { savedTemplates = templates }
 }
 
 private final class MigrationClipFileStore: ClipFileStore {

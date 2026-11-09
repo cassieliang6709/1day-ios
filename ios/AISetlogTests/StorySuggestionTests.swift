@@ -34,7 +34,8 @@ final class StorySuggestionTests: XCTestCase {
         let current = ["我手写的 English", "", "已经改过的题目"]
         let result = SuggestedPromptFill.apply(["新一", "新二"], to: current)
         XCTAssertEqual(result, [current[0], "新一", current[2], "新二"])
-        XCTAssertEqual(SuggestedPromptFill.apply(["替换"], to: Array(repeating: "保留", count: 7)), Array(repeating: "保留", count: 7))
+        let full = Array(repeating: "保留", count: StoryMoments.maxCount)
+        XCTAssertEqual(SuggestedPromptFill.apply(["替换"], to: full), full)
     }
 }
 

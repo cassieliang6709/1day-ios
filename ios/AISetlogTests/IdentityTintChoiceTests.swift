@@ -20,9 +20,9 @@ final class IdentityTintChoiceTests: XCTestCase {
             Identity.derivedIndex(for: "Cassie"), Identity.derivedIndex(for: "Cassie"))
     }
 
-    func testAMissingNameFallsBackToTheBrandBlue() {
-        XCTAssertEqual(Identity.uiColor(for: nil), .oneDayBlue)
-        XCTAssertEqual(Identity.uiColor(for: ""), .oneDayBlue)
+    func testAMissingNameFallsBackToTheBrandColour() {
+        XCTAssertEqual(Identity.uiColor(for: nil), .oneDayBrand)
+        XCTAssertEqual(Identity.uiColor(for: ""), .oneDayBrand)
     }
 
     func testEveryDerivedIndexIsInThePalette() {

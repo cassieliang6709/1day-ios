@@ -1,0 +1,1075 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1day.liangyue.site/contracts/analytics-event-v1.schema.json",
+  "title": "1day analytics event v1 — design contract, not a deployed endpoint",
+  "description": "Strict structural allowlist. Cross-field edited_count<=offered_count, time skew, byte limits and logical idempotency require server validation. Client cannot set environment/source/received_at. UUID identifiers must be random analytics identifiers, not business credentials.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "event_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "name": {
+      "type": "string",
+      "enum": [
+        "first_open",
+        "app_opened",
+        "story_creation_started",
+        "story_created",
+        "recording_started",
+        "recording_finished",
+        "clip_saved",
+        "invite_share_opened",
+        "room_join_result",
+        "room_clip_sync_result",
+        "film_render_started",
+        "film_render_finished",
+        "film_play_started",
+        "film_save_result",
+        "film_share_opened",
+        "ai_suggestion_requested",
+        "ai_suggestion_result",
+        "ai_suggestion_adopted",
+        "config_applied"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "actor_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "session_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "app_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$",
+      "maxLength": 20
+    },
+    "build_number": {
+      "type": "string",
+      "pattern": "^[0-9]{1,12}$"
+    },
+    "os_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$",
+      "maxLength": 20
+    },
+    "locale": {
+      "type": "string",
+      "enum": [
+        "zh-Hans",
+        "en"
+      ]
+    },
+    "timezone_offset_minutes": {
+      "type": "integer",
+      "minimum": -720,
+      "maximum": 840
+    },
+    "properties": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "name",
+    "occurred_at",
+    "actor_id",
+    "session_id",
+    "sequence",
+    "app_version",
+    "build_number",
+    "os_version",
+    "locale",
+    "timezone_offset_minutes",
+    "properties"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "name": {
+          "const": "first_open"
+        },
+        "properties": {
+          "$ref": "#/$defs/first_open"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "app_opened"
+        },
+        "properties": {
+          "$ref": "#/$defs/app_opened"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "story_creation_started"
+        },
+        "properties": {
+          "$ref": "#/$defs/story_creation_started"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "story_created"
+        },
+        "properties": {
+          "$ref": "#/$defs/story_created"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "recording_started"
+        },
+        "properties": {
+          "$ref": "#/$defs/recording_started"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "recording_finished"
+        },
+        "properties": {
+          "$ref": "#/$defs/recording_finished"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "clip_saved"
+        },
+        "properties": {
+          "$ref": "#/$defs/clip_saved"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "invite_share_opened"
+        },
+        "properties": {
+          "$ref": "#/$defs/invite_share_opened"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "room_join_result"
+        },
+        "properties": {
+          "$ref": "#/$defs/room_join_result"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "room_clip_sync_result"
+        },
+        "properties": {
+          "$ref": "#/$defs/room_clip_sync_result"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "film_render_started"
+        },
+        "properties": {
+          "$ref": "#/$defs/film_render_started"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "film_render_finished"
+        },
+        "properties": {
+          "$ref": "#/$defs/film_render_finished"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "film_play_started"
+        },
+        "properties": {
+          "$ref": "#/$defs/film_play_started"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "film_save_result"
+        },
+        "properties": {
+          "$ref": "#/$defs/film_save_result"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "film_share_opened"
+        },
+        "properties": {
+          "$ref": "#/$defs/film_share_opened"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "ai_suggestion_requested"
+        },
+        "properties": {
+          "$ref": "#/$defs/ai_suggestion_requested"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "ai_suggestion_result"
+        },
+        "properties": {
+          "$ref": "#/$defs/ai_suggestion_result"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "ai_suggestion_adopted"
+        },
+        "properties": {
+          "$ref": "#/$defs/ai_suggestion_adopted"
+        }
+      }
+    },
+    {
+      "properties": {
+        "name": {
+          "const": "config_applied"
+        },
+        "properties": {
+          "$ref": "#/$defs/config_applied"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "first_open": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "install_kind": {
+          "type": "string",
+          "enum": [
+            "new",
+            "existing_unknown"
+          ]
+        }
+      },
+      "required": [
+        "install_kind"
+      ]
+    },
+    "app_opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "deep_link",
+            "notification"
+          ]
+        }
+      },
+      "required": [
+        "entry"
+      ]
+    },
+    "story_creation_started": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "flow_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "entry": {
+          "type": "string",
+          "enum": [
+            "home",
+            "theme",
+            "invite"
+          ]
+        }
+      },
+      "required": [
+        "flow_id",
+        "entry"
+      ]
+    },
+    "story_created": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "flow_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "one_day",
+            "seven_day"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "solo",
+            "shared"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "builtin",
+            "custom",
+            "ai"
+          ]
+        },
+        "theme_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "theme_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "planned_moments": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "config_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "story_id",
+        "flow_id",
+        "type",
+        "mode",
+        "source",
+        "planned_moments",
+        "config_revision"
+      ]
+    },
+    "recording_started": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "slot_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        }
+      },
+      "required": [
+        "operation_id",
+        "slot_index"
+      ]
+    },
+    "recording_finished": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        }
+      },
+      "required": [
+        "operation_id",
+        "result",
+        "duration_ms"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "clip_saved": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "slot_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        },
+        "is_retake": {
+          "type": "boolean"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        }
+      },
+      "required": [
+        "story_id",
+        "operation_id",
+        "slot_index",
+        "is_retake",
+        "duration_ms"
+      ]
+    },
+    "invite_share_opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "room_analytics_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "room_analytics_id",
+        "story_id"
+      ]
+    },
+    "room_join_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "room_analytics_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "result"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "room_analytics_id"
+            ]
+          }
+        }
+      ]
+    },
+    "room_clip_sync_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "room_analytics_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "room_analytics_id",
+        "result"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "film_render_started": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "clip_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "sequential",
+            "friends_together"
+          ]
+        }
+      },
+      "required": [
+        "story_id",
+        "operation_id",
+        "clip_count",
+        "layout"
+      ]
+    },
+    "film_render_finished": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "superseded",
+            "session_ended"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "story_id",
+        "operation_id",
+        "result",
+        "duration_ms"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "film_play_started": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "render_operation_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "story_id",
+        "render_operation_id"
+      ]
+    },
+    "film_save_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "render_operation_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "permission_denied"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "story_id",
+        "operation_id",
+        "render_operation_id",
+        "result"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "film_share_opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "render_operation_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "story_id",
+        "render_operation_id"
+      ]
+    },
+    "ai_suggestion_requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "requested_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "request_id",
+        "requested_count"
+      ]
+    },
+    "ai_suggestion_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failure",
+            "cancelled"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": [
+            "network_unavailable",
+            "permission_denied",
+            "disk_full",
+            "upstream_timeout",
+            "rate_limited",
+            "malformed_response",
+            "asset_unavailable",
+            "unknown"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "returned_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "request_id",
+        "result",
+        "duration_ms",
+        "returned_count"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "failure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ai_suggestion_adopted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "story_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "offered_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "edited_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "calculation_version": {
+          "const": 1
+        }
+      },
+      "required": [
+        "request_id",
+        "story_id",
+        "offered_count",
+        "edited_count",
+        "calculation_version"
+      ]
+    },
+    "config_applied": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "network",
+            "cache",
+            "bundled"
+          ]
+        }
+      },
+      "required": [
+        "revision",
+        "source"
+      ]
+    }
+  }
+}

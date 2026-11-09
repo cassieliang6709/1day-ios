@@ -77,23 +77,23 @@ struct TimelineStamp: View {
         VStack(alignment: .trailing, spacing: 3) {
             if let label {
                 Text(label)
-                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .font(OneDay.Font.rounded(.caption, weight: .bold))
                     .monospacedDigit()
-                    .foregroundStyle(isEmphasized ? Color.oneDayBrand : OneDay.inkSoft)
+                    .foregroundStyle(isEmphasized ? OneDay.brandText : OneDay.inkSoft)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
 
             if let caption {
                 Text(caption)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .font(OneDay.Font.rounded(.caption2, weight: .medium))
                     .foregroundStyle(OneDay.inkFaint)
                     .lineLimit(1)
             }
 
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
+                    .font(OneDay.Font.rounded(.caption2, weight: .regular))
                     .foregroundStyle(Color.oneDaySky)
             }
         }
@@ -139,6 +139,23 @@ struct TimelineClip: View {
         .glassSurface(radius: OneDay.Radius.card, tint: tintForState)
         .contentShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
         .onTapGesture { onTap?() }
+        // A tap gesture isn't a button to VoiceOver: without these the card
+        // read as loose text and image fragments with no way to activate it.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityTitle)
+        .accessibilityAddTraits(onTap == nil ? [] : .isButton)
+        .accessibilityAction { onTap?() }
+    }
+
+    /// Whose moment, which one, and — for an empty slot — that tapping films it.
+    private var accessibilityTitle: String {
+        let who = authorName ?? Strings.youLabel
+        switch state {
+        case .filmed:
+            return showsMomentTitle ? "\(momentTitle), \(who)" : who
+        case .mine, .upcoming:
+            return showsMomentTitle ? "\(momentTitle), \(Strings.tapToFilm)" : Strings.tapToFilm
+        }
     }
 
     private var tintForState: Color? {
@@ -154,10 +171,12 @@ struct TimelineClip: View {
             case .filmed, .mine:
                 AvatarDot(name: authorName, size: 22)
                 Text(authorName ?? Strings.youLabel)
-                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                    .font(OneDay.Font.rounded(.footnote, weight: .bold))
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
             case .upcoming:
+                // Fixed size: centred in a fixed 22pt disc, matching the avatar
+                // it stands in for.
                 Image(systemName: momentIcon)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.oneDaySky)
@@ -170,7 +189,7 @@ struct TimelineClip: View {
                 // should look like one, not like seven identical to-dos.
                 if showsMomentTitle {
                     Text(momentTitle)
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .font(OneDay.Font.rounded(.footnote, weight: .bold))
                         .foregroundStyle(OneDay.inkSoft)
                         .lineLimit(1)
                 }
@@ -184,8 +203,8 @@ struct TimelineClip: View {
 
             if let durationLabel {
                 Text(durationLabel)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.oneDayBrand)
+                    .font(OneDay.Font.rounded(.caption2, weight: .bold))
+                    .foregroundStyle(OneDay.brandText)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(Color.oneDayBrand.opacity(0.12), in: Capsule())
@@ -196,10 +215,10 @@ struct TimelineClip: View {
     private var reactionPill: some View {
         let distinct = Array(NSOrderedSet(array: reactions).array.compactMap { $0 as? String }.prefix(3))
         return HStack(spacing: 1) {
-            ForEach(distinct, id: \.self) { Text($0).font(.system(size: 11)) }
+            ForEach(distinct, id: \.self) { Text($0).font(OneDay.Font.rounded(.caption2, weight: .regular)) }
             if reactions.count > distinct.count {
                 Text("\(reactions.count)")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OneDay.Font.rounded(.caption2, weight: .bold))
                     .foregroundStyle(OneDay.inkSoft)
                     .padding(.leading, 2)
             }
@@ -220,19 +239,21 @@ struct TimelineClip: View {
                 .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
                     if showsMomentTitle {
+                        // Dark glass, not a bare material: the material went
+                        // near-white in light mode and the white title on it
+                        // vanished over a bright frame.
                         Text(momentTitle)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .font(OneDay.Font.rounded(.caption, weight: .bold))
                             .lineLimit(1)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 5)
-                            .background(.ultraThinMaterial, in: Capsule())
+                            .overVideoControl()
                             .padding(8)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: "play.circle.fill")
-                        .font(.system(size: 20))
+                        .font(OneDay.Font.rounded(.title3, weight: .regular))
                         .foregroundStyle(.white.opacity(0.92))
                         .shadow(radius: 4)
                         .padding(8)
@@ -242,18 +263,18 @@ struct TimelineClip: View {
             EmptyFrame {
                 VStack(spacing: 7) {
                     Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .font(OneDay.Font.rounded(.title2, weight: .medium))
+                        .foregroundStyle(OneDay.brandText)
                         .symbolEffect(.pulse)
                     if showsMomentTitle {
                         Text(momentTitle)
-                            .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                            .font(OneDay.Font.rounded(.subheadline, weight: .bold))
                             .foregroundStyle(OneDay.ink)
                             .lineLimit(1)
                     }
                     Text(Strings.tapToFilm)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.oneDayBrand)
+                        .font(OneDay.Font.caption)
+                        .foregroundStyle(OneDay.brandText)
                 }
                 .padding(.vertical, 22)
             }
@@ -265,7 +286,7 @@ struct TimelineClip: View {
             EmptyFrame {
                 // No icon here — the byline above already carries it.
                 Text(Strings.tapToFilm)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .font(OneDay.Font.caption)
                     .foregroundStyle(OneDay.inkFaint)
                     .padding(.vertical, 15)
                     .frame(maxWidth: .infinity)

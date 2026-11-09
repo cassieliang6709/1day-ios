@@ -43,6 +43,47 @@ final class VideoStitcherTests: XCTestCase {
         XCTAssertGreaterThan(try fileSize(output), 0)
     }
 
+    // MARK: - Sequential framing
+
+    private let portraitCanvas = CGSize(width: 1080, height: 1920)
+
+    func testLandscapeTakeInAPortraitFilmIsShownWholeAndCentred() throws {
+        let framing = VideoStitcher.sequentialFraming(
+            orientedSize: CGSize(width: 1920, height: 1080), canvas: portraitCanvas)
+        guard case .fitOnBed(let subject) = framing else {
+            return XCTFail("a 16:9 take was cropped to fill a 9:16 film: \(framing)")
+        }
+        let canvas = CGRect(origin: .zero, size: portraitCanvas)
+        XCTAssertTrue(canvas.insetBy(dx: -0.5, dy: -0.5).contains(subject), "\(subject)")
+        XCTAssertEqual(subject.width, 1080, accuracy: 0.5)
+        XCTAssertEqual(subject.height, 607.5, accuracy: 0.5)
+        XCTAssertEqual(subject.width / subject.height, 16.0 / 9, accuracy: 0.001)
+        XCTAssertEqual(subject.midX, canvas.midX, accuracy: 0.5)
+        XCTAssertEqual(subject.midY, canvas.midY, accuracy: 0.5)
+    }
+
+    func testTakeOfTheCanvasShapeStillFills() {
+        XCTAssertEqual(
+            VideoStitcher.sequentialFraming(orientedSize: portraitCanvas, canvas: portraitCanvas),
+            .fill)
+        // A few pixels off the canvas's shape is inside the tolerance.
+        XCTAssertEqual(
+            VideoStitcher.sequentialFraming(
+                orientedSize: CGSize(width: 1072, height: 1920), canvas: portraitCanvas),
+            .fill)
+    }
+
+    func testCameraStyleTakesInANineBySixteenFilmAreShownWhole() {
+        for take in [CGSize(width: 1080, height: 1440), CGSize(width: 1080, height: 1620)] {
+            guard case .fitOnBed(let subject) = VideoStitcher.sequentialFraming(
+                orientedSize: take, canvas: portraitCanvas)
+            else { return XCTFail("\(take) was cropped to fill a 9:16 film") }
+            // Taller than wide but wider than the canvas: fitted to the width.
+            XCTAssertEqual(subject.width, 1080, accuracy: 0.5)
+            XCTAssertEqual(subject.midY, 960, accuracy: 0.5)
+        }
+    }
+
     func testStitchRejectsEmptyInput() async {
         do {
             _ = try await VideoStitcher.stitch(clips: [])

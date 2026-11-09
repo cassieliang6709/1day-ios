@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>1Day</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,17 +28,33 @@
 				<string>oneday</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.cassie.oneday.google-sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_URL_SCHEME)</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_CLIENT_ID)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Record your 2-second daily challenge clip.</string>
+	<string>To film the moments of your day.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Capture audio for your daily clip.</string>
+	<string>So your clips have sound.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Save your finished weekly vlog.</string>
+	<string>To save your finished film to Photos.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>To copy your reminders into today's list.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用来把你说的话转成心情日记里的文字。</string>
+	<key>OneDayAPNsEnvironment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

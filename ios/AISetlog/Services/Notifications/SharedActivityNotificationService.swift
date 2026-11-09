@@ -1,162 +1,195 @@
-import CloudKit
 import Foundation
 import UIKit
 import UserNotifications
 
+extension Notification.Name {
+    /// Posted on the main queue whenever a room's push reaches the running app,
+    /// so an open room can refetch instead of waiting for the next foreground.
+    /// `userInfo["roomCode"]` names the room. May arrive twice for one push
+    /// (once from the remote-notification callback, once from `willPresent`).
+    static let roomActivityArrived = Notification.Name("roomActivityArrived")
+}
+
+/// Room pushes. The Worker sends them through APNs the moment someone films,
+/// writes, reacts or pokes; this phone only tells it which rooms to alert it
+/// about and what the alert says (`PUT /push/device`).
+///
+/// The copy is still the app's: it goes up as a format plus which fields fill
+/// it, the Worker sends it back as `loc-key`/`loc-args`, and iOS formats it
+/// on the phone. Nobody is alerted about their own record; a poke reaches
+/// only the person poked — both decided on the server.
 enum SharedActivityNotificationService {
-    private static let subscriptionManager = SharedSubscriptionManager()
-    private static let subscriptionPrefix = "roomActivity."
-    private static let notificationPrefix = "roomActivityNotification."
-    private static let throttlePrefix = "notifications.shared.lastActivity."
+    private static let registrar = DeviceRegistrar()
+    static let deviceTokenKey = "notifications.shared.apnsToken"
+    /// Info.plist mirrors `aps-environment`, which the app can't read itself.
+    static var isSandbox: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "OneDayAPNsEnvironment") as? String == "development"
+    }
     private static var isRunningTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    private enum ActivityKind: String, CaseIterable {
+    enum ActivityKind: String, CaseIterable, Codable {
         case clip
         case comment
         case reaction
+        case poke
+    }
 
-        var recordType: String {
-            switch self {
-            case .clip: "Clip"
-            case .comment: "Comment"
-            case .reaction: "Reaction"
-            }
-        }
+    /// One kind's alert: the format and which fields fill its `%n$@`s.
+    struct AlertCopy: Codable, Equatable {
+        let format: String
+        let args: [String]
+    }
 
-        var options: CKQuerySubscription.Options {
-            switch self {
-            case .clip: [.firesOnRecordCreation, .firesOnRecordUpdate]
-            case .comment, .reaction: [.firesOnRecordCreation]
-            }
+    struct RoomRegistration: Codable, Equatable {
+        let code: String
+        let title: String
+    }
+
+    /// Everything the Worker keeps for this phone. An empty `rooms` removes
+    /// the phone: "off" has to mean no alerts, since an alert APNs shows
+    /// can't check a setting here first.
+    struct DeviceRegistration: Codable, Equatable {
+        let token: String
+        let topic: String
+        let sandbox: Bool
+        let alerts: [String: AlertCopy]
+        let rooms: [RoomRegistration]
+    }
+
+    static func alertCopy(kind: ActivityKind, showNames: Bool) -> AlertCopy {
+        switch kind {
+        case .clip:
+            return AlertCopy(format: Strings.roomClipAlertFormat(named: showNames),
+                             args: showNames ? ["authorName"] : [])
+        case .comment:
+            return AlertCopy(format: Strings.roomMessageAlertFormat(named: showNames),
+                             args: showNames ? ["authorName", "text"] : ["text"])
+        case .reaction:
+            return AlertCopy(format: Strings.roomReactionAlertFormat(named: showNames),
+                             args: showNames ? ["authorName"] : [])
+        case .poke:
+            return AlertCopy(format: Strings.roomPokeAlertFormat(named: showNames),
+                             args: showNames ? ["authorName"] : [])
         }
     }
 
-    private struct SubscriptionContext {
-        let roomCode: String
-        let kind: ActivityKind
+    static func registration(
+        token: String,
+        rooms: [String: String],
+        showNames: Bool = NotificationPreferences.showFriendNames,
+        topic: String = Bundle.main.bundleIdentifier ?? "",
+        sandbox: Bool = isSandbox
+    ) -> DeviceRegistration {
+        DeviceRegistration(
+            token: token,
+            topic: topic,
+            sandbox: sandbox,
+            alerts: Dictionary(uniqueKeysWithValues: ActivityKind.allCases.map {
+                ($0.rawValue, alertCopy(kind: $0, showNames: showNames))
+            }),
+            rooms: rooms.sorted { $0.key < $1.key }.map { RoomRegistration(code: $0.key, title: $0.value) })
+    }
+
+    // MARK: Registering
+
+    /// Called by the app delegate with APNs' token for this install.
+    static func didRegister(deviceToken: Data) {
+        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+        UserDefaults.standard.set(hex, forKey: deviceTokenKey)
+        reconcileSavedRooms()
+    }
+
+    /// Re-registers with the rooms saved on this phone — after a sign-in,
+    /// when nothing else has the list to hand.
+    static func reconcileSavedRooms() {
+        reconcileSubscriptions(for: persistedChallenges())
     }
 
     static func reconcileSubscriptions(for challenges: [Challenge]) {
-        guard !isRunningTests, NotificationPreferences.sharedEnabled else { return }
-        let roomCodes = Set(challenges.compactMap(\.roomCode))
-        Task {
-            await subscriptionManager.reconcile(roomCodes: roomCodes)
-        }
-    }
-
-    static func removeSubscriptions() {
         guard !isRunningTests else { return }
+        let rooms = NotificationPreferences.sharedEnabled ? roomTitles(for: challenges) : [:]
+        Task { await registrar.reconcile(rooms: rooms) }
+    }
+
+    /// Sign-out: this phone stops getting the last person's room alerts. Takes
+    /// the session explicitly because the keychain is about to lose it.
+    static func removeSubscriptions(session: AuthService.Session?) {
+        guard !isRunningTests,
+              let session,
+              let token = UserDefaults.standard.string(forKey: deviceTokenKey)
+        else { return }
         Task {
-            await subscriptionManager.reconcile(roomCodes: [])
+            struct Body: Encodable { let token: String }
+            var api = OneDayAPI.shared
+            api.fixedSession = session
+            _ = try? await api.send("DELETE", ["push", "device"], json: Body(token: token))
         }
     }
 
+    // MARK: Receiving
+
+    /// What a room push carries besides the alert (`oneday` in the payload).
+    struct RemoteContext: Equatable {
+        let roomCode: String
+        let kind: ActivityKind?
+        let day: Int
+    }
+
+    static func context(forRemote userInfo: [AnyHashable: Any]) -> RemoteContext? {
+        guard let info = userInfo["oneday"] as? [String: Any],
+              let code = info["roomCode"] as? String, !code.isEmpty
+        else { return nil }
+        let day = (info["day"] as? NSNumber)?.intValue ?? info["day"] as? Int ?? 1
+        return RemoteContext(
+            roomCode: code,
+            kind: (info["kind"] as? String).flatMap(ActivityKind.init),
+            day: max(day, 1))
+    }
+
+    /// APNs has already put the alert on screen; all that's left is telling
+    /// an open room to refetch.
     static func handleRemoteNotification(
         _ userInfo: [AnyHashable: Any]
     ) async -> UIBackgroundFetchResult {
-        guard NotificationPreferences.sharedEnabled,
-              let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
-              let query = notification as? CKQueryNotification,
-              let subscriptionID = query.subscriptionID,
-              let context = context(for: subscriptionID),
-              !NotificationPreferences.isRoomMuted(context.roomCode),
-              let challenge = persistedChallenges().first(where: {
-                  $0.roomCode == context.roomCode
-              })
-        else { return .noData }
+        guard let context = context(forRemote: userInfo) else { return .noData }
+        postActivityArrived(roomCode: context.roomCode)
+        return .newData
+    }
 
-        let fields = await activityFields(from: query)
-        let authorID = fields.authorID
-        if !authorID.isEmpty, authorID == AccountStore.persistedUserID {
-            return .noData
-        }
+    /// The room code of a room push, or nil for anything else.
+    static func roomCode(forRemote userInfo: [AnyHashable: Any]) -> String? {
+        context(forRemote: userInfo)?.roomCode
+    }
 
-        let now = Date.now
-        let throttleKey = throttlePrefix + context.roomCode
-        if let last = UserDefaults.standard.object(forKey: throttleKey) as? Date,
-           now.timeIntervalSince(last) < 5 * 60 {
-            return .noData
-        }
+    /// Where tapping a room alert should land.
+    static func route(forRemote userInfo: [AnyHashable: Any]) -> NotificationRecordRoute? {
+        guard let context = context(forRemote: userInfo) else { return nil }
+        return route(roomCode: context.roomCode, day: context.day, challenges: persistedChallenges())
+    }
 
-        let content = UNMutableNotificationContent()
-        content.title = ChallengePresenter(challenge: challenge).displayTitle
-        content.body = activityBody(
-            kind: context.kind,
-            authorName: fields.authorName,
-            day: fields.day)
-        content.sound = .default
-        content.categoryIdentifier = NotificationConstants.activityCategory
-        content.threadIdentifier = context.roomCode
-        content.userInfo = [
-            NotificationConstants.challengeIDKey: challenge.id.uuidString,
-            NotificationConstants.dayKey: max(fields.day, 1),
-        ]
+    static func route(roomCode: String, day: Int?, challenges: [Challenge]) -> NotificationRecordRoute? {
+        guard let challenge = challenges.first(where: { $0.roomCode == roomCode }) else { return nil }
+        return NotificationRecordRoute(challengeID: challenge.id, day: max(day ?? 1, 1))
+    }
 
-        let identifier = notificationPrefix + context.roomCode
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        let request = UNNotificationRequest(
-            identifier: identifier,
-            content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false))
-        do {
-            try await center.add(request)
-            UserDefaults.standard.set(now, forKey: throttleKey)
-            return .newData
-        } catch {
-            return .failed
+    static func postActivityArrived(roomCode: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .roomActivityArrived, object: nil, userInfo: ["roomCode": roomCode])
         }
     }
 
-    private static func context(for subscriptionID: String) -> SubscriptionContext? {
-        guard subscriptionID.hasPrefix(subscriptionPrefix) else { return nil }
-        let parts = subscriptionID.dropFirst(subscriptionPrefix.count).split(separator: ".")
-        guard parts.count == 2, let kind = ActivityKind(rawValue: String(parts[1])) else {
-            return nil
-        }
-        return SubscriptionContext(roomCode: String(parts[0]), kind: kind)
-    }
+    // MARK: Helpers
 
-    private static func activityFields(
-        from notification: CKQueryNotification
-    ) async -> (authorID: String, authorName: String, day: Int) {
-        var authorID = notification.recordFields?["authorID"] as? String ?? ""
-        var authorName = notification.recordFields?["authorName"] as? String ?? ""
-        var day = notification.recordFields?["day"] as? Int ?? 1
-
-        if (authorID.isEmpty || authorName.isEmpty), let recordID = notification.recordID {
-            do {
-                let record = try await CKContainer(identifier: CloudKitService.containerID)
-                    .publicCloudDatabase.record(for: recordID)
-                authorID = record["authorID"] as? String ?? authorID
-                authorName = record["authorName"] as? String ?? authorName
-                day = record["day"] as? Int ?? day
-            } catch {
-                // The desired keys normally arrive in the push. Generic copy is
-                // still useful if CloudKit trims the payload or the record moved.
-            }
+    private static func roomTitles(for challenges: [Challenge]) -> [String: String] {
+        var titles: [String: String] = [:]
+        for challenge in challenges {
+            guard let code = challenge.roomCode else { continue }
+            titles[code] = ChallengePresenter(challenge: challenge).displayTitle
         }
-        return (authorID, authorName, max(day, 1))
-    }
-
-    private static func activityBody(
-        kind: ActivityKind,
-        authorName: String,
-        day: Int
-    ) -> String {
-        let visibleName = NotificationPreferences.showFriendNames && !authorName.isEmpty
-            ? authorName
-            : nil
-        switch kind {
-        case .clip:
-            return Strings.roomClipActivity(name: visibleName, day: day)
-        case .comment:
-            return Strings.roomCommentActivity(name: visibleName)
-        case .reaction:
-            return Strings.roomReactionActivity(name: visibleName)
-        }
+        return titles
     }
 
     private static func persistedChallenges() -> [Challenge] {
@@ -167,57 +200,28 @@ enum SharedActivityNotificationService {
         return challenges
     }
 
-    private actor SharedSubscriptionManager {
-        private var database: CKDatabase {
-            CKContainer(identifier: CloudKitService.containerID).publicCloudDatabase
-        }
+    private actor DeviceRegistrar {
+        /// What the Worker last accepted, so an unchanged list isn't sent on
+        /// every foreground.
+        private var lastSent: DeviceRegistration?
 
-        func reconcile(roomCodes: Set<String>) async {
+        func reconcile(rooms: [String: String]) async {
+            guard let token = UserDefaults.standard.string(forKey: SharedActivityNotificationService.deviceTokenKey),
+                  OneDayAPI.shared.isSignedIn
+            else { return }
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             let allowed = settings.authorizationStatus == .authorized
                 || settings.authorizationStatus == .provisional
                 || settings.authorizationStatus == .ephemeral
-            let desiredCodes = NotificationPreferences.sharedEnabled && allowed
-                ? roomCodes.filter { !NotificationPreferences.isRoomMuted($0) }
-                : []
+            let desired = allowed ? rooms.filter { !NotificationPreferences.isRoomMuted($0.key) } : [:]
+            let registration = SharedActivityNotificationService.registration(token: token, rooms: desired)
+            guard registration != lastSent else { return }
             do {
-                let existing = try await database.allSubscriptions()
-                let existingIDs = Set(existing.map(\.subscriptionID))
-                let desiredIDs = Set(desiredCodes.flatMap { code in
-                    ActivityKind.allCases.map { subscriptionID(code: code, kind: $0) }
-                })
-
-                for id in existingIDs where id.hasPrefix(subscriptionPrefix) && !desiredIDs.contains(id) {
-                    _ = try? await database.deleteSubscription(withID: id)
-                }
-
-                for code in desiredCodes {
-                    for kind in ActivityKind.allCases {
-                        let id = subscriptionID(code: code, kind: kind)
-                        guard !existingIDs.contains(id) else { continue }
-                        let subscription = CKQuerySubscription(
-                            recordType: kind.recordType,
-                            predicate: NSPredicate(format: "roomCode == %@", code),
-                            subscriptionID: id,
-                            options: kind.options)
-                        let info = CKSubscription.NotificationInfo()
-                        info.shouldSendContentAvailable = true
-                        info.desiredKeys = ["roomCode", "day", "authorID", "authorName"]
-                        subscription.notificationInfo = info
-                        do {
-                            _ = try await database.save(subscription)
-                        } catch {
-                            print("[notifications] subscription failed: \(error)")
-                        }
-                    }
-                }
+                try await OneDayAPI.shared.send("PUT", ["push", "device"], json: registration)
+                lastSent = registration
             } catch {
-                print("[notifications] subscription reconciliation failed: \(error)")
+                print("[notifications] device registration failed: \(error)")
             }
-        }
-
-        private func subscriptionID(code: String, kind: ActivityKind) -> String {
-            "\(subscriptionPrefix)\(code).\(kind.rawValue)"
         }
     }
 }

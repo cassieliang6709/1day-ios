@@ -91,6 +91,76 @@ final class ClipFilingTests: XCTestCase {
             ClipFiling.candidates(in: [nearlyFull], orientation: .portrait).count, 1)
     }
 
+    // MARK: - Why there was nowhere to file
+
+    /// The two cases the drafts list has to tell apart. Both show up as an
+    /// empty candidate list, and the advice for them is opposite — so getting
+    /// this wrong sends someone to make a fourth portrait story when what they
+    /// need is to clear a moment in one of the three they have.
+    func testNoStoryAtAllInThatFrameSaysSo() {
+        let landscape = story(startDay: 1, orientation: .landscape)
+
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [landscape], orientation: .portrait),
+            .noStoryWithThisFrame)
+    }
+
+    func testMatchingStoriesThatAreAllFullSayThatInstead() {
+        let full = story(startDay: 1, filled: 3, total: 3)
+        let alsoFull = story(startDay: 2, filled: 3, total: 3)
+
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [full, alsoFull], orientation: .portrait),
+            .everyMatchingStoryIsFull)
+    }
+
+    /// A story of the right frame that has no cards at all is still a story of
+    /// the right frame — "make one" would be wrong advice.
+    func testAMatchingStoryWithNoSlotsCountsAsFullNotAsMissing() {
+        var empty = story(startDay: 1, total: 1)
+        empty.cards = []
+
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [empty], orientation: .portrait),
+            .everyMatchingStoryIsFull)
+    }
+
+    /// Legacy nil-orientation stories are portrait, so a portrait clip facing
+    /// only those is blocked on fullness, not on frame.
+    func testLegacyStoriesCountAsPortraitWhenExplainingTheBlock() {
+        var legacy = story(startDay: 1, filled: 3, total: 3)
+        legacy.orientation = nil
+
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [legacy], orientation: .portrait),
+            .everyMatchingStoryIsFull)
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [legacy], orientation: .landscape),
+            .noStoryWithThisFrame)
+    }
+
+    func testNoStoriesAtAllIsAMissingFrameNotAFullOne() {
+        XCTAssertEqual(
+            ClipFiling.blocker(in: [], orientation: .portrait),
+            .noStoryWithThisFrame)
+    }
+
+    /// The guard that keeps the alert from ever replacing the picker: when
+    /// filing would work, there is no explanation to give.
+    func testAFilableClipHasNoBlocker() {
+        let room = story(startDay: 1, filled: 2, total: 3)
+
+        XCTAssertNil(ClipFiling.blocker(in: [room], orientation: .portrait))
+    }
+
+    /// One story with room is enough, even standing next to full ones.
+    func testOneStoryWithRoomBeatsAnyNumberOfFullOnes() {
+        let full = story(startDay: 1, filled: 3, total: 3)
+        let room = story(startDay: 2, filled: 1, total: 3)
+
+        XCTAssertNil(ClipFiling.blocker(in: [full, room], orientation: .portrait))
+    }
+
     // MARK: - Target day
 
     func testClipLandsInTheFirstEmptySlot() {

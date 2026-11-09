@@ -12,6 +12,11 @@ struct ClipDraftsView: View {
     @Environment(ClipDraftStore.self) private var drafts
 
     @State private var filing: ClipDraft?
+    /// The draft whose delete is waiting on a yes. A draft is the only copy of
+    /// that take — it exists because there was nowhere else to put it — so a
+    /// menu item one mis-tap from 归档到… can't be the whole decision.
+    @State private var pendingDelete: ClipDraft?
+    @State private var blocked: DraftFilingBlocked?
     @State private var toast: String?
 
     /// Bound only so a language change re-renders the list.
@@ -49,10 +54,35 @@ struct ClipDraftsView: View {
                     Button(Strings.done) { dismiss() }
                 }
             }
+            .confirmationDialog(
+                Strings.deleteDraftQuestion,
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingDelete
+            ) { draft in
+                Button(Strings.deleteDraft, role: .destructive) {
+                    drafts.remove(draft)
+                    pendingDelete = nil
+                }
+                Button(Strings.cancel, role: .cancel) { pendingDelete = nil }
+            }
             .sheet(item: $filing) { draft in
                 ClipFilingSheet(candidates: candidates(for: draft)) { chosen in
                     archive(draft, to: chosen)
                 }
+            }
+            .alert(
+                blocked?.title ?? "",
+                isPresented: Binding(
+                    get: { blocked != nil },
+                    set: { if !$0 { blocked = nil } }),
+                presenting: blocked
+            ) { _ in
+                Button(Strings.ok, role: .cancel) {}
+            } message: { reason in
+                Text(reason.message)
             }
         }
     }
@@ -72,6 +102,12 @@ struct ClipDraftsView: View {
             .padding(20)
         }
         .scrollIndicators(.hidden)
+        .task(id: drafts.sortedDrafts.map(\.id)) {
+            ClipCameraIndex.shared.load(drafts.sortedDrafts.map {
+                (key: ClipCameraIndex.key(url: drafts.url(for: $0), recordedAt: $0.recordedAt),
+                 url: drafts.url(for: $0))
+            })
+        }
     }
 
     private func row(_ draft: ClipDraft) -> some View {
@@ -92,32 +128,49 @@ struct ClipDraftsView: View {
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
 
+                // Tappable, not just stated. The line names the symptom; what
+                // a person wants next is what to do about it, and the row is
+                // where they are looking when they want it.
                 if !canFile {
-                    Text(Strings.noPlaceForDraft(draft.orientation))
+                    Button {
+                        blocked = filingBlocked(for: draft)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(Strings.draftNoPlace)
+                                .lineLimit(2)
+                            Image(systemName: "info.circle")
+                        }
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(OneDay.inkFaint)
-                        .lineLimit(2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
             Spacer(minLength: 4)
 
             Menu {
-                // Only offered when it would work: a disabled row that opens a
-                // sheet with no options in it is just a slower dead end.
-                if canFile {
-                    Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
+                // Always offered, even when it can't run. Hiding it left the
+                // menu on an unfilable draft holding nothing but 删除 — the
+                // one action that ends with the clip gone — and no statement
+                // anywhere of what would make filing possible. It says that
+                // now, in the alert.
+                Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
+                    if canFile {
                         filing = draft
+                    } else {
+                        blocked = filingBlocked(for: draft)
                     }
                 }
                 Button(Strings.deleteDraft, systemImage: "trash", role: .destructive) {
-                    drafts.remove(draft)
+                    pendingDelete = draft
                 }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(OneDay.inkSoft)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
@@ -144,74 +197,28 @@ struct ClipDraftsView: View {
                 .locale(AppLanguage.effective.locale))
     }
 
+    /// 「胶片机 · 3.2 MB」: the camera it was filmed with, read from the file
+    /// (`ClipCameraIndex`), then its size. No camera, or not read yet: size only.
     private func detailLine(_ draft: ClipDraft) -> String {
-        let frame = switch draft.orientation {
-        case .portrait: Strings.orientationPortrait
-        case .landscape: Strings.orientationLandscape
-        case .square: Strings.orientationSquare
-        }
-        return "\(frame) · \(Strings.draftSize(draft.byteSize))"
+        let key = ClipCameraIndex.key(url: drafts.url(for: draft), recordedAt: draft.recordedAt)
+        let camera = ClipCameraIndex.shared.cameras[key].flatMap { $0 == .standard ? nil : $0 }
+        return [camera?.displayName, Strings.draftSize(draft.byteSize)]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: - Actions
 
     private func candidates(for draft: ClipDraft) -> [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: draft.orientation)
+        DraftFiler.candidates(for: draft, in: store)
     }
 
-    /// File the draft into every chosen story, then drop it — but only once at
-    /// least one copy has actually landed. `saveClip` reports failure by doing
-    /// nothing, so deleting first would throw away the only remaining copy.
-    ///
-    /// Takes a list as of 1.3. Each story gets its own copy in its own first
-    /// open slot; `ClipFileStore.storeClip` copies the file, so the same draft
-    /// URL can be handed to `saveClip` once per story.
-    ///
-    /// Partial success is a success for the draft's purposes: it exists because
-    /// the clip had nowhere to go, and once it is somewhere, keeping it here as
-    /// well leaves a copy nobody will come back for. What failed is named.
+    private func filingBlocked(for draft: ClipDraft) -> DraftFilingBlocked {
+        DraftFiler.blocked(for: draft, in: store)
+    }
+
+    /// See `DraftFiler.archive`: shared with 我的's grid.
     private func archive(_ draft: ClipDraft, to challenges: [Challenge]) {
-        var landed: [Challenge] = []
-        var refused: [Challenge] = []
-
-        for challenge in challenges {
-            // No open slot means no filing. The old code filed into the day the
-            // story was on, which for a full story is a day that already holds
-            // a clip: the draft overwrote it, and the check below — true before
-            // the save as well as after — then deleted the draft either way.
-            guard let day = ClipFiling.targetDay(in: challenge) else {
-                refused.append(challenge)
-                continue
-            }
-            store.saveClip(
-                from: drafts.url(for: draft),
-                day: day,
-                challengeID: challenge.id,
-                overlayText: draft.overlayText)
-
-            if store.challenge(challenge.id)?.cards
-                .first(where: { $0.day == day })?.clipFileName != nil {
-                landed.append(challenge)
-            } else {
-                refused.append(challenge)
-            }
-        }
-
-        guard !landed.isEmpty else {
-            showToast(
-                refused.count == challenges.count && challenges.allSatisfy {
-                    ClipFiling.targetDay(in: $0) == nil
-                }
-                    ? Strings.storyIsFull
-                    : Strings.draftArchiveFailed)
-            return
-        }
-
-        drafts.remove(draft)
-        showToast(
-            landed.count == 1
-                ? Strings.filedTo(ChallengePresenter(challenge: landed[0]).displayTitle)
-                : Strings.filedToCount(landed.count))
+        showToast(DraftFiler.archive(draft, to: challenges, store: store, drafts: drafts))
     }
 
     private func showToast(_ text: String) {
@@ -332,24 +339,34 @@ struct ClipFilingSheet: View {
 
 /// The camera tab's way in: only there when there's something waiting, so it
 /// never becomes another permanent piece of chrome over the viewfinder.
+///
+/// `compact` is the camera's top-bar form: tray and count only, sized to the
+/// slot beside the wordmark. The full sentence used to float 88pt down, inside
+/// the frame, where on a small phone it sat on the timer chip; VoiceOver still
+/// gets the sentence.
 struct DraftsEntryButton: View {
     let count: Int
+    var compact = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
+            HStack(spacing: compact ? 4 : 7) {
                 Image(systemName: "tray.full.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text(Strings.draftsPending(count))
+                Text(compact ? "\(count)" : Strings.draftsPending(count))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, compact ? 10 : 14)
             .padding(.vertical, 9)
             .background(.black.opacity(0.55), in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Strings.draftsPending(count))
         .accessibilityIdentifier("drafts-entry")
     }
 }

@@ -1,5 +1,7 @@
 # 1Day
 
+**English** · [中文](README.zh-CN.md)
+
 **Give today a theme. Live it your way, on your own or with friends, and turn it into a vlog.**
 
 1Day starts with a question: **How do you want to spend today?** Choose a theme,
@@ -9,7 +11,7 @@ seven-day stories, with film assembly entirely on-device.
 
 **Theme → Moments → Together → Film**
 
-[Website](https://1day.liangyue.site) · [中文官网](https://1day.liangyue.site/zh) · [App Store](https://apps.apple.com/us/app/1-day/id6794565199) · [App release notes](https://1day.liangyue.site/updates)
+[Website](https://1day.liangyue.site) · [中文官网](https://1day.liangyue.site/zh) · [App Store](https://apps.apple.com/us/app/1-day/id6794565199) · [TestFlight](https://testflight.apple.com/join/cRQm6Va2) · [App release notes](https://1day.liangyue.site/updates)
 
 <p align="center">
   <img src="landing-page/public/assets/app-theme-en.png" width="230" alt="Choose a theme in the real 1Day app">
@@ -23,26 +25,31 @@ Real App UI captured in an isolated iOS Simulator build. Blue’s illustrated
 story and the shared participants are demo data, not user footage or evidence
 of a live multiplayer session.
 
-## Version 1.2: a day your way
+## Version 1.5: rooms and your own day
 
-The current development version focuses on making it easier to design,
-capture, and revisit your own day:
+The current development version (1.5, build 35) has two tabs, **Camera** and
+**Rooms**. Your own timeline opens from the Rooms page.
 
-- **From an idea to moments.** Describe what you want to do today, request
-  filming suggestions, then edit the prompts yourself.
-- **Themes worth keeping.** Save custom prompts to your template library with
-  a cover, ready to use again.
-- **Film in your own order.** Choose any available moment rather than follow
-  a fixed recording sequence.
-- **Keep watching.** Review solo-story clips full-screen and swipe between them.
-- **A gentle look.** Adjust softness, brightness, and warmth for playback and
-  export while preserving the original footage.
-- **Know who is there.** Shared stories make participants and filming status
-  clearer; solo stories omit the shared-room UI.
+- **Rooms.** Each member gets a clip card. Landscape rooms stack 16:9 cards;
+  portrait rooms lay out a grid by head count. Tap an avatar to watch only that
+  person's clips full-screen, stories style. A calendar button picks the day.
+- **Chat and reactions.** Rooms have chat, emoji reactions, comments, and pokes.
+  Push notifications show the chat text in the app's language.
+- **Plans and mood.** A week calendar on Home shows each day's plan and mood.
+  Write a plan, import it from Reminders, or have AI turn a sentence into a
+  to-do list. Past days can generate a recap.
+- **Film.** Drag clips into your own order for a room film. A gentle look adjusts
+  softness, brightness, and warmth for playback and export. Mixed portrait and
+  landscape clips sit on a blurred backdrop instead of being cropped.
+- **Avatars.** Pick a photo or a little character; stickers crop to your face.
+- **Accounts.** Sign in with Apple or Google. Leaving a room removes your clips,
+  reactions, comments, and member record. Deleting your account removes your
+  rooms and clips from the cloud.
 
-Version 1.2 is **not yet listed as released**. The latest App Store version
-verified on September 8, 2026 was **1.1**, released August 25, 2026. Repository
-features and demo screenshots may be ahead of the store build.
+1.5 is **not yet listed as released**. The latest App Store version verified on
+September 8, 2026 was **1.1**, released August 25, 2026. Repository features may
+be ahead of the store build; the newest builds go out through
+[TestFlight](https://testflight.apple.com/join/cRQm6Va2).
 
 ## The idea
 
@@ -59,7 +66,7 @@ of footage or an evening spent in a video editor.
   or record by time without a prompt sequence.
 - **Short by design.** Choose 2, 5, or 10-second clips and lock the challenge to
   portrait or landscape.
-- **Made with friends.** Create a CloudKit room, invite people with a six-character
+- **Made with friends.** Create a room, invite people with a six-character
   code, and collect everyone’s clips in one shared story.
 - **More than a clip feed.** Friends can leave emoji reactions and comments;
   those interactions can appear in the final film.
@@ -69,10 +76,10 @@ of footage or an evening spent in a video editor.
   title cards, prompt captions, names, dates, reactions, and comments.
 - **Your film, your choice.** Preview the result, adjust its title card, captions,
   and transition length, then save it to Photos or share the MP4.
-- **Local-first.** Solo challenges need no account or custom backend. An optional,
-  configurable evening reminder sends at most one nudge and skips completed moments.
-- **Quiet shared activity.** Opt-in CloudKit subscriptions summarize nearby friend
-  clips, comments, and reactions without putting comment text in notifications.
+- **Local-first.** Solo challenges need no account or backend. Shared rooms need
+  a signed-in account.
+- **Room alerts.** Push notifications (APNs, sent by the Worker) announce new
+  clips, chat, and reactions in your rooms.
 - **English and Simplified Chinese.** Product copy, prompts, templates, and
   permission messaging follow the selected app language.
 
@@ -85,7 +92,7 @@ flowchart LR
     Review --> Render["Render on-device<br/>with AVFoundation"]
     Render --> Keep["Save to Photos<br/>or share an MP4"]
 
-    Room["CloudKit room"] <--> Review
+    Room["Room<br/>(Cloudflare Worker)"] <--> Review
 ```
 
 ## Engineering
@@ -111,7 +118,7 @@ flowchart TD
     Store --> Repo["ChallengeRepository<br/>challenge metadata"]
     Store --> Files["ClipFileStore<br/>local media"]
     Store --> Sync["RoomSyncService"]
-    Sync --> Cloud["CloudKit public database"]
+    Sync --> Cloud["Cloudflare Worker<br/>D1 + R2"]
     Store --> Reminder["ReminderService<br/>local notifications"]
     Files --> Stitcher["VideoStitcher"]
     Cloud --> Cache["Downloaded clip cache"]
@@ -122,12 +129,21 @@ flowchart TD
 This keeps the core flow usable offline and isolates persistence, collaboration,
 notifications, capture, and rendering behind focused components.
 
+### Backend: Cloudflare Worker
+
+Rooms, members, clips, reactions, chat, pokes, and the mood diary live in D1;
+videos and avatars live in R2; room alerts go straight to APNs. The app moved
+off CloudKit to this Worker (`workers/api`, served at `auth.liangyue.site`).
+Every route needs a bearer token, and the caller is always the author of what
+they write. `workers/api/scripts/migrate-cloudkit.mjs` moves old CloudKit data
+across. See [the Worker](workers/api) for routes and deploy steps.
+
 ### Idempotent collaboration
 
-A shared clip’s CloudKit record ID is derived from `room + participant + slot`.
-Re-recording updates the same record instead of creating a duplicate. The room
-code is also the `Room` record name, so joining is a direct record fetch rather
-than a query. Codes are convenient invitations, not security secrets.
+A shared clip’s ID is derived from `room + participant + slot`. Re-recording
+updates the same record instead of creating a duplicate. The room code is the
+room’s key, so joining is a direct fetch rather than a query. Codes are
+convenient invitations, not security secrets.
 
 ### Backward-compatible state
 
@@ -140,9 +156,9 @@ user’s clips.
 
 The core solo recording flow stays on-device. If the user requests suggestions,
 the app sends their sentence, prompt count, language, and a random installation
-identifier to a Cloudflare Worker. The Worker uses DeepSeek to suggest prompts;
-it does not receive the user’s video clips. Users can also write prompts without
-calling this service. See [the Worker](workers/suggest-prompts) for configuration.
+identifier to a separate Cloudflare Worker. The Worker uses DeepSeek to suggest
+prompts; it does not receive the user’s video clips. Users can also write prompts
+without calling this service. See [the Worker](workers/suggest-prompts) for configuration.
 
 ## Tech stack
 
@@ -151,11 +167,11 @@ calling this service. See [the Worker](workers/suggest-prompts) for configuratio
 | App | Swift 5.9, SwiftUI, Observation, iOS 17+ |
 | Capture | AVFoundation (`AVCaptureSession`, `AVCaptureMovieFileOutput`) |
 | Rendering | AVMutableComposition, AVVideoComposition, AVAudioMix, Core Animation |
-| Collaboration | CloudKit public database, Sign in with Apple, deep links |
+| Collaboration | Cloudflare Worker (`workers/api`), D1, R2, APNs, Sign in with Apple, Google sign-in, deep links |
 | Persistence | Codable metadata in UserDefaults, media on disk |
 | Notifications | UserNotifications |
 | Website | React 19, Vite 6, prerendered bilingual routes, Vercel |
-| Optional prompt suggestions | Cloudflare Worker, DeepSeek |
+| Optional prompt suggestions | Cloudflare Worker (`workers/suggest-prompts`), DeepSeek |
 | Project generation | XcodeGen |
 | Tests | XCTest with real MP4 export fixtures |
 
@@ -169,13 +185,14 @@ ios/
 │   ├── Presentation/      # Localized presentation logic
 │   ├── Resources/         # Theme, localization, and media fixtures
 │   ├── Services/
-│   │   ├── Cloud/         # CloudKit records and room synchronization
+│   │   ├── Cloud/         # Worker API client, auth, and room synchronization
 │   │   ├── Media/         # Camera capture and AVFoundation renderer
 │   │   └── Persistence/   # Metadata repository and clip file store
-│   └── Views/             # Home, board, recorder, reel, and settings
+│   └── Views/             # Home, plans, mood, record, film, rooms, avatar, settings
 ├── AISetlogTests/          # State, localization, migration, and export tests
 └── project.yml             # XcodeGen project definition
 landing-page/               # React/Vite product site
+workers/api/                # Backend: auth, rooms, clips, chat, push (D1 + R2)
 workers/suggest-prompts/    # Optional filming-prompt service
 docs/                       # Product specs, beta protocol, and assets
 ```
@@ -197,12 +214,9 @@ Select the `AISetlog` scheme and run it on an iPhone or iOS Simulator. The
 simulator can exercise the product flow and export fixtures; camera behavior and
 Core Animation render overlays should be verified on a physical device.
 
-Shared rooms additionally require:
-
-- an Apple Developer team
-- the `iCloud.com.cassie.AISetlog` CloudKit container
-- matching CloudKit and Sign in with Apple entitlements
-- a device signed in to iCloud
+Shared rooms additionally require an Apple Developer team (Sign in with Apple
+and push entitlements) and a reachable backend. The app talks to the Worker
+at `auth.liangyue.site`; to run your own, deploy [`workers/api`](workers/api).
 
 ## Run the landing page
 
@@ -240,21 +254,12 @@ xcodebuild test \
   -project AISetlog.xcodeproj \
   -scheme AISetlog \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -skip-testing:AISetlogTests/CloudKitIdempotencyTests \
-  -skip-testing:AISetlogTests/CloudKitPaginationTests \
-  -skip-testing:AISetlogTests/RoomSyncIntegrationTests \
-  -skip-testing:AISetlogTests/JoinedRoomTests \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-The suite covers challenge and card state, one-day behavior, localized prompt
-resolution, legacy data decoding, empty renderer input, and playable
+The suite covers challenge and card state, localized prompt resolution, legacy
+data decoding, account deletion, room sync and chat, avatars, mood, and playable
 AVFoundation MP4 export with real media fixtures.
-
-The four skipped suites talk to the real CloudKit development database. Run
-them separately on a signed simulator or device that is signed into iCloud;
-an unsigned test host has no CloudKit entitlement, and constructing the
-container terminates the process before XCTest can skip the test.
 
 ## Project status
 

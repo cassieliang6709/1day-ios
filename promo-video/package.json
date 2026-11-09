@@ -1,0 +1,23 @@
+{
+  "name": "1day-promo-video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts --no-open",
+    "render": "node scripts/render-all.mjs",
+    "still": "remotion still src/index.ts FriendsTogether out/qa/friends.png --frame=240"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.522",
+    "@remotion/media": "4.0.522",
+    "@remotion/transitions": "4.0.522",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.522"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

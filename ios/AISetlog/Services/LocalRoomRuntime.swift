@@ -19,6 +19,7 @@ import Foundation
 ///     "-demoRoomTitle", "我们的一天",
 ///     "-demoRoomMembers", "小蓝,小白",
 ///     "-demoRoomMoments", "晨光,午饭,傍晚",
+///     "-demoRoomOrientation", "landscape",   // a 横拍 room; portrait if absent
 /// ]
 /// ```
 struct DemoRoomNaming {
@@ -27,12 +28,15 @@ struct DemoRoomNaming {
     /// member gets a clip in every slot — so three names is a six-clip room.
     var moments: [String]
     var members: [String]
+    var orientation: Challenge.Orientation = .portrait
 
     static func fromLaunchArguments(_ defaults: UserDefaults = .standard) -> DemoRoomNaming {
         DemoRoomNaming(
             title: trimmed(defaults.string(forKey: "demoRoomTitle")),
             moments: list(defaults.string(forKey: "demoRoomMoments")),
-            members: list(defaults.string(forKey: "demoRoomMembers")))
+            members: list(defaults.string(forKey: "demoRoomMembers")),
+            orientation: Challenge.Orientation(
+                rawValue: defaults.string(forKey: "demoRoomOrientation") ?? "") ?? .portrait)
     }
 
     private static func list(_ value: String?) -> [String] {
@@ -66,7 +70,7 @@ struct DemoRoomNaming {
 /// with generated colour cards.
 ///
 /// ```
-/// xcrun simctl launch booted com.cassie.AISetlog --args \
+/// xcrun simctl launch booted com.cassie.AISetlog.dev --args \
 ///     -demoEntries YES -demoRoomClips demo-clips -demoRoomChrome NO
 /// ```
 struct DemoRoomStaging {
@@ -138,7 +142,7 @@ final class LocalRoomRuntime {
         self.challengeID = challenge.id
         account = AccountStore(localIdentity: .init(id: chat.scope.accountID, displayName: challenge.ownerName ?? "Sample"))
         let sync = RoomSyncService(fileStore: storage, transport: source.transport)
-        store = ChallengeStore(repository: storage, fileStore: storage, coverStore: storage,
+        store = ChallengeStore(repository: storage, fileStore: storage,
                                roomSync: sync, effects: .isolated)
         store.account = account
         store.challenges = [challenge]
@@ -174,6 +178,7 @@ final class LocalRoomRuntime {
             for (slot, _) in moments.enumerated() {
                 let day = slot + 1
                 var ownFile: String?
+                var ownFilmed = Date()
                 for index in 0..<memberCount {
                     try Task.checkCancellation()
                     let authorID = index == 0 ? chat.scope.accountID : "demo-friend-\(index)"
@@ -190,7 +195,7 @@ final class LocalRoomRuntime {
                     } else {
                         guard let made = await DemoClipFactory.makeClip(moment: day,
                             label: chinese ? "本地动态示例" : "Local motion sample", author: name,
-                            seconds: clipSeconds, orientation: .portrait) else { throw Failure.media }
+                            seconds: clipSeconds, orientation: naming.orientation) else { throw Failure.media }
                         generated = made
                         source = made
                     }
@@ -198,16 +203,24 @@ final class LocalRoomRuntime {
                     guard let file = storage.storeClip(from: source, day: day, challengeID: id)
                     else { throw Failure.storage }
                     if index == 0 { ownFile = file }
+                    // Spread over the afternoon rather than all stamped "now":
+                    // the room page and the chat both lead with the time a
+                    // clip was filmed (1.5), and six clips at the same minute
+                    // read as one glitch, not a day. Later slots are newer;
+                    // within a slot each member is a few minutes apart.
+                    let filmed = Date().addingTimeInterval(
+                        -Double((moments.count - 1 - slot) * 95 + index * 7) * 60)
+                    if index == 0 { ownFilmed = filmed }
                     remote.append(.init(id: "\(id)-\(authorID)-day\(day)", day: day, authorID: authorID,
-                                        authorName: name, recordedAt: Date(),
+                                        authorName: name, recordedAt: filmed,
                                         localURL: storage.clipURL(fileName: file, challengeID: id), overlayText: nil))
                 }
-                cards.append(DayCard(day: day, clipFileName: ownFile, recordedAt: Date()))
+                cards.append(DayCard(day: day, clipFileName: ownFile, recordedAt: ownFilmed))
             }
             let challenge = Challenge(id: id,
                 title: naming.title ?? (chinese ? "本地房间示例" : "Local room sample"),
                 startDate: Date(), cards: cards,
-                mode: .oneDay, clipLength: .tiny, orientation: .portrait,
+                mode: .oneDay, clipLength: .tiny, orientation: naming.orientation,
                 momentTitles: moments,
                 roomCode: chat.scope.roomCode, ownerName: remote.first?.authorName, ownerID: chat.scope.accountID)
             let source = LocalRoomSyncSource(code: chat.scope.roomCode, clips: remote)
@@ -272,7 +285,6 @@ final class LocalRoomRuntime {
         source.close()
         store.roomSync.clearRoom(chat.scope.roomCode)
         store.challenges = []
-        store.customTemplates = []
         account.signOut()
         for url in derivedMedia { try? FileManager.default.removeItem(at: url) }
         derivedMedia = []

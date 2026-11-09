@@ -15,7 +15,7 @@ final class SevenDayPersistentRepositoryTests: XCTestCase {
             let freshDefaults = try XCTUnwrap(UserDefaults(suiteName: suite))
             let repository = UserDefaultsChallengeRepository(defaults: freshDefaults, fileStore: files)
             let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
-            return ChallengeStore(repository: repository, fileStore: files, coverStore: files,
+            return ChallengeStore(repository: repository, fileStore: files,
                 roomSync: RoomSyncService(fileStore: files, transport: source.transport), effects: .isolated)
         }
         let titles = (1...7).map { "自己写的 Day \($0) 🌱" }

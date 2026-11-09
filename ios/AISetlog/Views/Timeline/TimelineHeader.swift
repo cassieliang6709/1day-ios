@@ -1,32 +1,70 @@
 import SwiftUI
 
-/// The top of the timeline: what this story is and who's in it.
+/// The top of the timeline: what this story is called.
 ///
 /// It no longer says how far the day has got. That was a `RoomProgress` the
 /// header only used to print `0/3` beside two other numbers, and the bar
 /// underneath says it better; the parameter went with the line.
+///
+/// A room used to add 「2 人 · 邀请码 KPADC7」 under the title. Gone (1.5):
+/// the columns below already show who's here, and the code goes out through
+/// 邀请 in the nav bar, which is the only place anyone sends it from.
 struct TimelineHeader: View {
     let challenge: Challenge
-    /// Who's in the room. Nil for a solo story, which has nobody to name.
-    let cast: RoomCast?
     var isSyncing = false
+    /// A room's name can be changed by anyone in it (1.5): tapping the title
+    /// turns it into the text field, in place — no dialog. Return saves;
+    /// tapping away leaves it as it was. Nil keeps the title plain text.
+    var onRename: ((String) -> Void)? = nil
+    /// 29 at the top of a story; 17 when it sits in a room's nav bar.
+    var fontSize: CGFloat = 29
 
-    @Environment(\.roomPreviewMediaScope) private var previewMedia
-    @State private var didCopyCode = false
+    @State private var renaming = false
+    @State private var draftTitle = ""
+    @FocusState private var fieldFocused: Bool
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
 
+    /// 「和我过一天」 is the name 按时间拍 used to give every story it made —
+    /// a template's label, not a name anybody chose — so a story still
+    /// carrying it shows no title rather than that. Stories made since are
+    /// named for their date, and a name you typed always shows.
+    private var showsTitle: Bool {
+        challenge.title != "Live With Me" && challenge.title != "和我过一天"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        if let onRename {
+            if renaming {
+                TextField("", text: $draftTitle, prompt: Text(Strings.roomNamePlaceholder))
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .tint(Color.oneDayBrand)
+                    .focused($fieldFocused)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        let name = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !name.isEmpty { onRename(name) }
+                        renaming = false
+                    }
+                    // Tapped away without Return: nothing changes.
+                    .onChange(of: fieldFocused) { _, focused in
+                        if !focused { renaming = false }
+                    }
+                    .onAppear { fieldFocused = true }
+                    .accessibilityIdentifier("room-title-field")
+            } else {
+                Button {
+                    draftTitle = showsTitle ? challenge.title : ""
+                    renaming = true
+                } label: {
+                    title
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("room-title")
+            }
+        } else if showsTitle || isSyncing {
             title
-
-            if let cast, !cast.members.isEmpty {
-                RoomRoster(cast: cast)
-            }
-
-            if previewMedia == nil, challenge.isShared, let code = challenge.roomCode {
-                inviteCode(code)
-            }
         }
     }
 
@@ -45,10 +83,18 @@ struct TimelineHeader: View {
     /// it is about to matter, and the runtime is on the film screen.
     private var title: some View {
         HStack(spacing: 8) {
-            Text(presenter.displayTitle)
-                .font(.system(size: 29, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .lineLimit(2)
+            if showsTitle {
+                Text(presenter.displayTitle)
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(fontSize < 29 ? 1 : 2)
+            } else if onRename != nil {
+                // A room still called 和我过一天 has no title to tap; this is it.
+                Text(Strings.roomNamePlaceholder)
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.inkFaint)
+                    .lineLimit(1)
+            }
 
             if isSyncing {
                 ProgressView()
@@ -56,120 +102,5 @@ struct TimelineHeader: View {
                     .tint(Color.oneDayBrand)
             }
         }
-    }
-
-    /// The join code, in full, on the screen the owner is already looking at.
-    /// Sharing used to mean opening a share sheet and pulling six characters
-    /// out of a sentence — fine for iMessage, useless when you just want to
-    /// read the code aloud. Tapping copies the bare code, not the blurb.
-    private func inviteCode(_ code: String) -> some View {
-        Button {
-            UIPasteboard.general.string = code
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.easeOut(duration: 0.15)) { didCopyCode = true }
-        } label: {
-            HStack(spacing: 8) {
-                Text(Strings.inviteCodeLabel)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-
-                Text(code)
-                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
-                    .tracking(2)
-                    .foregroundStyle(Color.oneDayBrand)
-
-                Image(systemName: didCopyCode ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(didCopyCode ? Color.oneDayMint : OneDay.inkFaint)
-
-                if didCopyCode {
-                    Text(Strings.inviteCodeCopied)
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.oneDayMint)
-                        .transition(.opacity)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(OneDay.surfaceSoft.opacity(0.7), in: Capsule())
-            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .task(id: didCopyCode) {
-            guard didCopyCode else { return }
-            try? await Task.sleep(for: .seconds(1.6))
-            withAnimation(.easeOut(duration: 0.2)) { didCopyCode = false }
-        }
-    }
-
-}
-
-/// Renaming a story and its moment prompts. A plain form on purpose — this is
-/// maintenance, not part of the emotional flow.
-struct EditPlanSheet: View {
-    let challenge: Challenge
-    let onSave: (String, [String]) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var title: String
-    @State private var moments: [String]
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-
-    init(challenge: Challenge, onSave: @escaping (String, [String]) -> Void) {
-        self.challenge = challenge
-        self.onSave = onSave
-        _title = State(initialValue: challenge.title)
-        _moments = State(initialValue: challenge.cards.map { card in
-            challenge.momentValue(forSlot: card.day) ?? Strings.dayN(card.day)
-        })
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(Strings.planTitle) {
-                    TextField(Strings.planTitle, text: $title)
-                }
-                Section {
-                    ForEach(moments.indices, id: \.self) { index in
-                        HStack(spacing: 12) {
-                            Text("\(index + 1)")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(width: 24, height: 24)
-                                .background(Color.oneDayBrand, in: Circle())
-                            TextField(
-                                Strings.promptN(index + 1),
-                                text: Binding(
-                                    get: { MomentCatalog.localize(moments[index]) },
-                                    set: { moments[index] = $0 }))
-                        }
-                    }
-                } header: {
-                    Text(Strings.captureTitles)
-                }
-            }
-            .navigationTitle(Strings.editPlan)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(Strings.cancel) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.save) {
-                        onSave(
-                            title.trimmingCharacters(in: .whitespacesAndNewlines),
-                            moments.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-                        dismiss()
-                    }
-                    .disabled(!canSave)
-                }
-            }
-        }
-    }
-
-    private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && moments.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }

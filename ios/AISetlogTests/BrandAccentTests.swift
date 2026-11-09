@@ -3,37 +3,49 @@ import XCTest
 
 @testable import AISetlog
 
-/// The app's accent is the brand blue, and picking a colour only moves your
-/// avatar. 1.3 wired the accent to the avatar pick; these tests pin the
+/// The app's accent is the skin's colour (奶油黄 by default, 经典蓝 on
+/// request — see `AppSkin`), and picking a colour only moves your avatar. 1.3 wired the accent to the avatar pick; these tests pin the
 /// unwiring, because the two are one property apart and easy to reconnect by
 /// accident.
 final class BrandAccentTests: XCTestCase {
     private var defaults: UserDefaults!
     private let suite = "brand-accent-tests"
 
+    private var savedSkin: Any?
+
     override func setUp() {
         super.setUp()
         defaults = UserDefaults(suiteName: suite)
         defaults.removePersistentDomain(forName: suite)
+        savedSkin = UserDefaults.standard.object(forKey: AppSkin.storageKey)
     }
 
     override func tearDown() {
         defaults.removePersistentDomain(forName: suite)
+        UserDefaults.standard.set(savedSkin, forKey: AppSkin.storageKey)
         super.tearDown()
     }
 
-    func testTheAccentIsTheBrandBlue() {
+    func testTheAccentFollowsTheSkin() {
+        UserDefaults.standard.set(AppSkin.cream.rawValue, forKey: AppSkin.storageKey)
+        XCTAssertEqual(UIColor.oneDayBrand, UIColor.oneDayCream)
+        UserDefaults.standard.set(AppSkin.blue.rawValue, forKey: AppSkin.storageKey)
         XCTAssertEqual(UIColor.oneDayBrand, UIColor.oneDayBlue)
     }
 
-    /// The whole point of the revert: a warm avatar on a blue app, not a warm
-    /// app. `oneDayBrand` reads no defaults at all now, so a real pick in the
-    /// standard domain cannot reach it either.
+    func testCreamIsTheDefaultSkin() {
+        UserDefaults.standard.removeObject(forKey: AppSkin.storageKey)
+        XCTAssertEqual(AppSkin.current, .cream)
+    }
+
+    /// The whole point of the 1.3 revert: the avatar pick moves your avatar,
+    /// never the app's accent. `oneDayBrand` reads only the skin.
     func testAPickMovesYourAvatarAndLeavesTheAccentAlone() {
+        let before = UIColor.oneDayBrand
         let wanted = Identity.paletteUIColors.count - 1
         Identity.chooseTint(wanted, forName: "Cassie", in: defaults)
         XCTAssertEqual(Identity.tintIndex(for: "Cassie", in: defaults), wanted)
-        XCTAssertEqual(UIColor.oneDayBrand, UIColor.oneDayBlue)
+        XCTAssertEqual(UIColor.oneDayBrand, before)
     }
 
     /// Somebody else in the room keeps the colour their name hashes to — the

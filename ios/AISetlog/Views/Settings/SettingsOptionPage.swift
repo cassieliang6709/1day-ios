@@ -8,6 +8,7 @@ protocol SettingsOption: CaseIterable, Identifiable, Hashable {
 
 extension AppLanguage: SettingsOption {}
 extension AppAppearance: SettingsOption {}
+extension AppSkin: SettingsOption {}
 
 /// One choice, one screen. Settings used to lay every option of every picker
 /// out on the front page, which cost most of a medium-detent sheet to show

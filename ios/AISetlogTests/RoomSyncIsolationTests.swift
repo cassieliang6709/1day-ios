@@ -23,6 +23,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         defer { files.close() }
         var calls: [String] = []
         let url = files.root.appendingPathComponent("fixture.mov")
+        let filmedAt = Date(timeIntervalSince1970: 1_700_000_000)
         let transport = RoomSyncTransport(
             fetchClips: { code, directory in
                 XCTAssertEqual(directory, files.remoteCacheDir(roomCode: code))
@@ -30,14 +31,17 @@ final class RoomSyncIsolationTests: XCTestCase {
                 return []
             },
             fetchInteractions: { calls.append("interactions:\($0)"); return ([], []) },
-            uploadClip: { code, day, author, name, file, caption in
-                XCTAssertEqual([code, author, name, caption ?? ""], ["ROOM", "me", "Me", "mine"])
+            uploadClip: { code, day, author, name, file, caption, recordedAt, takeID in
+                XCTAssertEqual([code, author, name, caption.firstText ?? ""], ["ROOM", "me", "Me", "mine"])
                 XCTAssertEqual(day, 2); XCTAssertEqual(file, url)
+                XCTAssertEqual(recordedAt, filmedAt)
+                XCTAssertNil(takeID)
                 calls.append("upload")
             },
-            updateClipCaption: { code, day, author, caption in
-                XCTAssertEqual([code, author, caption ?? ""], ["ROOM", "me", "edited"])
+            updateClipCaption: { code, day, author, caption, takeID in
+                XCTAssertEqual([code, author, caption.firstText ?? ""], ["ROOM", "me", "edited"])
                 XCTAssertEqual(day, 2)
+                XCTAssertNil(takeID)
                 calls.append("caption")
             },
             setReaction: { code, day, author, name, target, emoji, on in
@@ -55,7 +59,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         XCTAssertEqual(clips?.count, 0)
         let interactions = await service.fetchInteractions(code: "ROOM")
         XCTAssertNotNil(interactions)
-        let uploaded = await service.uploadClip(code: "ROOM", day: 2, authorID: "me", authorName: "Me", fileURL: url, overlayText: "mine")
+        let uploaded = await service.uploadClip(code: "ROOM", day: 2, authorID: "me", authorName: "Me", fileURL: url, overlayText: "mine", recordedAt: filmedAt)
         XCTAssertTrue(uploaded)
         // Editing a caption after the take goes to the room too — it used to
         // stop at this device.
@@ -81,7 +85,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         XCTAssertEqual(clips?.map(\.id), [clip.id])
         let unknown = await service.syncClips(code: "REAL")
         XCTAssertNil(unknown)
-        let uploaded = await service.uploadClip(code: "LOCAL", day: 1, authorID: "me", authorName: "Me", fileURL: clip.localURL, overlayText: nil)
+        let uploaded = await service.uploadClip(code: "LOCAL", day: 1, authorID: "me", authorName: "Me", fileURL: clip.localURL, overlayText: nil, recordedAt: .now)
         XCTAssertFalse(uploaded, "read-only fixtures must not fake cloud confirmation")
         XCTAssertNotNil(service.lastError["LOCAL"])
         source.close()
@@ -99,7 +103,7 @@ final class RoomSyncIsolationTests: XCTestCase {
         let source = LocalRoomSyncSource(code: "LOCAL", clips: [])
         let transport = source.transport
         let operations: [() async throws -> Void] = [
-            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), nil) },
+            { try await transport.uploadClip("LOCAL", 1, "me", "Me", URL(fileURLWithPath: "/unused"), [], .now, nil) },
             { try await transport.setReaction("LOCAL", 1, "me", "Me", "friend", "♥", true) },
             { try await transport.postComment("LOCAL", 1, "id", "text", "me", "Me", "friend") },
             { try await transport.deleteComment("id") }
