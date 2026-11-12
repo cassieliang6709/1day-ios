@@ -128,10 +128,7 @@ jobs:
   # a merge the way they sit watching a PR.
   room:
     name: Shared-room integration
-    # Temporary: also run on this PR so testMemberPickerCancelPreservesFormalRoomAndChat
-    # can be verified before merge. The room lane is otherwise push-to-main only.
-    # Revert once that run is green.
-    if: github.event_name == 'push' || github.head_ref == 'bot/fix-room-member-picker-test'
+    if: github.event_name == 'push'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
