@@ -59,6 +59,7 @@ struct LocalRoomImportControls: View {
                         failed = false
                         showPicker = true
                     }
+                    .accessibilityIdentifier("local-room-import-member")
                 }
             }
             .disabled(busy)
