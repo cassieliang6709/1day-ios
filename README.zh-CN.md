@@ -2,155 +2,104 @@
 
 [English](README.md) · **中文**
 
-**给今天定一个主题。用自己的方式过，一个人或和朋友一起，最后做成一支 vlog。**
+**每天拍几秒，攒成你的 vlog。**
 
-1Day 从一个问题开始：**今天想怎么过？** 选一个主题，跟着几条瞬间提示，一个人或和朋友一起把这一天拍下来。
-做好的 vlog 就是留念。原生 iOS App 支持一天和七天的故事，成片完全在手机上合成。
+1Day 是一个用短视频记录每一天的 iOS App。点一下相机，就拍一段 2 秒的片段；拍的都存进「我的」，按天排好，还有日历。挑几段，就能拼成一支 vlog。你也可以开一个最多 6 人的房间，把片段发进去，点朋友的头像看他这天拍了什么。
 
-**主题 → 瞬间 → 一起 → 成片**
-
-[官网](https://1day.liangyue.site) · [中文官网](https://1day.liangyue.site/zh) · [App Store](https://apps.apple.com/us/app/1-day/id6794565199) · [TestFlight](https://testflight.apple.com/join/cRQm6Va2) · [更新日志](https://1day.liangyue.site/updates)
+[官网](https://1day.liangyue.site) · [中文官网](https://1day.liangyue.site/zh) · [App Store](https://apps.apple.com/cn/app/1-day/id6794565199?uo=4) · [TestFlight](https://testflight.apple.com/join/cRQm6Va2) · [更新日志](https://1day.liangyue.site/updates)
 
 <p align="center">
-  <img src="landing-page/public/assets/app-theme-en.png" width="230" alt="在真实的 1Day App 里选主题">
+  <img src="landing-page/public/assets/app-home-zh.png" width="230" alt="1Day 首页：一周日历和今天的心情">
   &nbsp;&nbsp;
-  <img src="landing-page/public/assets/app-friends-en.png" width="230" alt="1Day 里带演示成员的共享故事">
-  &nbsp;&nbsp;
-  <img src="landing-page/public/assets/app-film-en.png" width="230" alt="1Day 里的成片">
+  <img src="landing-page/public/assets/app-friends-zh.png" width="230" alt="一个房间里两位示例成员和他们的片段">
 </p>
 
-截图是在独立的 iOS 模拟器构建里截的真实 App 界面。Blue 的插画故事和共享成员都是演示数据，不是用户素材，也不能证明有真实的多人使用。
+截图是模拟器构建里的真实 App 界面，人物和片段都是演示数据，不是真实用户。截图拍于底部标签改名之前，所以底栏写的是「我的 / 朋友」；当前代码里的两个 tab 是**相机**和**房间**。
 
-## 1.5 版：房间和自己的一天
+## 状态
 
-当前开发版（1.5，build 35）有两个 tab：**相机**和**房间**。自己的时间线从房间页进入。
+- **仓库 / 开发版本：1.5（build 35）**，来自 [`ios/project.yml`](ios/project.yml)。
+- **1.5 是 TestFlight 公测版。** 按[更新日志](https://1day.liangyue.site/updates)，它还没在 App Store 上线。这里记录的最近一个 App Store 版本是 **1.1**（2026 年 8 月 25 日发布，2026 年 9 月 8 日查验），本文不声称有更新的版本。
+- 最新的构建通过 [TestFlight](https://testflight.apple.com/join/cRQm6Va2) 发出。
 
-- **房间。** 每个成员一张片段卡片。横拍房间上下排 16:9 卡片，竖拍房间按人数排格子。点头像只看这个人的片段，全屏连播。右上角日历按钮选看哪天。
-- **聊天和回应。** 房间里有聊天、表情回应、评论和拍一拍。推送通知显示聊天原文，并跟随 App 语言。
-- **计划和心情。** 首页的周日历显示每天的计划和心情。可以写计划、从提醒事项导入，或让 AI 把一句话写成待办清单。过去的日子可以生成回顾。
-- **成片。** 可以拖动片段，按自己的顺序排房间成片。「温柔滤镜」可调柔和度、亮度和暖度，用于回看和导出。横竖混拍的片段放在模糊底图上，不再被裁掉。
-- **头像。** 可以选照片或小人，贴纸会按脸裁切。
-- **账号。** 支持 Apple 和 Google 登录。退出房间会删掉你在房间里的片段、回应、评论和成员记录。删除账号会从云端删掉你的房间和片段。
+## App 现在能做什么（1.5）
 
-1.5 **尚未上架**。2026 年 9 月 8 日核实的 App Store 最新版本是 **1.1**，发布于 2026 年 8 月 25 日。仓库里的功能可能比商店版本新，最新构建通过 [TestFlight](https://testflight.apple.com/join/cRQm6Va2) 发放。
+两个 tab：**相机**和**房间**。个人库「我的」从房间页进入。
 
-## 想法
+- **相机。** 点一下拍一段 2 秒的片段，到时间自动停。前后摄像头、变焦，以及画面上带日期的 DV 机效果。支持多摄的 iPhone 可以前后摄像头一起拍。还没归档的片段可以先存成待归档。
+- **我的。** 你拍的所有片段按天分组，有日历可以跳到某一天。勾几段，生成 vlog。每天的日期旁边是那天的心情。
+- **计划和心情。** 顶部是一周日历。五个表情里选一个今天的心情，写今天的清单，从提醒事项导入（只读），或让 AI 把一句话写成清单。过去的日子可以生成回顾。
+- **房间。** 创建房间，把六位邀请码发给朋友，一个房间最多 6 人。每个成员一张片段卡片。点头像连着看这个人这天拍的，日历按钮选看哪天。房间里有聊天、表情回应、评论，朋友还没拍可以拍一拍。每段片段发到哪几个房间由你选；不发，就只有你自己看得到。
+- **Vlog。** 选片段、排顺序，生成 vlog。在房间里生成，可以把几个人放进同一个画面。声音可选原声、音乐（内置六首）或混合。调节面板可以改柔和度、亮度和暖色。合成在手机上完成，可以保存到相册或分享 MP4。
+- **头像和账号。** 用照片或一个小角色当头像。用 Apple 或 Google 登录（房间需要登录）。退出房间会删除你在里面的片段、回应、评论和成员记录；删除账号会把你的房间和片段从云端删除。
+- **通知。** 房间动态的推送由 Worker 经 APNs 发出。
+- **语言。** 英文和简体中文。
 
-多数日子是靠几个小瞬间被记住的，而不是一段长录像。1Day 给每个瞬间一条提示，让每段片段保持很短，最后再统一剪辑。结果是一支属于自己的影片，不需要相册里堆满素材，也不需要花一晚上用剪辑软件。
+### 早期版本
 
-## 产品亮点
+到 1.1 为止，App 围绕「选主题、跟着瞬间提示拍」，有一天和七天的故事。1.5 去掉了主题和模板选择：新建的计划和房间只需要一个名字（计划还有一份清单）。那套流程留下的一些类型和素材仍在代码里，好让已有的故事和片段能打开；它们不是现在的主流程。更新日志保留了历史。
 
-- **一天或七天。** 今天拍几个瞬间，或者一周内每天回来拍一段。
-- **有引导，也可以自己来。** 从中英双语主题开始，自己写提示，或不按提示顺序、按时间拍。
-- **刻意很短。** 片段可选 2、5、10 秒，并可把挑战锁定为竖拍或横拍。
-- **和朋友一起。** 创建房间，用六位邀请码邀请朋友，把大家的片段收进同一个共享故事。
-- **不只是片段列表。** 朋友可以留表情回应和评论，这些互动可以出现在最终成片里。
-- **完整的相机流程。** 切换前后摄像头，回看一段，加叠加文字，或重拍同一个瞬间。
-- **自动剪辑。** AVFoundation 把片段、音频、交叉淡化、标题卡、提示字幕、名字、日期、回应和评论合成在一起。
-- **成片由你决定。** 预览结果，调整标题卡、字幕和转场长度，然后存到相册或分享 MP4。
-- **本地优先。** 单人挑战不需要账号和后端。共享房间需要登录账号。
-- **房间提醒。** 推送通知（APNs，由 Worker 发送）告知房间里的新片段、聊天和回应。
-- **英文和简体中文。** 产品文案、提示、模板和权限说明跟随所选的 App 语言。
-
-## 工作流程
-
-```mermaid
-flowchart LR
-    Create["选模板<br/>或自己写"] --> Record["拍 2–10 秒片段"]
-    Record --> Review["回看、加字幕、<br/>回应和评论"]
-    Review --> Render["用 AVFoundation<br/>在手机上合成"]
-    Render --> Keep["存到相册<br/>或分享 MP4"]
-
-    Room["房间<br/>（Cloudflare Worker）"] <--> Review
-```
-
-## 工程实现
-
-### 手机上的视频合成
-
-`VideoStitcher` 加载并统一每段素材，保留摄像头的方向变换，建立交替的合成轨道，用交叉淡化混音，并通过 `AVVideoCompositionCoreAnimationTool` 加 Core Animation 叠加层。导出的 MP4 可直接分享，个人素材不会发到渲染服务器。
-
-代价是：设备上的媒体行为比集中式渲染更难预测。实现里明确处理了方向、轨道生命周期、音频范围、空输入和模拟器限制。
-
-### 本地优先的服务边界
-
-`ChallengeStore` 持有可观察的 App 状态，存储和 I/O 交给别的组件：
+## 架构
 
 ```mermaid
 flowchart TD
-    Views["SwiftUI 视图"] --> Store["ChallengeStore"]
-    Store --> Repo["ChallengeRepository<br/>挑战元数据"]
-    Store --> Files["ClipFileStore<br/>本地媒体"]
+    Views["SwiftUI views"] --> Store["ChallengeStore"]
+    Store --> Repo["ChallengeRepository<br/>story metadata"]
+    Store --> Files["ClipFileStore<br/>local media"]
     Store --> Sync["RoomSyncService"]
     Sync --> Cloud["Cloudflare Worker<br/>D1 + R2"]
-    Store --> Reminder["ReminderService<br/>本地通知"]
     Files --> Stitcher["VideoStitcher"]
-    Cloud --> Cache["已下载的片段缓存"]
+    Cloud --> Cache["Downloaded clip cache"]
     Cache --> Stitcher
-    Stitcher --> Film["MP4 → 相册 / ShareLink"]
+    Stitcher --> Film["MP4 → Photos / ShareLink"]
 ```
 
-这样核心流程离线也能用，存储、协作、通知、拍摄和合成各自放在职责单一的组件后面。
-
-### 后端：Cloudflare Worker
-
-房间、成员、片段、回应、聊天、拍一拍和心情日记存在 D1；视频和头像存在 R2；房间提醒直接发给 APNs。App 已从 CloudKit 迁到这个 Worker（`workers/api`，地址 `auth.liangyue.site`）。每个接口都需要 bearer token，调用者始终是自己所写内容的作者。`workers/api/scripts/migrate-cloudkit.mjs` 负责把旧的 CloudKit 数据迁过来。接口和部署步骤见 [Worker](workers/api)。
-
-### 幂等的协作
-
-共享片段的 ID 由 `房间 + 成员 + 槽位` 推导。重拍会更新同一条记录，不会产生重复。房间码就是房间的键，所以加入房间是直接读取，不是查询。房间码只是方便邀请，不是安全密钥。
-
-### 向后兼容的状态
-
-已保存的挑战使用稳定的提示 key 和容忍版本差异的解码。旧的中英文提示字符串、旧版挑战默认值和最初的单挑战存储格式，都会被迁移或解析，不会丢掉用户的片段。
-
-### 可选的提示建议
-
-核心的单人拍摄流程留在手机上。用户请求建议时，App 会把他们写的那句话、提示条数、语言和一个随机的安装标识发给另一个 Cloudflare Worker。该 Worker 用 DeepSeek 生成提示建议，不会收到用户的视频片段。用户也可以不调用这个服务，自己写提示。配置见 [Worker](workers/suggest-prompts)。
+- **设备上合成。** `VideoStitcher` 构建 AVFoundation 合成（轨道、混音、Core Animation 叠加层），导出 MP4，不需要渲染服务器。
+- **后端：Cloudflare Worker。** [`workers/api`](workers/api) 用 D1 存房间、成员、片段、回应、聊天、拍一拍和心情日记，用 R2 存视频和头像，推送走 APNs。服务地址是 `auth.liangyue.site`，每个路由都需要 bearer token。`CloudKitService.swift` 这类文件虽然名字里有 CloudKit，实际调用的是这个 Worker；App 已经离开 CloudKit，`workers/api/scripts/migrate-cloudkit.mjs` 负责搬旧数据。
+- **幂等的片段。** 共享片段的 ID 由房间、参与者和槽位推出，重拍会更新同一条记录。房间码是房间的 key，是邀请而不是秘密。
+- **AI 清单建议。** 如果你让 AI 写清单，App 会把你那一句话、数量、语言和一个随机安装标识发给 [`workers/suggest-prompts`](workers/suggest-prompts)，由它调用 DeepSeek。它收不到你的视频。
 
 ## 技术栈
 
-| 方面 | 实现 |
+| 领域 | 实现 |
 | --- | --- |
 | App | Swift 5.9、SwiftUI、Observation、iOS 17+ |
-| 拍摄 | AVFoundation（`AVCaptureSession`、`AVCaptureMovieFileOutput`） |
+| 拍摄 | AVFoundation（支持的机型含多摄像头同时拍） |
 | 合成 | AVMutableComposition、AVVideoComposition、AVAudioMix、Core Animation |
-| 协作 | Cloudflare Worker（`workers/api`）、D1、R2、APNs、Sign in with Apple、Google 登录、深度链接 |
-| 持久化 | UserDefaults 里的 Codable 元数据，媒体存磁盘 |
-| 通知 | UserNotifications |
-| 网站 | React 19、Vite 6、预渲染的双语路由、Vercel |
-| 可选的提示建议 | Cloudflare Worker（`workers/suggest-prompts`）、DeepSeek |
+| 后端 | Cloudflare Worker（`workers/api`）、D1、R2、APNs |
+| 登录 | Sign in with Apple、Google Sign-In |
+| 持久化 | Codable 元数据，媒体存在磁盘 |
+| 网站 | React 19、Vite 6、预渲染双语路由、Vercel |
+| AI 清单建议 | Cloudflare Worker（`workers/suggest-prompts`）、DeepSeek |
 | 工程生成 | XcodeGen |
-| 测试 | XCTest，带真实 MP4 导出夹具 |
+| 测试 | XCTest 和 XCUITest |
 
 ## 仓库结构
 
 ```text
 ios/
-├── AISetlog/
-│   ├── App/               # App 入口和生命周期
-│   ├── Models/            # 挑战、卡片、片段、模板、互动
-│   ├── Presentation/      # 本地化的展示逻辑
-│   ├── Resources/         # 主题、本地化和媒体夹具
-│   ├── Services/
-│   │   ├── Cloud/         # Worker API 客户端、认证和房间同步
-│   │   ├── Media/         # 相机拍摄和 AVFoundation 合成器
-│   │   └── Persistence/   # 元数据仓库和片段文件存储
-│   └── Views/             # 首页、计划、心情、拍摄、成片、房间、头像、设置
-├── AISetlogTests/          # 状态、本地化、迁移和导出测试
+├── AISetlog/               # App 源码（SwiftUI）
+│   ├── App/                # 入口
+│   ├── Models/             # 故事、片段、互动（不含展示文案）
+│   ├── Presentation/       # 纯展示逻辑（不 import SwiftUI，不读 `.now`）
+│   ├── Resources/          # 本地化、音乐、主题
+│   ├── Services/           # 云端、拍摄与合成、持久化、通知
+│   └── Views/              # 计划/我的、房间、录制、成片、片段库、心情、头像、设置
+├── AISetlogTests/          # 单元测试
+├── AISetlogUITests/        # UI 测试
 └── project.yml             # XcodeGen 工程定义
 landing-page/               # React/Vite 产品官网
-workers/api/                # 后端：认证、房间、片段、聊天、推送（D1 + R2）
-workers/suggest-prompts/    # 可选的拍摄提示服务
-docs/                       # 产品文档、内测流程和素材
+workers/api/                # 后端：登录、房间、片段、聊天、推送（D1 + R2）
+workers/suggest-prompts/    # AI 清单建议服务
+android-app/                # 旧流程的 Flutter 原型（见下）
+docs/                       # 产品笔记、测试协议、素材
 ```
+
+贡献规则（分层、CI、提交）见 [AGENTS.md](AGENTS.md)。
 
 ## 运行 iOS App
 
-### 环境要求
-
-- 装有 Xcode 和 iOS 17 或更新 SDK 的 macOS
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+需要：macOS、带 iOS 17 SDK 或更新版本的 Xcode，以及 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。
 
 ```bash
 cd ios
@@ -158,30 +107,9 @@ xcodegen generate --spec project.yml
 open AISetlog.xcodeproj
 ```
 
-选 `AISetlog` scheme，在 iPhone 或 iOS 模拟器上运行。模拟器可以走通产品流程和导出夹具；相机行为和 Core Animation 叠加层需要在真机上验证。
+用 `AISetlog` scheme 在 iPhone 或模拟器上运行。增、删、改名源文件之后要重新跑 `xcodegen generate`；`.xcodeproj` 不进仓库。相机表现和成片上的叠加层应在真机上确认，因为模拟器会编译掉其中一部分。
 
-共享房间还需要一个 Apple Developer 团队（Sign in with Apple 和推送权限）和一个可访问的后端。App 连接的是 `auth.liangyue.site` 上的 Worker；想跑自己的后端，请部署 [`workers/api`](workers/api)。
-
-## 运行官网
-
-源码：[`landing-page/`](landing-page)。线上站点是 [1day.liangyue.site](https://1day.liangyue.site)。
-
-路由：`/` 和 `/en` 是产品站，`/updates` 和 `/en/updates` 是 App 更新日志，`/privacy` 和 `/en/privacy` 是隐私说明。
-
-```bash
-cd landing-page
-npm install
-npm run dev
-```
-
-生产构建和本地预览：
-
-```bash
-npm run build
-npm run preview
-```
-
-构建会生成客户端包并预渲染全部六个路由。App 截图和插画演示视频放在 `landing-page/public/assets`。演示视频有可选的中英文字幕；首屏以下的图片懒加载，视频等到播放时才加载。
+房间需要 Apple Developer 团队（Sign in with Apple 和推送权限）以及可访问的后端。App 连的是 `auth.liangyue.site` 上的 Worker；想自己跑一套，请部署 [`workers/api`](workers/api)。
 
 ## 测试
 
@@ -191,15 +119,38 @@ xcodegen generate --spec project.yml
 xcodebuild test \
   -project AISetlog.xcodeproj \
   -scheme AISetlog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=<已安装的 iPhone 模拟器>' \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-测试覆盖挑战和卡片状态、本地化提示解析、旧数据解码、删除账号、房间同步和聊天、头像、心情，以及用真实媒体夹具导出可播放的 AVFoundation MP4。
+用你装好的任意 iPhone 模拟器（`xcrun simctl list devices available`）。CI（[`.github/workflows/ios-tests.yml`](.github/workflows/ios-tests.yml)）跑分层检查，以及单元、UI 和共享房间三条 lane，并跳过四个无法在未签名环境运行、名字里带 CloudKit 的套件。
 
-## 项目状态
+两个 Worker 各有自己的测试：
 
-1Day 已在 [App Store](https://apps.apple.com/cn/app/1-day/id6794565199?uo=4) 上架。测试流程和保护隐私的结果模板仍在 [docs/BETA_TESTING.md](docs/BETA_TESTING.md)；仓库不会声称没有实际测量过的使用量或完成率数据。
+```bash
+cd workers/api && npm test
+cd workers/suggest-prompts && npm test
+```
+
+## 运行官网
+
+源码在 [`landing-page/`](landing-page)，线上地址是 [1day.liangyue.site](https://1day.liangyue.site)。路由：`/` 和 `/zh`，`/updates` 和 `/zh/updates`（更新日志），`/privacy` 和 `/zh/privacy`。
+
+```bash
+cd landing-page
+npm install
+npm run dev
+```
+
+`npm run build` 生成客户端包并预渲染各路由；`npm run preview` 本地预览。截图和插画示例影片在 `landing-page/public/assets`。那里有些图比当前 App 旧（例如 `app-theme-*` 和 `app-film-*` 已不再是名字所说的界面）。
+
+## Android
+
+[`android-app/`](android-app) 是一个 Flutter 项目（`1.0.0+1`，包名 `com.cassie.one_day`），沿用的是早期的一天/七天模板流程。它是离线原型，没有跟进 1.5，官网没有链接，release APK 用的是 debug 签名。请当作未发布。
+
+## 内测
+
+测试协议和不含隐私的结果模板在 [docs/BETA_TESTING.md](docs/BETA_TESTING.md)。仓库不声称任何没有实测过的使用率或完成率数据。
 
 ## 许可证
 
