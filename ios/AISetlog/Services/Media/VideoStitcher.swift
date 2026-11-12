@@ -195,6 +195,7 @@ enum VideoStitcher {
     // MARK: - Entry point
 
     static func stitch(clips allClips: [DayClip], options: Options = .default) async throws -> URL {
+        try Task.checkCancellation()
         // Before the look pass, so a take left out of the film isn't graded.
         let clips = kept(allClips, ids: options.keptClipIDs)
         guard !clips.isEmpty else { throw StitchError.noClips }
@@ -208,6 +209,7 @@ enum VideoStitcher {
         // the original's metadata.
         var cameraStamped: Set<String> = []
         for clip in clips where await CameraStyleBaker.hasCameraStamp(clip.url) {
+            try Task.checkCancellation()
             cameraStamped.insert(clip.id)
         }
 
@@ -219,6 +221,7 @@ enum VideoStitcher {
         // ---- Load track info for every clip --------------------------------
         var loaded: [LoadedClip] = []
         for clip in source {
+            try Task.checkCancellation()
             let asset = AVURLAsset(url: clip.url)
             guard let video = try await asset.loadTracks(withMediaType: .video).first else { continue }
             // Use each track's own timeRange, NOT the container duration —
@@ -267,7 +270,7 @@ enum VideoStitcher {
         var reframeScratch: [URL] = []
         defer { discard(reframeScratch) }
         if case .sequential = options.layout {
-            (loaded, reframeScratch) = await reframed(loaded, canvas: renderSize)
+            (loaded, reframeScratch) = try await reframed(loaded, canvas: renderSize)
         }
 
         #if targetEnvironment(simulator)
@@ -365,6 +368,8 @@ enum VideoStitcher {
         // ---- Export ----------------------------------------------------------
         let outURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("daily_film_\(UUID().uuidString).mp4")
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: outURL) } }
 
         guard let export = AVAssetExportSession(
             asset: composition, presetName: AVAssetExportPresetHighestQuality)
@@ -376,13 +381,12 @@ enum VideoStitcher {
         export.audioMix = audioMix
 
         print("[stitch] exporting clips=\(loaded.count) renderSize=\(renderSize)")
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
+        try await export.exportRespectingCancellation()
         guard export.status == .completed else {
             print("[stitch] export status=\(export.status.rawValue) error=\(String(describing: export.error))")
             throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
         }
+        completed = true
         return outURL
     }
 
@@ -407,7 +411,10 @@ enum VideoStitcher {
 
         var out: [DayClip] = []
         var scratch: [URL] = []
+        var completed = false
+        defer { if !completed { discard(scratch) } }
         for clip in clips {
+            try Task.checkCancellation()
             // Somebody else's take goes in as they filmed it. Nil authorID is a
             // solo film, where the question doesn't arise.
             guard authorID == nil || clip.authorID == authorID else {
@@ -420,6 +427,8 @@ enum VideoStitcher {
                 guard filtered != clip.url else { out.append(clip); continue }
                 scratch.append(filtered)
                 out.append(clip.replacingURL(filtered))
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 // One clip the grade couldn't handle is not a reason to lose the
                 // whole film. It goes in as the camera saw it.
@@ -427,6 +436,7 @@ enum VideoStitcher {
                 out.append(clip)
             }
         }
+        completed = true
         return (out, scratch)
     }
 
@@ -624,10 +634,13 @@ enum VideoStitcher {
     /// Only odd takes pay for it; an all-portrait diary does no extra work.
     private static func reframed(
         _ loaded: [LoadedClip], canvas: CGSize
-    ) async -> (clips: [LoadedClip], scratch: [URL]) {
+    ) async throws -> (clips: [LoadedClip], scratch: [URL]) {
         var out: [LoadedClip] = []
         var scratch: [URL] = []
+        var completed = false
+        defer { if !completed { discard(scratch) } }
         for clip in loaded {
+            try Task.checkCancellation()
             guard case .fitOnBed(let subject) = sequentialFraming(
                 orientedSize: clip.orientedSize, canvas: canvas)
             else {
@@ -640,6 +653,8 @@ enum VideoStitcher {
                 var copy = try await reloaded(clip, from: url)
                 copy.shownWhole = subject
                 out.append(copy)
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 // A take cropped is better than a film lost: it goes in the way
                 // it always did.
@@ -647,6 +662,7 @@ enum VideoStitcher {
                 out.append(clip)
             }
         }
+        completed = true
         return (out, scratch)
     }
 
@@ -684,19 +700,19 @@ enum VideoStitcher {
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("reframed_\(UUID().uuidString).mov")
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: url) } }
         guard let export = AVAssetExportSession(
             asset: composition, presetName: AVAssetExportPresetHighestQuality)
         else { throw StitchError.compositionFailed }
         export.outputURL = url
         export.outputFileType = .mov
         export.videoComposition = videoComposition
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
+        try await export.exportRespectingCancellation()
         guard export.status == .completed else {
-            try? FileManager.default.removeItem(at: url)
             throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
         }
+        completed = true
         return url
     }
 

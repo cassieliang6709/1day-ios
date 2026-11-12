@@ -6,6 +6,8 @@ import AVFoundation
 /// aspect-*fits* by default, which is what was letterboxing recorded clips
 /// with black bars whenever the footage didn't exactly match the frame.
 struct LoopingClipPlayer: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isVisible = false
     let url: URL
     /// Bump this (e.g. the card's `recordedAt`) when the file at `url` gets
     /// overwritten in place — a re-record reuses the same file name, which
@@ -18,8 +20,12 @@ struct LoopingClipPlayer: View {
     var muted = false
 
     var body: some View {
-        LoopingPlayerLayerView(url: url, look: look, muted: muted)
+        LoopingPlayerLayerView(
+            url: url, look: look, muted: muted,
+            isActive: isVisible && scenePhase == .active)
             .id(refreshToken)
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
     }
 }
 
@@ -27,6 +33,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
     var look: PersonalEffectParameters = .none
     var muted = false
+    var isActive = true
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -44,6 +51,8 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         var looper: AVPlayerLooper?
         var loaded: Request?
         var building: Task<Void, Never>?
+        var muted = false
+        var isActive = true
 
         deinit { building?.cancel() }
     }
@@ -58,6 +67,14 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
+        context.coordinator.muted = muted
+        context.coordinator.isActive = isActive
+        uiView.playerLayer.player?.isMuted = muted
+        if isActive {
+            uiView.playerLayer.player?.play()
+        } else {
+            uiView.playerLayer.player?.pause()
+        }
         // SwiftUI reuses the UIView when only the URL changed (same view
         // identity) — rebuild the player or the old clip keeps looping.
         guard context.coordinator.loaded != Coordinator.Request(url: url, look: look) else { return }
@@ -66,9 +83,16 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
 
     private func start(in view: PlayerView, coordinator: Coordinator) {
         let request = Coordinator.Request(url: url, look: look)
+        coordinator.muted = muted
+        coordinator.isActive = isActive
         coordinator.loaded = request
         coordinator.building?.cancel()
         coordinator.building = nil
+        view.playerLayer.player?.pause()
+        coordinator.looper?.disableLooping()
+        coordinator.looper = nil
+        (view.playerLayer.player as? AVQueuePlayer)?.removeAllItems()
+        view.playerLayer.player = nil
 
         // Off is the path this view has always taken: file straight to layer.
         guard !look.isIdentity else {
@@ -95,15 +119,21 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         let item = AVPlayerItem(url: request.url)
         item.videoComposition = composition
         let queuePlayer = AVQueuePlayer()
-        queuePlayer.isMuted = muted
+        queuePlayer.isMuted = coordinator.muted
         coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
         view.playerLayer.player = queuePlayer
-        queuePlayer.play()
+        if coordinator.isActive { queuePlayer.play() }
     }
 
     static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
         coordinator.building?.cancel()
+        coordinator.building = nil
+        coordinator.loaded = nil
         uiView.playerLayer.player?.pause()
+        coordinator.looper?.disableLooping()
+        coordinator.looper = nil
+        (uiView.playerLayer.player as? AVQueuePlayer)?.removeAllItems()
+        uiView.playerLayer.player = nil
     }
 }
 
@@ -143,6 +173,10 @@ struct ClipThumbnail: View {
 
     @State private var image: UIImage?
 
+    private var request: ClipThumbnailCache.Request {
+        .init(url: url, refreshToken: refreshToken)
+    }
+
     var body: some View {
         Group {
             if let image {
@@ -176,14 +210,56 @@ struct ClipThumbnail: View {
                 Color(.systemGray5)
             }
         }
-        .task(id: refreshToken) {
+        .task(id: request) {
+            guard !Task.isCancelled else { return }
+            let requested = request
+            // A reused cell must not show its previous clip while decoding.
+            image = ClipThumbnailCache.image(for: requested)
+            guard image == nil else { return }
             let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 600, height: 600)
             let time = CMTime(seconds: 0.1, preferredTimescale: 600)
-            if let cgImage = try? await generator.image(at: time).image {
-                image = UIImage(cgImage: cgImage)
+            let frame = await withTaskCancellationHandler {
+                try? await generator.image(at: time).image
+            } onCancel: {
+                generator.cancelAllCGImageGeneration()
             }
+            guard !Task.isCancelled, requested == request, let frame else { return }
+            let thumbnail = UIImage(cgImage: frame)
+            ClipThumbnailCache.store(thumbnail, for: requested)
+            image = thumbnail
         }
+    }
+}
+
+/// Decoded frames are disposable: bound their memory and let NSCache evict
+/// them under pressure. A re-record at the same URL is a different request.
+@MainActor
+enum ClipThumbnailCache {
+    struct Request: Hashable {
+        let url: URL
+        let refreshToken: Date?
+
+        var key: NSString {
+            let path = url.absoluteString
+            return "\(path.utf8.count):\(path):\(refreshToken.map { String($0.timeIntervalSince1970) } ?? "none")" as NSString
+        }
+    }
+
+    private static let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 24 * 1024 * 1024
+        cache.countLimit = 120
+        return cache
+    }()
+
+    static func image(for request: Request) -> UIImage? {
+        images.object(forKey: request.key)
+    }
+
+    static func store(_ image: UIImage, for request: Request) {
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        images.setObject(image, forKey: request.key, cost: cost)
     }
 }

@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class RoomPreviewMediaScopeTests: XCTestCase {
+    func testProductionCacheEvictsFilesButKeepsAnActivePreviewAlive() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.mov")
+        let first = root.appendingPathComponent("first.mov")
+        let second = root.appendingPathComponent("second.mov")
+        for url in [source, first, second] { try Data([1]).write(to: url) }
+        let cache = MomentPreviewCache(capacity: 1)
+        cache.store(MomentPreviewOutput(url: first), for: "first")
+        var active = cache.output(for: "first")
+        XCTAssertEqual(active?.url, first)
+        cache.store(MomentPreviewOutput(url: second), for: "second")
+        XCTAssertNil(cache.output(for: "first"))
+        withExtendedLifetime(active) {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: first.path))
+        }
+        active = nil
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        try FileManager.default.removeItem(at: second)
+        XCTAssertNil(cache.output(for: "second"))
+    }
+
     func testCachesAreIsolatedAndCloseRemovesOnlyOwnedOutputs() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

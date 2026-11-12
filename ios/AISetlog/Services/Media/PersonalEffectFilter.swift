@@ -84,6 +84,7 @@ enum PersonalEffectFilter {
     static func filteredCopy(
         of url: URL, parameters: PersonalEffectParameters
     ) async throws -> URL {
+        try Task.checkCancellation()
         guard !parameters.isIdentity else { return url }
 
         let asset = AVURLAsset(url: url)
@@ -95,17 +96,18 @@ enum PersonalEffectFilter {
 
         let output = FileManager.default.temporaryDirectory
             .appendingPathComponent("graded-\(UUID().uuidString).mov")
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: output) } }
         export.outputURL = output
         export.outputFileType = .mov
         export.videoComposition = composition
         export.shouldOptimizeForNetworkUse = false
 
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
+        try await export.exportRespectingCancellation()
         guard export.status == .completed else {
             throw ExportError.failed(export.error?.localizedDescription ?? "unknown")
         }
+        completed = true
         return output
     }
 
@@ -119,5 +121,22 @@ enum PersonalEffectFilter {
             case .failed(let reason): "Grading pass failed: \(reason)"
             }
         }
+    }
+}
+
+extension AVAssetExportSession {
+    /// Cancelling a Swift task does not cancel an AVFoundation export. Bridge
+    /// both ways, including cancellation just before exportAsynchronously starts.
+    func exportRespectingCancellation() async throws {
+        try Task.checkCancellation()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                exportAsynchronously { continuation.resume() }
+                if Task.isCancelled { cancelExport() }
+            }
+        } onCancel: {
+            self.cancelExport()
+        }
+        try Task.checkCancellation()
     }
 }

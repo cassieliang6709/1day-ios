@@ -412,6 +412,7 @@ struct RecordClipView: View {
         .accessibilityHint(Strings.tapToFilmTwoSeconds)
         .accessibilityIdentifier("camera-shutter")
         .accessibilityAction { startCapture() }
+        .disabled(recorder.isChangingCamera)
     }
 
     /// Match the idle shutter's center axis. No 正在拍，2 秒自动停 under it
@@ -423,7 +424,8 @@ struct RecordClipView: View {
     }
 
     private func startCapture() {
-        guard !isLeaving, recorder.state == .ready, recorder.clipURL == nil else { return }
+        guard !isLeaving, recorder.state == .ready, recorder.clipURL == nil,
+              !recorder.isChangingCamera else { return }
         recorder.startRecording(seconds: clipSeconds)
     }
 
@@ -951,6 +953,7 @@ struct RecordClipView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+        .disabled(recorder.isChangingCamera)
     }
 
     /// 横拍: lit when on. Films landscape whatever the tilt reads, and turns

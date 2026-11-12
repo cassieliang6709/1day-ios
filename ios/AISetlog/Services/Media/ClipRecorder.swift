@@ -106,6 +106,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     var cameraStyle: CameraStyle = .standard
 
     private(set) var state: State = .idle
+    /// Session configuration is asynchronous. Keep capture and other graph
+    /// changes out until its main-thread completion has installed the result.
+    private(set) var isChangingCamera = false
+    @ObservationIgnored private var previewIsActive = false
     private(set) var clipURL: URL? {
         didSet {
             #if DEBUG
@@ -302,6 +306,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
     func toggleTorch() {
+        guard !isChangingCamera else { return }
         isTorchOn.toggle()
         applyTorch()
     }
@@ -328,6 +333,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     /// running product and a slider can hand over its own bounds without
     /// either of them knowing what lenses are behind the preview.
     func setZoom(_ display: CGFloat) {
+        guard !isChangingCamera else { return }
         guard let device = videoInput?.device else { return }
         let clamped = zoomCapabilities.clampedDisplay(display)
         zoom = clamped
@@ -373,13 +379,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     /// Called by `CameraPreview` once its layer exists so the preview's
     /// rotation can be managed here alongside the recorded file's.
     func attachPreview(_ layer: AVCaptureVideoPreviewLayer) {
+        previewIsActive = true
         previewLayer = layer
         applyOrientation()
         Self.sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
             // A torch only lights on a running session.
-            Task { @MainActor in self.applyTorch() }
+            Task { @MainActor in
+                if self.previewIsActive { self.applyTorch() }
+            }
         }
     }
 
@@ -515,20 +524,20 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
     #endif
     func flipCamera() {
-        guard state == .ready else { return }
+        guard state == .ready, clipURL == nil, !isChangingCamera else { return }
         // Both cameras are already on: flipping means trading places.
         if isDualCamera {
             isSwapped.toggle()
             return
         }
         let newPosition: AVCaptureDevice.Position = position == .front ? .back : .front
-        // On the session queue with every other change to the session's
-        // inputs and connections, so an angle being set can't meet a
-        // connection being torn down. `sync`: the rest of this needs the new
-        // input, and nothing on that queue waits for the main thread.
-        Self.sessionQueue.sync {
+        isChangingCamera = true
+        // Hardware discovery, format selection and commit can all block. Keep
+        // them serialized with capture, without making the UI wait on the queue.
+        Self.sessionQueue.async { [self] in
             session.beginConfiguration()
-            if let videoInput { session.removeInput(videoInput) }
+            let previous = videoInput
+            if let previous { session.removeInput(previous) }
             if let camera = camera(for: newPosition),
                Self.prepare(camera, for: session),
                let input = try? AVCaptureDeviceInput(device: camera),
@@ -536,22 +545,27 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 session.addInput(input)
                 videoInput = input
                 position = newPosition
-            } else if let videoInput, session.canAddInput(videoInput) {
-                session.addInput(videoInput) // revert
+            } else if let previous, session.canAddInput(previous) {
+                session.addInput(previous) // revert
+            } else {
+                videoInput = nil
             }
             session.commitConfiguration()
+            let hasInput = videoInput != nil
+            Task { @MainActor in
+                self.isChangingCamera = false
+                guard hasInput else { self.state = .unavailable; return }
+                // Only after commit: replacing an input rebuilds connections.
+                // These enqueue on the same session queue before another take.
+                self.applyOrientation()
+                self.refreshZoom()
+                if self.previewIsActive { self.applyTorch() }
+            }
         }
-        // After the commit, never before: swapping an input rebuilds the
-        // session's connections, so an angle set inside the transaction is
-        // discarded and the connection falls back to 0° — which records a
-        // portrait clip sideways.
-        applyOrientation()
-        refreshZoom()
-        applyTorch()
     }
 
     func startRecording(seconds: Double) {
-        guard state == .ready else { return }
+        guard state == .ready, !isChangingCamera else { return }
         #if DEBUG && targetEnvironment(simulator)
         if Self.isSimulated {
             recordedAt = .now
@@ -746,6 +760,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
     func teardown() {
+        previewIsActive = false
         let session = self.session
         Self.sessionQueue.async {
             if session.isRunning { session.stopRunning() }
@@ -898,15 +913,18 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     /// cannot run two cameras; if the hardware refuses the pair, the camera
     /// stays single and `isDualCamera` stays false.
     func setDualCamera(_ on: Bool) {
-        guard state == .ready, clipURL == nil, supportsDualCamera, on != isDualCamera else { return }
+        guard state == .ready, clipURL == nil, supportsDualCamera,
+              on != isDualCamera, !isChangingCamera else { return }
+        isChangingCamera = true
         Self.sessionQueue.async { [self] in
             let ok = on ? addSecondaryCamera() : { removeSecondaryCamera(); return true }()
             Task { @MainActor in
+                self.isChangingCamera = false
                 self.isDualCamera = on && ok
                 if !self.isDualCamera { self.isSwapped = false }
                 self.applyOrientation()
                 self.refreshZoom()
-                self.applyTorch()
+                if self.previewIsActive { self.applyTorch() }
             }
         }
     }

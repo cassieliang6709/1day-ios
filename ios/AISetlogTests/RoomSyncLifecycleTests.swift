@@ -84,24 +84,93 @@ final class RoomSyncLifecycleTests: XCTestCase {
 
     func testSigningOutStopsTheRemainingRoomSyncSteps() async {
         let response = HeldResponse<[CloudKitService.RemoteMember]>()
+        let interactions = HeldResponse<(
+            reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])>()
         var clipRequests = 0
         var interactionRequests = 0
         var boundary = transport()
         boundary.fetchMembers = { _, _ in await response.wait() }
         boundary.fetchClips = { _, _ in clipRequests += 1; return [] }
-        boundary.fetchInteractions = { _ in interactionRequests += 1; return ([], []) }
+        boundary.fetchInteractions = { _ in
+            interactionRequests += 1
+            return await interactions.wait()
+        }
         let store = store(transport: boundary)
         let room = Challenge(id: UUID(), title: "Room", startDate: .now,
                              cards: [DayCard(day: 1)], roomCode: "AAAAAA")
         store.challenges = [room]
         let sync = Task { await store.syncRoom(room.id) }
-        await fulfillment(of: [response.started], timeout: 2)
+        await fulfillment(of: [response.started, interactions.started], timeout: 2)
         store.signOut()
         response.resume([])
+        interactions.resume(([], [.init(
+            id: UUID().uuidString, day: 1, text: "Old account",
+            authorID: "friend", authorName: "Friend", targetAuthorID: "first", createdAt: .now)]))
         await sync.value
         XCTAssertEqual(clipRequests, 0)
-        XCTAssertEqual(interactionRequests, 0)
+        XCTAssertEqual(interactionRequests, 1, "Interactions now start before media, but must not land after sign-out")
         XCTAssertNil(store.roomSync.remoteClips["AAAAAA"])
+        XCTAssertNil(store.roomSync.remoteComments["AAAAAA"])
+        XCTAssertNil(store.roomSync.remoteReactions["AAAAAA"])
+    }
+
+    func testInteractionsAppearBeforeTheRoomsVideoDownloadCompletes() async {
+        let media = HeldResponse<[CloudKitService.RemoteClip]>()
+        let fetchedInteractions = expectation(description: "Interactions fetched while video is held")
+        var boundary = transport()
+        boundary.fetchMembers = { _, _ in [] }
+        boundary.fetchClips = { _, _ in await media.wait() }
+        let comment = CloudKitService.RemoteComment(
+            id: UUID().uuidString, day: 1, text: "Already here",
+            authorID: "friend", authorName: "Friend", targetAuthorID: account.account!.id, createdAt: .now)
+        boundary.fetchInteractions = { _ in
+            fetchedInteractions.fulfill()
+            return ([], [comment])
+        }
+        let store = store(transport: boundary)
+        let room = Challenge(id: UUID(), title: "Room", startDate: .now,
+                             cards: [DayCard(day: 1)], roomCode: "AAAAAA")
+        store.challenges = [room]
+        let sync = Task { await store.syncRoom(room.id) }
+        await fulfillment(of: [media.started, fetchedInteractions], timeout: 2)
+        // The media response is still suspended; no timing or fast-network assumption.
+        XCTAssertEqual(store.roomSync.remoteComments["AAAAAA"]?.first?.text, "Already here")
+        XCTAssertEqual(store.challenge(room.id)?.cards.first?.comments.first?.text, "Already here")
+        media.resume([])
+        await sync.value
+    }
+
+    func testOlderInteractionResponseCannotReplaceANewerRefresh() async {
+        typealias Interactions = (
+            reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
+        let first = HeldResponse<Interactions>()
+        let second = HeldResponse<Interactions>()
+        var count = 0
+        var boundary = transport()
+        boundary.fetchMembers = { _, _ in [] }
+        boundary.fetchInteractions = { _ in
+            count += 1
+            return count == 1 ? await first.wait() : await second.wait()
+        }
+        let store = store(transport: boundary)
+        let room = Challenge(id: UUID(), title: "Room", startDate: .now,
+                             cards: [DayCard(day: 1)], roomCode: "AAAAAA")
+        store.challenges = [room]
+        let old = Task { await store.syncRoom(room.id) }
+        await fulfillment(of: [first.started], timeout: 2)
+        let new = Task { await store.syncRoom(room.id) }
+        await fulfillment(of: [second.started], timeout: 2)
+        func comments(_ text: String) -> Interactions {
+            ([], [.init(id: UUID().uuidString, day: 1, text: text,
+                        authorID: "friend", authorName: "Friend", targetAuthorID: account.account!.id,
+                        createdAt: .now)])
+        }
+        second.resume(comments("Newer"))
+        await new.value
+        first.resume(comments("Older"))
+        await old.value
+        XCTAssertEqual(store.roomSync.remoteComments["AAAAAA"]?.first?.text, "Newer")
+        XCTAssertEqual(store.challenge(room.id)?.cards.first?.comments.first?.text, "Newer")
     }
 
     func testALateRestoreCannotAdoptThePreviousAccountsRoomsOrProfile() async {

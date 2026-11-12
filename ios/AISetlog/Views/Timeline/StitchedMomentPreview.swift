@@ -24,15 +24,16 @@ struct StitchedMomentPreview: View {
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var stitched: URL?
     @State private var stitchFailed = false
+    /// Keep an evicted output alive for as long as this view still uses it.
+    @State private var productionOutput: MomentPreviewOutput?
 
     /// Stitching two clips takes a second or so; keeping the result means
     /// reopening the same moment is instant, and the temporary files don't
     /// pile up one per tap.
-    private static var cache: [String: URL] = [:]
+    private static let cache = MomentPreviewCache()
 
     private var cacheKey: String {
-        if previewMedia != nil { return LocalRoomMediaKey.make(day: day, clips: clips) }
-        return "\(day)-" + clips.map(\.id).joined(separator: "-")
+        LocalRoomMediaKey.make(day: day, clips: clips)
     }
 
     private var mine: DayClip? {
@@ -95,12 +96,17 @@ struct StitchedMomentPreview: View {
     }
 
     private func stitch() async {
-        guard clips.count > 1, stitched == nil else { return }
+        stitched = nil
+        productionOutput = nil
+        stitchFailed = false
+        guard clips.count > 1, !Task.isCancelled else { return }
+        let requested = cacheKey
         let cached: URL?
         if let previewMedia {
-            cached = previewMedia.cached(cacheKey)
+            cached = previewMedia.cached(requested)
         } else {
-            cached = Self.cache[cacheKey]
+            productionOutput = Self.cache.output(for: requested)
+            cached = productionOutput?.url
         }
         if let cached,
            FileManager.default.fileExists(atPath: cached.path) {
@@ -126,12 +132,14 @@ struct StitchedMomentPreview: View {
                 // that asked for the stitch can still be on screen afterwards —
                 // so this has to land on the fallback rather than return and
                 // leave the spinner up with nothing left to finish it.
-                guard previewMedia.accept(url, key: cacheKey) else {
+                guard previewMedia.accept(url, key: requested) else {
                     stitchFailed = true
                     return
                 }
             } else {
-                Self.cache[cacheKey] = url
+                let output = MomentPreviewOutput(url: url)
+                Self.cache.store(output, for: requested)
+                productionOutput = output
             }
             stitched = url
         } catch {
@@ -142,5 +150,48 @@ struct StitchedMomentPreview: View {
             print("[moment] stitch failed: \(error)")
             stitchFailed = true
         }
+    }
+}
+
+/// Derived files only. The cache and any visible preview share ownership, so
+/// eviction never removes a file still being played by another preview.
+final class MomentPreviewOutput {
+    let url: URL
+
+    init(url: URL) { self.url = url }
+
+    deinit { try? FileManager.default.removeItem(at: url) }
+}
+
+@MainActor
+final class MomentPreviewCache {
+    private let capacity: Int
+    private var entries: [String: MomentPreviewOutput] = [:]
+    private var recent: [String] = []
+
+    init(capacity: Int = 8) { self.capacity = max(1, capacity) }
+
+    func output(for key: String) -> MomentPreviewOutput? {
+        guard let output = entries[key] else { return nil }
+        guard FileManager.default.fileExists(atPath: output.url.path) else {
+            entries[key] = nil
+            recent.removeAll { $0 == key }
+            return nil
+        }
+        touch(key)
+        return output
+    }
+
+    func store(_ output: MomentPreviewOutput, for key: String) {
+        entries[key] = output
+        touch(key)
+        while recent.count > capacity {
+            entries[recent.removeFirst()] = nil
+        }
+    }
+
+    private func touch(_ key: String) {
+        recent.removeAll { $0 == key }
+        recent.append(key)
     }
 }

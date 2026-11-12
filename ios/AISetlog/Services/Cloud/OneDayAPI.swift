@@ -116,15 +116,18 @@ struct OneDayAPI {
             (temp, response) = try await session.download(for: request)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw Failure.unavailable
         }
+        defer { try? FileManager.default.removeItem(at: temp) }
         try check(response)
+        try Task.checkCancellation()
         let fm = FileManager.default
-        try? fm.createDirectory(
+        try fm.createDirectory(
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? fm.removeItem(at: destination)
-        try fm.moveItem(at: temp, to: destination)
+        try RoomClipCache.install(temp, to: destination, consumingSource: true)
     }
 
     private func perform(_ request: URLRequest, uploading file: URL? = nil) async throws -> Data {

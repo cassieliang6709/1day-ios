@@ -85,6 +85,7 @@ struct FilmView: View {
     /// filter sheet's Apply and saved for this story on this phone.
     @State private var selection: FilmSelection
     @State private var filterTarget: FilmFilterTarget?
+    @State private var retryRevision = 0
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     /// The film gets whatever you've been watching your clips in. It isn't
@@ -191,7 +192,7 @@ struct FilmView: View {
                 .foregroundStyle(OneDay.inkSoft)
                 .multilineTextAlignment(.center)
             Button(Strings.rebuildFilm) {
-                Task { await render() }
+                retryRevision += 1
             }
             .buttonStyle(.softAction)
             .padding(.top, 4)
@@ -219,7 +220,8 @@ struct FilmView: View {
             RenderRevision(
                 options: "\(adjustments.includeTitleCard)-\(adjustments.includeCaptions)"
                     + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]"
-                    + "-order[\(selection.dayOrder.map(String.init).joined(separator: ","))]")
+                    + "-order[\(selection.dayOrder.map(String.init).joined(separator: ","))]"),
+            RenderRevision(options: "retry[\(retryRevision)]")
         ]
     }
 
@@ -310,6 +312,10 @@ struct FilmView: View {
                 if !selection.dayOrder.isEmpty { options.dayOrder = selection.dayOrder }
             }
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
             // The scope refuses — and deletes — anything handed to it after it
             // closes, which is what 退出演示 does. Asked before the outcome is
             // computed so the answer is part of the decision rather than an
@@ -328,6 +334,7 @@ struct FilmView: View {
                     scopeClosed: previewMedia?.isClosed == true),
                 url: url)
         } catch {
+            guard !Task.isCancelled else { return }
             print("[stitch] failed: \(error)")
             apply(
                 FilmRenderOutcome.of(

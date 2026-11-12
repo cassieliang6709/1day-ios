@@ -295,6 +295,8 @@ enum CloudKitService {
 
     /// Every member of a room, avatars downloaded into `cacheDir`. An avatar
     /// already there under the same key isn't fetched again.
+    private static let parallelAvatarDownloads = 4
+
     static func fetchMembers(code: String, into cacheDir: URL) async throws -> [RemoteMember] {
         try Task.checkCancellation()
         struct Body: Decodable { let members: [MemberBody] }
@@ -302,31 +304,49 @@ enum CloudKitService {
             try await api.get(Body.self, ["rooms", code, "members"]).members
         }
         try Task.checkCancellation()
-        let fm = FileManager.default
-        try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-        var out: [RemoteMember] = []
-        for m in members {
-            var local: URL?
-            if let key = m.avatarKey {
-                let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: m.userID))
-                let marker = dst.appendingPathExtension("key")
-                if (try? String(contentsOf: marker, encoding: .utf8)) == key, fm.fileExists(atPath: dst.path) {
-                    local = dst
-                } else if (try? await api.download(key: key, to: dst)) != nil {
-                    try? key.write(to: marker, atomically: true, encoding: .utf8)
-                    local = dst
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        // A slow avatar should occupy one slot, not hold up every later member.
+        // Keep wire order even when downloads finish in a different order.
+        let out = await withTaskGroup(of: (Int, RemoteMember).self) { group in
+            var results = [RemoteMember?](repeating: nil, count: members.count)
+            var next = 0
+            for _ in 0..<min(parallelAvatarDownloads, members.count) {
+                let index = next
+                group.addTask { (index, await cachedMember(members[index], in: cacheDir)) }
+                next += 1
+            }
+            for await (index, member) in group {
+                guard !Task.isCancelled else { group.cancelAll(); break }
+                results[index] = member
+                if next < members.count {
+                    let index = next
+                    group.addTask { (index, await cachedMember(members[index], in: cacheDir)) }
+                    next += 1
                 }
             }
-            out.append(RemoteMember(
-                userID: m.userID,
-                displayName: m.displayName,
-                avatarURL: local,
-                moodKind: m.moodKind,
-                moodDay: m.moodDay.map(Date.init(apiMillis:)),
-                roomTitle: m.roomTitle,
-                roomTitleAt: m.roomTitleAt.map(Date.init(apiMillis:))))
+            return results.compactMap { $0 }
         }
+        try Task.checkCancellation()
         return out
+    }
+
+    private static func cachedMember(_ m: MemberBody, in cacheDir: URL) async -> RemoteMember {
+        var local: URL?
+        if let key = m.avatarKey, !Task.isCancelled {
+            let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: m.userID))
+            let marker = dst.appendingPathExtension("key")
+            if (try? String(contentsOf: marker, encoding: .utf8)) == key,
+               FileManager.default.fileExists(atPath: dst.path) {
+                local = dst
+            } else if (try? await api.download(key: key, to: dst)) != nil, !Task.isCancelled {
+                try? key.write(to: marker, atomically: true, encoding: .utf8)
+                local = dst
+            }
+        }
+        return RemoteMember(
+            userID: m.userID, displayName: m.displayName, avatarURL: local,
+            moodKind: m.moodKind, moodDay: m.moodDay.map(Date.init(apiMillis:)),
+            roomTitle: m.roomTitle, roomTitleAt: m.roomTitleAt.map(Date.init(apiMillis:)))
     }
 
     /// Apple user IDs carry dots; keep the file name to safe characters.

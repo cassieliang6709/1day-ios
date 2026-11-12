@@ -3,6 +3,24 @@ import XCTest
 @testable import AISetlog
 
 final class VideoStitcherTests: XCTestCase {
+    func testCancelledStitchStopsBeforeReadingTheSource() async {
+        let task = Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await VideoStitcher.stitch(clips: [
+                    DayClip(day: 1, url: URL(fileURLWithPath: "/missing/cancelled-take.mov"))
+                ])
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }
+        let cancelled = await task.value
+        XCTAssertTrue(cancelled, "A cancelled render must not continue into media I/O")
+    }
+
     func testSequentialStitchExportsPlayableVideo() async throws {
         let clips = try await sampleClips(count: 3)
         var options = VideoStitcher.Options()

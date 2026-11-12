@@ -130,14 +130,24 @@ enum RoomClipCache {
     /// Copied beside the destination first, so a copy that fails part-way
     /// leaves the previous file where it was instead of nothing.
     static func install(_ source: URL, recordName: String, in dir: URL) throws {
+        try install(source, to: fileURL(recordName: recordName, in: dir))
+    }
+
+    /// Stage beside the destination and atomically replace it. Readers keep
+    /// the previous complete file until the replacement is ready.
+    static func install(_ source: URL, to dest: URL, consumingSource: Bool = false) throws {
         let fm = FileManager.default
-        let dest = fileURL(recordName: recordName, in: dir)
-        let partial = dir.appendingPathComponent("\(recordName).mov.part")
-        try? fm.removeItem(at: partial)
-        try fm.copyItem(at: source, to: partial)
-        if fm.fileExists(atPath: dest.path) {
-            try fm.removeItem(at: dest)
+        let partial = dest.appendingPathExtension("\(UUID().uuidString).part")
+        defer { try? fm.removeItem(at: partial) }
+        if consumingSource {
+            try fm.moveItem(at: source, to: partial)
+        } else {
+            try fm.copyItem(at: source, to: partial)
         }
-        try fm.moveItem(at: partial, to: dest)
+        if fm.fileExists(atPath: dest.path) {
+            _ = try fm.replaceItemAt(dest, withItemAt: partial)
+        } else {
+            try fm.moveItem(at: partial, to: dest)
+        }
     }
 }

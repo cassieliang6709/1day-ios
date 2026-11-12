@@ -30,6 +30,8 @@ final class ChallengeStore {
 
     /// CloudKit room sync (remote clip cache + syncing spinners live there).
     let roomSync: RoomSyncService
+    /// A newer interaction refresh wins even if an older request returns last.
+    @ObservationIgnored private var interactionRequests: [UUID: UUID] = [:]
 
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
@@ -374,6 +376,11 @@ final class ChallengeStore {
         // Who is in the room first: last launch's roster at once, then a fresh
         // one, before the clip downloads that can take a while.
         roomSync.restoreCachedMembers(code: code)
+        // Responses are independent of media downloads and uploads. A slow
+        // friend's video must not hold back the room's comments and reactions.
+        // Structured lifetime: sign-out/room changes still invalidate both paths.
+        async let interactions: Void = syncRoomInteractions(
+            id, code: code, userID: userID, revision: revision)
         await roomSync.syncMembers(code: code)
         guard isCurrent() else { return }
         if let remote = await roomSync.syncClips(code: code) {
@@ -387,15 +394,30 @@ final class ChallengeStore {
             await pushStaleCaptions(in: id, code: code, remote: remote)
         }
         guard isCurrent() else { return }
-        if let interactions = await roomSync.fetchInteractions(code: code) {
-            guard isCurrent() else { return }
-            let kept = keepingMyRecentInteractions(interactions, code: code)
-            roomSync.remoteReactions[code] = kept.reactions
-            roomSync.remoteComments[code] = kept.comments
-            mergeInteractions(interactions, into: id)
+        await syncRoomTitle(id, code: code)
+        await interactions
+    }
+
+    @MainActor
+    private func syncRoomInteractions(
+        _ id: UUID, code: String, userID: String?, revision: UInt64
+    ) async {
+        let isCurrent = {
+            self.isCurrentAccount(userID, revision: revision)
+                && self.challenge(id)?.roomCode == code && !Task.isCancelled
         }
         guard isCurrent() else { return }
-        await syncRoomTitle(id, code: code)
+        let request = UUID()
+        interactionRequests[id] = request
+        defer {
+            if interactionRequests[id] == request { interactionRequests[id] = nil }
+        }
+        guard let interactions = await roomSync.fetchInteractions(code: code),
+              isCurrent(), interactionRequests[id] == request else { return }
+        let kept = keepingMyRecentInteractions(interactions, code: code)
+        roomSync.remoteReactions[code] = kept.reactions
+        roomSync.remoteComments[code] = kept.comments
+        mergeInteractions(interactions, into: id)
     }
 
     private func isCurrentAccount(_ userID: String?, revision: UInt64) -> Bool {

@@ -19,6 +19,7 @@ final class VlogPlayback {
     var isScrubbing = false
 
     private var timeObserver: Any?
+    private var endObserver: NSObjectProtocol?
 
     init(url: URL) {
         player = AVPlayer(url: url)
@@ -27,6 +28,7 @@ final class VlogPlayback {
 
     deinit {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
     }
 
     private func observe() {
@@ -42,7 +44,7 @@ final class VlogPlayback {
             }
         }
 
-        NotificationCenter.default.addObserver(
+        endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
             queue: .main
@@ -89,6 +91,7 @@ final class VlogPlayback {
 }
 
 struct VlogPlayer: View {
+    @Environment(\.scenePhase) private var scenePhase
     /// Re-renders the transport's spoken labels when the language changes
     /// (see the `Strings` convention).
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -122,7 +125,11 @@ struct VlogPlayer: View {
         // it's given, and a sibling control bar would overhang its corners.
         PlayerSurface(player: playback.player)
             .aspectRatio(shape, contentMode: .fit)
-            .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
+            .task(id: url) {
+                let aspect = await ClipGeometry.aspect(of: url)
+                guard !Task.isCancelled else { return }
+                measuredAspect = aspect
+            }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
             .onTapGesture {
@@ -144,8 +151,20 @@ struct VlogPlayer: View {
             }
         .oneDaySoftShadow(strength: 1.2)
         .onAppear {
-            guard autoplay else { return }
+            guard autoplay, scenePhase == .active, !playback.isPlaying else { return }
             playback.toggle()
+        }
+        .onChange(of: url) { _, next in
+            playback.pause()
+            playback = VlogPlayback(url: next)
+            measuredAspect = nil
+            if autoplay, scenePhase == .active { playback.toggle() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { playback.pause() }
+        }
+        .onChange(of: expanded) { _, isExpanded in
+            if isExpanded { playback.pause() }
         }
         .onDisappear { playback.pause() }
         .fullScreenCover(isPresented: $expanded) {
@@ -308,6 +327,7 @@ private struct FullscreenFilm: View {
     let onClose: () -> Void
 
     @State private var player: AVPlayer?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -322,6 +342,12 @@ private struct FullscreenFilm: View {
             self.player = player
             player.play()
         }
-        .onDisappear { player?.pause() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { player?.pause() }
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
     }
 }

@@ -143,6 +143,26 @@ final class RoomClipCacheTests: XCTestCase {
         XCTAssertEqual(try contents(of: "clip"), "new")
         XCTAssertEqual(RoomClipCache.cachedRecordNames(in: dir), ["clip"])
     }
+
+    func testGenericMediaInstallKeepsItsNameAndCleansStagingFiles() throws {
+        let source = dir.appendingPathComponent("download.tmp")
+        let destination = dir.appendingPathComponent("avatar.png")
+        try Data("old-avatar".utf8).write(to: destination)
+        try Data("new-avatar".utf8).write(to: source)
+        try RoomClipCache.install(source, to: destination)
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new-avatar".utf8))
+        XCTAssertEqual(try Data(contentsOf: source), Data("new-avatar".utf8))
+        XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            .contains { $0.hasSuffix(".part") })
+
+        XCTAssertThrowsError(try RoomClipCache.install(
+            dir.appendingPathComponent("missing"), to: destination))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new-avatar".utf8))
+
+        try RoomClipCache.install(source, to: destination, consumingSource: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new-avatar".utf8))
+    }
 }
 
 /// How room syncs overlap: different rooms side by side up to a cap, the same

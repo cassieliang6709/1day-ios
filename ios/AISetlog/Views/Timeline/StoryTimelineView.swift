@@ -23,6 +23,7 @@ struct StoryTimelineView: View {
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @Environment(\.reservesTabBarClearance) private var reservesTabBarClearance
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var sheet: TimelineSheet?
     @State private var showFilm = false
@@ -266,7 +267,8 @@ struct StoryTimelineView: View {
         .refreshable {
             if challenge.isShared { await store.syncRoom(challengeID) }
         }
-        .task(id: challengeID) {
+        .task(id: scenePhase == .active ? challengeID : nil) {
+            guard scenePhase == .active else { return }
             offerShareIfRoomIsStillEmpty()
             guard challenge.isShared else { return }
             while !Task.isCancelled {
