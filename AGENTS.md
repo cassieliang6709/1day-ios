@@ -11,7 +11,7 @@
 
 ## CI
 
-工作流在 `.github/workflows/ios-tests.yml`，`macos-15` runner，Xcode 钉在 26.2。
+工作流在 `.github/workflows/ios-tests.yml`，`macos-15` runner，Xcode 钉在 26.2。PR / push 跑分层检查、`workers/api` 测试、单元测试，以及 CaptureReview / RoomNavigation / AvatarFlow / MoodToday 四组核心 UI。共享房间集成（`ROOM_SUITES`，含渲染视频的慢测试）和其余 UI 套件只在每周日和手动触发时跑。
 
 **读失败先看它挂在哪一步，别先怀疑代码。** 这个仓库的 CI 挂过五种，没有一种是测试真的发现了 bug：
 

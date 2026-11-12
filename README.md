@@ -177,10 +177,13 @@ xcodebuild test \
 
 Use any iPhone simulator you have installed (`xcrun simctl list devices
 available`). CI ([`.github/workflows/ios-tests.yml`](.github/workflows/ios-tests.yml))
-runs a layer-boundary check plus unit, UI, and shared-room lanes, and skips four
-CloudKit-named suites that cannot run unsigned.
+runs a layer-boundary check, `workers/api` tests, unit tests, and four core UI
+suites (capture/review, room navigation, avatar setup, mood) on every PR.
+Shared-room integration, the remaining UI suites, and the video-rendering
+tests in `ROOM_SUITES` run weekly and on manual dispatch. Four CloudKit-named
+suites are skipped because they cannot run unsigned.
 
-The Workers have their own tests:
+Worker tests, also runnable locally (`workers/api` is part of CI):
 
 ```bash
 cd workers/api && npm test

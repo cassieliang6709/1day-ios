@@ -1,37 +1,48 @@
 name: iOS Tests
 
-# Three lanes instead of one, because one lane was 68 minutes and 95% of that
-# was a single `xcodebuild test` step. The measurement, from run 35519844647:
+# PR/push waits on the cheap lanes: layer check, workers/api, unit tests, and
+# four core UI suites. The expensive remainder — shared-room integration
+# (ROOM_SUITES, including the video-rendering tests that dominate runner
+# time) and the other UI suites — runs weekly and on manual dispatch.
 #
-#   checkout 16s · generate 10s · layer check 0s · pick simulator 3m
-#   run tests 1h4m49s
-#
-# Inside those 65 minutes, twelve tests accounted for 46. All twelve render
-# video, and all twelve are 10–20x slower here than on a laptop — the runner
-# has no GPU, so the stitcher's per-clip look pass is software Core Image.
-# Nothing is wrong with the tests' own speed; the machine is the cost.
-#
-# So: split by what the tests need, run the lanes in parallel, and keep the
-# expensive lane off the pull-request path. A PR now waits for the longest of
-# `unit` and `ui` rather than the sum of everything.
+# Why the split exists: a single `xcodebuild test` was 65 minutes on the
+# runner (run 35519844647), and twelve video-rendering tests accounted for
+# 46 of those. The runner has no GPU, so the stitcher's per-clip look pass
+# is software Core Image, 10–20x slower than a laptop. Those twelve tests
+# already live in ROOM_SUITES; moving that lane off push is what takes them
+# off the PR path.
 
 on:
   push:
     branches: [main]
-    paths: ['ios/**', '.github/workflows/ios-tests.yml', '.github/actions/**']
+    paths:
+      - 'ios/**'
+      - 'workers/api/**'
+      - '.github/workflows/ios-tests.yml'
+      - '.github/actions/**'
   pull_request:
-    paths: ['ios/**', '.github/workflows/ios-tests.yml', '.github/actions/**']
+    paths:
+      - 'ios/**'
+      - 'workers/api/**'
+      - '.github/workflows/ios-tests.yml'
+      - '.github/actions/**'
+  # Sunday 08:00 Asia/Singapore (00:00 UTC).
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
 
 env:
-  # The shared-room integration tests. They drive the real ChallengeStore,
+  # Shared-room integration tests. They drive the real ChallengeStore,
   # RoomSyncService and VideoStitcher through the local-room harness, so they
   # are testing the shipping two- and three-person room, not the demo
-  # scaffolding that stands in for CloudKit. They are also 39 of the 65
-  # minutes, which is why they wait for the merge instead of the PR.
+  # scaffolding that stands in for CloudKit. They also include the
+  # video-rendering tests that are 10–20x slower on the GPU-less runner,
+  # which is why this list waits for the weekly/manual lane.
   #
   # Defined once and used twice — `-only-testing` for the room lane and
-  # `-skip-testing` for the others — so the lanes always partition the suite
-  # and a new file cannot quietly land in both or neither.
+  # `-skip-testing` for `unit` — so the lanes always partition the suite
+  # and a new file cannot quietly land in both or neither. A new UI suite
+  # must be added to CORE_UI_SUITES, EXTENDED_UI_SUITES, or ROOM_SUITES.
   ROOM_SUITES: >-
     AISetlogTests/LocalRoomRuntimeTests
     AISetlogTests/LocalRoomRuntimeBoundaryTests
@@ -46,6 +57,23 @@ env:
     AISetlogUITests/LocalFormalRoomUITests
     AISetlogUITests/LocalFormalMomentUITests
     AISetlogUITests/LocalRoomImportUITests
+
+  # Core UI suites on every PR/push: capture and review, room navigation,
+  # avatar setup, mood and plan.
+  CORE_UI_SUITES: >-
+    AISetlogUITests/CaptureReviewUITests
+    AISetlogUITests/RoomNavigationUITests
+    AISetlogUITests/AvatarFlowUITests
+    AISetlogUITests/MoodTodayUITests
+
+  # The remaining UI suites. Not deleted; run on the weekly/manual lane.
+  EXTENDED_UI_SUITES: >-
+    AISetlogUITests/ComposerGuidanceUITests
+    AISetlogUITests/CreationFlowUITests
+    AISetlogUITests/IntentFirstCreationUITests
+    AISetlogUITests/RoomFramesUITests
+    AISetlogUITests/RoomPreviewCardUITests
+    AISetlogUITests/SevenDayVisibilityUITests
 
   # Skipped in every lane. These four talk to the real CloudKit development
   # database. They already skip on a simulator that isn't signed into iCloud —
@@ -63,6 +91,7 @@ jobs:
   # Cheap and first to fail: no simulator, no build.
   layers:
     name: Layer boundaries
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,8 +104,26 @@ jobs:
             exit 1
           fi
 
+  # package.json script is `node --test test/*.test.mjs`. The tests use
+  # `node:sqlite` (no npm dependencies), which is stable on Node 24.
+  api:
+    name: API tests
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run tests
+        run: npm test
+
   unit:
     name: Unit tests
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +148,7 @@ jobs:
 
   ui:
     name: UI tests
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -112,23 +160,21 @@ jobs:
         working-directory: ios
         run: |
           flags=""
-          for suite in $ROOM_SUITES; do
-            flags="$flags -skip-testing:$suite"
+          for suite in $CORE_UI_SUITES; do
+            flags="$flags -only-testing:$suite"
           done
           xcodebuild test \
             -scheme AISetlog \
             -destination "id=${{ steps.setup.outputs.simulator-id }}" \
             -derivedDataPath build/DerivedData \
-            -only-testing:AISetlogUITests \
             $flags \
             CODE_SIGNING_ALLOWED=NO
 
-  # The 39-minute lane. Not on pull requests — a PR that breaks it is caught
-  # here on the way into main, before anything ships, and nobody sits watching
-  # a merge the way they sit watching a PR.
+  # Shared-room integration, including the video-rendering tests in
+  # ROOM_SUITES. Weekly and manual only — not on push or pull_request.
   room:
     name: Shared-room integration
-    if: github.event_name == 'push'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -160,4 +206,29 @@ jobs:
             $flags \
             -skip-testing:AISetlogUITests/LocalFormalRoomUITests/testFormalRoomFilmRenders \
             -skip-testing:AISetlogUITests/LocalFormalRoomUITests/testFormalRoomFilmFilterAndHold \
+            CODE_SIGNING_ALLOWED=NO
+
+  # UI suites that are not in CORE_UI_SUITES or ROOM_SUITES.
+  extended-ui:
+    name: Extended UI tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-ios
+        id: setup
+        with:
+          lane: extended-ui
+      - name: Run tests
+        working-directory: ios
+        run: |
+          flags=""
+          for suite in $EXTENDED_UI_SUITES; do
+            flags="$flags -only-testing:$suite"
+          done
+          xcodebuild test \
+            -scheme AISetlog \
+            -destination "id=${{ steps.setup.outputs.simulator-id }}" \
+            -derivedDataPath build/DerivedData \
+            $flags \
             CODE_SIGNING_ALLOWED=NO

@@ -123,9 +123,9 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-用你装好的任意 iPhone 模拟器（`xcrun simctl list devices available`）。CI（[`.github/workflows/ios-tests.yml`](.github/workflows/ios-tests.yml)）跑分层检查，以及单元、UI 和共享房间三条 lane，并跳过四个无法在未签名环境运行、名字里带 CloudKit 的套件。
+用你装好的任意 iPhone 模拟器（`xcrun simctl list devices available`）。CI（[`.github/workflows/ios-tests.yml`](.github/workflows/ios-tests.yml)）在每个 PR 上跑分层检查、`workers/api` 测试、单元测试，以及四组核心 UI（拍摄和回看、房间导航、头像设置、心情）。共享房间集成、其余 UI 套件，以及 `ROOM_SUITES` 里渲染视频的测试，改到每周和手动触发。四个名字里带 CloudKit 的套件会跳过，因为它们无法在未签名环境运行。
 
-两个 Worker 各有自己的测试：
+Worker 测试也可以在本地跑（`workers/api` 已纳入 CI）：
 
 ```bash
 cd workers/api && npm test
