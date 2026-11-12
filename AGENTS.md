@@ -5,6 +5,7 @@
 ## 项目 skills
 
 - 非简单的 Swift / UI 工作：[dayday-mode](.agents/skills/dayday-mode/SKILL.md)。先明确用户行为和证据，再做一个可验证的改动。
+- UI、组件、文案与无障碍：[dayday-design-system](.agents/skills/dayday-design-system/SKILL.md)。沿用现有 tokens，参考 [设计规范](docs/design-system.md)，区分建议与已验收实现。
 - 并发、媒体、缓存、性能：[dayday-swift-performance](.agents/skills/dayday-swift-performance/SKILL.md)。没有同条件测量，不声称性能提升。
 - 构建、回归和视觉验收：[dayday-verify](.agents/skills/dayday-verify/SKILL.md)。脚本明确区分静态通过和原生验证不可用。
 

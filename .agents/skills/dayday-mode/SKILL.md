@@ -11,7 +11,7 @@ Read the repository's AGENTS.md and inspect the current diff before editing. Use
 2. Read the real entry point, state owner, and side-effect boundary. Name the data being shared before changing its concurrency.
 3. Pick one unit:
    - Swift, media, cache, synchronization: read [dayday-swift-performance](../dayday-swift-performance/SKILL.md).
-   - UI polish: preserve current visual identity unless redesign is requested. Capture the affected native screen first when available. Check one primary action, content visibility, 44-point targets, Dynamic Type, Reduce Motion, and error recovery. Code inspection without native capture supports hypotheses, not a visual audit.
+   - UI polish: read [dayday-design-system](../dayday-design-system/SKILL.md). Preserve current visual identity unless redesign is requested. Capture the affected native screen first when available. Check one primary action, content visibility, 44-point targets, Dynamic Type, Reduce Motion, and error recovery. Code inspection without native capture supports hypotheses, not a visual audit.
 4. Read [dayday-verify](../dayday-verify/SKILL.md), choose the affected journey, and establish what can actually run before implementation.
 5. Make the smallest coherent change. Avoid speculative layers, unrelated rewrites, and tests that merely repeat the implementation. Add a regression only for observable failure or a meaningful boundary.
 6. Run the selected check. Report executed, failed, skipped, and unavailable separately. A static check is never proof that an iOS feature works.
