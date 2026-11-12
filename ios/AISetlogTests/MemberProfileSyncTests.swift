@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import AISetlog
 
 /// My avatar and today's mood face go to my `Member` record in every room I'm
@@ -7,6 +8,42 @@ import XCTest
 /// never part of what's sent.
 @MainActor
 final class MemberProfileSyncTests: XCTestCase {
+    func testAvatarCacheReturnsUpdatedPixelsAfterReplacementAndNothingAfterRemoval() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("friend.png")
+        func write(_ color: UIColor, at date: Date) throws {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { context in
+                context.cgContext.setFillColor(color.cgColor)
+                context.cgContext.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+            }
+            try XCTUnwrap(image.pngData()).write(to: file, options: .atomic)
+            try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: file.path)
+        }
+        func pixel(_ image: UIImage) throws -> [UInt8] {
+            let source = try XCTUnwrap(image.cgImage)
+            var bytes = [UInt8](repeating: 0, count: 4)
+            try bytes.withUnsafeMutableBytes { buffer in
+                let context = try XCTUnwrap(CGContext(
+                    data: buffer.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+                context.draw(source, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            }
+            return bytes
+        }
+        try write(.red, at: Date(timeIntervalSince1970: 100))
+        let first = try XCTUnwrap(AvatarImageCache.image(at: file))
+        XCTAssertEqual(try pixel(first), [255, 0, 0, 255])
+        XCTAssertEqual(try pixel(XCTUnwrap(AvatarImageCache.image(at: file))), [255, 0, 0, 255])
+        try write(.blue, at: Date(timeIntervalSince1970: 101))
+        let replacement = try XCTUnwrap(AvatarImageCache.image(at: file))
+        XCTAssertEqual(try pixel(replacement), [0, 0, 255, 255])
+        try FileManager.default.removeItem(at: file)
+        XCTAssertNil(AvatarImageCache.image(at: file))
+    }
+
     private var writes: [CloudKitService.MemberProfileWrite] = []
     private var writeFails = false
     private var fetched: [CloudKitService.RemoteMember] = []

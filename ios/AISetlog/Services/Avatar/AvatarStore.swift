@@ -86,14 +86,41 @@ final class AvatarStore {
 /// it syncs; decoding a PNG on every pass would be wasted work.
 @MainActor
 enum AvatarImageCache {
-    private static var images: [URL: (UIImage, Date?)] = [:]
+    private final class Entry {
+        let image: UIImage
+        let modified: Date?
+        let fileSize: Int?
+
+        init(image: UIImage, modified: Date?, fileSize: Int?) {
+            self.image = image
+            self.modified = modified
+            self.fileSize = fileSize
+        }
+    }
+
+    private static let images: NSCache<NSURL, Entry> = {
+        let cache = NSCache<NSURL, Entry>()
+        cache.totalCostLimit = 12 * 1024 * 1024
+        cache.countLimit = 64
+        return cache
+    }()
 
     static func image(at url: URL?) -> UIImage? {
         guard let url else { return nil }
-        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-        if let (image, at) = images[url], at == modified { return image }
+        var resourceURL = url
+        resourceURL.removeAllCachedResourceValues()
+        guard let values = try? resourceURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]) else {
+            images.removeObject(forKey: url as NSURL)
+            return nil
+        }
+        let modified = values.contentModificationDate
+        if let entry = images.object(forKey: url as NSURL),
+           entry.modified == modified, entry.fileSize == values.fileSize { return entry.image }
+        images.removeObject(forKey: url as NSURL)
         guard let image = UIImage(contentsOfFile: url.path) else { return nil }
-        images[url] = (image, modified)
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        images.setObject(Entry(image: image, modified: modified, fileSize: values.fileSize),
+                         forKey: url as NSURL, cost: cost)
         return image
     }
 }

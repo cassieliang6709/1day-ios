@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Camera and rooms share one compact navigation control.
 struct FloatingTabBar<Tab: Hashable>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     struct Item: Identifiable {
         let tab: Tab
         let label: String
@@ -32,12 +33,12 @@ struct FloatingTabBar<Tab: Hashable>: View {
     private func segment(_ item: Item) -> some View {
         let isOn = item.tab == selection
         return Button {
-            withAnimation(OneDay.Motion.snap) { selection = item.tab }
+            withAnimation(reduceMotion ? nil : OneDay.Motion.snap) { selection = item.tab }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: isOn ? item.activeIcon : item.icon)
                     .font(.system(size: 16, weight: .semibold))
-                    .contentTransition(.symbolEffect(.replace))
+                    .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                     .accessibilityHidden(true)
                 Text(item.label)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))

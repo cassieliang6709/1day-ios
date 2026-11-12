@@ -11,6 +11,7 @@ import SwiftUI
 /// The line and its node. Drawn as a background behind the row's content so
 /// the line's length always matches the row's height, however tall the card is.
 struct TimelineRail: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isFirst = false
     var isLast = false
     /// Filled nodes are moments that exist; hollow ones are still to come.
@@ -59,7 +60,7 @@ struct TimelineRail: View {
                         .padding(-2.5)
                 }
         }
-        .symbolEffect(.pulse, isActive: isNext)
+        .symbolEffect(.pulse, isActive: isNext && !reduceMotion)
     }
 }
 
@@ -107,6 +108,7 @@ struct TimelineStamp: View {
 /// One moment on the timeline. Either footage that exists, or the shape of
 /// footage that doesn't yet.
 struct TimelineClip: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     enum State {
         /// Filmed — show the frame.
         case filmed(url: URL, recordedAt: Date?)
@@ -265,7 +267,7 @@ struct TimelineClip: View {
                     Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(OneDay.Font.rounded(.title2, weight: .medium))
                         .foregroundStyle(OneDay.brandText)
-                        .symbolEffect(.pulse)
+                        .symbolEffect(.pulse, isActive: !reduceMotion)
                     if showsMomentTitle {
                         Text(momentTitle)
                             .font(OneDay.Font.rounded(.subheadline, weight: .bold))
