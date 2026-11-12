@@ -1073,6 +1073,7 @@ struct RecordClipView: View {
 private struct RoomSendList: View {
     let rooms: [Challenge]
     @Binding var picked: Set<UUID>
+    @ScaledMetric(relativeTo: .subheadline) private var rowAllowance: CGFloat = 50
 
     var body: some View {
         if !rooms.isEmpty {
@@ -1081,32 +1082,37 @@ private struct RoomSendList: View {
                     ForEach(rooms) { room in row(room) }
                 }
             }
-            .frame(maxHeight: min(CGFloat(rooms.count) * 50, 150))
+            .frame(maxHeight: min(CGFloat(rooms.count), 3) * rowAllowance)
             .scrollBounceBehavior(.basedOnSize)
         }
     }
 
     private func row(_ room: Challenge) -> some View {
         let on = picked.contains(room.id)
+        let title = ChallengePresenter(challenge: room).displayTitle
         return Button {
             if on { picked.remove(room.id) } else { picked.insert(room.id) }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(on ? Color.oneDayBrand : OneDay.inkFaint)
-                Text(ChallengePresenter(challenge: room).displayTitle)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OneDay.Font.rounded(.title3))
+                    .foregroundStyle(on ? OneDay.brandText : OneDay.inkSoft)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(OneDay.Font.rounded(.subheadline, weight: .bold))
                     .foregroundStyle(OneDay.ink)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .frame(minHeight: 44)
             .background(OneDay.surface, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("send-room-row")
     }

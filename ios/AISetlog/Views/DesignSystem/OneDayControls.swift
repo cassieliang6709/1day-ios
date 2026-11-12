@@ -26,6 +26,7 @@ struct PrimaryActionStyle: ButtonStyle {
         let glow: Color
 
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             configuration.label
@@ -36,9 +37,9 @@ struct PrimaryActionStyle: ButtonStyle {
                 .background(tint, in: Capsule())
                 .oneDayGlow(glow, strength: glowStrength)
                 .opacity(isEnabled ? 1 : 0.4)
-                .scaleEffect(configuration.isPressed ? 0.975 : 1)
-                .animation(OneDay.Motion.snap, value: configuration.isPressed)
-                .animation(OneDay.Motion.soft, value: isEnabled)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.975 : 1)
+                .animation(OneDay.Motion.reduced(OneDay.Motion.snap, if: reduceMotion), value: configuration.isPressed)
+                .animation(OneDay.Motion.reduced(OneDay.Motion.soft, if: reduceMotion), value: isEnabled)
         }
 
         private var glowStrength: Double {
@@ -52,18 +53,27 @@ struct PrimaryActionStyle: ButtonStyle {
 /// that still deserve a full-width tap target.
 struct SoftActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(OneDay.Font.callout)
-            // `brandText`, not the raw brand blue: 16pt is small type, and
-            // #1677FF on white is 4.1:1.
-            .foregroundStyle(OneDay.brandText)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(OneDay.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
-            .oneDaySoftShadow(strength: 0.6)
-            .scaleEffect(configuration.isPressed ? 0.975 : 1)
-            .animation(OneDay.Motion.snap, value: configuration.isPressed)
+        Surface(configuration: configuration)
+    }
+
+    private struct Surface: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .font(OneDay.Font.callout)
+                .foregroundStyle(OneDay.brandText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(OneDay.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
+                .oneDaySoftShadow(strength: isEnabled ? 0.6 : 0)
+                .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.975 : 1)
+                .animation(OneDay.Motion.reduced(OneDay.Motion.snap, if: reduceMotion), value: configuration.isPressed)
+        }
     }
 }
 

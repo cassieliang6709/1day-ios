@@ -54,3 +54,14 @@ python3 .agents/skills/dayday-verify/scripts/verify.py test --target ui
 ```
 
 随后按 UI 旅程对比 Reduce Motion 与大字体；按同一设备、同一房间数据和同一 Release 构建捕获头像回看前后的内存峰值。UI 测试通过仍不能代替这些视觉和性能证据。
+
+## 后续应用：共用按钮与拍后房间列表
+
+用户希望继续完善体验，同时保持现有 UI 风格。这次应用 `dayday-design-system` 和 `dayday-verify`，没有新增主题体系。
+
+- 主、次按钮现在读取 Reduce Motion，开启后按压不缩放；主按钮仍改变光晕，次按钮改变透明度，保留反馈。次按钮也根据 `isEnabled` 降低强调程度。
+- 拍后 `RoomSendList` 的文字与图标改用语义字号，长标题允许两行，列表高度预算随字号缩放。保留原有最小 44pt 行高和选择逻辑。
+- 选中图标使用 `brandText`，未选中使用 `inkSoft`；VoiceOver 读取完整房间名与已有选中 trait，装饰图标不单独朗读。
+- 搜索确认 `PillSelector` 当前只有定义，没有调用；本轮没有修改该闲置组件。主次按钮有实际调用，房间列表由拍后预览使用。
+
+静态分层与 diff 检查、两份改动 Swift 文件的 tree-sitter 语法解析通过。`doctor` 返回 2，缺少 macOS / Xcode / XcodeGen。没有新增只验证样式常量的测试；已将实际按钮和长房间名的验收步骤加入 verify 旅程。原生编译、VoiceOver 朗读、最大字号下保存按钮是否仍可达，以及两种皮肤的视觉验收尚未执行。本次不宣称运行时性能收益。

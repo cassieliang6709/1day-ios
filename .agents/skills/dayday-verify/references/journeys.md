@@ -19,3 +19,7 @@ Check re-recording at the same path, editing a second caption and its position, 
 
 Entry: tab bar and timeline with recorded and empty slots. Keep the current brand and media hierarchy.
 Compare small iPhone and a larger one; English and Chinese; light/dark; default and largest Dynamic Type; Reduce Motion on/off; VoiceOver. Reduce Motion should stop decorative pulse and moving selection while preserving visible selection, labels and activation. Do not treat fixed-size text or a Dynamic Type cap as an accessibility solution. Native screenshots and an interaction pass remain required before visual sign-off.
+
+Shared controls: open a primary action (for example Join Room) and a secondary action (film retry or voiceover retake). With Reduce Motion on, pressing must retain visible feedback without scaling. Disabled actions must remain visibly unavailable and must not activate. Toggle Reduce Motion while the screen is open.
+
+Post-capture destinations: use long Chinese and English room names, one room and more than three rooms. Increase Dynamic Type and scroll to the last room; names should wrap, the save action must remain reachable, and VoiceOver must read the full room name plus its selected state without announcing the decorative checkmark. Check both skins and appearances. Verify selecting/deselecting still sends only to the chosen rooms; this is native interaction verification, not a source-code assertion.
