@@ -37,6 +37,11 @@ struct AvatarSetupFlow: View {
     var body: some View {
         ZStack {
             OneDayCanvas(seed: 3)
+            // Instant swap, not a spring cross-fade. `.smooth` left the
+            // outgoing full-screen step in the ZStack, still taking hits:
+            // 「就是这样」 was visible and in the tree, but the tap landed on
+            // the generating view that had not quite finished leaving. The
+            // generating screen already has its own nine-second animation.
             switch step {
             case .upload: upload
             case .generating: generating
@@ -44,7 +49,6 @@ struct AvatarSetupFlow: View {
             case .done: done
             }
         }
-        .animation(.smooth(duration: 0.35), value: step)
         .photosPicker(isPresented: $showsPicker, selection: $pickerItem, matching: .images)
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
@@ -209,6 +213,8 @@ struct AvatarSetupFlow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: 340, maxHeight: 340)
+                    .clipped()
+                    .contentShape(Rectangle())
                     .padding(.top, 28)
                     .accessibilityLabel(Strings.avatarAccessibility)
                     .accessibilityIdentifier("avatar-result")
@@ -350,12 +356,24 @@ struct AvatarSetupFlow: View {
     }
 
     private func accept() {
-        guard let result, let data = AvatarComposer.pngData(result) else { return }
+        guard let result else { return }
+        guard let data = AvatarComposer.pngData(result) else {
+            // Don't leave 「就是这样」 on screen doing nothing.
+            error = Strings.avatarFailed
+            var txn = Transaction()
+            txn.disablesAnimations = true
+            withTransaction(txn) { step = .upload }
+            return
+        }
         AvatarStore.shared.save(pngData: data)
         // The photo is done with.
         photo = nil
         head = nil
-        step = .done
+        // A lingering confirm→done transition keeps avatar-confirm in the
+        // accessibility tree after the tap; drop it immediately.
+        var txn = Transaction()
+        txn.disablesAnimations = true
+        withTransaction(txn) { step = .done }
         Task {
             try? await Task.sleep(for: .seconds(1.3))
             onFinish(true)

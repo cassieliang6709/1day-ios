@@ -23,7 +23,13 @@ final class LocalRoomImportUITests: XCTestCase {
         let importer = app.buttons["local-room-import"]
         XCTAssertTrue(importer.exists)
         importer.tap()
-        let member = app.buttons["示例成员 2"]
+        // The formal room's story face has the same label (成员名) and stays in
+        // the accessibility tree behind the menu, so the label alone matches two
+        // buttons. Disambiguate by excluding that face; do not rely on the menu
+        // row identifier being visible, because SwiftUI Menu may not expose it.
+        let member = app.buttons.matching(
+            NSPredicate(format: "label == '示例成员 2' AND identifier != 'room-story-face'")
+        ).firstMatch
         XCTAssertTrue(member.waitForExistence(timeout: 15))
         member.tap()
         let cancel = app.buttons.matching(NSPredicate(format: "label == 'Cancel' OR label == '取消'")).firstMatch
