@@ -21,7 +21,8 @@ final class ClipThumbnailCacheTests: XCTestCase {
     }
 
     private func makeClip(index: Int = 0) async throws -> URL {
-        let url = try XCTUnwrap(await ClipFixtureFactory.makeClip(index: index))
+        let made = await ClipFixtureFactory.makeClip(index: index)
+        let url = try XCTUnwrap(made)
         urls.append(url)
         return url
     }
@@ -32,11 +33,13 @@ final class ClipThumbnailCacheTests: XCTestCase {
 
         XCTAssertNil(ClipThumbnailCache.imageIfCached(url: url, refreshToken: token))
 
-        let first = try XCTUnwrap(await ClipThumbnailCache.image(url: url, refreshToken: token))
+        let loaded = await ClipThumbnailCache.image(url: url, refreshToken: token)
+        let first = try XCTUnwrap(loaded)
         let cached = try XCTUnwrap(ClipThumbnailCache.imageIfCached(url: url, refreshToken: token))
         XCTAssertTrue(first === cached)
 
-        let second = try XCTUnwrap(await ClipThumbnailCache.image(url: url, refreshToken: token))
+        let reloaded = await ClipThumbnailCache.image(url: url, refreshToken: token)
+        let second = try XCTUnwrap(reloaded)
         XCTAssertTrue(first === second)
     }
 
@@ -45,7 +48,8 @@ final class ClipThumbnailCacheTests: XCTestCase {
         let firstTake = Date(timeIntervalSince1970: 1)
         let rerecorded = Date(timeIntervalSince1970: 2)
 
-        _ = try XCTUnwrap(await ClipThumbnailCache.image(url: url, refreshToken: firstTake))
+        let loaded = await ClipThumbnailCache.image(url: url, refreshToken: firstTake)
+        _ = try XCTUnwrap(loaded)
         XCTAssertNotNil(ClipThumbnailCache.imageIfCached(url: url, refreshToken: firstTake))
         XCTAssertNil(ClipThumbnailCache.imageIfCached(url: url, refreshToken: rerecorded))
     }
@@ -55,8 +59,9 @@ final class ClipThumbnailCacheTests: XCTestCase {
         let token = Date(timeIntervalSince1970: 1_000)
         let preview = ClipThumbnailCache.defaultMaxSize
 
-        _ = try XCTUnwrap(await ClipThumbnailCache.image(
-            url: url, refreshToken: token, maxSize: preview))
+        let loaded = await ClipThumbnailCache.image(
+            url: url, refreshToken: token, maxSize: preview)
+        _ = try XCTUnwrap(loaded)
         XCTAssertNotNil(ClipThumbnailCache.imageIfCached(
             url: url, refreshToken: token, maxSize: preview))
         XCTAssertNil(ClipThumbnailCache.imageIfCached(
