@@ -157,6 +157,15 @@ final class PromptSuggestionServiceTests: XCTestCase {
 
         XCTAssertEqual(prompts, ["出门前", "第一个箱子"])
         XCTAssertEqual(StubURLProtocol.requestCount, 2)
+        let requests = try StubURLProtocol.sentBodies.map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: $0) as? [String: Any])
+        }
+        let requestID = try XCTUnwrap(requests.first?["requestID"] as? String)
+        XCTAssertFalse(requestID.isEmpty)
+        XCTAssertEqual(requests.last?["requestID"] as? String, requestID)
+        _ = try await service().suggest(intent: "今天要搬家", count: 7, language: .chinese)
+        let next = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(StubURLProtocol.lastBody)) as? [String: Any])
+        XCTAssertNotEqual(next["requestID"] as? String, requestID)
     }
 
     func testItGivesUpAfterTheRetry() async {
@@ -231,6 +240,7 @@ private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var error: Error?
     nonisolated(unsafe) static var lastBody: Data?
+    nonisolated(unsafe) static var sentBodies: [Data] = []
     nonisolated(unsafe) static var lastMethod: String?
     nonisolated(unsafe) static var requestCount = 0
     /// Fail this many requests with a timeout before answering normally.
@@ -252,6 +262,7 @@ private final class StubURLProtocol: URLProtocol {
         body = Data()
         error = nil
         lastBody = nil
+        sentBodies = []
         lastMethod = nil
         requestCount = 0
         failuresBeforeSuccess = 0
@@ -264,6 +275,7 @@ private final class StubURLProtocol: URLProtocol {
         // `httpBody` is stripped by the loading system, so read it back out of
         // the stream the way a real transport would.
         Self.lastBody = request.httpBody ?? request.httpBodyStream.map(Self.drain)
+        if let data = Self.lastBody { Self.sentBodies.append(data) }
         Self.lastMethod = request.httpMethod
         Self.requestCount += 1
 

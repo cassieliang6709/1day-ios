@@ -9,11 +9,13 @@ import SwiftUI
 struct LibraryVlogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var order: [LibraryClip]
+    @State private var retryRevision = 0
     @State private var stage: Stage = .arrange
     /// What the player lays out before the film is read; the film's own
     /// shape wins once it is.
     private let layoutRatio: CGFloat
     @State private var phase: Phase = .rendering
+    @State private var renderError: String?
     @State private var saveMessage: String?
     @State private var isSaving = false
     /// The film remixed with music or voiceover; nil while it's the original.
@@ -45,7 +47,7 @@ struct LibraryVlogSheet: View {
             }
         }
         .background(OneDayCanvas().ignoresSafeArea())
-        .task(id: stage) {
+        .task(id: "\(stage)-\(retryRevision)") {
             if stage == .film { await render() }
         }
     }
@@ -78,10 +80,10 @@ struct LibraryVlogSheet: View {
                         .id(mixedURL ?? url)
                 case .failed:
                     VStack(spacing: 12) {
-                        Text(Strings.vlogFailed)
+                        Text(renderError ?? Strings.vlogFailed)
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundStyle(OneDay.inkSoft)
-                        Button(Strings.vlogRetry) { Task { await render() } }
+                        Button(Strings.vlogRetry) { retryRevision += 1 }
                             .buttonStyle(.primaryAction)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -114,6 +116,7 @@ struct LibraryVlogSheet: View {
 
     private func render() async {
         phase = .rendering
+        renderError = nil
         saveMessage = nil
         mixedURL = nil
         var options = VideoStitcher.Options()
@@ -122,11 +125,19 @@ struct LibraryVlogSheet: View {
         do {
             let url = try await VideoStitcher.stitch(
                 clips: ClipLibrary.stitchable(order), options: options)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
             phase = .done(url)
         } catch {
             guard !Task.isCancelled else { return }
             print("[library] vlog failed: \(error)")
+            switch error {
+            case VideoStitcher.StitchError.inputTooLarge: renderError = Strings.filmInputTooLarge
+            case VideoExportOperation.Failure.timedOut: renderError = Strings.filmExportTimedOut
+            default: break
+            }
             phase = .failed
         }
     }
