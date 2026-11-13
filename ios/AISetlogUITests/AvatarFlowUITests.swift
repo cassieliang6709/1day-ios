@@ -58,28 +58,6 @@ final class AvatarFlowUITests: XCTestCase {
         XCTAssertTrue(closed)
     }
 
-    /// TEMPORARY, for finding the flake: the same walk, eight launches.
-    func testZZDiagnoseConfirmRepeatedly() throws {
-        var failures: [Int] = []
-        for attempt in 1...8 {
-            let path = try Self.writeSample()
-            try? FileManager.default.removeItem(atPath: Self.tracePath)
-            let app = launch(sample: path)
-            let confirm = app.buttons["avatar-confirm"]
-            guard confirm.waitForExistence(timeout: 90) else {
-                trace("attempt \(attempt): confirm never appeared")
-                failures.append(attempt); dumpFailure(app); continue
-            }
-            trace("attempt \(attempt) before tap: hittable=\(confirm.isHittable)")
-            confirm.tap()
-            trace("attempt \(attempt) tapped")
-            let closed = confirm.waitForNonExistence(timeout: 15)
-            trace("attempt \(attempt) closed=\(closed)")
-            if !closed { failures.append(attempt); dumpFailure(app) } else { printAppTrace() }
-        }
-        XCTAssertEqual(failures, [], "attempts that stayed open")
-    }
-
     // MARK: - Diagnostics
 
     /// Written by the app (`AvatarFlowTrace`) while `-debugAvatarSample` is set.

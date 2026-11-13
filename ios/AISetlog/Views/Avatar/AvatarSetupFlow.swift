@@ -66,8 +66,18 @@ struct AvatarSetupFlow: View {
             .ignoresSafeArea()
         }
         .task { startDebugSampleIfAsked() }
-        .onAppear { AvatarFlowTrace.log("flow appear step=\(step)") }
-        .onChange(of: step) { old, new in AvatarFlowTrace.log("step \(old) -> \(new)") }
+        .onAppear {
+            AvatarFlowTrace.log("flow appear step=\(step)")
+            #if DEBUG
+            AvatarTouchTraceRecognizer.installIfTracing()
+            #endif
+        }
+        .onChange(of: step) { old, new in
+            AvatarFlowTrace.log("step \(old) -> \(new)")
+            #if DEBUG
+            AvatarTouchTraceRecognizer.installIfTracing()
+            #endif
+        }
         .onDisappear {
             AvatarFlowTrace.log("flow disappear step=\(step)")
             work?.cancel()
