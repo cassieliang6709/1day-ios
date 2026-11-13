@@ -2,15 +2,20 @@ import SwiftUI
 
 /// 我的's archive (1.5): your clips — from every story and room, plus your
 /// drafts — as a grid or a month calendar, and a select mode that turns any
-/// set of clips into a vlog. Lives inside `PlansHomeView`'s scroll view,
-/// which keeps the header, the in-progress story card and all launch routing.
+/// set of clips into a vlog.
+///
+/// This view *is* the page's scroll view. `PlansHomeView` hands it the
+/// header and today's cards as `chrome`, and the filmed days sit as
+/// direct children of the same `LazyVStack`. Nesting a lazy grid inside
+/// `ScrollView { VStack { LibrarySection } }` used to give the stack
+/// unbounded height, so every thumbnail was built at once.
 ///
 /// Only ever yours. Friends' clips stay in the room they were filmed in: 我的
 /// is *my* area, and finding a friend's clip in it read as "did I film this?".
 /// There is no filter row any more either — no 含朋友的, no 只有我, no camera
 /// chips (there is one camera) — so everything the page computes goes
 /// through `scope`, and no number on the page counts a clip the grid hides.
-struct LibrarySection: View {
+struct LibrarySection<Chrome: View>: View {
     let library: ClipLibrary
     /// Shared stories. No longer drawn as chips (the row filters by camera
     /// now); kept so the page's call site doesn't change.
@@ -22,6 +27,30 @@ struct LibrarySection: View {
     /// and presents the sheet. See `LibrarySelectionBar`.
     @Binding var isSelecting: Bool
     @Binding var picked: [LibraryClip]
+    /// The page's header, day strip and today's cards. Placed at the top
+    /// of the same lazy stack as the day blocks, so the page is one scroll.
+    var chrome: Chrome
+
+    /// What `PlansHomeView` scrolls to when the camera asks for 待归档.
+    static var scrollAnchor: String { "library-section" }
+
+    init(
+        library: ClipLibrary,
+        rooms: [Challenge],
+        onOpenStory: @escaping (UUID) -> Void,
+        draftsRequest: Int = 0,
+        isSelecting: Binding<Bool>,
+        picked: Binding<[LibraryClip]>,
+        @ViewBuilder chrome: () -> Chrome
+    ) {
+        self.library = library
+        self.rooms = rooms
+        self.onOpenStory = onOpenStory
+        self.draftsRequest = draftsRequest
+        self._isSelecting = isSelecting
+        self._picked = picked
+        self.chrome = chrome()
+    }
 
     enum Mode: Hashable { case grid, calendar }
 
@@ -55,42 +84,30 @@ struct LibrarySection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            titleRow
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                chrome
+                    .padding(.bottom, 26)
 
-            // Nothing filmed: nothing said (copy audit) — empty is empty.
-            if !scope.clips.isEmpty {
-                if mode == .calendar {
-                    LibraryCalendar(
-                        month: $month,
-                        covers: scope.coverByDay(
-                            scope.filtered(.mine, cameras: cameraIndex.cameras)),
-                        selectedDay: $day,
-                        showsMoods: true)
-                        .padding(.horizontal, Self.inset)
-                }
+                libraryChrome
+                    .padding(.bottom, showsDayGrid ? 14 : 0)
+                    .id(Self.scrollAnchor)
 
-                if let day {
-                    Button {
-                        self.day = nil
-                    } label: {
-                        Label(
-                            "\(day.formatted(.dateTime.month().day())) · \(Strings.libraryAllDays)",
-                            systemImage: "xmark.circle.fill")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(OneDay.brandText)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, Self.inset)
-                }
-
-                if mode == .grid || day != nil {
-                    if !shown.isEmpty {
-                        grid
+                if showsDayGrid {
+                    ForEach(Array(dayGroups.enumerated()), id: \.element.id) { index, group in
+                        dayBlock(group)
+                            .padding(.bottom, index == dayGroups.count - 1 ? 0 : 22)
                     }
                 }
             }
+            .padding(.top, 8)
+            .padding(.bottom, OneDay.tabBarClearance + 20)
+            // Belt and braces: the page can never be wider than the scroll
+            // viewport. Without this a single over-eager child silently drags
+            // every section off both edges of the display.
+            .containerRelativeFrame(.horizontal)
         }
+        .scrollIndicators(.hidden)
         .onChange(of: isSelecting) { _, selecting in
             if !selecting { picked = [] }
         }
@@ -155,29 +172,69 @@ struct LibrarySection: View {
 
     // MARK: - Grid
 
+    /// Title, optional calendar, and the "show every day" chip. Kept as
+    /// one small block above the day rows so the rows themselves can be
+    /// direct children of the page's `LazyVStack`.
+    @ViewBuilder
+    private var libraryChrome: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            titleRow
+
+            // Nothing filmed: nothing said (copy audit) — empty is empty.
+            if !scope.clips.isEmpty {
+                if mode == .calendar {
+                    LibraryCalendar(
+                        month: $month,
+                        covers: scope.coverByDay(
+                            scope.filtered(.mine, cameras: cameraIndex.cameras)),
+                        selectedDay: $day,
+                        showsMoods: true)
+                        .padding(.horizontal, Self.inset)
+                }
+
+                if let day {
+                    Button {
+                        self.day = nil
+                    } label: {
+                        Label(
+                            "\(day.formatted(.dateTime.month().day())) · \(Strings.libraryAllDays)",
+                            systemImage: "xmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(OneDay.brandText)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, Self.inset)
+                }
+            }
+        }
+    }
+
+    private var showsDayGrid: Bool {
+        !scope.clips.isEmpty && (mode == .grid || day != nil) && !shown.isEmpty
+    }
+
     /// A diary: one block per day, newest day first, each headed by its date
     /// and how many clips it holds. Tiles are 3:4, the shape of the DV and
     /// instant cameras, with 3pt gaps the way Photos packs a grid. The whole
     /// frame shows — border, date and all — since that is what tells the
     /// cameras apart; a 2:3 film clip sits in its tile on a blurred bed.
-    private var grid: some View {
-        LazyVStack(alignment: .leading, spacing: 22) {
-            ForEach(dayGroups, id: \.day) { group in
-                VStack(alignment: .leading, spacing: 9) {
-                    dayHeader(group.day, count: group.clips.count)
+    ///
+    /// The day's own `LazyVGrid` is only built while this block is on
+    /// screen; a single day is a handful of takes, not the whole library.
+    private func dayBlock(_ group: DayGroup) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            dayHeader(group.day, count: group.clips.count)
 
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3),
-                        spacing: 3
-                    ) {
-                        ForEach(group.clips) { clip in
-                            cell(clip)
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .padding(.horizontal, Self.inset)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3),
+                spacing: 3
+            ) {
+                ForEach(group.clips) { clip in
+                    cell(clip)
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, Self.inset)
         }
     }
 
@@ -198,10 +255,16 @@ struct LibrarySection: View {
         playing = nil
     }
 
-    private var dayGroups: [(day: Date, clips: [LibraryClip])] {
+    private struct DayGroup: Identifiable {
+        let day: Date
+        let clips: [LibraryClip]
+        var id: Date { day }
+    }
+
+    private var dayGroups: [DayGroup] {
         let calendar = Calendar.current
         return Dictionary(grouping: shown) { calendar.startOfDay(for: $0.recordedAt) }
-            .map { (day: $0.key, clips: $0.value.sorted { $0.recordedAt > $1.recordedAt }) }
+            .map { DayGroup(day: $0.key, clips: $0.value.sorted { $0.recordedAt > $1.recordedAt }) }
             .sorted { $0.day > $1.day }
     }
 
