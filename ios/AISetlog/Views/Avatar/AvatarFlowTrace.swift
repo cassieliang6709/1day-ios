@@ -9,7 +9,7 @@ import UIKit.UIGestureRecognizerSubclass
 /// Only writes when `-debugAvatarSample` is set (the UI test, or someone
 /// feeding a sample by hand). Each line is a wall-clock timestamp and an
 /// event, appended to a file the test process on the same Mac can read and
-/// print when the flow doesn't close. A main-thread watchdog notes stalls.
+/// print when the flow doesn't close.
 enum AvatarFlowTrace {
     static let path = "/tmp/1day-uitest-avatar-trace.log"
 
@@ -28,32 +28,20 @@ enum AvatarFlowTrace {
                 FileManager.default.createFile(atPath: path, contents: data)
             }
         }
-        startWatchdogOnce()
         #endif
     }
 
     #if DEBUG
     private static let queue = DispatchQueue(label: "avatar-trace")
-    private static var watchdogStarted = false
-    private static var lastTick = Date()
-
-    private static func startWatchdogOnce() {
-        guard Thread.isMainThread, !watchdogStarted else { return }
-        watchdogStarted = true
-        lastTick = Date()
-        Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
-            let gap = Date().timeIntervalSince(lastTick)
-            lastTick = Date()
-            if gap > 1 { log(String(format: "main stalled %.2fs", gap)) }
-        }
-    }
     #endif
 }
 
 #if DEBUG
 /// Logs every touch the window gets while the trace is on, with what UIKit
-/// hit-tested, so a lost tap can be told apart from a tap the button ignored.
-/// It never recognises, so it doesn't take touches from anything.
+/// hit-tested and which recognisers held it. It never recognises, and it
+/// recognises alongside everything else, so it takes no touch from anyone; it
+/// gets `touchesCancelled` when the touch itself is cancelled under the app,
+/// which is what the UI test looks for.
 final class AvatarTouchTraceRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
     private static var installed = false
 
@@ -72,19 +60,6 @@ final class AvatarTouchTraceRecognizer: UIGestureRecognizer, UIGestureRecognizer
         recognizer.delaysTouchesEnded = false
         recognizer.delegate = recognizer
         window.addGestureRecognizer(recognizer)
-        let names: [Notification.Name] = [
-            UIApplication.willResignActiveNotification, UIApplication.didBecomeActiveNotification,
-            UIApplication.didEnterBackgroundNotification, UIApplication.willEnterForegroundNotification,
-            UIWindow.didBecomeKeyNotification, UIWindow.didResignKeyNotification,
-            UIWindow.didBecomeVisibleNotification, UIWindow.didBecomeHiddenNotification,
-            UIResponder.keyboardWillShowNotification, UIScene.willDeactivateNotification,
-            UIScene.didActivateNotification,
-        ]
-        for name in names {
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { note in
-                AvatarFlowTrace.log("note \(name.rawValue) object=\(note.object.map { String(describing: type(of: $0)) } ?? "nil")")
-            }
-        }
         AvatarFlowTrace.log("touch trace installed windows=\(window.windowScene?.windows.count ?? 0)")
     }
 

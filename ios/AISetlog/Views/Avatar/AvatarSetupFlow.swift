@@ -359,7 +359,6 @@ struct AvatarSetupFlow: View {
                     try await Task.sleep(for: .seconds(pause))
                 }
                 result = last
-                AvatarFlowTrace.log("run done, set confirm")
                 step = .confirm
             } catch is CancellationError {
                 return
@@ -383,9 +382,7 @@ struct AvatarSetupFlow: View {
             withTransaction(txn) { step = .upload }
             return
         }
-        AvatarFlowTrace.log("accept png \(data.count) bytes")
         AvatarStore.shared.save(pngData: data)
-        AvatarFlowTrace.log("accept saved")
         // The photo is done with.
         photo = nil
         head = nil

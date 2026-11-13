@@ -156,16 +156,10 @@ struct RootView: View {
             }
         }
         .environment(\.locale, appLanguage.resolved.locale)
-        .fullScreenCover(isPresented: $showsDebugAvatarFlow, onDismiss: {
-            AvatarFlowTrace.log("debug cover dismissed")
-        }) {
+        .fullScreenCover(isPresented: $showsDebugAvatarFlow) {
             AvatarSetupFlow { _ in showsDebugAvatarFlow = false }
         }
-        .onChange(of: showsDebugAvatarFlow) { _, shows in
-            AvatarFlowTrace.log("debug cover isPresented=\(shows)")
-        }
         .onAppear {
-            AvatarFlowTrace.log("root appear")
             // Existing installs should never be sent through first-run screens
             // merely because this version introduced onboarding.
             if !store.challenges.isEmpty {
