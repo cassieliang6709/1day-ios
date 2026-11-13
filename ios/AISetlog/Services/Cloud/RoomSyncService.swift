@@ -92,8 +92,12 @@ final class RoomSyncService {
 
     @MainActor
     private func pullClips(code: String, generation: UUID?) async -> [CloudKitService.RemoteClip]? {
-        syncing.insert(code)
-        defer { syncing.remove(code) }
+        // The board spinner is for the first fill, or a retry after a
+        // failure. A quiet 10-second poll of a room that's already on
+        // screen should not flash the header or invalidate observers.
+        let advertise = remoteClips[code] == nil || lastError[code] != nil
+        if advertise { syncing.insert(code) }
+        defer { if advertise { syncing.remove(code) } }
         do {
             var clips = try await transport.fetchClips(
                 code, fileStore.remoteCacheDir(roomCode: code))
@@ -101,19 +105,37 @@ final class RoomSyncService {
             clips += await DebugFakeFriends.clips(for: code)
             #endif
             guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
-            remoteClips[code] = clips
-            lastError[code] = nil
+            if !Self.sameClips(remoteClips[code], clips) {
+                remoteClips[code] = clips
+            }
+            if lastError[code] != nil { lastError[code] = nil }
             return clips
         } catch {
             guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
             print("[room] sync failed: \(error)")
-            lastError[code] = error.localizedDescription
+            if lastError[code] != error.localizedDescription {
+                lastError[code] = error.localizedDescription
+            }
             #if DEBUG
             let fakes = await DebugFakeFriends.clips(for: code)
-            if !fakes.isEmpty { remoteClips[code] = fakes }
+            if !fakes.isEmpty, !Self.sameClips(remoteClips[code], fakes) {
+                remoteClips[code] = fakes
+            }
             #endif
             return nil
         }
+    }
+
+    /// Same takes, ignoring fetch order: a poll can list the same cached
+    /// files in a different sequence, which is not a reason to redraw.
+    /// `nil` is not the same as `[]`: an empty first fetch still has to
+    /// be stored, or the board spinner would come back every quiet poll.
+    private static func sameClips(
+        _ current: [CloudKitService.RemoteClip]?,
+        _ incoming: [CloudKitService.RemoteClip]
+    ) -> Bool {
+        guard let current else { return false }
+        return current.sorted { $0.id < $1.id } == incoming.sorted { $0.id < $1.id }
     }
 
     /// Fetch remote reactions/comments. Degrades to nil (caller keeps local
@@ -261,7 +283,10 @@ final class RoomSyncService {
         do {
             let members = try await transport.fetchMembers(code, membersDir(code))
             guard roomGenerations[code] == generation, !Task.isCancelled else { return }
-            remoteMembers[code] = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
+            let next = Dictionary(members.map { ($0.userID, $0) }, uniquingKeysWith: { a, _ in a })
+            if remoteMembers[code] != next {
+                remoteMembers[code] = next
+            }
             saveCachedMembers(members, code: code)
         } catch {
             guard roomGenerations[code] == generation, !Task.isCancelled else { return }

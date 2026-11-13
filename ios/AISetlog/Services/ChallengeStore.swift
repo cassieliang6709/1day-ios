@@ -390,8 +390,12 @@ final class ChallengeStore {
         if let interactions = await roomSync.fetchInteractions(code: code) {
             guard isCurrent() else { return }
             let kept = keepingMyRecentInteractions(interactions, code: code)
-            roomSync.remoteReactions[code] = kept.reactions
-            roomSync.remoteComments[code] = kept.comments
+            if !RoomInteractionMerge.isUnchanged(roomSync.remoteReactions[code], kept.reactions) {
+                roomSync.remoteReactions[code] = kept.reactions
+            }
+            if !RoomInteractionMerge.isUnchanged(roomSync.remoteComments[code], kept.comments) {
+                roomSync.remoteComments[code] = kept.comments
+            }
             mergeInteractions(interactions, into: id)
         }
         guard isCurrent() else { return }
@@ -405,34 +409,22 @@ final class ChallengeStore {
     /// How long a reaction or comment I just added on a friend's take is kept
     /// on screen while the room's answer doesn't have it yet: the save may
     /// still be in flight, or saved but not yet in query results.
-    static let myInteractionGrace: TimeInterval = 120
+    static let myInteractionGrace: TimeInterval = RoomInteractionMerge.myGrace
 
     /// The fetched interactions plus my own recent ones the fetch didn't
-    /// return. Replacing them outright made a comment I had just typed vanish
-    /// on the next poll and flicker back later — or never, if it failed.
+    /// return. See `RoomInteractionMerge.keepingMine`.
     @MainActor
     private func keepingMyRecentInteractions(
         _ fetched: (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment]),
         code: String, now: Date = .now
     ) -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment]) {
-        guard let me = account?.account?.id else { return fetched }
-        let recent = { (date: Date) in now.timeIntervalSince(date) < Self.myInteractionGrace }
-        var reactions = fetched.reactions
-        for mine in roomSync.remoteReactions[code] ?? []
-        where mine.authorID == me && recent(mine.createdAt)
-            && !reactions.contains(where: {
-                $0.authorID == me && $0.emoji == mine.emoji && $0.day == mine.day
-                    && $0.targetAuthorID == mine.targetAuthorID
-            }) {
-            reactions.append(mine)
-        }
-        var comments = fetched.comments
-        let ids = Set(comments.map(\.id))
-        for mine in roomSync.remoteComments[code] ?? []
-        where mine.authorID == me && recent(mine.createdAt) && !ids.contains(mine.id) {
-            comments.append(mine)
-        }
-        return (reactions, comments)
+        RoomInteractionMerge.keepingMine(
+            fetched: fetched,
+            existing: (
+                reactions: roomSync.remoteReactions[code] ?? [],
+                comments: roomSync.remoteComments[code] ?? []),
+            myID: account?.account?.id,
+            now: now)
     }
 
     /// Renames a room on this phone at once, then for everyone in it.
@@ -620,25 +612,20 @@ final class ChallengeStore {
         let myID = account?.account?.id
         for cardIdx in challenges[ci].cards.indices {
             let day = challenges[ci].cards[cardIdx].day
-
-            var reactions = remote.reactions
-                .filter { $0.day == day && $0.targetAuthorID == myID }
-                .map { ClipReaction(emoji: $0.emoji, authorID: $0.authorID, authorName: $0.authorName, createdAt: $0.createdAt) }
-            for mine in challenges[ci].cards[cardIdx].reactions where mine.authorID == myID {
-                if !reactions.contains(where: { $0.id == mine.id }) { reactions.append(mine) }
+            let reactions = RoomInteractionMerge.reactions(
+                remote: remote.reactions,
+                existing: challenges[ci].cards[cardIdx].reactions,
+                day: day, myID: myID)
+            if challenges[ci].cards[cardIdx].reactions != reactions {
+                challenges[ci].cards[cardIdx].reactions = reactions
             }
-            challenges[ci].cards[cardIdx].reactions = reactions
-
-            var comments = remote.comments
-                .filter { $0.day == day && $0.targetAuthorID == myID }
-                .compactMap { rc -> ClipComment? in
-                    guard let uuid = UUID(uuidString: rc.id) else { return nil }
-                    return ClipComment(id: uuid, text: rc.text, authorID: rc.authorID, authorName: rc.authorName, createdAt: rc.createdAt)
-                }
-            for mine in challenges[ci].cards[cardIdx].comments where mine.authorID == myID {
-                if !comments.contains(where: { $0.id == mine.id }) { comments.append(mine) }
+            let comments = RoomInteractionMerge.comments(
+                remote: remote.comments,
+                existing: challenges[ci].cards[cardIdx].comments,
+                day: day, myID: myID)
+            if challenges[ci].cards[cardIdx].comments != comments {
+                challenges[ci].cards[cardIdx].comments = comments
             }
-            challenges[ci].cards[cardIdx].comments = comments.sorted { $0.createdAt < $1.createdAt }
         }
     }
 
