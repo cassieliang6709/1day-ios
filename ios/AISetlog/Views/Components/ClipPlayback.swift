@@ -126,6 +126,111 @@ enum ClipGeometry {
     }
 }
 
+/// First-frame stills, decoded once per file version. A library grid, a
+/// story card and a room page all ask for the same frame; without this,
+/// each view's `.task` reopens the video. The room page also redraws
+/// every few seconds while it syncs — the same reason `AvatarImageCache`
+/// exists — and "我的" destroys its grid when you flip to the calendar
+/// and back, which would otherwise flash grey and decode everything again.
+///
+/// Keyed by the file, `recordedAt` (re-records reuse the name), the
+/// requested time, and the pixel cap. Memory only; a memory warning
+/// evicts entries through `NSCache`.
+enum ClipThumbnailCache {
+    static let defaultMaxSize = CGSize(width: 600, height: 600)
+    /// The still `ClipThumbnail` asks for: a hair past the start, so a
+    /// file whose first timestamp isn't exactly zero still has a frame.
+    static let previewTime: Double = 0.1
+
+    private static let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        // ~80 tiles at 600×600 would be more than we ever show at once;
+        // the byte cap lets a handful of large frames coexist with a
+        // long library without holding every one forever.
+        cache.countLimit = 80
+        cache.totalCostLimit = 32 * 1024 * 1024
+        return cache
+    }()
+
+    static func imageIfCached(
+        url: URL,
+        refreshToken: Date?,
+        seconds: Double = previewTime,
+        maxSize: CGSize = defaultMaxSize,
+        exactTime: Bool = false
+    ) -> UIImage? {
+        images.object(forKey: key(
+            url: url, refreshToken: refreshToken, seconds: seconds,
+            maxSize: maxSize, exactTime: exactTime))
+    }
+
+    /// The cached still, or a newly decoded one. Off the caller's actor
+    /// so a grid of misses doesn't stall the main thread.
+    static func image(
+        url: URL,
+        refreshToken: Date?,
+        seconds: Double = previewTime,
+        maxSize: CGSize = defaultMaxSize,
+        exactTime: Bool = false
+    ) async -> UIImage? {
+        if let cached = imageIfCached(
+            url: url, refreshToken: refreshToken, seconds: seconds,
+            maxSize: maxSize, exactTime: exactTime)
+        {
+            return cached
+        }
+        let generated = await generate(
+            url: url, seconds: seconds, maxSize: maxSize, exactTime: exactTime)
+        guard !Task.isCancelled else { return generated }
+        if let generated {
+            let cacheKey = key(
+                url: url, refreshToken: refreshToken, seconds: seconds,
+                maxSize: maxSize, exactTime: exactTime)
+            // A twin request may have finished first; keep the stored
+            // instance so callers can identity-compare a hit.
+            if let existing = images.object(forKey: cacheKey) { return existing }
+            images.setObject(generated, forKey: cacheKey, cost: cost(generated))
+        }
+        return generated
+    }
+
+    static func removeAll() {
+        images.removeAllObjects()
+    }
+
+    private static func key(
+        url: URL, refreshToken: Date?, seconds: Double,
+        maxSize: CGSize, exactTime: Bool
+    ) -> NSString {
+        let token = refreshToken.map { String($0.timeIntervalSince1970) } ?? ""
+        let time = String(format: "%.3f", seconds)
+        let exact = exactTime ? "e" : "a"
+        return "\(url.standardizedFileURL.path)|\(token)|\(time)|\(exact)|\(Int(maxSize.width))x\(Int(maxSize.height))" as NSString
+    }
+
+    private static func cost(_ image: UIImage) -> Int {
+        let pixelCount = Int(image.size.width * image.scale) * Int(image.size.height * image.scale)
+        return max(pixelCount * 4, 1)
+    }
+
+    private static func generate(
+        url: URL, seconds: Double, maxSize: CGSize, exactTime: Bool
+    ) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = maxSize
+            if exactTime {
+                generator.requestedTimeToleranceBefore = .zero
+                generator.requestedTimeToleranceAfter = .zero
+            }
+            let time = CMTime(seconds: seconds, preferredTimescale: 600)
+            guard let cgImage = try? await generator.image(at: time).image else { return nil }
+            return UIImage(cgImage: cgImage)
+        }.value
+    }
+}
+
 /// First-frame thumbnail of a clip, loaded off the main thread.
 struct ClipThumbnail: View {
     let url: URL
@@ -143,9 +248,15 @@ struct ClipThumbnail: View {
 
     @State private var image: UIImage?
 
+    /// Prefer the cache in `body` so a tile that has been shown before
+    /// doesn't flash the placeholder for a frame while `.task` starts.
+    private var shown: UIImage? {
+        image ?? ClipThumbnailCache.imageIfCached(url: url, refreshToken: refreshToken)
+    }
+
     var body: some View {
         Group {
-            if let image {
+            if let shown {
                 if bedsInsteadOfCrops {
                     // `Color.clear` takes the offered size and overlays don't
                     // feed back into it, so the filling bed can overflow
@@ -155,20 +266,20 @@ struct ClipThumbnail: View {
                             // `opaque: true`: a transparent-edged blur fades
                             // into nothing at the tile's border and leaves a
                             // pale halo inside the corner radius.
-                            Image(uiImage: image)
+                            Image(uiImage: shown)
                                 .resizable()
                                 .scaledToFill()
                                 .blur(radius: 14, opaque: true)
                                 .overlay(Color.black.opacity(0.18))
                         }
                         .overlay {
-                            Image(uiImage: image)
+                            Image(uiImage: shown)
                                 .resizable()
                                 .scaledToFit()
                         }
                         .clipped()
                 } else {
-                    Image(uiImage: image)
+                    Image(uiImage: shown)
                         .resizable()
                         .scaledToFill()
                 }
@@ -176,14 +287,20 @@ struct ClipThumbnail: View {
                 Color(.systemGray5)
             }
         }
-        .task(id: refreshToken) {
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 600, height: 600)
-            let time = CMTime(seconds: 0.1, preferredTimescale: 600)
-            if let cgImage = try? await generator.image(at: time).image {
-                image = UIImage(cgImage: cgImage)
+        .task(id: taskID) {
+            if let cached = ClipThumbnailCache.imageIfCached(url: url, refreshToken: refreshToken) {
+                image = cached
+                return
+            }
+            if let loaded = await ClipThumbnailCache.image(url: url, refreshToken: refreshToken) {
+                image = loaded
             }
         }
+    }
+
+    /// `refreshToken` alone used to be the task id; the URL also belongs
+    /// here, or a reused view identity pointing at a new file wouldn't reload.
+    private var taskID: String {
+        "\(url.standardizedFileURL.path)|\(refreshToken?.timeIntervalSince1970 ?? 0)"
     }
 }
