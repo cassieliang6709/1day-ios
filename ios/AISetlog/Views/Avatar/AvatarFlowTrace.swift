@@ -72,6 +72,19 @@ final class AvatarTouchTraceRecognizer: UIGestureRecognizer, UIGestureRecognizer
         recognizer.delaysTouchesEnded = false
         recognizer.delegate = recognizer
         window.addGestureRecognizer(recognizer)
+        let names: [Notification.Name] = [
+            UIApplication.willResignActiveNotification, UIApplication.didBecomeActiveNotification,
+            UIApplication.didEnterBackgroundNotification, UIApplication.willEnterForegroundNotification,
+            UIWindow.didBecomeKeyNotification, UIWindow.didResignKeyNotification,
+            UIWindow.didBecomeVisibleNotification, UIWindow.didBecomeHiddenNotification,
+            UIResponder.keyboardWillShowNotification, UIScene.willDeactivateNotification,
+            UIScene.didActivateNotification,
+        ]
+        for name in names {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { note in
+                AvatarFlowTrace.log("note \(name.rawValue) object=\(note.object.map { String(describing: type(of: $0)) } ?? "nil")")
+            }
+        }
         AvatarFlowTrace.log("touch trace installed windows=\(window.windowScene?.windows.count ?? 0)")
     }
 
@@ -83,6 +96,12 @@ final class AvatarTouchTraceRecognizer: UIGestureRecognizer, UIGestureRecognizer
                                        phase, point.x, point.y,
                                        hit.map { String(describing: type(of: $0)) } ?? "nil",
                                        touch.view.map { String(describing: type(of: $0)) } ?? "nil"))
+            let recognizers = (touch.gestureRecognizers ?? []).filter { $0 !== self }.map {
+                "\(type(of: $0))[\($0.state.rawValue)]@\($0.view.map { String(describing: type(of: $0)) } ?? "nil")"
+            }
+            AvatarFlowTrace.log("  app=\(UIApplication.shared.applicationState.rawValue) "
+                + "scene=\(view?.window?.windowScene?.activationState.rawValue ?? -9) "
+                + "key=\(view?.window?.isKeyWindow ?? false) recognizers=\(recognizers)")
         }
     }
 
