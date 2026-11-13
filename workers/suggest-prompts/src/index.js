@@ -51,19 +51,50 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
  */
 const recentCalls = new Map();
 
-function overRateLimit(deviceKey, now, calls = recentCalls, limit = RATE_LIMIT) {
-  const window = (calls.get(deviceKey) ?? []).filter(
-    (t) => now - t < RATE_WINDOW_MS
-  );
-  window.push(now);
-  calls.set(deviceKey, window);
+// Fixed-window counters and result entries have hard bounds, even under a
+// stream of new device IDs. These are isolate-local safeguards, not auth.
+const MAX_ENTRIES = 5000;
+const requests = new Map();
+const CACHE_MS = 60_000;
+const MAX_PENDING = 32;
+let pending = 0;
 
-  if (calls.size > 5000) {
-    for (const [key, times] of calls) {
-      if (times.every((t) => now - t >= RATE_WINDOW_MS)) calls.delete(key);
-    }
+function overRateLimit(deviceKey, now, calls = recentCalls, limit = RATE_LIMIT) {
+  for (const [key, entry] of calls) {
+    if (now >= entry.expires) calls.delete(key);
   }
-  return window.length > limit;
+  let entry = calls.get(deviceKey);
+  if (!entry) {
+    if (calls.size >= MAX_ENTRIES) return true;
+    entry = { count: 0, expires: now + RATE_WINDOW_MS };
+    calls.set(deviceKey, entry);
+  }
+  if (entry.count >= limit) return true;
+  entry.count += 1;
+  return false;
+}
+
+async function readBody(request) {
+  const reader = request.body?.getReader();
+  if (!reader) throw new Error('empty_body');
+  const chunks = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 4096) {
+        await reader.cancel();
+        throw new Error('body_too_large');
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  return JSON.parse(new TextDecoder().decode(data));
 }
 
 
@@ -188,7 +219,7 @@ export default {
 
     let body;
     try {
-      body = await request.json();
+      body = await readBody(request);
     } catch {
       return json({ error: 'bad_request' }, 400);
     }
@@ -197,65 +228,96 @@ export default {
     const language = body?.language === 'en' ? 'en' : 'zh';
     const count = clamp(Number(body?.count) || MAX_COUNT, MIN_COUNT, MAX_COUNT);
     const device = typeof body?.device === 'string' ? body.device : '';
-
-    if (!intent || intent.length > MAX_INTENT) {
+    const requestID = body?.requestID ?? '';
+    if (typeof requestID !== 'string' || requestID.length > 128) {
       return json({ error: 'bad_request' }, 400);
     }
 
-    // Falling back to the IP so a caller can't skip the limit by omitting it.
-    const deviceKey = await hash(
-      device || request.headers.get('cf-connecting-ip') || 'anonymous'
-    );
-    if (overRateLimit(deviceKey, Date.now())) {
-      return json({ error: 'rate_limited' }, 429);
+    if (!intent || intent.length > MAX_INTENT || device.length > 128) {
+      return json({ error: 'bad_request' }, 400);
     }
 
-    try {
-      const upstream = await fetch(DEEPSEEK_URL, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${key}`,
-        },
-        body: JSON.stringify({
-          model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
-          // Reasoning off: v4-flash otherwise spends its whole budget thinking
-          // and returns an empty message. Nothing here needs deliberation, and
-          // somebody is watching a spinner — 2s with it off, 5s with it on.
-          thinking: { type: 'disabled' },
-          // Generous, because the failure mode of being wrong about this is a
-          // truncated reply, and unused tokens cost nothing.
-          max_tokens: 1200,
-          // Lower than the default so the length rule is followed more often;
-          // still loose enough that two days of moving house don't read alike.
-          temperature: 0.8,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: systemPrompt(count, language) },
-            { role: 'user', content: intent },
-          ],
-        }),
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      });
+    const ip = request.headers.get('cf-connecting-ip');
+    const deviceKey = await hash(device || ip || 'anonymous');
+    // Include model/config identity and every generation input. Never share a
+    // private diary suggestion between installations. No raw intent in keys.
+    const requestKey = await hash(JSON.stringify([
+      deviceKey, requestID, intent, count, language, env.DEEPSEEK_MODEL || DEFAULT_MODEL, key,
+    ]));
+    const ipKey = ip ? 'ip:' + await hash(ip) : null;
+    const now = Date.now();
+    for (const [id, entry] of requests) {
+      if (entry.expires <= now) requests.delete(id);
+    }
+    const existing = requests.get(requestKey);
+    if (existing) return (await existing.promise).clone();
 
-      if (!upstream.ok) {
-        // Status only. The upstream error body can echo the prompt back.
-        console.error('upstream', upstream.status);
+    if (overRateLimit('device:' + deviceKey, now)
+        || (ipKey && overRateLimit(ipKey, now, recentCalls, 100))) {
+      return json({ error: 'rate_limited' }, 429);
+    }
+    if (pending >= MAX_PENDING || requests.size >= MAX_ENTRIES) {
+      return json({ error: 'unavailable' }, 503);
+    }
+    pending += 1;
+    const entry = { expires: Infinity, promise: null };
+    entry.promise = generate().then(response => {
+      // Cache only valid output. A failure must leave the next attempt free.
+      if (response.ok) entry.expires = Date.now() + CACHE_MS;
+      else requests.delete(requestKey);
+      return response;
+    }).finally(() => { pending -= 1; });
+    requests.set(requestKey, entry);
+    return (await entry.promise).clone();
+
+    async function generate() {
+      try {
+        const upstream = await fetch(DEEPSEEK_URL, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
+            // Reasoning off: v4-flash otherwise spends its whole budget thinking
+            // and returns an empty message. Nothing here needs deliberation, and
+            // somebody is watching a spinner — 2s with it off, 5s with it on.
+            thinking: { type: 'disabled' },
+            // Generous, because the failure mode of being wrong about this is a
+            // truncated reply, and unused tokens cost nothing.
+            max_tokens: 1200,
+            // Lower than the default so the length rule is followed more often;
+            // still loose enough that two days of moving house don't read alike.
+            temperature: 0.8,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt(count, language) },
+              { role: 'user', content: intent },
+            ],
+          }),
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+
+        if (!upstream.ok) {
+          // Status only. The upstream error body can echo the prompt back.
+          console.error('upstream', upstream.status);
+          return json({ error: 'unavailable' }, 502);
+        }
+
+        const payload = await upstream.json();
+        const story = parseStory(
+          String(payload?.choices?.[0]?.message?.content ?? ''),
+          count,
+          language
+        );
+        if (!story) return json({ error: 'unavailable' }, 502);
+
+        return json(story);
+      } catch (error) {
+        console.error('failed', error?.name ?? 'error');
         return json({ error: 'unavailable' }, 502);
       }
-
-      const payload = await upstream.json();
-      const story = parseStory(
-        String(payload?.choices?.[0]?.message?.content ?? ''),
-        count,
-        language
-      );
-      if (!story) return json({ error: 'unavailable' }, 502);
-
-      return json(story);
-    } catch (error) {
-      console.error('failed', error?.name ?? 'error');
-      return json({ error: 'unavailable' }, 502);
     }
   },
 };

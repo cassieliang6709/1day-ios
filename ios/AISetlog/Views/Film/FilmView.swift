@@ -76,6 +76,7 @@ struct FilmView: View {
     /// How far the staged progress animation has got. Cosmetic — the stitcher
     /// gives no progress callbacks, so this paces the copy honestly by naming
     /// what is actually happening rather than claiming a percentage.
+    @State private var retryRevision = 0
     @State private var stage = 0
     @State private var showAdjust = false
     /// What goes into the render. Written only by the Adjust sheet's Apply —
@@ -164,7 +165,7 @@ struct FilmView: View {
                 FilmSelectionStore.save(kept, for: challenge.id)
             }
         }
-        .task(id: renderRevision) { await render() }
+        .task(id: RenderTaskID(revision: renderRevision, retry: retryRevision)) { await render() }
         // A toast, not a status line: "saved" is news for a moment and then
         // it's the button's job (已保存) to remember. A permission refusal
         // stays, because it carries the way to Settings.
@@ -191,7 +192,7 @@ struct FilmView: View {
                 .foregroundStyle(OneDay.inkSoft)
                 .multilineTextAlignment(.center)
             Button(Strings.rebuildFilm) {
-                Task { await render() }
+                retryRevision += 1
             }
             .buttonStyle(.softAction)
             .padding(.top, 4)
@@ -270,6 +271,11 @@ struct FilmView: View {
         }
     }
 
+    private struct RenderTaskID: Equatable {
+        let revision: [RenderRevision]
+        let retry: Int
+    }
+
     private func render() async {
         let requested = renderRevision
         let context = cacheContext
@@ -314,6 +320,10 @@ struct FilmView: View {
             // closes, which is what 退出演示 does. Asked before the outcome is
             // computed so the answer is part of the decision rather than an
             // early return around it.
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
             let rejected = previewMedia.map { !$0.accept(url) } ?? false
             let superseded = requested != renderRevision
             if previewMedia == nil, !superseded {
@@ -328,6 +338,7 @@ struct FilmView: View {
                     scopeClosed: previewMedia?.isClosed == true),
                 url: url)
         } catch {
+            guard !Task.isCancelled else { return }
             print("[stitch] failed: \(error)")
             apply(
                 FilmRenderOutcome.of(
@@ -336,6 +347,13 @@ struct FilmView: View {
                     scopeRejected: false,
                     scopeClosed: previewMedia?.isClosed == true),
                 url: nil)
+            if requested == renderRevision, previewMedia?.isClosed != true {
+                switch error {
+                case VideoStitcher.StitchError.inputTooLarge: errorMessage = Strings.filmInputTooLarge
+                case VideoExportOperation.Failure.timedOut: errorMessage = Strings.filmExportTimedOut
+                default: break
+                }
+            }
         }
     }
 

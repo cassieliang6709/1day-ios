@@ -167,7 +167,7 @@ test('the same device gets rate limited', async (t) => {
   const device = crypto.randomUUID();
   let limited = null;
   for (let i = 0; i < 25 && limited === null; i += 1) {
-    const res = await worker.fetch(post(body({ device })), env());
+    const res = await worker.fetch(post(body({ device, intent: `day ${i}` })), env());
     if (res.status === 429) limited = i;
   }
 
@@ -198,3 +198,109 @@ test(
     console.log(payload.prompts);
   }
 );
+
+test('concurrent identical calls and a retry reuse one valid response', async (t) => {
+  let release, started;
+  const gate = new Promise(resolve => { release = resolve; });
+  const began = new Promise(resolve => { started = resolve; });
+  const upstream = t.mock.method(globalThis, 'fetch', async () => {
+    started();
+    await gate;
+    return upstreamReturning('{"prompts":["a","b","c"]}')();
+  });
+  const input = body();
+  const first = worker.fetch(post(input), env());
+  await began;
+  const second = worker.fetch(post(input), env());
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(upstream.mock.callCount(), 1);
+  release();
+  const responses = await Promise.all([first, second]);
+  for (const response of responses) assert.deepEqual(await response.json(), { prompts: ['a', 'b', 'c'] });
+  assert.equal((await worker.fetch(post(input), env())).status, 200);
+  assert.equal(upstream.mock.callCount(), 1);
+});
+
+test('cache expires and keys separate device, count, language, intent and model', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{"prompts":["a","b","c"]}'));
+  const input = body();
+  const now = Date.now();
+  const clock = t.mock.method(Date, 'now', () => now);
+  await worker.fetch(post(input), env());
+  await worker.fetch(post({ ...input, intent: `  ${input.intent}  ` }), env());
+  assert.equal(upstream.mock.callCount(), 1);
+  for (const change of [{ device: crypto.randomUUID() }, { count: 3 }, { language: 'en' }, { intent: 'another day' }]) {
+    await worker.fetch(post({ ...input, ...change }), env());
+  }
+  await worker.fetch(post(input), { ...env(), DEEPSEEK_MODEL: 'other-model' });
+  assert.equal(upstream.mock.callCount(), 6);
+  clock.mock.mockImplementation(() => now + 60_001);
+  await worker.fetch(post(input), env());
+  assert.equal(upstream.mock.callCount(), 7);
+});
+
+test('failed generation is evicted so an explicit retry can succeed', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', async () => { throw new DOMException('timeout', 'TimeoutError'); });
+  const input = body();
+  assert.equal((await worker.fetch(post(input), env())).status, 502);
+  upstream.mock.mockImplementation(upstreamReturning('{"prompts":["a","b","c"]}'));
+  assert.equal((await worker.fetch(post(input), env())).status, 200);
+  assert.equal(upstream.mock.callCount(), 2);
+});
+
+test('cache hits do not consume the generation allowance', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{"prompts":["a","b","c"]}'));
+  const input = body();
+  for (let i = 0; i < 25; i++) assert.equal((await worker.fetch(post(input), env())).status, 200);
+  assert.equal(upstream.mock.callCount(), 1);
+});
+
+test('rotating device IDs cannot bypass the per-IP generation allowance', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{"prompts":["a","b","c"]}'));
+  for (let i = 0; i < 101; i++) {
+    const request = post(body());
+    request.headers.set('cf-connecting-ip', '192.0.2.10');
+    const response = await worker.fetch(request, env());
+    assert.equal(response.status, i < 100 ? 200 : 429);
+  }
+  assert.equal(upstream.mock.callCount(), 100);
+});
+
+test('oversized bodies without Content-Length and oversized device IDs never reach upstream', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{}'));
+  for (const input of [body({ extra: 'x'.repeat(4096) }), body({ device: 'x'.repeat(129) })]) {
+    assert.equal((await worker.fetch(post(input), env())).status, 400);
+  }
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
+test('limits concurrent upstream work and releases capacity after completion', async (t) => {
+  let release, started;
+  const gate = new Promise(resolve => { release = resolve; });
+  const began = new Promise(resolve => { started = resolve; });
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    if (++calls === 32) started();
+    await gate;
+    return upstreamReturning('{"prompts":["a","b","c"]}')();
+  });
+  const inFlight = Array.from({ length: 32 }, () => worker.fetch(post(body()), env()));
+  await began;
+  try {
+    assert.equal((await worker.fetch(post(body()), env())).status, 503);
+    assert.equal(calls, 32);
+  } finally { release(); }
+  for (const response of await Promise.all(inFlight)) assert.equal(response.status, 200);
+  assert.equal((await worker.fetch(post(body()), env())).status, 200);
+});
+
+test('one action retries reuse output; an explicit Another action generates again', async (t) => {
+  const upstream = t.mock.method(globalThis, 'fetch', upstreamReturning('{"prompts":["a","b","c"]}'));
+  const input = body({ requestID: crypto.randomUUID() });
+  assert.equal((await worker.fetch(post(input), env())).status, 200);
+  assert.equal((await worker.fetch(post(input), env())).status, 200);
+  assert.equal(upstream.mock.callCount(), 1);
+  assert.equal((await worker.fetch(post({ ...input, requestID: crypto.randomUUID() }), env())).status, 200);
+  assert.equal(upstream.mock.callCount(), 2);
+  assert.equal((await worker.fetch(post({ ...input, requestID: 'x'.repeat(129) }), env())).status, 400);
+});

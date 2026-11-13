@@ -38,6 +38,7 @@ struct GuidedMomentsView: View {
 
     @State private var intent = ""
     @State private var isSuggesting = false
+    @State private var suggestionTask: Task<Void, Never>?
     @State private var suggestionNote: String?
     @State private var suggestedName: String?
     /// Kept so the rewrite rate has something to compare against at save time.
@@ -64,6 +65,7 @@ struct GuidedMomentsView: View {
             }
             .task { await suggestions.warmUp() }
             .onAppear(perform: seed)
+            .onDisappear { suggestionTask?.cancel() }
             .sheet(isPresented: $showReminders) {
                 RemindersPicker(room: StoryMoments.maxCount - filledCount, onAdd: addFromReminders)
             }
@@ -284,16 +286,19 @@ struct GuidedMomentsView: View {
         isSuggesting = true
         suggestionNote = nil
 
-        Task {
+        suggestionTask = Task {
             defer { isSuggesting = false }
             do {
                 let suggestion = try await suggestions.suggestStory(
                     intent: sentence, count: Self.suggestionCount, language: appLanguage)
+                try Task.checkCancellation()
                 metrics.recordGenerated()
                 setTexts(SuggestedPromptFill.apply(
                     suggestion.prompts, to: rows.map(\.text), replacing: offeredPrompts))
                 offeredPrompts = suggestion.prompts
                 suggestedName = suggestion.title ?? IntentStoryName.derive(from: sentence)
+            } catch is CancellationError {
+                return
             } catch PromptSuggestionError.rateLimited {
                 suggestionNote = Strings.suggestRateLimited
             } catch {

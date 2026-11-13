@@ -3,6 +3,49 @@ import XCTest
 @testable import AISetlog
 
 final class VideoStitcherTests: XCTestCase {
+    func testExpiredSharedDeadlineFailsBeforeStartingAnotherPass() {
+        XCTAssertThrowsError(try VideoExportOperation.remainingTime(until: 0))
+    }
+
+    func testExportInputBudget() throws {
+        XCTAssertNoThrow(try VideoStitcher.validateInput(count: 300, seconds: 600))
+        XCTAssertThrowsError(try VideoStitcher.validateInput(count: 301, seconds: 2))
+        for seconds in [600.1, Double.infinity, Double.nan, -1] {
+            XCTAssertThrowsError(try VideoStitcher.validateInput(count: 1, seconds: seconds))
+        }
+    }
+
+    func testExpiredExportBudgetRemovesPartialOutput() async throws {
+        let session = try XCTUnwrap(AVAssetExportSession(
+            asset: AVMutableComposition(), presetName: AVAssetExportPresetHighestQuality))
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        session.outputURL = output
+        session.outputFileType = .mp4
+        try Data("partial".utf8).write(to: output)
+        do {
+            try await VideoExportOperation.run(session, timeout: 0)
+            XCTFail("expired budget should fail")
+        } catch VideoExportOperation.Failure.timedOut {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+        }
+    }
+
+    func testAlreadyCancelledExportDoesNotStart() async throws {
+        let session = try XCTUnwrap(AVAssetExportSession(
+            asset: AVMutableComposition(), presetName: AVAssetExportPresetHighestQuality))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await VideoExportOperation.run(session)
+        }
+        do {
+            try await task.value
+            XCTFail("cancelled work should throw")
+        } catch is CancellationError {
+            XCTAssertNotEqual(session.status, .exporting)
+        }
+    }
+
     func testSequentialStitchExportsPlayableVideo() async throws {
         let clips = try await sampleClips(count: 3)
         var options = VideoStitcher.Options()
