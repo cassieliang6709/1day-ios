@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// Horizontal inset for the library title, day headers and grid.
+/// The page's 20 plus the mood card's 18 (`MoodTodayCard`), so they all
+/// start where 今天的心情 does.
+///
+/// Lives outside `LibrarySection` because Swift does not allow static
+/// stored properties on a generic type.
+private enum LibrarySectionMetrics {
+    static let inset: CGFloat = 38
+}
+
 /// 我的's archive (1.5): your clips — from every story and room, plus your
 /// drafts — as a grid or a month calendar, and a select mode that turns any
 /// set of clips into a vlog.
@@ -53,10 +63,6 @@ struct LibrarySection<Chrome: View>: View {
     }
 
     enum Mode: Hashable { case grid, calendar }
-
-    /// The page's 20 plus the mood card's 18 (`MoodTodayCard`): the title,
-    /// the day headers and the grid all start where 今天的心情 does.
-    private static let inset: CGFloat = 38
 
     @State private var mode: Mode = .grid
     @State private var day: Date?
@@ -149,7 +155,7 @@ struct LibrarySection<Chrome: View>: View {
                 .accessibilityIdentifier("library-select")
             }
         }
-        .padding(.horizontal, Self.inset)
+        .padding(.horizontal, LibrarySectionMetrics.inset)
     }
 
     /// The camera's drafts button: the grid, every date. It used to narrow
@@ -167,7 +173,7 @@ struct LibrarySection<Chrome: View>: View {
             .foregroundStyle(OneDay.inkSoft)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 28)
-            .padding(.horizontal, Self.inset)
+            .padding(.horizontal, LibrarySectionMetrics.inset)
     }
 
     // MARK: - Grid
@@ -189,7 +195,7 @@ struct LibrarySection<Chrome: View>: View {
                             scope.filtered(.mine, cameras: cameraIndex.cameras)),
                         selectedDay: $day,
                         showsMoods: true)
-                        .padding(.horizontal, Self.inset)
+                        .padding(.horizontal, LibrarySectionMetrics.inset)
                 }
 
                 if let day {
@@ -203,7 +209,7 @@ struct LibrarySection<Chrome: View>: View {
                             .foregroundStyle(OneDay.brandText)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, Self.inset)
+                    .padding(.horizontal, LibrarySectionMetrics.inset)
                 }
             }
         }
@@ -234,7 +240,7 @@ struct LibrarySection<Chrome: View>: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal, Self.inset)
+            .padding(.horizontal, LibrarySectionMetrics.inset)
         }
     }
 
@@ -287,7 +293,7 @@ struct LibrarySection<Chrome: View>: View {
                 .foregroundStyle(OneDay.inkFaint)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Self.inset)
+        .padding(.horizontal, LibrarySectionMetrics.inset)
         .accessibilityElement(children: .combine)
     }
 
