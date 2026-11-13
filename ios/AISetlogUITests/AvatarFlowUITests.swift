@@ -36,6 +36,7 @@ final class AvatarFlowUITests: XCTestCase {
 
     func testAPhotoBecomesAnAvatarThroughTheThreeSteps() throws {
         let path = try Self.writeSample()
+        try? FileManager.default.removeItem(atPath: Self.tracePath)
         let app = launch(sample: path)
 
         XCTAssertTrue(app.staticTexts["正在画你"].waitForExistence(timeout: 30))
@@ -48,8 +49,42 @@ final class AvatarFlowUITests: XCTestCase {
         XCTAssertTrue(app.images["avatar-result"].exists)
         capture(app, "Avatar confirm")
 
+        trace("before tap: hittable=\(confirm.isHittable) enabled=\(confirm.isEnabled)")
         confirm.tap()
-        XCTAssertTrue(confirm.waitForNonExistence(timeout: 15))
+        trace("tapped")
+        let closed = confirm.waitForNonExistence(timeout: 15)
+        trace("closed=\(closed)")
+        if !closed { dumpFailure(app) } else { printAppTrace() }
+        XCTAssertTrue(closed)
+    }
+
+    // MARK: - Diagnostics
+
+    /// Written by the app (`AvatarFlowTrace`) while `-debugAvatarSample` is set.
+    private static let tracePath = "/tmp/1day-uitest-avatar-trace.log"
+
+    private func trace(_ note: String) {
+        print(String(format: "[avatar-test] %.3f ", Date().timeIntervalSince1970) + note)
+    }
+
+    @discardableResult
+    private func printAppTrace() -> String {
+        let appTrace = (try? String(contentsOfFile: Self.tracePath, encoding: .utf8)) ?? "(no trace file)"
+        print("[avatar-test] app trace:\n" + appTrace)
+        return appTrace
+    }
+
+    private func dumpFailure(_ app: XCUIApplication) {
+        let appTrace = printAppTrace()
+        let tree = app.debugDescription
+        print("[avatar-test] app tree:\n" + tree)
+        for (name, text) in [("App trace", appTrace), ("App tree", tree)] {
+            let attachment = XCTAttachment(string: text)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        capture(app, "Avatar still open")
     }
 
     /// A plain drawn "face" — a skin-coloured oval on a coloured background.
