@@ -8,6 +8,7 @@ import Observation
 final class ChallengeStore {
     var challenges: [Challenge] = [] {
         didSet {
+            recordedClipListCache.keepOnly(ids: Set(challenges.map(\.id)))
             repository.saveChallenges(challenges)
             effects.reconcileReminders(challenges)
             let oldRooms = Set(oldValue.compactMap(\.roomCode))
@@ -34,6 +35,11 @@ final class ChallengeStore {
     private let repository: ChallengeRepository
     private let fileStore: ClipFileStore
     let effects: ChallengeStoreEffects
+
+    /// Memo for `recordedClips(for:)`. Ignored by Observation so a cache
+    /// hit does not itself dirty the store, and the two resident home
+    /// views can reread the same list without rebuilding it.
+    @ObservationIgnored private let recordedClipListCache = RecordedClipListCache()
 
     init(repository: ChallengeRepository? = nil,
          fileStore: ClipFileStore = DiskClipFileStore(),
@@ -1161,7 +1167,28 @@ final class ChallengeStore {
     /// list alone made a moment I had just filmed offline disappear from the
     /// room, the home card and the count, and come back only after a relaunch.
     func recordedClips(for challengeID: UUID) -> [DayClip] {
-        guard let challenge = challenge(challengeID) else { return [] }
+        guard let challenge = challenge(challengeID) else {
+            recordedClipListCache.remove(challengeID)
+            return []
+        }
+        let code = challenge.roomCode
+        let input = RecordedClipListCache.Input(
+            challenge: challenge,
+            remoteClips: code.flatMap { roomSync.remoteClips[$0] },
+            remoteReactions: code.flatMap { roomSync.remoteReactions[$0] } ?? [],
+            remoteComments: code.flatMap { roomSync.remoteComments[$0] } ?? [],
+            accountID: account?.account?.id,
+            displayName: account?.account?.displayName,
+            localeCode: AppLanguage.effective.localeCode
+        )
+        return recordedClipListCache.clips(for: challengeID, input: input) {
+            makeRecordedClips(for: challenge)
+        }
+    }
+
+    /// Builds the list `recordedClips(for:)` memoizes. Callers go through
+    /// the cache; this is the uncached path.
+    private func makeRecordedClips(for challenge: Challenge) -> [DayClip] {
         let presenter = ChallengePresenter(challenge: challenge)
         if let code = challenge.roomCode,
            let remote = roomSync.remoteClips[code], !remote.isEmpty {

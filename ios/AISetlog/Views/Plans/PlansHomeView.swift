@@ -343,6 +343,10 @@ struct PlansHomeView: View {
     }
 
     /// Every clip on this device, as 我的 lists it.
+    ///
+    /// `recordedClips(for:)` is memoized on the store, so two home body
+    /// passes with the same stories, remotes, account and language reuse
+    /// the DayClip lists instead of rebuilding them for every story.
     private var library: ClipLibrary {
         let mine = [account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 }
         return ClipLibrary(
@@ -1152,8 +1156,12 @@ struct PlansHomeView: View {
     ///
     /// `recordedClips` is not cheap — it localises every moment title and
     /// rebuilds a documents-directory URL per card, and in a room it filters
-    /// the whole reaction and comment list per clip. Asking for it three times
-    /// per row (progress, cover, refresh token) tripled that for nothing.
+    /// the whole reaction and comment list per clip. The store memoizes the
+    /// result, so a later read in the same body (`library`, `sharedStories`,
+    /// the other resident home) is free until something actually changes.
+    /// Asking for it three times per row (progress, cover, refresh token)
+    /// used to triple that work for nothing; one pass still keeps the
+    /// cheaper work in this function itself off the hot path twice.
     private struct CardState {
         let progress: RoomProgress
         /// What the card shows: the cover this story was given, and failing
