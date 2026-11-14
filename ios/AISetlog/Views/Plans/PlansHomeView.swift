@@ -274,71 +274,70 @@ struct PlansHomeView: View {
         #endif
     }
 
+    /// Must match `LibrarySection.scrollAnchor` — the id lives on the
+    /// library title inside that section's scroll view.
     private static let libraryAnchor = "library-section"
 
-    private var storiesScroll: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                if let onBackToRooms {
-                    Button(action: onBackToRooms) {
-                        Label(Strings.surfaceFriends, systemImage: "chevron.left")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(OneDay.brandText)
-                            .frame(minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .accessibilityIdentifier("personal-back")
+    /// The page chrome above 所有片段. `LibrarySection` owns the `ScrollView`
+    /// and puts this at the top of the same `LazyVStack` as each filmed
+    /// day, so off-screen days are not built. A `VStack` wrapping the
+    /// section used to give the inner lazy grid unbounded height.
+    private var storiesChrome: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            if let onBackToRooms {
+                Button(action: onBackToRooms) {
+                    Label(Strings.surfaceFriends, systemImage: "chevron.left")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.brandText)
+                        .frame(minHeight: 44)
                 }
-                header
-
-                // Off unless something asked for it — see `DemoEntries`. It
-                // was an always-on button on the first screen of every Debug
-                // build, which is where 1.3's 冗余内容清理 found it.
-                #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-                if DemoEntries.areEnabled {
-                    Button {
-                        showRoomDemo = true
-                    } label: {
-                        Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
-                              systemImage: "person.3.sequence")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .accessibilityIdentifier("home-room-demo")
-                }
-                #endif
-
-                // 我的, top to bottom: the week, the picked day's mood and
-                // plan, then every clip. No plan today: the mood has the row.
-                DayStrip(selected: $selectedDay) { day in
-                    store.plan(on: day) != nil || !clips(on: day).isEmpty
-                }
-                todayCards
-
-                // A first run — no stories, no clips — gets the three-line
-                // guide.
-                if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
-
-                // Replaces the date-grouped story list (`timelineSection`):
-                // every clip, filterable by room, with a calendar.
-                LibrarySection(
-                    library: library,
-                    rooms: store.challenges.filter(\.isShared),
-                    onOpenStory: { path.append($0) },
-                    draftsRequest: draftsRequest,
-                    isSelecting: $isSelectingClips,
-                    picked: $pickedClips)
-                    .id(Self.libraryAnchor)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .accessibilityIdentifier("personal-back")
             }
-            .padding(.top, 8)
-            .padding(.bottom, OneDay.tabBarClearance + 20)
-            // Belt and braces: the page can never be wider than the scroll
-            // viewport. Without this a single over-eager child silently drags
-            // every section off both edges of the display.
-            .containerRelativeFrame(.horizontal)
+            header
+
+            // Off unless something asked for it — see `DemoEntries`. It
+            // was an always-on button on the first screen of every Debug
+            // build, which is where 1.3's 冗余内容清理 found it.
+            #if DEBUG || LOCAL_ROOM_CHAT_DEMO
+            if DemoEntries.areEnabled {
+                Button {
+                    showRoomDemo = true
+                } label: {
+                    Label(appLanguage.resolved == .chinese ? "房间演示" : "Room demo",
+                          systemImage: "person.3.sequence")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("home-room-demo")
+            }
+            #endif
+
+            // 我的, top to bottom: the week, the picked day's mood and
+            // plan, then every clip. No plan today: the mood has the row.
+            DayStrip(selected: $selectedDay) { day in
+                store.plan(on: day) != nil || !clips(on: day).isEmpty
+            }
+            todayCards
+
+            // A first run — no stories, no clips — gets the three-line
+            // guide.
+            if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
         }
-        .scrollIndicators(.hidden)
+    }
+
+    private var storiesScroll: some View {
+        LibrarySection(
+            library: library,
+            rooms: store.challenges.filter(\.isShared),
+            onOpenStory: { path.append($0) },
+            draftsRequest: draftsRequest,
+            isSelecting: $isSelectingClips,
+            picked: $pickedClips
+        ) {
+            storiesChrome
+        }
         .overlay { joiningOverlay }
     }
 
@@ -389,12 +388,19 @@ struct PlansHomeView: View {
     }
 
     private var friendsContent: some View {
+        // `LazyVStack` is the scroll view's direct child, and each room
+        // row is a direct child of that stack. The previous
+        // `ScrollView { VStack { LazyVStack { rows } } }` built every
+        // row at once: the inner lazy stack was given unbounded height.
+        // Spacing is unchanged: 18 above the list, 14 between rows.
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 if let onOpenPersonal {
                     personalEntry(onOpen: onOpenPersonal)
+                        .padding(.bottom, 18)
                 }
                 friendsHeader
+                    .padding(.bottom, 18)
 
                 if sharedStories.isEmpty {
                     friendsEmptyState
@@ -405,10 +411,9 @@ struct PlansHomeView: View {
                     // gets made.
                     // Rows without cards (`StoryRowCard`), so the gap does the
                     // separating.
-                    LazyVStack(alignment: .leading, spacing: 14) {
-                        ForEach(sharedStories) { challenge in
-                            storyRow(challenge, membersAsCover: true)
-                        }
+                    ForEach(Array(sharedStories.enumerated()), id: \.element.id) { index, challenge in
+                        storyRow(challenge, membersAsCover: true)
+                            .padding(.bottom, index == sharedStories.count - 1 ? 0 : 14)
                     }
                 }
             }
