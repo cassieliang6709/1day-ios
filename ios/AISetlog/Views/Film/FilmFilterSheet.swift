@@ -393,17 +393,23 @@ private struct FrameThumbnail: View {
         }
         // Rounded so a drag doesn't ask for a new frame on every point of it.
         .task(id: (seconds * 10).rounded()) {
+            // Exact time and a smaller cap than `ClipThumbnail`: a hold
+            // marker has to be the frame you stopped on, not a nearby one.
+            if let cached = ClipThumbnailCache.imageIfCached(
+                url: url, refreshToken: nil, seconds: seconds,
+                maxSize: CGSize(width: 300, height: 300), exactTime: true)
+            {
+                image = cached
+                return
+            }
             // Lets a fast drag settle before decoding a frame.
             try? await Task.sleep(for: .milliseconds(80))
             guard !Task.isCancelled else { return }
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 300, height: 300)
-            generator.requestedTimeToleranceBefore = .zero
-            generator.requestedTimeToleranceAfter = .zero
-            let time = CMTime(seconds: seconds, preferredTimescale: 600)
-            if let cgImage = try? await generator.image(at: time).image, !Task.isCancelled {
-                image = UIImage(cgImage: cgImage)
+            if let loaded = await ClipThumbnailCache.image(
+                url: url, refreshToken: nil, seconds: seconds,
+                maxSize: CGSize(width: 300, height: 300), exactTime: true)
+            {
+                image = loaded
             }
         }
     }
