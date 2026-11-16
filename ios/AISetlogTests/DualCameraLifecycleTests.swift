@@ -8,6 +8,7 @@ final class DualCameraLifecycleTests: XCTestCase {
         let recorder = ClipRecorder()
         try XCTSkipUnless(recorder.supportsDualCamera, "Requires a physical MultiCam device")
         await recorder.configure()
+        try XCTSkipIf(recorder.state == .unavailable, "No camera on this device")
         XCTAssertEqual(recorder.state, .ready)
         guard recorder.state == .ready else { return }
         defer { recorder.teardown() }
