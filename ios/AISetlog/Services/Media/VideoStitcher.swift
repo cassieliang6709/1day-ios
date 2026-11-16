@@ -101,11 +101,13 @@ enum VideoStitcher {
 
     enum StitchError: LocalizedError {
         case noClips
+        case inputTooLarge
         case compositionFailed
         case exportFailed(String)
 
         var errorDescription: String? {
             switch self {
+            case .inputTooLarge: return "Select fewer or shorter clips and try again."
             case .noClips: return "No clips to stitch yet."
             case .compositionFailed: return "Could not build the video composition."
             case .exportFailed(let reason): return "Export failed: \(reason)"
@@ -194,10 +196,29 @@ enum VideoStitcher {
 
     // MARK: - Entry point
 
+    static func validateInput(count: Int, seconds: Double) throws {
+        guard count <= 300, seconds.isFinite, seconds >= 0, seconds <= 600 else {
+            throw StitchError.inputTooLarge
+        }
+    }
+
     static func stitch(clips allClips: [DayClip], options: Options = .default) async throws -> URL {
+        try Task.checkCancellation()
+        let deadline = ProcessInfo.processInfo.systemUptime + 180
         // Before the look pass, so a take left out of the film isn't graded.
         let clips = kept(allClips, ids: options.keptClipIDs)
         guard !clips.isEmpty else { throw StitchError.noClips }
+        // Bound work before any expensive grading/reframing. Do not silently
+        // truncate somebody's footage. Normal two-second diaries fit easily.
+        try validateInput(count: clips.count, seconds: 0)
+        var sourceSeconds = 0.0
+        for clip in clips {
+            _ = try VideoExportOperation.remainingTime(until: deadline)
+            let seconds = try await AVURLAsset(url: clip.url).load(.duration).seconds
+            guard seconds.isFinite, seconds > 0 else { throw StitchError.compositionFailed }
+            sourceSeconds += seconds
+            try validateInput(count: clips.count, seconds: sourceSeconds)
+        }
 
         #if !targetEnvironment(simulator)
         let drawCaptions = options.showDayCaptions
@@ -207,18 +228,20 @@ enum VideoStitcher {
         // Read before the look pass: its graded copies aren't promised to carry
         // the original's metadata.
         var cameraStamped: Set<String> = []
-        for clip in clips where await CameraStyleBaker.hasCameraStamp(clip.url) {
-            cameraStamped.insert(clip.id)
+        for clip in clips {
+            _ = try VideoExportOperation.remainingTime(until: deadline)
+            if await CameraStyleBaker.hasCameraStamp(clip.url) { cameraStamped.insert(clip.id) }
         }
 
         // ---- The look, one clip at a time, before anything is stitched ------
         let (source, scratch) = try await filteredClips(
-            clips, look: options.look, authorID: options.lookAuthorID)
+            clips, look: options.look, authorID: options.lookAuthorID, deadline: deadline)
         defer { discard(scratch) }
 
         // ---- Load track info for every clip --------------------------------
         var loaded: [LoadedClip] = []
         for clip in source {
+            _ = try VideoExportOperation.remainingTime(until: deadline)
             let asset = AVURLAsset(url: clip.url)
             guard let video = try await asset.loadTracks(withMediaType: .video).first else { continue }
             // Use each track's own timeRange, NOT the container duration —
@@ -267,7 +290,7 @@ enum VideoStitcher {
         var reframeScratch: [URL] = []
         defer { discard(reframeScratch) }
         if case .sequential = options.layout {
-            (loaded, reframeScratch) = await reframed(loaded, canvas: renderSize)
+            (loaded, reframeScratch) = try await reframed(loaded, canvas: renderSize, deadline: deadline)
         }
 
         #if targetEnvironment(simulator)
@@ -376,13 +399,7 @@ enum VideoStitcher {
         export.audioMix = audioMix
 
         print("[stitch] exporting clips=\(loaded.count) renderSize=\(renderSize)")
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
-        guard export.status == .completed else {
-            print("[stitch] export status=\(export.status.rawValue) error=\(String(describing: export.error))")
-            throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
-        }
+        try await VideoExportOperation.run(export, timeout: VideoExportOperation.remainingTime(until: deadline))
         return outURL
     }
 
@@ -401,13 +418,16 @@ enum VideoStitcher {
     /// A clip is two seconds. Even fifteen of them is a short wait, and it only
     /// happens when a dial has been moved.
     private static func filteredClips(
-        _ clips: [DayClip], look: PersonalEffectParameters, authorID: String?
+        _ clips: [DayClip], look: PersonalEffectParameters, authorID: String?, deadline: TimeInterval
     ) async throws -> (clips: [DayClip], scratch: [URL]) {
         guard !look.isIdentity else { return (clips, []) }
 
         var out: [DayClip] = []
         var scratch: [URL] = []
+        var succeeded = false
+        defer { if !succeeded { discard(scratch) } }
         for clip in clips {
+            try Task.checkCancellation()
             // Somebody else's take goes in as they filmed it. Nil authorID is a
             // solo film, where the question doesn't arise.
             guard authorID == nil || clip.authorID == authorID else {
@@ -416,10 +436,14 @@ enum VideoStitcher {
             }
             do {
                 let filtered = try await PersonalEffectFilter.filteredCopy(
-                    of: clip.url, parameters: look)
+                    of: clip.url, parameters: look, timeout: VideoExportOperation.remainingTime(until: deadline))
                 guard filtered != clip.url else { out.append(clip); continue }
                 scratch.append(filtered)
                 out.append(clip.replacingURL(filtered))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch VideoExportOperation.Failure.timedOut {
+                throw VideoExportOperation.Failure.timedOut
             } catch {
                 // One clip the grade couldn't handle is not a reason to lose the
                 // whole film. It goes in as the camera saw it.
@@ -427,6 +451,7 @@ enum VideoStitcher {
                 out.append(clip)
             }
         }
+        succeeded = true
         return (out, scratch)
     }
 
@@ -623,11 +648,14 @@ enum VideoStitcher {
     ///
     /// Only odd takes pay for it; an all-portrait diary does no extra work.
     private static func reframed(
-        _ loaded: [LoadedClip], canvas: CGSize
-    ) async -> (clips: [LoadedClip], scratch: [URL]) {
+        _ loaded: [LoadedClip], canvas: CGSize, deadline: TimeInterval
+    ) async throws -> (clips: [LoadedClip], scratch: [URL]) {
         var out: [LoadedClip] = []
         var scratch: [URL] = []
+        var succeeded = false
+        defer { if !succeeded { discard(scratch) } }
         for clip in loaded {
+            try Task.checkCancellation()
             guard case .fitOnBed(let subject) = sequentialFraming(
                 orientedSize: clip.orientedSize, canvas: canvas)
             else {
@@ -635,11 +663,15 @@ enum VideoStitcher {
                 continue
             }
             do {
-                let url = try await bedCopy(of: clip, canvas: canvas)
+                let url = try await bedCopy(of: clip, canvas: canvas, deadline: deadline)
                 scratch.append(url)
                 var copy = try await reloaded(clip, from: url)
                 copy.shownWhole = subject
                 out.append(copy)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch VideoExportOperation.Failure.timedOut {
+                throw VideoExportOperation.Failure.timedOut
             } catch {
                 // A take cropped is better than a film lost: it goes in the way
                 // it always did.
@@ -647,12 +679,13 @@ enum VideoStitcher {
                 out.append(clip)
             }
         }
+        succeeded = true
         return (out, scratch)
     }
 
     /// One take, rendered canvas-sized: whole, centred, over a blurred copy of
     /// itself. Its sound comes along untouched.
-    private static func bedCopy(of clip: LoadedClip, canvas: CGSize) async throws -> URL {
+    private static func bedCopy(of clip: LoadedClip, canvas: CGSize, deadline: TimeInterval) async throws -> URL {
         let composition = AVMutableComposition()
         guard let video = composition.addMutableTrack(
             withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
@@ -690,13 +723,7 @@ enum VideoStitcher {
         export.outputURL = url
         export.outputFileType = .mov
         export.videoComposition = videoComposition
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
-        guard export.status == .completed else {
-            try? FileManager.default.removeItem(at: url)
-            throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
-        }
+        try await VideoExportOperation.run(export, timeout: VideoExportOperation.remainingTime(until: deadline))
         return url
     }
 
@@ -1731,4 +1758,86 @@ enum VideoStitcher {
         return formatter.string(from: date ?? .now)
     }
 
+}
+
+/// Serializes completion, timeout and cancellation so the continuation resumes
+/// exactly once. The watchdog does not depend on AVFoundation calling back.
+/// A late callback removes partial output again after the writer has stopped.
+final class VideoExportOperation: @unchecked Sendable {
+    enum Failure: Error { case timedOut, failed }
+    private let queue = DispatchQueue(label: "1day.video-export")
+    private let session: AVAssetExportSession
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var terminal: Result<Void, Error>?
+    private var timer: DispatchWorkItem?
+
+    private init(_ session: AVAssetExportSession) { self.session = session }
+
+    static func remainingTime(until deadline: TimeInterval) throws -> TimeInterval {
+        try Task.checkCancellation()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        guard remaining > 0 else { throw Failure.timedOut }
+        return remaining
+    }
+
+    static func run(_ session: AVAssetExportSession, timeout: TimeInterval = 180) async throws {
+        let operation = VideoExportOperation(session)
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                operation.start(continuation, timeout: timeout)
+            }
+        } onCancel: {
+            operation.queue.async { operation.stop(CancellationError()) }
+        }
+    }
+
+    private func start(_ continuation: CheckedContinuation<Void, Error>, timeout: TimeInterval) {
+        queue.async {
+            if let terminal = self.terminal {
+                continuation.resume(with: terminal)
+                return
+            }
+            self.continuation = continuation
+            guard timeout.isFinite, timeout > 0 else {
+                self.stop(Failure.timedOut)
+                return
+            }
+            let timer = DispatchWorkItem { [weak self] in self?.stop(Failure.timedOut) }
+            self.timer = timer
+            self.queue.asyncAfter(deadline: .now() + timeout, execute: timer)
+            self.session.exportAsynchronously {
+                self.queue.async {
+                    if self.terminal == nil {
+                        if self.session.status == .completed {
+                            self.finish(.success(()))
+                        } else {
+                            self.stop(self.session.error ?? Failure.failed)
+                        }
+                    }
+                    if case .failure? = self.terminal { self.removeOutput() }
+                }
+            }
+        }
+    }
+
+    private func stop(_ error: Error) {
+        guard terminal == nil else { return }
+        session.cancelExport()
+        removeOutput()
+        finish(.failure(error))
+    }
+
+    private func finish(_ result: Result<Void, Error>) {
+        guard terminal == nil else { return }
+        terminal = result
+        timer?.cancel()
+        timer = nil
+        continuation?.resume(with: result)
+        continuation = nil
+    }
+
+    private func removeOutput() {
+        if let url = session.outputURL { try? FileManager.default.removeItem(at: url) }
+    }
 }

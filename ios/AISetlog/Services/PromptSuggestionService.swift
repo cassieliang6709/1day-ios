@@ -77,10 +77,14 @@ struct RemotePromptSuggestionService: PromptSuggesting {
     }
 
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
+        // One user action, including its transport retry. “Another” is a new
+        // action and must not receive the previous successful suggestion.
+        let requestID = UUID().uuidString
         var lastError = PromptSuggestionError.unavailable
         for _ in 0..<Self.attempts {
+            try Task.checkCancellation()
             do {
-                return try await attempt(intent: intent, count: count, language: language)
+                return try await attempt(intent: intent, count: count, language: language, requestID: requestID)
             } catch PromptSuggestionError.unavailable {
                 // Network or server trouble is worth one more go. A rate limit
                 // or a malformed answer would only come back the same.
@@ -91,7 +95,7 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         throw lastError
     }
 
-    private func attempt(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
+    private func attempt(intent: String, count: Int, language: AppLanguage, requestID: String) async throws -> StorySuggestion {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = Self.timeout
@@ -101,13 +105,15 @@ struct RemotePromptSuggestionService: PromptSuggesting {
                 intent: intent,
                 count: count,
                 language: language.resolved == .chinese ? "zh" : "en",
-                device: deviceID))
+                device: deviceID,
+                requestID: requestID))
 
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            try Task.checkCancellation()
             throw PromptSuggestionError.unavailable
         }
 
@@ -149,6 +155,7 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         var count: Int
         var language: String
         var device: String
+        var requestID: String
     }
 
     private struct Response: Decodable {

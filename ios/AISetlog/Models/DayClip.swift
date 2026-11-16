@@ -3,7 +3,7 @@ import Foundation
 /// A recorded clip labeled with its challenge day — the stitcher's input.
 /// In a shared room a single day can hold several clips (one per friend), so
 /// `id` is unique rather than the day number.
-struct DayClip: Identifiable {
+struct DayClip: Identifiable, Equatable {
     let id: String
     let day: Int
     let url: URL

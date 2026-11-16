@@ -36,6 +36,7 @@ final class AvatarFlowUITests: XCTestCase {
 
     func testAPhotoBecomesAnAvatarThroughTheThreeSteps() throws {
         let path = try Self.writeSample()
+        try? FileManager.default.removeItem(atPath: Self.tracePath)
         let app = launch(sample: path)
 
         XCTAssertTrue(app.staticTexts["正在画你"].waitForExistence(timeout: 30))
@@ -49,7 +50,61 @@ final class AvatarFlowUITests: XCTestCase {
         capture(app, "Avatar confirm")
 
         confirm.tap()
-        XCTAssertTrue(confirm.waitForNonExistence(timeout: 15))
+        // On the runner the synthesized tap is now and then cancelled
+        // underneath the app: the window sees the touch begin and then
+        // `touchesCancelled`, never `touchesEnded`, so the Button rightly does
+        // nothing (runs 43351505237 and 43357115667). A person would tap
+        // again; so does this, once, and only when the app's trace shows that
+        // a cancelled touch is what happened. A touch that ended without
+        // reaching accept() still fails.
+        if Self.waitForTapOutcome() == .cancelled {
+            print("[avatar-test] first tap was cancelled under the app, tapping again:\n" + Self.appTrace())
+            confirm.tap()
+        }
+        let closed = confirm.waitForNonExistence(timeout: 15)
+        if !closed { dumpFailure(app) }
+        XCTAssertTrue(closed)
+    }
+
+    // MARK: - Diagnostics
+
+    /// Written by the app (`AvatarFlowTrace`) while `-debugAvatarSample` is set.
+    private static let tracePath = "/tmp/1day-uitest-avatar-trace.log"
+
+    enum TapOutcome { case accepted, cancelled, unknown }
+
+    /// What the app logged for the tap on 「就是这样」, waiting a few seconds
+    /// for it to say.
+    private static func waitForTapOutcome() -> TapOutcome {
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            let lines = appTrace().split(separator: "\n")
+            guard let confirmShown = lines.lastIndex(where: { $0.contains("step generating -> confirm") })
+            else { return .unknown }
+            let after = lines[confirmShown...]
+            if after.contains(where: { $0.contains("accept tapped") }) { return .accepted }
+            if after.contains(where: { $0.contains("touch cancelled") }) { return .cancelled }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        return .unknown
+    }
+
+    private static func appTrace() -> String {
+        (try? String(contentsOfFile: tracePath, encoding: .utf8)) ?? "(no trace file)"
+    }
+
+    private func dumpFailure(_ app: XCUIApplication) {
+        let appTrace = Self.appTrace()
+        print("[avatar-test] app trace:\n" + appTrace)
+        let tree = app.debugDescription
+        print("[avatar-test] app tree:\n" + tree)
+        for (name, text) in [("App trace", appTrace), ("App tree", tree)] {
+            let attachment = XCTAttachment(string: text)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        capture(app, "Avatar still open")
     }
 
     /// A plain drawn "face" — a skin-coloured oval on a coloured background.

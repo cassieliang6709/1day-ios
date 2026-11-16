@@ -1591,6 +1591,16 @@ enum Strings {
     /// The film couldn't be made. Fixed words rather than the system's own
     /// error, which is an AVFoundation sentence nobody can act on — the raw
     /// one goes to the log.
+    static var filmInputTooLarge: String {
+        lang == .chinese
+            ? "素材太多或太长了。请选择最多 300 段、总时长不超过 10 分钟的视频。"
+            : "Choose up to 300 clips with a combined duration of 10 minutes or less."
+    }
+    static var filmExportTimedOut: String {
+        lang == .chinese
+            ? "导出用时太久，已停止。请减少片段或关闭调色后重试。"
+            : "Export took too long and was stopped. Try fewer clips or turn off the look."
+    }
     static var filmFailedTryAgain: String {
         lang == .chinese ? "没做出来" : "Couldn't make the film"
     }

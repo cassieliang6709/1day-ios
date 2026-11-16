@@ -58,11 +58,12 @@ it's the vendor here.
   request can only supply the sentence, a count, and a language. It is not a
   general LLM proxy, so a leaked endpoint is worth very little to whoever finds
   it.
-- **Rate limit properly.** The limiter is in-memory and per-isolate, and
-  Cloudflare recycles isolates freely, so the real ceiling is well above 20/hour
-  and resets on its own. That stops a runaway script, not a determined person. A
-  real limiter wants a Durable Object, which is a bigger thing than this
-  endpoint.
+- **Authenticate callers or guarantee global quotas.** Device IDs are caller
+  supplied, not proof of identity. Generation is limited to 20/hour/device and
+  100/hour/Cloudflare-provided IP, per isolate. Distributed abuse and isolate
+  recycling can still exceed these limits. Production cost guarantees need a
+  shared limiter (for example a Durable Object), verified identity/App Attest
+  compatible with guest creation, and a provider-side spending cap.
 - **Send CORS headers.** The only caller is a native app. A browser calling this
   would need them added.
 
@@ -73,3 +74,23 @@ doing it, returning an empty message — which showed up as a 502 the first time
 this was wired up for real. `thinking: { type: 'disabled' }` fixes it and takes
 the round trip from ~5s to ~2s. Nothing here needs deliberation, and somebody is
 watching a spinner.
+
+## Repeat requests and resource bounds
+
+The iOS client sends one `requestID` per user action and keeps it across its
+transport retry. “Another” gets a new ID and generates fresh output. Legacy
+clients without an ID fall back to content-based deduplication.
+
+Same request ID, normalized intent, count, language, model/config and device coalesce while
+in flight, then reuse successful output for 60 seconds. Keys are SHA-256 hashes;
+raw diary text is not logged. Replies remain `Cache-Control: no-store`; this is
+bounded process memory, not a public HTTP cache. Failures are evicted so an
+explicit retry can work. Cache hits do not consume generation quota.
+
+At most 32 upstream calls run per isolate, and counters/results each have a
+5,000-entry ceiling. Bodies are limited to 4 KiB even without Content-Length;
+device IDs to 128 characters. Saturation returns 503 and rate limits return 429.
+The upstream still has a 7-second timeout; no new provider or paid live test is
+introduced. This is best-effort deduplication, **not** durable exactly-once
+billing: separate isolates, expiry, restarts, and an ambiguous upstream timeout
+can still produce another billed call. No deployment is implied by these tests.

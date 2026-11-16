@@ -116,6 +116,14 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let queue = DispatchQueue(label: "1day.friends-together-compositor")
     private var renderSize: CGSize = .zero
+    private let cancellationLock = NSLock()
+    private var generation = 0
+
+    private func currentGeneration() -> Int {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return generation
+    }
 
     let sourcePixelBufferAttributes: [String: any Sendable]? = [
         kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -130,9 +138,14 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     }
 
     func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+        let requestedGeneration = currentGeneration()
         queue.async { [weak self] in
             guard let self else {
                 request.finish(with: CompositorError.cancelled)
+                return
+            }
+            guard requestedGeneration == self.currentGeneration() else {
+                request.finishCancelledRequest()
                 return
             }
             guard let buffer = request.renderContext.newPixelBuffer() else {
@@ -218,7 +231,13 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
                     translationX: placed.minX, y: placed.minY)))
     }
 
-    func cancelAllPendingVideoCompositionRequests() {}
+    func cancelAllPendingVideoCompositionRequests() {
+        cancellationLock.lock()
+        generation += 1
+        cancellationLock.unlock()
+        // Finish the running frame, cancel queued frames, then acknowledge.
+        queue.sync {}
+    }
 
     enum CompositorError: LocalizedError {
         case noBuffer

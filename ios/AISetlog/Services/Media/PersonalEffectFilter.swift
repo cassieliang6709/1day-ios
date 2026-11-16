@@ -82,9 +82,10 @@ enum PersonalEffectFilter {
     /// caller can then hand the same array to the stitcher either way, and
     /// nothing gets copied for the sake of it.
     static func filteredCopy(
-        of url: URL, parameters: PersonalEffectParameters
+        of url: URL, parameters: PersonalEffectParameters, timeout: TimeInterval = 180
     ) async throws -> URL {
         guard !parameters.isIdentity else { return url }
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
 
         let asset = AVURLAsset(url: url)
         guard let composition = await playbackComposition(parameters, for: asset) else { return url }
@@ -100,12 +101,7 @@ enum PersonalEffectFilter {
         export.videoComposition = composition
         export.shouldOptimizeForNetworkUse = false
 
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
-        guard export.status == .completed else {
-            throw ExportError.failed(export.error?.localizedDescription ?? "unknown")
-        }
+        try await VideoExportOperation.run(export, timeout: VideoExportOperation.remainingTime(until: deadline))
         return output
     }
 

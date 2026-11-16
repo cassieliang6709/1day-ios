@@ -66,7 +66,22 @@ struct AvatarSetupFlow: View {
             .ignoresSafeArea()
         }
         .task { startDebugSampleIfAsked() }
-        .onDisappear { work?.cancel() }
+        .onAppear {
+            AvatarFlowTrace.log("flow appear step=\(step)")
+            #if DEBUG
+            AvatarTouchTraceRecognizer.installIfTracing()
+            #endif
+        }
+        .onChange(of: step) { old, new in
+            AvatarFlowTrace.log("step \(old) -> \(new)")
+            #if DEBUG
+            AvatarTouchTraceRecognizer.installIfTracing()
+            #endif
+        }
+        .onDisappear {
+            AvatarFlowTrace.log("flow disappear step=\(step)")
+            work?.cancel()
+        }
     }
 
     // MARK: - 1. 给我看看你
@@ -356,8 +371,10 @@ struct AvatarSetupFlow: View {
     }
 
     private func accept() {
+        AvatarFlowTrace.log("accept tapped step=\(step) result=\(result != nil)")
         guard let result else { return }
         guard let data = AvatarComposer.pngData(result) else {
+            AvatarFlowTrace.log("accept png failed")
             // Don't leave 「就是这样」 on screen doing nothing.
             error = Strings.avatarFailed
             var txn = Transaction()
@@ -374,8 +391,10 @@ struct AvatarSetupFlow: View {
         var txn = Transaction()
         txn.disablesAnimations = true
         withTransaction(txn) { step = .done }
+        AvatarFlowTrace.log("accept set done")
         Task {
             try? await Task.sleep(for: .seconds(1.3))
+            AvatarFlowTrace.log("onFinish(true)")
             onFinish(true)
         }
     }
@@ -407,7 +426,11 @@ struct AvatarSetupFlow: View {
         guard photo == nil, step == .upload,
               let path = UserDefaults.standard.string(forKey: "debugAvatarSample"),
               let image = UIImage(contentsOfFile: path)
-        else { return }
+        else {
+            AvatarFlowTrace.log("debug sample skipped photo=\(photo != nil) step=\(step)")
+            return
+        }
+        AvatarFlowTrace.log("debug sample start")
         start(with: image)
         #endif
     }

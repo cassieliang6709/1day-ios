@@ -18,12 +18,14 @@ on:
     paths:
       - 'ios/**'
       - 'workers/api/**'
+      - 'workers/suggest-prompts/**'
       - '.github/workflows/ios-tests.yml'
       - '.github/actions/**'
   pull_request:
     paths:
       - 'ios/**'
       - 'workers/api/**'
+      - 'workers/suggest-prompts/**'
       - '.github/workflows/ios-tests.yml'
       - '.github/actions/**'
   # Sunday 08:00 Asia/Singapore (00:00 UTC).
@@ -107,12 +109,15 @@ jobs:
   # package.json script is `node --test test/*.test.mjs`. The tests use
   # `node:sqlite` (no npm dependencies), which is stable on Node 24.
   api:
-    name: API tests
+    name: API tests (${{ matrix.worker }})
+    strategy:
+      matrix:
+        worker: [api, suggest-prompts]
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: workers/api
+        working-directory: workers/${{ matrix.worker }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

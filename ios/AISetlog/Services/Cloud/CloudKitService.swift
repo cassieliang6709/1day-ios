@@ -337,7 +337,7 @@ enum CloudKitService {
 
     // MARK: - Clips
 
-    struct RemoteClip: Identifiable {
+    struct RemoteClip: Identifiable, Equatable {
         let id: String          // record name
         let day: Int
         let authorID: String
@@ -534,7 +534,7 @@ enum CloudKitService {
 
     // MARK: - Reactions & comments
 
-    struct RemoteReaction {
+    struct RemoteReaction: Equatable {
         let day: Int
         let emoji: String
         let authorID: String
@@ -543,7 +543,7 @@ enum CloudKitService {
         let createdAt: Date
     }
 
-    struct RemoteComment {
+    struct RemoteComment: Equatable {
         let id: String          // the local ClipComment UUID
         let day: Int
         let text: String
