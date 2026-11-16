@@ -13,25 +13,21 @@ name: iOS Tests
 # off the PR path.
 
 on:
+  # No `paths:` filter here: branch protection requires these checks, and a
+  # workflow that never starts leaves a required check pending forever. The
+  # `changes` job decides instead; a job skipped by `if:` counts as passed.
   push:
     branches: [main]
-    paths:
-      - 'ios/**'
-      - 'workers/api/**'
-      - 'workers/suggest-prompts/**'
-      - '.github/workflows/ios-tests.yml'
-      - '.github/actions/**'
   pull_request:
-    paths:
-      - 'ios/**'
-      - 'workers/api/**'
-      - 'workers/suggest-prompts/**'
-      - '.github/workflows/ios-tests.yml'
-      - '.github/actions/**'
   # Sunday 08:00 Asia/Singapore (00:00 UTC).
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+
+# A new push to a PR cancels that PR's older run. Runs on main finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Shared-room integration tests. They drive the real ChallengeStore,
@@ -90,6 +86,22 @@ env:
     AISetlogTests/JoinedRoomTests
 
 jobs:
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ios:
+              - 'ios/**'
+              - '.github/workflows/ios-tests.yml'
+              - '.github/actions/**'
+
   # Cheap and first to fail: no simulator, no build.
   layers:
     name: Layer boundaries
@@ -126,9 +138,13 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # On PRs only: a squash merge lands exactly the tree the PR tested.
   unit:
     name: Unit tests
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    needs: changes
+    if: >-
+      (github.event_name == 'pull_request' && needs.changes.outputs.ios == 'true')
+      || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -151,9 +167,14 @@ jobs:
             $flags \
             CODE_SIGNING_ALLOWED=NO
 
+  # After merge, not on PRs: the slowest lane and the flakiest, so it
+  # never blocks a merge. A failure on main shows up right after landing.
   ui:
     name: UI tests
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    needs: changes
+    if: >-
+      (github.event_name == 'push' && needs.changes.outputs.ios == 'true')
+      || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
