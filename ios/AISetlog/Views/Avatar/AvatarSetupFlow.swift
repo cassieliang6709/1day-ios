@@ -590,6 +590,8 @@ private struct PlaygroundSheet: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        // `.emoji` only exists in the iOS 26.4 SDK; CI builds with Xcode 26.2.
+        #if compiler(>=6.3)
         if #available(iOS 26.4, *) {
             sheet(content)
                 .imagePlaygroundGenerationStyle(
@@ -601,6 +603,13 @@ private struct PlaygroundSheet: ViewModifier {
         } else {
             content
         }
+        #else
+        if #available(iOS 18.1, *) {
+            sheet(content)
+        } else {
+            content
+        }
+        #endif
     }
 
     @available(iOS 18.1, *)
