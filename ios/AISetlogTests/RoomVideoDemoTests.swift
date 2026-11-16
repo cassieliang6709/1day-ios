@@ -14,8 +14,6 @@ final class RoomVideoDemoTests: XCTestCase {
         let portrait = try XCTUnwrap(model.film)
         let firstAsset = AVURLAsset(url: portrait)
         let firstDuration = try await firstAsset.load(.duration).seconds
-        // The film is one moment, so it is as long as the takes in it — which
-        // is whatever this suite asked the generator for, not a literal 3.
         XCTAssertEqual(firstDuration, DemoHarness.clipSeconds, accuracy: 0.1)
         let firstTracks = try await firstAsset.loadTracks(withMediaType: .video)
         let firstSize = try await XCTUnwrap(firstTracks.first).load(.naturalSize)

@@ -3,10 +3,8 @@ import XCTest
 
 @testable import AISetlog
 
-/// The corner handle and the centre guide, without a view in the way.
 final class CaptionGestureMathTests: XCTestCase {
 
-    // MARK: - The corner handle
 
     func testPullingStraightOutDoublesTheScaleAndDoesNotTurnIt() throws {
         let move = try XCTUnwrap(CaptionGestureMath.cornerDrag(
@@ -25,7 +23,6 @@ final class CaptionGestureMathTests: XCTestCase {
         XCTAssertEqual(move.scale, 0.5, accuracy: 0.001)
     }
 
-    /// A quarter turn around the centre at the same radius: all angle, no size.
     func testSweepingAroundTurnsItWithoutResizing() throws {
         let move = try XCTUnwrap(CaptionGestureMath.cornerDrag(
             centre: CGPoint(x: 0, y: 0),
@@ -35,14 +32,6 @@ final class CaptionGestureMathTests: XCTestCase {
         XCTAssertEqual(move.angleDelta, 90, accuracy: 0.001)
     }
 
-    /// Crossing the negative x axis is where `atan2` jumps by a full turn:
-    /// raw subtraction answers -348.58° for a finger that moved 8pt. Added to a
-    /// saved angle that clamps at ±35°, that slams the caption to the stop
-    /// instead of nudging it, so the short way round is the only useful answer.
-    ///
-    /// Positive because y grows downwards here: 4 → -4 at x = -40 sweeps
-    /// clockwise on screen, which is the direction `rotationEffect` calls
-    /// positive.
     func testCrossingTheAxisReportsTheShortWayRound() throws {
         let move = try XCTUnwrap(CaptionGestureMath.cornerDrag(
             centre: .zero,
@@ -59,7 +48,6 @@ final class CaptionGestureMathTests: XCTestCase {
             current: CGPoint(x: 160, y: 40)))
     }
 
-    // MARK: - The centre guide
 
     func testNearlyCentredSnapsExactlyToTheMiddle() {
         XCTAssertEqual(CaptionGestureMath.snapToCentre(0.512), 0.5)
@@ -70,13 +58,9 @@ final class CaptionGestureMathTests: XCTestCase {
     func testDeliberatelyOffCentreIsLeftAlone() {
         XCTAssertNil(CaptionGestureMath.snapToCentre(0.2))
         XCTAssertNil(CaptionGestureMath.snapToCentre(0.62))
-        // Just outside the threshold: the guide must not grab a caption the
-        // user is holding a visible distance off the middle.
         XCTAssertNil(CaptionGestureMath.snapToCentre(0.54))
     }
 
-    /// The saved value still goes through `CaptionSticker`, so a snapped
-    /// position survives the clamp it passes on the way to the card.
     func testASnappedPositionSurvivesTheStickersOwnClamping() throws {
         let snapped = try XCTUnwrap(CaptionGestureMath.snapToCentre(0.503))
         let sticker = CaptionSticker(x: snapped, y: 0.43, style: .outline)

@@ -1,15 +1,9 @@
 import SwiftUI
 
-/// Pick a face, then show only today's mood. Tap it to choose again.
-///
-/// `compact` is the half-width card beside 今天的计划: the faces sit three
-/// and two, without their names.
 struct MoodTodayCard: View {
     var compact = false
 
     @Environment(MoodStore.self) private var moods
-    /// Bumped when the date rolls over or the app comes back, so a card left
-    /// on screen overnight shows today (empty) rather than yesterday's mood.
     @State private var dayTick = 0
     @State private var isChoosing = false
     @Environment(\.scenePhase) private var scenePhase
@@ -145,7 +139,6 @@ struct MoodFaceButton: View {
                     .overlay(Circle().strokeBorder(OneDay.surface, lineWidth: 2))
                     .opacity(state == .selected ? 1 : 0)
             }
-            // Keep the selected face inside its grid cell, including its badge.
             .scaleEffect(state == .selected ? 1.16 : 1)
     }
 }

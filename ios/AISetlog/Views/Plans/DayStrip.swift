@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// The week across the top of 我的. Tap a day to see its plan; swipe for
-/// the week before or after. A dot marks a day with a plan or a clip.
 struct DayStrip: View {
     @Binding var selected: Date
     let hasSomething: (Date) -> Bool
@@ -64,9 +62,6 @@ struct DayStrip: View {
     }
 }
 
-/// A past day's mood, to look at: the face and the line written that day.
-/// Not editable — a mood is filled in on the day or not at all. `wide`
-/// when it has the row to itself: face on the left, a sentence beside it.
 struct MoodDayCard: View {
     let entry: MoodEntry
     var wide = false
@@ -113,8 +108,6 @@ struct MoodDayCard: View {
     }
 }
 
-/// A past day's clips, one tap from a recap film. Same size as the mood
-/// card beside it.
 struct DayRecapCard: View {
     let count: Int
     let onMake: () -> Void

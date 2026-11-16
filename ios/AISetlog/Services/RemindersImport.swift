@@ -1,9 +1,6 @@
 import EventKit
 import Foundation
 
-/// 从提醒事项导入 (1.5): the person's unfinished reminders, read once, to copy
-/// into today's list. Read-only — nothing in Reminders is changed, and the
-/// list keeps no link back to them.
 enum RemindersImport {
     struct Item: Identifiable, Hashable {
         let id: String
@@ -37,9 +34,6 @@ enum RemindersImport {
         return .items(ordered(items, now: now))
     }
 
-    /// Due today or overdue first, earliest first; then the ones with no
-    /// date; then the ones due later. Titles break ties so the order holds
-    /// still between openings.
     static func ordered(_ items: [Item], now: Date, calendar: Calendar = .current) -> [Item] {
         let endOfToday = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
         func rank(_ item: Item) -> Int {

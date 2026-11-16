@@ -1,7 +1,5 @@
 import Foundation
 
-/// Explicitly local-only preview. This type has no CloudKit dependency and
-/// never delegates to the production transport, even when sending/deleting.
 @MainActor
 final class RoomChatDemoTransport: RoomChatTransport {
     let scope = RoomChatScope(accountID: "demo-me", roomCode: "LOCAL-DEMO")
@@ -61,7 +59,7 @@ final class RoomChatDemoTransport: RoomChatTransport {
     }
 
     func close() {
-        isClosed = true // Invalidate the lease before removing any temporary archive.
+        isClosed = true
         messages = []
         try? FileManager.default.removeItem(at: directory)
     }

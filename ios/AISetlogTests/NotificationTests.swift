@@ -93,8 +93,6 @@ final class NotificationTests: XCTestCase {
         XCTAssertFalse(plan?.body.contains("Day") == true)
     }
 
-    /// A room doesn't number its days on screen (1.5), so its reminders
-    /// can't either; a solo week still says which day it is.
     func testSharedRoomReminderNamesNoDay() throws {
         let now = try date(2026, 7, 25, 12, 0)
         let shared = makeChallenge(
@@ -116,7 +114,6 @@ final class NotificationTests: XCTestCase {
         XCTAssertTrue(soloPlans.allSatisfy { $0.body.contains("第 \($0.day) 天") })
     }
 
-    /// The push for a friend's clip says who, not which day.
     func testRoomClipActivityNamesNoDay() {
         defer { UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey) }
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
@@ -136,7 +133,6 @@ final class NotificationTests: XCTestCase {
         XCTAssertEqual(route, NotificationRecordRoute(challengeID: id, day: 4))
     }
 
-    // MARK: Room pushes
 
     func testRegistrationCarriesTheAppsOwnCopyForEveryKind() {
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)

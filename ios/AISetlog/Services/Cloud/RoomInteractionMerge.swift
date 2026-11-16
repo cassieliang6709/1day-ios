@@ -11,7 +11,7 @@ enum RoomInteractionMerge {
     /// How long a reaction or comment I just added on a friend's take is
     /// kept on screen while the room's answer doesn't have it yet: the
     /// save may still be in flight, or saved but not yet in query results.
-    static let myGrace: TimeInterval = 120
+    static let myGrace: TimeInterval = RoomContentCache.confirmationGrace
 
     /// The fetched interactions plus my own recent ones the fetch didn't
     /// return. Replacing them outright made a comment I had just typed

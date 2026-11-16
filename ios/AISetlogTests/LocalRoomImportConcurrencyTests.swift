@@ -41,7 +41,6 @@ final class LocalRoomImportConcurrencyTests: XCTestCase {
         XCTAssertEqual(runtime.store.recordedClips(for: runtime.challengeID).map(\.url), clips.map(\.url))
         XCTAssertTrue(FileManager.default.fileExists(atPath: input.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
-        // Failure releases the busy guard; a later real import remains usable.
         try await runtime.replaceClip(authorID: target, from: input)
         XCTAssertNotEqual(runtime.store.recordedClips(for: runtime.challengeID).first?.url, input)
     }

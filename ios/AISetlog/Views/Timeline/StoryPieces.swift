@@ -1,29 +1,7 @@
 import SwiftUI
 
-/// The pieces the story page is built from: the moments that are still
-/// yours to take, the moments that happened, and — only
-/// once there is nothing left to film — the film.
-///
-/// The page is deliberately weighted in that order rather than around a single
-/// next step. An earlier version put one moment on a full-width gradient card
-/// labelled "next up" and demoted the rest to a list, which reads as a queue:
-/// this one first, the others after. A day doesn't work like that. You film
-/// the walk because you're on the walk. So every open moment here is the same
-/// row, the same size and the same tap; the only thing the suggestion earns is
-/// a softer word and a tint you have to be looking for.
 
-/// The film, once every moment holds footage — and the only object on this
-/// page that gets the loudest treatment.
-///
-/// It earns that because by the time it appears there is genuinely nothing
-/// else to do: no moment is still open, so a full-width gradient card can't be
-/// read as a queue of one. While the day is still being filmed, nothing here
-/// looks like this. The way into the film used to be a second full-width
-/// button floating at the bottom of this same screen, competing with a card
-/// that wanted you to film instead.
 struct FilmReadyCard: View {
-    /// Moments in the story, not clips: a room where three people filmed
-    /// breakfast has three clips of one moment, and the film is cut by moment.
     let momentCount: Int
     let action: () -> Void
 
@@ -82,39 +60,15 @@ struct FilmReadyCard: View {
     }
 }
 
-/// A moment that happened, at the size of a memory rather than a button.
-///
-/// One tap region, one meaning: it plays. The tile this replaces stacked three
-/// of them on top of each other — a dashed border you could tap, a camera
-/// bubble in the middle, and a play badge in the corner — so where your thumb
-/// landed decided whether you were about to watch something or film something.
 struct ClipThumb: View {
     let momentTitle: String
-    /// Everyone who filmed this moment, in stacking order. Rendered with the
-    /// split the finished film uses, so the thumbnail is a real preview of the
-    /// moment rather than a lookalike.
     let lanes: [MomentLane]
     var timeStamp: String?
-    /// Whose takes these are, in the order the thumbnail stacks them. Empty in
-    /// a solo story: the badge answers "whose is this", and there is only one
-    /// answer to that in a diary.
     var authorNames: [String] = []
     var reaction: String?
-    /// A friend filmed this and I haven't. It only changes the edge — adding
-    /// my own take is the quiet row's job, because this thumbnail already
-    /// means "play what's here".
     var awaitingMine = false
     var aspectRatio: CGFloat = 0.72
-    /// The shape the takes were filmed in, which is what decides how the film
-    /// splits them up. It is not the shape of this tile: the tile is 103pt of
-    /// a scrolling grid and the film is a 9:8 diptych, and asking the tile's
-    /// own proportions which way the film splits is how the thumbnail ended up
-    /// stacking two people the film had put side by side.
     var sourceAspect: CGFloat = 9.0 / 16
-    /// Print the moment's name across the bottom of the still. Off where the
-    /// row already names the moment on the line above — the timeline does —
-    /// because the same words twice in 60 points is a stutter, not a label.
-    /// The reaction keeps its corner either way.
     var showsCaption = true
     let onTap: () -> Void
 
@@ -132,18 +86,12 @@ struct ClipThumb: View {
             .animation(OneDay.Motion.soft, value: lanes.map(\.id).joined())
     }
 
-    /// Who's in it, for VoiceOver. Sighted people get that from the faces in
-    /// the corner; without this the faces were read as a row of initials, or
-    /// not at all. Unnamed authors are left out rather than read as blanks.
     private var accessibilityTitle: String {
         let named = authorNames.filter { !$0.isEmpty }
         guard !named.isEmpty else { return momentTitle }
         return Strings.momentFilmedBy(momentTitle, names: named)
     }
 
-    /// A fixed `Color.clear` box with edge-pinned overlays: overlays never
-    /// resize their base, so nothing in here can push past the clip frame the
-    /// way a filling VStack does.
     private var thumb: some View {
         Color.clear
             .aspectRatio(aspectRatio, contentMode: .fit)
@@ -173,7 +121,6 @@ struct ClipThumb: View {
 
     private var frames: some View {
         let split = grid
-        // No gaps, because the film has none: its cells tile the canvas.
         return VStack(spacing: 0) {
             ForEach(
                 Array(StoryGridView.rows(of: lanes, columns: split.columns).enumerated()),
@@ -182,9 +129,6 @@ struct ClipThumb: View {
                 HStack(spacing: 0) {
                     ForEach(row) { lane in
                         if let clip = lane.clip {
-                            // Bedded, not cropped: the tile is 0.72 and the
-                            // take is 9:16, and cropping that difference away
-                            // lands squarely on whatever is mid-frame.
                             ClipThumbnail(
                                 url: clip.url,
                                 refreshToken: clip.recordedAt,
@@ -198,9 +142,6 @@ struct ClipThumb: View {
         }
     }
 
-    /// Whose take it is, and when. Both facts about the same clip, so they sit
-    /// in one cluster in one corner — the tile is 103pt wide and a second
-    /// floating label anywhere else on it starts reading as another button.
     @ViewBuilder
     private var topRow: some View {
         if timeStamp != nil || !authorNames.isEmpty {
@@ -222,8 +163,6 @@ struct ClipThumb: View {
         }
     }
 
-    /// Decoration, not a control. The badge that used to sit here was a second
-    /// button inside the tile, half of it hanging over the first one.
     private var playGlyph: some View {
         Image(systemName: "play.circle.fill")
             .font(.system(size: 17))
@@ -256,29 +195,10 @@ struct ClipThumb: View {
     }
 }
 
-/// A moment that's still yours to take, as one row among equals.
-///
-/// Every row in this list is the same height, the same weight and the same
-/// tap: it opens the camera on that moment. Nothing is dimmed, nothing is
-/// numbered, and there is no order to work through — three rows down is as
-/// available as the first one.
-///
-/// Two rows say something extra, and both are one short phrase rather than a
-/// different kind of object:
-///
-/// - `isSuggested` — the place to start if you'd rather not choose. It gets a
-///   tint you have to be looking for and a question, not an instruction.
-/// - `awaitingMine` — a friend filmed this one; the thumbnail above plays
-///   their take and this row is how mine gets in.
-///
-/// The two can never both be true: a moment somebody has filmed is never the
-/// one being suggested.
 struct OpenSlotRow: View {
     let momentTitle: String
     let momentIcon: String
-    /// A friend filmed this moment already; this row is how mine gets in.
     var awaitingMine = false
-    /// Somewhere to start, for a day you haven't got into yet.
     var isSuggested = false
     let onTap: () -> Void
 
@@ -311,9 +231,6 @@ struct OpenSlotRow: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            // A wash rather than a border. A stroked outline reads as a
-            // selected item — as though the others were waiting their turn —
-            // and that is the exact wrong sentence for this list.
             .background(isSuggested ? Color.oneDayMist.opacity(0.35) : .clear)
             .contentShape(Rectangle())
         }

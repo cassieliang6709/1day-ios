@@ -110,7 +110,7 @@ The app swaps it for a fresh one in its last 14 days (`/auth/refresh`).
 ## Setup
 
 ```bash
-wrangler secret put SESSION_SECRET   # 32+ random characters: openssl rand -base64 48
+wrangler secret put SESSION_SECRET
 ```
 
 The app uses `auth.liangyue.site` only. `*.workers.dev` is blocked in mainland
@@ -120,8 +120,8 @@ every Worker, `suggest-prompts` included.
 ## Working on it
 
 ```bash
-npm test       # no network; node:sqlite stands in for D1
-npm run dev    # wrangler dev, needs .dev.vars (copy .dev.vars.example)
+npm test
+npm run dev
 ```
 
 Locally, Apple's key URL answers `403` to the Workers runtime (curl and Node

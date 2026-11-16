@@ -3,21 +3,11 @@ import CoreImage
 import XCTest
 @testable import AISetlog
 
-/// The chain, run on real pixels.
-///
-/// `PersonalEffectParametersTests` covers the arithmetic; this covers the thing
-/// the arithmetic is for. A filter chain fails in ways a value type can't: a
-/// filter that grows the frame and shifts the picture, a contrast filter that
-/// flattens instead of hardening, a temperature filter wired backwards so
-/// "warm" comes out blue. All three are visible in a 32×32 image, so none of
-/// them need a video.
 final class PersonalEffectFilterTests: XCTestCase {
 
     private let context = CIContext(options: [.useSoftwareRenderer: true])
     private let frame = CGRect(x: 0, y: 0, width: 32, height: 32)
 
-    /// A checkerboard on a mid-grey card: something with edges to harden and a
-    /// known average to lift.
     private func subject() -> CIImage {
         let grey = CIImage(color: CIColor(red: 0.5, green: 0.45, blue: 0.42))
             .cropped(to: frame)
@@ -36,11 +26,8 @@ final class PersonalEffectFilterTests: XCTestCase {
         let red: Double
         let green: Double
         let blue: Double
-        /// Mean absolute difference between neighbouring pixels — how much edge
-        /// the picture still has.
         let contrast: Double
         var luminance: Double { 0.299 * red + 0.587 * green + 0.114 * blue }
-        /// Above 1 is warm, below 1 is cold.
         var warmth: Double { red / blue }
     }
 
@@ -75,18 +62,13 @@ final class PersonalEffectFilterTests: XCTestCase {
             contrast: edge / (count - Double(height)))
     }
 
-    // MARK: Off
 
     func testCentredDialsReturnTheVerySameImage() {
         let input = subject()
         XCTAssertTrue(PersonalEffectFilter.apply(.none, to: input) === input)
     }
 
-    // MARK: The frame
 
-    /// The one that silently ruins a video: a filter whose output extent is
-    /// bigger than its input makes `AVVideoComposition` render a shifted
-    /// picture rather than fail.
     func testEveryDialKeepsTheFrameItWasGiven() {
         let settings: [PersonalEffectParameters] = [
             .init(exposure: 50), .init(exposure: -50),
@@ -107,7 +89,6 @@ final class PersonalEffectFilterTests: XCTestCase {
             PersonalEffectFilter.apply(.init(exposure: 40), to: offset).extent, offset.extent)
     }
 
-    // MARK: Each dial does its own job
 
     func testExposureLiftsAndItsOppositeDarkens() throws {
         let before = try read(subject())
@@ -117,9 +98,6 @@ final class PersonalEffectFilterTests: XCTestCase {
         XCTAssertLessThan(down.luminance, before.luminance)
     }
 
-    /// Positive is warm. The filter corrects towards its target white point, so
-    /// this is the assertion that catches the sign being flipped — the bug is
-    /// invisible in the arithmetic and obvious on a face.
     func testWarmthGoesWarmNotBlue() throws {
         let before = try read(subject())
         let warm = try read(PersonalEffectFilter.apply(.init(temperature: 50), to: subject()))
@@ -136,8 +114,6 @@ final class PersonalEffectFilterTests: XCTestCase {
         XCTAssertLessThan(flat.contrast, before.contrast)
     }
 
-    /// Exposure before contrast. The other order pushes highlights up and then
-    /// clips them, which costs the picture its brightest detail.
     func testAFullGradeChangesTheImageWithoutBlowingItOut() throws {
         let graded = try read(PersonalEffectFilter.apply(
             .init(exposure: 40, temperature: 30, contrast: 25), to: subject()))
@@ -147,7 +123,6 @@ final class PersonalEffectFilterTests: XCTestCase {
         XCTAssertGreaterThan(graded.contrast, 0)
     }
 
-    // MARK: Playback and export
 
     func testPlaybackIsLeftAloneEntirelyWhenTheDialsAreCentred() async throws {
         let made = await ClipFixtureFactory.makeClip(index: 0)
@@ -167,8 +142,6 @@ final class PersonalEffectFilterTests: XCTestCase {
         XCTAssertNotNil(composition)
     }
 
-    /// Nothing is copied for the sake of it: a centred grade hands back the
-    /// original URL so the stitcher takes the same path either way.
     func testExportSkipsTheCopyWhenThereIsNothingToApply() async throws {
         let made = await ClipFixtureFactory.makeClip(index: 2)
         let url = try XCTUnwrap(made)
@@ -190,7 +163,6 @@ final class PersonalEffectFilterTests: XCTestCase {
 
         let tracks = try await AVURLAsset(url: copy).loadTracks(withMediaType: .video)
         XCTAssertFalse(tracks.isEmpty)
-        // The promise the panel makes out loud: the recording is untouched.
         XCTAssertEqual(try Data(contentsOf: url), before)
     }
 }

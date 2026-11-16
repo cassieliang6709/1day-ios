@@ -1,20 +1,8 @@
 import Foundation
 
-/// Turning "今天要搬家" into the seven things worth pointing a camera at.
-///
-/// The problem this solves is the one that makes people give up on the custom
-/// path: a day that hasn't happened yet is hard to write prompts for, so what
-/// gets written is generic, and generic prompts produce a film about nothing.
-/// But "今天要搬家" is sayable right now, before any of it has happened.
-///
-/// This is an accelerator, never a gate. Every failure is silent and lands the
-/// user back where they already were — in front of an editable list they can
-/// fill in themselves. There is no error state worth interrupting someone for
-/// here, because the thing they were doing still works.
 protocol PromptSuggesting: Sendable {
     func suggest(intent: String, count: Int, language: AppLanguage) async throws -> [String]
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion
-    /// Opens the connection ahead of time. Fire-and-forget; never throws.
     func warmUp() async
 }
 
@@ -24,7 +12,6 @@ struct StorySuggestion: Equatable, Sendable {
 }
 
 extension PromptSuggesting {
-    /// Existing injected services remain source-compatible and need no title.
     func suggestStory(intent: String, count: Int, language: AppLanguage) async throws -> StorySuggestion {
         StorySuggestion(title: nil, prompts: try await suggest(intent: intent, count: count, language: language))
     }
@@ -33,42 +20,26 @@ extension PromptSuggesting {
 }
 
 enum PromptSuggestionError: Error, Equatable {
-    /// The server answered, but not with prompts we can use.
     case malformed
-    /// Too many calls from this device.
     case rateLimited
-    /// No network, timed out, or the server is down. All the same to the user.
     case unavailable
 }
 
-/// Calls the one-purpose Cloudflare Worker in `workers/suggest-prompts`.
-///
-/// The API key lives on the server. A key shipped inside the app is a key
-/// somebody else is going to spend.
 struct RemotePromptSuggestionService: PromptSuggesting {
-    /// Own domain, not *.workers.dev: that one is blocked in mainland China.
     static let defaultEndpoint = URL(
         string: "https://oneday-api.liangyue.site/api/suggest-prompts")!
 
-    /// The model answers in about a second; the rest of a slow call is the
-    /// network. Past this the connection is stuck, and a fresh one does
-    /// better than waiting on it — hence the retry rather than a longer wait.
     static let timeout: TimeInterval = 8
-    /// One retry. Two attempts cap the spinner at ~16s, down from 20s for one.
     static let attempts = 2
 
     var session: URLSession = .shared
     var endpoint: URL = RemotePromptSuggestionService.defaultEndpoint
-    /// Opaque, per-install, and only used for rate limiting.
     var deviceID: String = DeviceIdentity.installID
 
     func suggest(intent: String, count: Int, language: AppLanguage) async throws -> [String] {
         try await suggestStory(intent: intent, count: count, language: language).prompts
     }
 
-    /// A HEAD the Worker answers without touching the model, so DNS and the
-    /// TLS handshake — seconds, on a bad mobile network — are paid while the
-    /// user is still typing. `session` keeps the connection for the real call.
     func warmUp() async {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "HEAD"
@@ -86,8 +57,6 @@ struct RemotePromptSuggestionService: PromptSuggesting {
             do {
                 return try await attempt(intent: intent, count: count, language: language, requestID: requestID)
             } catch PromptSuggestionError.unavailable {
-                // Network or server trouble is worth one more go. A rate limit
-                // or a malformed answer would only come back the same.
                 lastError = .unavailable
                 if Task.isCancelled { break }
             }
@@ -124,9 +93,6 @@ struct RemotePromptSuggestionService: PromptSuggesting {
         return try Self.story(from: data, wanted: count)
     }
 
-    /// Split out from the request so the parsing rules can be tested without a
-    /// server: a model writing free text is exactly the kind of input that
-    /// arrives malformed eventually.
     static func prompts(from data: Data, wanted: Int) throws -> [String] {
         guard let decoded = try? JSONDecoder().decode(Response.self, from: data) else {
             throw PromptSuggestionError.malformed
@@ -136,15 +102,12 @@ struct RemotePromptSuggestionService: PromptSuggesting {
             .filter { !$0.isEmpty }
             .prefix(max(wanted, 1))
 
-        // Two is what the composer needs to make a story at all. Fewer than
-        // that isn't a shorter answer, it's a broken one.
         guard prompts.count >= 2 else { throw PromptSuggestionError.malformed }
         return Array(prompts)
     }
 
     static func story(from data: Data, wanted: Int) throws -> StorySuggestion {
         let prompts = try prompts(from: data, wanted: wanted)
-        // An invalid optional title must not discard otherwise usable prompts.
         let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         let title = (object?["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         return StorySuggestion(title: title.flatMap { $0.isEmpty ? nil : String($0.prefix(80)) }, prompts: prompts)
@@ -163,11 +126,6 @@ struct RemotePromptSuggestionService: PromptSuggesting {
     }
 }
 
-/// A random id minted on first use and kept in UserDefaults.
-///
-/// Not `identifierForVendor`: that one is stable across a reinstall for the
-/// same vendor and is a real device identifier. This is a number that means
-/// nothing anywhere else, which is all a rate limiter needs.
 enum DeviceIdentity {
     static let storageKey = "promptSuggestion.installID"
 

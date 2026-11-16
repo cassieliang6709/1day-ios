@@ -1,8 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Exercises the composed runtime used by StoryTimelineView, not a lookalike
-/// room or a second live store with a fake room code.
 @MainActor
 final class LocalRoomRuntimeBoundaryTests: XCTestCase {
     func testClosingOneFormalRoomInvalidatesItsChatWithoutTouchingOtherRuntime() async throws {
@@ -34,8 +32,6 @@ final class LocalRoomRuntimeBoundaryTests: XCTestCase {
         let firstArchive = first.chat.directory
 
         first.close()
-        // Retained production chat sessions and a retained store may still get
-        // UI tasks after dismissal. None may recreate the closed local scope.
         a.setDraft("late draft")
         await a.send(authorName: "Late")
         await a.refresh()

@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Drafts exist because a recorded clip that can't be filed used to die with
-/// the screen. So these tests care about one thing above all: a clip is never
-/// lost quietly — either it's on disk, or the caller was told it isn't.
 final class ClipDraftStoreTests: XCTestCase {
     private var tempDir: URL!
 
@@ -20,7 +17,6 @@ final class ClipDraftStoreTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Keeping
 
     func testKeepingADraftCopiesTheClipOutOfTemp() throws {
         let store = makeStore()
@@ -30,7 +26,6 @@ final class ClipDraftStoreTests: XCTestCase {
 
         XCTAssertEqual(store.count, 1)
         XCTAssertEqual(draft.orientation, .portrait)
-        // The point of the whole feature: it no longer lives only in temp.
         XCTAssertNotEqual(store.url(for: draft), source)
         XCTAssertTrue(FileManager.default.fileExists(atPath: store.url(for: draft).path))
     }
@@ -55,7 +50,6 @@ final class ClipDraftStoreTests: XCTestCase {
         XCTAssertEqual(draft.overlayText, "傍晚的光")
     }
 
-    // MARK: - Failure is loud
 
     func testKeepingThrowsWhenTheRecordedFileIsGone() {
         let store = makeStore()
@@ -64,8 +58,6 @@ final class ClipDraftStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.keep(tempURL: missing, orientation: .portrait)) { error in
             XCTAssertEqual(error as? ClipDraftFileStoreError, .sourceMissing)
         }
-        // Nothing recorded as kept, because nothing was kept. A draft entry
-        // pointing at a file that isn't there would be worse than no draft.
         XCTAssertTrue(store.isEmpty)
     }
 
@@ -79,7 +71,6 @@ final class ClipDraftStoreTests: XCTestCase {
         XCTAssertTrue(store.isEmpty)
     }
 
-    // MARK: - Removing
 
     func testRemovingADraftTakesItsFileWithIt() throws {
         let store = makeStore()
@@ -90,11 +81,9 @@ final class ClipDraftStoreTests: XCTestCase {
         store.remove(draft)
 
         XCTAssertTrue(store.isEmpty)
-        // No orphan: the metadata and the bytes go together.
         XCTAssertFalse(FileManager.default.fileExists(atPath: stored.path))
     }
 
-    // MARK: - Persistence
 
     func testDraftsComeBackAfterRelaunch() throws {
         let repository = InMemoryDraftRepository()
@@ -126,10 +115,7 @@ final class ClipDraftStoreTests: XCTestCase {
         XCTAssertEqual(store.sortedDrafts.map(\.id), [newer.id, older.id])
     }
 
-    // MARK: - Helpers
 
-    /// Real disk store, in-memory metadata — the file behaviour is the part
-    /// worth exercising for real.
     private func makeStore() -> ClipDraftStore {
         ClipDraftStore(
             repository: InMemoryDraftRepository(),
@@ -142,20 +128,7 @@ final class ClipDraftStoreTests: XCTestCase {
         return url
     }
 
-    // MARK: - Filing one clip into several stories
 
-    /// The premise `ClipFilingSheet` is built on: one take can go into more
-    /// than one story.
-    ///
-    /// Filing used to be a single-choice dialog, so this was never exercised —
-    /// and it is only safe because `DiskClipFileStore.storeClip` *copies*. If
-    /// it ever moved the file instead, the first story would get the clip and
-    /// every story after it would silently get nothing: `saveClip` reports
-    /// failure by doing nothing at all, so the batch loop in
-    /// `RecordClipView.file(_:to:)` would count successes it didn't have.
-    ///
-    /// Asserts the three things that would break: every story ends up holding
-    /// a clip, each in its own first open slot, and the source survives.
     func testOneClipFilesIntoSeveralStoriesAndLeavesTheSourceAlone() throws {
         let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -201,9 +174,6 @@ final class ClipDraftStoreTests: XCTestCase {
             "filing copies; the take is still there to file again")
     }
 
-    /// Filing a draft is not filming it. A take kept as a draft at 2:06 and
-    /// filed at 3:21 happened at 2:06 — the card used to say 3:21, and so did
-    /// every friend's copy of it.
     @MainActor
     func testFilingADraftKeepsTheDraftsTime() throws {
         let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
@@ -240,10 +210,6 @@ final class ClipDraftStoreTests: XCTestCase {
         XCTAssertEqual(card.recordedAt, filmedAt)
     }
 
-    /// The sheet only ever offers stories with room in them, and the batch loop
-    /// skips any that filled up in between. A story with every slot taken must
-    /// not be a candidate — filing into one used to overwrite whatever was in
-    /// whichever day the story happened to be on.
     func testAFullStoryIsNotOfferedAsSomewhereToFileTo() throws {
         let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -274,8 +240,6 @@ final class ClipDraftStoreTests: XCTestCase {
             "a full story is not somewhere a clip can go")
     }
 
-    /// A room is filmed whenever (1.5), so it is never full: once its slots
-    /// hold footage, the next clip sent to it is one more take.
     @MainActor
     func testARoomIsNeverFullASecondClipIsAnotherTake() throws {
         let suiteName = "ClipDraftStoreTests.\(UUID().uuidString)"
@@ -301,7 +265,6 @@ final class ClipDraftStoreTests: XCTestCase {
     }
 }
 
-// MARK: - Doubles
 
 private final class InMemoryDraftRepository: ClipDraftRepository {
     private var stored: [ClipDraft] = []
@@ -309,7 +272,6 @@ private final class InMemoryDraftRepository: ClipDraftRepository {
     func saveDrafts(_ drafts: [ClipDraft]) { stored = drafts }
 }
 
-/// The disk store, pointed at a throwaway directory instead of Documents/.
 private final class TempRootDraftFileStore: ClipDraftFileStore {
     private let root: URL
 
@@ -341,7 +303,6 @@ private final class TempRootDraftFileStore: ClipDraftFileStore {
     }
 }
 
-/// Stands in for a full disk or a permissions problem.
 private final class FailingDraftFileStore: ClipDraftFileStore {
     func storeDraft(from tempURL: URL, draftID: UUID) throws -> String {
         throw ClipDraftFileStoreError.copyFailed("no space left on device")

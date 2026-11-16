@@ -1,10 +1,6 @@
 #if DEBUG
 import Foundation
 
-/// `-debugSeedLibrary YES`: fill 我的 with something to look at on a simulator
-/// with no camera — two stories for today with clips, three drafts on earlier
-/// days, and today's mood. Runs once per install (it sets a flag), and only in
-/// Debug builds. The footage is the onboarding sample film, copied.
 @MainActor
 enum LibraryDebugSeed {
     private static let doneKey = "debugSeedLibrary.done"
@@ -36,7 +32,6 @@ enum LibraryDebugSeed {
     }
 
     #if targetEnvironment(simulator)
-    /// Simulator-only content for reviewing the room list, with no cloud writes.
     private static func seedRoomPreviewsIfAsked(store: ChallengeStore) {
         guard UserDefaults.standard.bool(forKey: "debugSeedRoomPreviews"),
               let sample = Bundle.main.url(forResource: "sample-film", withExtension: "mp4") else { return }

@@ -11,9 +11,6 @@ final class DefaultFilmAspectTests: XCTestCase {
         super.tearDown()
     }
 
-    /// A film nobody shares the frame in is the shape it was filmed in. The old
-    /// automatic rule turned a portrait diary into a 16:9 film — one take, no
-    /// mosaic, and every pixel of it letterboxed for no reason.
     func testOneUpKeepsTheShapeItWasFilmedIn() async throws {
         let portrait = try await fixture(.portrait)
         let portraitFilm = try await render([portrait, portrait], layout: .sequential)
@@ -24,8 +21,6 @@ final class DefaultFilmAspectTests: XCTestCase {
         XCTAssertEqual(landscapeFilm.width / landscapeFilm.height, 16.0 / 9, accuracy: 0.01)
     }
 
-    /// A mosaic's canvas is whatever makes its cells match the takes: two
-    /// portrait takes side by side is 9:8, two landscape takes stacked is 8:9.
     func testTwoUpCanvasFollowsTheSplitItNeeds() async throws {
         let portrait = try await fixture(.portrait)
         let sideBySide = try await render([portrait, portrait], layout: .friendsTogether)
@@ -36,8 +31,6 @@ final class DefaultFilmAspectTests: XCTestCase {
         XCTAssertEqual(stacked.width / stacked.height, 8.0 / 9, accuracy: 0.02)
     }
 
-    /// Both takes in one moment, not one take each in two moments: a film whose
-    /// busiest moment is one person wide gets a one-up canvas.
     func testCanvasIsSetByTheBusiestMomentNotTheClipCount() async throws {
         let portrait = try await fixture(.portrait)
         let clips = [
@@ -118,10 +111,7 @@ final class DefaultFilmAspectTests: XCTestCase {
         XCTAssertGreaterThan(model.filmRatio, 1)
     }
 
-    // MARK: - Square
 
-    /// A square room's takes arrive square, so one-up and 2×2 land on a square
-    /// canvas with nothing cropped and nothing padded.
     func testSquareTakesKeepASquareCanvasWhereTheGridAllowsIt() throws {
         for count in [1, 4] {
             let size = VideoStitcher.mosaicRenderSize(
@@ -132,19 +122,11 @@ final class DefaultFilmAspectTests: XCTestCase {
         }
     }
 
-    /// Two square takes stack into 1:2 — twice as tall as wide, still watchable
-    /// on a phone, and every pixel of both takes intact.
     func testTwoSquareTakesStackWithoutCropping() throws {
         let size = VideoStitcher.mosaicRenderSize(count: 2, sourceAspect: 1, longEdge: 960)
         XCTAssertEqual(size.width / size.height, 0.5, accuracy: 0.01)
     }
 
-    /// Three would want 1:3, which is crop-free and unwatchable. Past the
-    /// elongation limit the canvas becomes the take's own shape instead and the
-    /// compositor's fit-and-bed is what keeps all three whole.
-    ///
-    /// The limit must not fire for the two shapes a phone films: 9:16 three-up
-    /// is 27:16 and 16:9 three-up is 16:27, both inside it.
     func testThreeSquareTakesFallBackToTheTakesOwnShape() throws {
         let square = VideoStitcher.mosaicRenderSize(count: 3, sourceAspect: 1, longEdge: 960)
         XCTAssertEqual(square.width / square.height, 1, accuracy: 0.01)
@@ -158,8 +140,6 @@ final class DefaultFilmAspectTests: XCTestCase {
         XCTAssertEqual(landscape.width / landscape.height, 16.0 / 27, accuracy: 0.02)
     }
 
-    /// The camera writes the sensor's whole frame whatever the room asked for,
-    /// so a square room's clip is square because of this crop and nothing else.
     func testSquareCropTurnsAPortraitTakeSquareAndKeepsItsLength() async throws {
         let portrait = try await fixture(.portrait)
         let before = try await AVURLAsset(url: portrait).load(.duration).seconds
@@ -179,8 +159,6 @@ final class DefaultFilmAspectTests: XCTestCase {
         XCTAssertEqual(after, before, accuracy: 0.1, "the crop must not trim the take")
     }
 
-    /// A take that cannot be cropped is still the take somebody just filmed:
-    /// the original URL comes back rather than nothing.
     func testSquareCropReturnsTheOriginalWhenItCannotWork() async throws {
         let missing = FileManager.default.temporaryDirectory
             .appendingPathComponent("not-a-clip-\(UUID().uuidString).mov")

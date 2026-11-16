@@ -1,11 +1,8 @@
 import XCTest
 @testable import AISetlog
 
-/// A clip holds a list of captions now. Everything saved before that — on this
-/// phone and in the room — has to read as a list of one.
 final class CaptionListTests: XCTestCase {
 
-    // MARK: - Old local data
 
     func testAnOldCardDecodesAsOneCaption() throws {
         let json = #"""
@@ -49,8 +46,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(draft.byteSize, 12)
     }
 
-    /// A save writes the list, and the first caption again under the old keys,
-    /// so an older build reading the same file still shows it.
     func testSavingWritesTheListAndTheOldKeys() throws {
         let sticker = CaptionSticker(x: 0.3, y: 0.3, style: .solid)
         var card = DayCard(day: 1, clipFileName: "day1.mov")
@@ -66,7 +61,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(back.captions, card.captions)
     }
 
-    // MARK: - The first-caption shims
 
     func testSettingOverlayTextEditsOrRemovesTheFirstCaption() {
         var card = DayCard(day: 1)
@@ -78,7 +72,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(card.captions.map(\.text), ["b"])
     }
 
-    // MARK: - The room record
 
     func testTheRoomListWinsWhileItAgreesWithOverlayText() {
         let list = [Caption(text: "one"), Caption(text: "two")]
@@ -87,8 +80,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(read, list)
     }
 
-    /// 1.5 (31) rewrites `overlayText` and leaves `captionsJSON` behind; the
-    /// words just typed win over the stale list.
     func testAStaleRoomListLosesToOverlayText() {
         let list = [Caption(text: "old"), Caption(text: "two")]
         let read = Caption.fromCloud(
@@ -122,7 +113,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(clip.captions.map(\.text), ["one", "two"])
     }
 
-    // MARK: - The store
 
     @MainActor
     func testUpdateCaptionsKeepsTheListAndDropsBlankOnes() throws {
@@ -149,8 +139,6 @@ final class CaptionListTests: XCTestCase {
         XCTAssertEqual(clip.replacingURL(URL(fileURLWithPath: "/tmp/b.mov")).captions.count, 2)
     }
 
-    /// A caption edit that failed to reach the room is sent again on the next
-    /// sync — and only then: a take the room already agrees with is left alone.
     func testStaleRoomCaptionsAreNoticed() {
         func room(_ overlay: String?, _ list: [Caption]?) -> CloudKitService.RemoteClip {
             CloudKitService.RemoteClip(
@@ -164,11 +152,8 @@ final class CaptionListTests: XCTestCase {
         XCTAssertTrue(ChallengeStore.captionsDiffer(local: [], remote: room("旧的", nil)))
         XCTAssertTrue(ChallengeStore.captionsDiffer(
             local: mine, remote: room("早上好", [Caption(text: "早上好")])))
-        // Rebuilt from overlayText the ids are new; same words are no change.
         XCTAssertFalse(ChallengeStore.captionsDiffer(
             local: [Caption(text: "早上好")], remote: room("早上好", nil)))
-        // Without the list on the record only the first words can be compared,
-        // so a second caption alone must not resend forever.
         XCTAssertFalse(ChallengeStore.captionsDiffer(local: mine, remote: room("早上好", nil)))
         XCTAssertFalse(ChallengeStore.captionsDiffer(local: [], remote: room(nil, nil)))
     }

@@ -1,7 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Two real session/archive clients; the server is deliberately local and injectable.
 @MainActor
 final class RoomChatTwoClientRegressionTests: XCTestCase {
     private final class Server: RoomChatTransport {

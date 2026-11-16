@@ -25,8 +25,6 @@ class StoryTemplate {
   final List<String> momentKeys;
 }
 
-/// Keys and template identity match the iOS ChallengeTemplate catalog.
-/// The Android library remains local until a shared room backend exists.
 const storyTemplates = <StoryTemplate>[
   StoryTemplate(
     key: 'Live With Me',

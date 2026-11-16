@@ -1,9 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// The one-line note under the faces, with a mic to say it instead of typing.
-/// Tap the mic to start, tap again to stop; the live transcript is appended to
-/// whatever was already typed.
 struct MoodNoteField: View {
     let entry: MoodEntry
     let onCommit: (String) -> Void

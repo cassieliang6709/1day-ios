@@ -7,7 +7,6 @@ final class RoomChatRecordCodecTests: XCTestCase {
               text: "你好 👋", createdAt: Date(timeIntervalSince1970: 123), moment: moment)
     }
 
-    /// What the Worker would send back for a message this phone wrote.
     private func row(for message: RoomChatMessage, targetAuthorID: String? = nil) -> CloudKitService.CommentBody {
         let write = RoomChatRecordCodec.encode(message)
         return .init(id: message.id.uuidString, roomCode: write.roomCode, day: write.day,
@@ -47,8 +46,6 @@ final class RoomChatRecordCodecTests: XCTestCase {
         XCTAssertThrowsError(try RoomChatRecordCodec.decode(noAuthor, roomCode: "ABCDEF"))
     }
 
-    /// One row that didn't parse used to throw for the whole conversation, so
-    /// nobody in the room saw any new message.
     func testOneBadRowDoesNotHideTheRestOfTheConversation() throws {
         let good = [message(), message()]
         let json = """

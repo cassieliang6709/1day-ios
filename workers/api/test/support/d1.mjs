@@ -1,7 +1,3 @@
-/**
- * Just enough of D1 and R2 for tests, on Node's built-in sqlite: the real
- * migration runs, so the SQL under test is the SQL that ships.
- */
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,7 +14,6 @@ class Statement {
     return new Statement(this.db, this.sql, params);
   }
   #named() {
-    // D1 takes `?1`-style positions; node:sqlite wants them as an object.
     if (!/\?\d/.test(this.sql)) return [this.params];
     const named = {};
     this.params.forEach((value, i) => {

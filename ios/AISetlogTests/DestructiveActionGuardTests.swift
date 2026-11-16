@@ -1,17 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The copy on the three "are you sure" dialogs.
-///
-/// A confirmation is only worth the tap it costs if it says the right thing.
-/// Two of these used to say nothing at all — deleting a story and leaving a
-/// room were the same menu item, went straight through with no dialog, and had
-/// opposite consequences. The wording is what carries that difference, so it is
-/// what gets pinned here.
-///
-/// `ChallengeStore.delete` is the source of truth these assertions are written
-/// against: it deletes local clip files, clears the room locally, and leaves the
-/// shared CloudKit records alone.
 final class DestructiveActionGuardTests: XCTestCase {
 
     override func tearDown() {
@@ -22,7 +11,6 @@ final class DestructiveActionGuardTests: XCTestCase {
     private func inChinese() { UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey) }
     private func inEnglish() { UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey) }
 
-    // MARK: Deleting a story
 
     func testDeletingAStorySaysHowManyClipsGoWithIt() {
         inChinese()
@@ -31,8 +19,6 @@ final class DestructiveActionGuardTests: XCTestCase {
         XCTAssertTrue(Strings.deleteStoryWarning(3).contains("3"))
     }
 
-    /// A story with nothing filmed has no clips to warn about, and claiming
-    /// "0 clips will be deleted" reads like a bug.
     func testAnEmptyStoryIsNotWarnedAboutClips() {
         for setLanguage in [inChinese, inEnglish] {
             setLanguage()
@@ -55,11 +41,7 @@ final class DestructiveActionGuardTests: XCTestCase {
         }
     }
 
-    // MARK: Leaving a room
 
-    /// Leaving a room deletes your own clips, reactions, comments and member
-    /// record (commit e1b304f), so the warning must say they go for good, and
-    /// must still not be the same sentence as the story-deletion one.
     func testLeavingARoomWarnsTheClipsAreDeleted() {
         inChinese()
         let zh = Strings.leaveRoomWarning
@@ -74,10 +56,7 @@ final class DestructiveActionGuardTests: XCTestCase {
         XCTAssertNotEqual(en, Strings.deleteStoryWarning(3))
     }
 
-    // MARK: Leaving the camera with a clip in review
 
-    /// "Keep" and "Discard" on their own are a coin toss — keep it *where*?
-    /// The footnote is the part that makes the choice answerable.
     func testTheKeepOrDiscardFootnoteSaysWhereKeepPutsIt() {
         inChinese()
         XCTAssertTrue(Strings.keepClipFootnote.contains("我的"))
@@ -85,11 +64,7 @@ final class DestructiveActionGuardTests: XCTestCase {
         XCTAssertTrue(Strings.keepClipFootnote.contains("Mine"))
     }
 
-    // MARK: Camera permission
 
-    /// Denied and unavailable need different words because they need different
-    /// actions: iOS never re-asks, so "try again" on a denied camera is a
-    /// button that cannot work, and the only way out is Settings.
     func testDeniedCameraIsWordedDifferentlyFromAnUnavailableOne() {
         for setLanguage in [inChinese, inEnglish] {
             setLanguage()
@@ -102,7 +77,6 @@ final class DestructiveActionGuardTests: XCTestCase {
         XCTAssertTrue(Strings.cameraDeniedFootnote.contains("Settings"))
     }
 
-    // MARK: Both languages
 
     func testEveryNewWarningIsWrittenInBothLanguages() {
         inChinese()

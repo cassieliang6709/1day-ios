@@ -2,7 +2,6 @@ import XCTest
 
 @testable import AISetlog
 
-/// Which moment the home card's button opens. Today's, not the earliest empty.
 final class TodaysSlotTests: XCTestCase {
     private func progress(total: Int, filled: Set<Int>) -> RoomProgress {
         RoomProgress(
@@ -13,10 +12,7 @@ final class TodaysSlotTests: XCTestCase {
             myID: "me")
     }
 
-    // MARK: - Seven-day stories, where a slot is a day
 
-    /// The bug this exists for: Tuesday missed, Thursday open, and the button
-    /// sent you back to Tuesday.
     func testAMissedDayDoesNotHijackTodaysButton() {
         let p = progress(total: 7, filled: [1, 3])
         XCTAssertEqual(p.nextOpenMoment, 2, "the old rule")
@@ -29,9 +25,6 @@ final class TodaysSlotTests: XCTestCase {
         XCTAssertEqual(p.slotToOffer(today: 4), 4)
     }
 
-    /// Once today is filmed the button has to point somewhere useful, and
-    /// re-filming today is not it — so the earliest gap comes back, and the
-    /// label is told to say which day that is.
     func testOnceTodayIsFilmedTheEarliestGapComesBack() {
         let p = progress(total: 7, filled: [1, 4])
         XCTAssertEqual(p.slotToOffer(today: 4), 2)
@@ -54,11 +47,7 @@ final class TodaysSlotTests: XCTestCase {
         XCTAssertEqual(p.slotToOffer(today: 2), 3)
     }
 
-    // MARK: - One-day stories, where every slot is today
 
-    /// Passing `nil` keeps the old rule, which is the right one here: three
-    /// moments of one day are not three days, so "the earliest empty" is what
-    /// "what's next" means.
     func testAOneDayStoryUsesTheEarliestEmptyMoment() {
         let p = progress(total: 3, filled: [1])
         XCTAssertEqual(p.slotToOffer(today: nil), 2)

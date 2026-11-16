@@ -1,14 +1,8 @@
 import XCTest
 @testable import AISetlog
 
-/// The arithmetic behind the three dials.
-///
-/// `PersonalEffectFilterTests` covers the pixels; this covers the numbers that
-/// get handed to Core Image, the clamping that stops a bad stored value turning
-/// into a bad picture, and the rule about whether a grade survives a relaunch.
 final class PersonalEffectParametersTests: XCTestCase {
 
-    // MARK: Range
 
     func testCentreIsTheUntouchedSource() {
         XCTAssertTrue(PersonalEffectParameters().isIdentity)
@@ -25,15 +19,12 @@ final class PersonalEffectParametersTests: XCTestCase {
         XCTAssertEqual(over.contrast, 50)
     }
 
-    /// A NaN read off disk must not travel any further: Core Image takes it
-    /// without complaining and renders a blank frame.
     func testNonFiniteValuesFallBackToCentre() {
         let bad = PersonalEffectParameters(
             exposure: .nan, temperature: .infinity, contrast: -.infinity)
         XCTAssertTrue(bad.isIdentity)
     }
 
-    // MARK: Core Image units
 
     func testExposureMapsToOnePointFiveStopsEitherWay() {
         XCTAssertEqual(PersonalEffectParameters(exposure: 50).exposureEV, 1.5, accuracy: 0.0001)
@@ -41,9 +32,6 @@ final class PersonalEffectParametersTests: XCTestCase {
         XCTAssertEqual(PersonalEffectParameters().exposureEV, 0, accuracy: 0.0001)
     }
 
-    /// The inversion worth pinning: `CITemperatureAndTint` corrects *towards*
-    /// the target white point, so a warmer picture needs a lower number. Wiring
-    /// this the intuitive way round makes "warm" come out blue.
     func testWarmerMeansALowerTargetWhitePoint() {
         let neutral = PersonalEffectParameters.neutralTemperature
         XCTAssertEqual(PersonalEffectParameters().targetTemperature, neutral, accuracy: 0.0001)
@@ -61,7 +49,6 @@ final class PersonalEffectParametersTests: XCTestCase {
             PersonalEffectParameters(contrast: -50).contrastMultiplier, 0.6, accuracy: 0.0001)
     }
 
-    // MARK: Storage
 
     func testRawValueSurvivesARoundTrip() {
         let original = PersonalEffectParameters(exposure: -12, temperature: 34, contrast: 7)
@@ -76,9 +63,6 @@ final class PersonalEffectParametersTests: XCTestCase {
         XCTAssertNil(PersonalEffectParameters(rawValue: "1,two,3"))
     }
 
-    /// The old `gentleLook.v1` string is three numbers separated by commas too,
-    /// so it parses. It must not be *read*, because those numbers were a 0...1
-    /// smoothing/brightness/warmth triple and mean nothing on these dials.
     func testTheOldStorageKeyIsNotReusedSoLegacyValuesCannotBeMisread() {
         XCTAssertNotEqual(PersonalEffectParameters.storageKey, "gentleLook.v1")
         XCTAssertNotEqual(PersonalEffectParameters.stickyKey, "gentleLook.sticky.v1")
@@ -99,7 +83,6 @@ final class PersonalEffectParametersTests: XCTestCase {
         XCTAssertEqual(decoded, PersonalEffectParameters(exposure: 25))
     }
 
-    // MARK: Whether it sticks
 
     func testAGradeOnlySurvivesRelaunchWhenYouAskedItTo() {
         let graded = PersonalEffectParameters(exposure: 20)

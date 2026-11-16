@@ -1,8 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Clips threaded into the room chat by time (1.5). Built on the phone from
-/// the room's clips — nothing new is sent — so the merge is the feature.
 final class RoomChatTimelineTests: XCTestCase {
     private let myID = "me"
     private let base = Date(timeIntervalSince1970: 2_000_000)
@@ -40,8 +38,6 @@ final class RoomChatTimelineTests: XCTestCase {
                        ["msg", "clip", "msg", "clip", "msg"])
     }
 
-    /// A clip and a message from the same instant: the clip first, so the
-    /// message reads as being about it.
     func testClipGoesBeforeAMessageAtTheSameInstant() {
         let events = RoomChatTimeline.clipEvents(
             from: [clip("ana", day: 1, at: 10)], myID: myID, momentTitle: { _ in nil })
@@ -67,8 +63,6 @@ final class RoomChatTimelineTests: XCTestCase {
         XCTAssertEqual(Strings.chatClipEvent(name: "小蓝", moment: nil), "小蓝 拍了一段")
     }
 
-    /// A shared room's slot has a name or nothing — never 「第 N 天」 — while
-    /// a solo story keeps its day wording.
     func testRoomSlotLabelNeverFallsBackToADay() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         let cards = (1...3).map { DayCard(day: $0) }

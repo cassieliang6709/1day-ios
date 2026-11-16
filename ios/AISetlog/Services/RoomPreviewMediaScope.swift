@@ -1,8 +1,6 @@
 import Foundation
 import SwiftUI
 
-/// Session-owned derived files and cache for the real room UI in local mode.
-/// Never register source clips here. No global cache or production persistence.
 @MainActor
 final class RoomPreviewMediaScope {
     private var outputs: Set<URL> = []

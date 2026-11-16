@@ -1,7 +1,6 @@
 import Foundation
 import UserNotifications
 
-/// Reconciles the complete set of on-device evening capture reminders.
 enum ReminderService {
     struct PlannedReminder: Equatable {
         let challengeID: UUID
@@ -21,7 +20,6 @@ enum ReminderService {
     private static let scheduler = ReminderScheduler()
     private static let prefix = "reminder."
 
-    /// Evening capture reminders are off (1.5).
     static let schedulesEveningReminders = false
 
     static func reconcile(for challenges: [Challenge]) {
@@ -94,10 +92,6 @@ enum ReminderService {
                       fireDate > now
                 else { continue }
                 let prompt = challenge.momentValue(forSlot: card.day)
-                // A shared room doesn't number its days on screen any more
-                // (1.5), so its reminder can't either: 「第 3 天到了」 would be
-                // the only place the room still says which day it is. Solo
-                // stories keep the day — there it is the plan.
                 let body = challenge.isShared
                     ? Strings.roomReminderBody(prompt: prompt.map { MomentCatalog.localize($0) })
                     : prompt.map {
@@ -163,9 +157,6 @@ enum ReminderService {
 
         func reconcile(challenges: [Challenge]) async {
             await removeScheduledReminders()
-            // Off (1.5): an evening nudge to film is the app telling you to
-            // record, which it doesn't do any more. Reconciling still clears
-            // whatever an earlier build scheduled.
             guard ReminderService.schedulesEveningReminders else { return }
             guard NotificationPreferences.eveningEnabled else { return }
             let settings = await center.notificationSettings()

@@ -1,29 +1,19 @@
 import SwiftUI
 
-/// The vertical timeline: the app's core idea, as a component.
-///
-/// Everyone's moments hang off one line, ordered by when they happened. It is
-/// deliberately not a grid or a collage — a grid says "seven things you did",
-/// a line says "one day, and here is how it went".
 
-// MARK: - Rail
 
-/// The line and its node. Drawn as a background behind the row's content so
-/// the line's length always matches the row's height, however tall the card is.
 struct TimelineRail: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isFirst = false
     var isLast = false
-    /// Filled nodes are moments that exist; hollow ones are still to come.
     var isFilled = true
     var tint: Color = .oneDayBrand
-    /// The next moment to film pulses gently — the one live thing on screen.
     var isNext = false
 
     private let nodeSize: CGFloat = 13
 
     var body: some View {
         ZStack(alignment: .top) {
-            // The line, trimmed at the ends so the day starts and stops.
             VStack(spacing: 0) {
                 Rectangle()
                     .fill(isFirst ? Color.clear : Color.oneDaySky.opacity(0.35))
@@ -59,14 +49,10 @@ struct TimelineRail: View {
                         .padding(-2.5)
                 }
         }
-        .symbolEffect(.pulse, isActive: isNext)
+        .symbolEffect(.pulse, isActive: isNext && !reduceMotion)
     }
 }
 
-/// The time column: when this moment was filmed, plus a glyph for the part of
-/// the day it landed in. `label` is nil for a moment that hasn't happened yet
-/// — the column stays blank rather than inventing a time, and the fixed width
-/// keeps the rail aligned regardless.
 struct TimelineStamp: View {
     let label: String?
     var caption: String?
@@ -102,21 +88,12 @@ struct TimelineStamp: View {
     }
 }
 
-// MARK: - Clip card
 
-/// One moment on the timeline. Either footage that exists, or the shape of
-/// footage that doesn't yet.
 struct TimelineClip: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     enum State {
-        /// Filmed — show the frame.
         case filmed(url: URL, recordedAt: Date?)
-        /// Mine to film, and it's next up.
         case mine
-        // No `.waiting(friend:)` any more. A friend who hasn't filmed used to
-        // get a 120pt card under every moment they hadn't filmed; who the room
-        // is waiting on is one line at the bottom of the story page now, and
-        // `RoomCast` is the only thing that decides it.
-        /// A slot further down the day that nobody is on yet.
         case upcoming
     }
 
@@ -139,15 +116,12 @@ struct TimelineClip: View {
         .glassSurface(radius: OneDay.Radius.card, tint: tintForState)
         .contentShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
         .onTapGesture { onTap?() }
-        // A tap gesture isn't a button to VoiceOver: without these the card
-        // read as loose text and image fragments with no way to activate it.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityTitle)
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
         .accessibilityAction { onTap?() }
     }
 
-    /// Whose moment, which one, and — for an empty slot — that tapping films it.
     private var accessibilityTitle: String {
         let who = authorName ?? Strings.youLabel
         switch state {
@@ -163,7 +137,6 @@ struct TimelineClip: View {
         return nil
     }
 
-    // MARK: Byline
 
     private var byline: some View {
         HStack(spacing: 8) {
@@ -175,18 +148,11 @@ struct TimelineClip: View {
                     .foregroundStyle(OneDay.ink)
                     .lineLimit(1)
             case .upcoming:
-                // Fixed size: centred in a fixed 22pt disc, matching the avatar
-                // it stands in for.
                 Image(systemName: momentIcon)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.oneDaySky)
                     .frame(width: 22, height: 22)
                     .background(OneDay.surfaceSoft, in: Circle())
-                // Nothing to say when the story has no prompts. This used to
-                // fall back to "Film this moment" — which, down a record-by-time
-                // timeline, printed the same seven words seven times, under a
-                // frame that already says "tap to film". A story with no titles
-                // should look like one, not like seven identical to-dos.
                 if showsMomentTitle {
                     Text(momentTitle)
                         .font(OneDay.Font.rounded(.footnote, weight: .bold))
@@ -228,20 +194,16 @@ struct TimelineClip: View {
         .background(OneDay.surfaceSoft, in: Capsule())
     }
 
-    // MARK: Media
 
     @ViewBuilder
     private var media: some View {
         switch state {
         case .filmed(let url, let recordedAt):
-            ClipThumbnail(url: url, refreshToken: recordedAt)
-                .clipBox(height: mediaHeight)
-                .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
+            ClipTile(url: url, refreshToken: recordedAt)
+                .frame(height: mediaHeight)
+                .frame(maxWidth: .infinity)
                 .overlay(alignment: .bottomLeading) {
                     if showsMomentTitle {
-                        // Dark glass, not a bare material: the material went
-                        // near-white in light mode and the white title on it
-                        // vanished over a bright frame.
                         Text(momentTitle)
                             .font(OneDay.Font.rounded(.caption, weight: .bold))
                             .lineLimit(1)
@@ -265,7 +227,7 @@ struct TimelineClip: View {
                     Image(systemName: showsMomentTitle ? momentIcon : "camera.fill")
                         .font(OneDay.Font.rounded(.title2, weight: .medium))
                         .foregroundStyle(OneDay.brandText)
-                        .symbolEffect(.pulse)
+                        .symbolEffect(.pulse, isActive: !reduceMotion)
                     if showsMomentTitle {
                         Text(momentTitle)
                             .font(OneDay.Font.rounded(.subheadline, weight: .bold))
@@ -280,11 +242,7 @@ struct TimelineClip: View {
             }
 
         case .upcoming:
-            // Same words as `.mine`, quieter. The difference is emphasis, not
-            // permission — saying "later today" would be a lie for a moment
-            // whose slot has already passed.
             EmptyFrame {
-                // No icon here — the byline above already carries it.
                 Text(Strings.tapToFilm)
                     .font(OneDay.Font.caption)
                     .foregroundStyle(OneDay.inkFaint)
@@ -295,11 +253,7 @@ struct TimelineClip: View {
     }
 }
 
-// MARK: - Row
 
-/// One position in the day: the stamp, the rail, and everything filed under
-/// that time. In a shared room several friends can land on the same slot, so
-/// a row holds a stack of clips rather than exactly one.
 struct TimelineRow<Content: View>: View {
     let stamp: TimelineStamp
     var isFirst = false

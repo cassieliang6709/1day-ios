@@ -1,35 +1,24 @@
 import Foundation
 
-/// A recorded clip labeled with its challenge day — the stitcher's input.
-/// In a shared room a single day can hold several clips (one per friend), so
-/// `id` is unique rather than the day number.
-struct DayClip: Identifiable, Equatable {
+struct DayClip: Identifiable, Equatable, Codable {
     let id: String
     let day: Int
     let url: URL
     var authorName: String?
     var authorID: String?
     var label: String?
-    /// The clip's own words, every one of them, in the order they were added.
     var captions: [Caption]
-    /// The first caption's words.
     var overlayText: String? {
         get { captions.firstText }
         set { captions.setFirstText(newValue) }
     }
-    /// Where the first caption sits. Nil draws it at `CaptionSticker.default`,
-    /// which is where every caption used to go.
     var captionSticker: CaptionSticker? {
         get { captions.first?.sticker }
         set { captions.setFirstSticker(newValue) }
     }
     var recordedAt: Date?
-    /// Which take of this person's moment this is. Nil is take 1 — the card's
-    /// own fields, and the only take a clip from before takes existed has.
     var takeID: UUID?
-    /// Emoji to float onto this clip in the final film (from its reactions).
     var emoji: [String]
-    /// "name: text" comments to bubble up in the final film.
     var comments: [String]
 
     init(
@@ -60,10 +49,6 @@ struct DayClip: Identifiable, Equatable {
         self.id = key ?? "day\(day)"
     }
 
-    /// The same clip, read from somewhere else. For handing a processed copy of
-    /// the footage onward without the rest of the app noticing: the `id` is
-    /// carried over, so this is still that moment by that person and not a new
-    /// one that happens to look the same.
     func replacingURL(_ url: URL) -> DayClip {
         DayClip(
             day: day, url: url, authorName: authorName, authorID: authorID,

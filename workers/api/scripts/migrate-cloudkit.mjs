@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-/**
- * One-off: copies everything in CloudKit's public database (rooms, members,
- * clips with their videos, avatars, reactions, chat, pokes) into D1 and R2.
- * Ids, authors and times stay exactly as they were, so the app finds the
- * same rooms with the same clips under the same people.
- *
- * Not copied: the mood diary (each person's private iCloud — a server key
- * can't read it; the app uploads its local copy on first sync) and push
- * subscriptions (phones register again on their own).
- *
- * Needs a CloudKit server-to-server key (see README, "上线步骤"):
- *
- *   CK_KEY_ID=<key id> CK_KEY_FILE=eckey.pem node scripts/migrate-cloudkit.mjs
- *
- * Writes `migration-out/import.sql` and `migration-out/media/…`, touching
- * nothing remote. Add `--upload` to also run the wrangler commands that put
- * the media in R2 and the rows in D1. Safe to run again: rows are
- * INSERT OR REPLACE, keyed by their CloudKit record name.
- */
 import { createHash, createSign, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -36,7 +17,6 @@ if (!KEY_ID || !KEY) {
   process.exit(1);
 }
 
-// MARK: - CloudKit Web Services
 
 async function ck(operation, body) {
   const subpath = `/database/1/${CONTAINER}/${ENVIRONMENT}/public/${operation}`;
@@ -61,8 +41,6 @@ async function ck(operation, body) {
   return json;
 }
 
-/** Every record of a type. A type nobody ever wrote answers an error, which
- * is "none". Needs `recordName` QUERYABLE on the type. */
 async function all(recordType) {
   const records = [];
   let continuationMarker;
@@ -83,7 +61,6 @@ async function all(recordType) {
 
 const field = (r, name) => r.fields?.[name]?.value ?? null;
 
-// MARK: - SQL
 
 function sqlValue(v) {
   if (v === null || v === undefined) return 'NULL';
@@ -97,9 +74,8 @@ function insert(table, row) {
   lines.push(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((c) => sqlValue(row[c])).join(', ')});`);
 }
 
-// MARK: - Media
 
-const media = []; // [key, file, contentType]
+const media = [];
 async function copyAsset(asset, owner, extension, contentType) {
   if (!asset?.downloadURL) return null;
   const key = `${mediaPrefix(owner)}${randomUUID()}.${extension}`;
@@ -116,7 +92,6 @@ async function copyAsset(asset, owner, extension, contentType) {
   return key;
 }
 
-// MARK: - Copy
 
 mkdirSync(OUT, { recursive: true });
 const now = Date.now();
@@ -162,7 +137,7 @@ for (const r of await all('Clip')) {
   const code = field(r, 'roomCode');
   if (!author || !code) continue;
   const videoKey = await copyAsset(field(r, 'video'), author, 'mov', 'video/quicktime');
-  if (!videoKey) continue; // a clip without its video shows nothing
+  if (!videoKey) continue;
   insert('clips', {
     id: r.recordName,
     room_code: code,
@@ -228,8 +203,6 @@ if (!UPLOAD) {
   process.exit(0);
 }
 
-// Media first: a row that points at a file not uploaded yet would show a
-// clip that can't play.
 for (const [key, file, type] of media) {
   if (!existsSync(file)) continue;
   execFileSync('wrangler', ['r2', 'object', 'put', `oneday-media/${key}`, '--file', file, '--content-type', type, '--remote'], { stdio: 'inherit' });

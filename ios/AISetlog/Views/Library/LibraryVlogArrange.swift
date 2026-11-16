@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// The vlog sheet's first step: the picked clips in the order they'll play,
-/// dragged into a different order if wanted, any one previewed on top.
 struct LibraryVlogArrange: View {
     @Binding var order: [LibraryClip]
     let onMake: () -> Void
@@ -38,7 +36,6 @@ struct LibraryVlogArrange: View {
         .padding(.horizontal, 20)
     }
 
-    /// The tapped clip, else the first one, looping.
     @ViewBuilder
     private var preview: some View {
         if let clip = previewing ?? order.first {
@@ -73,9 +70,8 @@ struct LibraryVlogArrange: View {
                     .foregroundStyle(.white)
                     .frame(width: 26, height: 26)
                     .background(Color.oneDayBrand, in: Circle())
-                ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                ClipTile(url: clip.url, refreshToken: clip.recordedAt)
                     .frame(width: 40, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(clip.recordedAt.formatted(
                         .dateTime.month().day().hour().minute()
@@ -101,7 +97,6 @@ struct LibraryVlogArrange: View {
         .accessibilityIdentifier("vlog-arrange-row-\(number)")
     }
 
-    /// The story the clip is in; nil for a draft, which is in none.
     private func sourceName(_ clip: LibraryClip) -> String? {
         switch clip.source {
         case .story(_, let title, _): title

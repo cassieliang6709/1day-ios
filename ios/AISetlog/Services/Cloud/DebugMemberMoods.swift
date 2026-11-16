@@ -1,10 +1,6 @@
 #if DEBUG
 import Foundation
 
-/// Debug-only: gives everyone who has footage in a room a mood for today, so
-/// the room page's mood faces can be seen (and screenshotted) on a Simulator
-/// that can't read real `Member` records. Off unless the app is launched with
-/// `-debugMemberMoods YES`. Nothing is written anywhere.
 @MainActor
 enum DebugMemberMoods {
     static let flagKey = "debugMemberMoods"

@@ -20,8 +20,6 @@ export type MobileDeviceGeometry = {
 };
 
 export const iphoneGeometry = {
-  // CSS-space coordinates for the 3x iPhone assets. Keep source PNG dimensions
-  // divisible by 3 so the rendered phone frame lands on whole CSS pixels.
   device: {
     width: 511,
     height: 968,
@@ -43,8 +41,6 @@ export const iphoneGeometry = {
 } as const satisfies MobileDeviceGeometry;
 
 export const pixelGeometry = {
-  // Pixel10.png is a 2x asset. Its 854 x 1904 screen opening renders at
-  // exactly 427 x 952 CSS pixels inside the 566 x 1022 asset canvas.
   device: {
     width: 566,
     height: 1022,

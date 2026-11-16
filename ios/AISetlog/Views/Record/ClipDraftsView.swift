@@ -1,25 +1,15 @@
 import SwiftUI
 
-/// Where clips wait when there was nowhere to file them.
-///
-/// PR-4 gave "keep it for now" somewhere to write to; without this screen that
-/// was a one-way door — the clip survived, but nobody could ever reach it
-/// again. Filing and deleting both live here, and both take the file with them
-/// so a draft can't outlive its bytes or the other way round.
 struct ClipDraftsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
 
     @State private var filing: ClipDraft?
-    /// The draft whose delete is waiting on a yes. A draft is the only copy of
-    /// that take — it exists because there was nowhere else to put it — so a
-    /// menu item one mis-tap from 归档到… can't be the whole decision.
     @State private var pendingDelete: ClipDraft?
     @State private var blocked: DraftFilingBlocked?
     @State private var toast: String?
 
-    /// Bound only so a language change re-renders the list.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
@@ -113,9 +103,8 @@ struct ClipDraftsView: View {
     private func row(_ draft: ClipDraft) -> some View {
         let canFile = !candidates(for: draft).isEmpty
         return HStack(spacing: 13) {
-            ClipThumbnail(url: drafts.url(for: draft), refreshToken: draft.recordedAt)
+            ClipTile(url: drafts.url(for: draft), refreshToken: draft.recordedAt)
                 .frame(width: 58, height: 58)
-                .clipShape(RoundedRectangle(cornerRadius: 13))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(recordedLine(draft))
@@ -128,9 +117,6 @@ struct ClipDraftsView: View {
                     .foregroundStyle(OneDay.inkSoft)
                     .lineLimit(1)
 
-                // Tappable, not just stated. The line names the symptom; what
-                // a person wants next is what to do about it, and the row is
-                // where they are looking when they want it.
                 if !canFile {
                     Button {
                         blocked = filingBlocked(for: draft)
@@ -151,11 +137,6 @@ struct ClipDraftsView: View {
             Spacer(minLength: 4)
 
             Menu {
-                // Always offered, even when it can't run. Hiding it left the
-                // menu on an unfilable draft holding nothing but 删除 — the
-                // one action that ends with the clip gone — and no statement
-                // anywhere of what would make filing possible. It says that
-                // now, in the alert.
                 Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
                     if canFile {
                         filing = draft
@@ -189,7 +170,6 @@ struct ClipDraftsView: View {
         .padding(30)
     }
 
-    // MARK: - Copy
 
     private func recordedLine(_ draft: ClipDraft) -> String {
         draft.recordedAt.formatted(
@@ -197,8 +177,6 @@ struct ClipDraftsView: View {
                 .locale(AppLanguage.effective.locale))
     }
 
-    /// 「胶片机 · 3.2 MB」: the camera it was filmed with, read from the file
-    /// (`ClipCameraIndex`), then its size. No camera, or not read yet: size only.
     private func detailLine(_ draft: ClipDraft) -> String {
         let key = ClipCameraIndex.key(url: drafts.url(for: draft), recordedAt: draft.recordedAt)
         let camera = ClipCameraIndex.shared.cameras[key].flatMap { $0 == .standard ? nil : $0 }
@@ -206,7 +184,6 @@ struct ClipDraftsView: View {
             .compactMap { $0 }.joined(separator: " · ")
     }
 
-    // MARK: - Actions
 
     private func candidates(for draft: ClipDraft) -> [Challenge] {
         DraftFiler.candidates(for: draft, in: store)
@@ -216,7 +193,6 @@ struct ClipDraftsView: View {
         DraftFiler.blocked(for: draft, in: store)
     }
 
-    /// See `DraftFiler.archive`: shared with 我的's grid.
     private func archive(_ draft: ClipDraft, to challenges: [Challenge]) {
         showToast(DraftFiler.archive(draft, to: challenges, store: store, drafts: drafts))
     }
@@ -230,22 +206,8 @@ struct ClipDraftsView: View {
     }
 }
 
-/// Picking the stories a clip goes into — one, or several.
-///
-/// Replaces the `confirmationDialog` both filing paths used to raise, which
-/// listed story names and filed into whichever one you tapped. One clip could
-/// only ever have one home, so a take that belonged both in your own story and
-/// in the room you share with the people who were there meant filming it twice.
-/// `ClipFileStore.storeClip` copies rather than moves, so nothing about the
-/// storage layer required that limit.
-///
-/// Every row says which slot the clip would land in, because with several
-/// selected "where does each copy go" stops being obvious — see
-/// `ClipFiling.targetDay`, whose answer is the first empty moment, per story.
 struct ClipFilingSheet: View {
     let candidates: [Challenge]
-    /// Called with the chosen stories, in the order they were listed. Never
-    /// called empty — the button is disabled until something is picked.
     let onFile: ([Challenge]) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -337,13 +299,6 @@ struct ClipFilingSheet: View {
     }
 }
 
-/// The camera tab's way in: only there when there's something waiting, so it
-/// never becomes another permanent piece of chrome over the viewfinder.
-///
-/// `compact` is the camera's top-bar form: tray and count only, sized to the
-/// slot beside the wordmark. The full sentence used to float 88pt down, inside
-/// the frame, where on a small phone it sat on the timer chip; VoiceOver still
-/// gets the sentence.
 struct DraftsEntryButton: View {
     let count: Int
     var compact = false

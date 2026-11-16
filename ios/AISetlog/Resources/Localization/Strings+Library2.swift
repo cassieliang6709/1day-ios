@@ -1,7 +1,5 @@
 import Foundation
 
-/// Copy for 我的's 待归档 chip, the vlog selection bar and arrange sheet, and
-/// the today rows. Its own file so parallel edits don't collide.
 extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
@@ -13,7 +11,6 @@ extension Strings {
     static var libraryCaptionPlaceholder: String { zh ? "这一段想说什么" : "Say something about this clip" }
     static var libraryCaptionSave: String { zh ? "好了" : "Done" }
 
-    /// "已选 4 段 · 约 8 秒". Seconds are nil until the files have been read.
     static func librarySelectedSummary(_ count: Int, seconds: Int?) -> String {
         let clips = zh ? "\(count) 段" : (count == 1 ? "1 clip" : "\(count) clips")
         guard let seconds, count > 0 else { return clips }
@@ -26,12 +23,9 @@ extension Strings {
         zh ? "按住右边的横线拖动换顺序，点一段看看。" : "Drag the handle to reorder. Tap a clip to preview it."
     }
 
-    /// The today row's button.
     static var todayKeepFilming: String { zh ? "继续拍" : "Film" }
     static var todayWatch: String { zh ? "看成片" : "Watch" }
 
-    // Filing a draft, without 竖屏/横屏/正方形: cameras decide the shape now.
-    // The matching underneath still checks the frame (old stories need it).
     static var draftNoPlace: String { zh ? "还没有房间" : "No rooms yet" }
     static var draftNoStoryYet: String {
         zh ? "这段还没有能放进去的选题。在「\(surfacePlans)」页点「＋ \(surfaceCompose)」建一个，就能放进去了。"

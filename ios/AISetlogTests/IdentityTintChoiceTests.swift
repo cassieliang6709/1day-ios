@@ -2,18 +2,15 @@ import XCTest
 
 @testable import AISetlog
 
-/// Picking your own avatar colour, and everybody else keeping the derived one.
 final class IdentityTintChoiceTests: XCTestCase {
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
-        // A suite of its own: these tests write the same keys the app does.
         defaults = UserDefaults(suiteName: "identity-tint-tests")
         defaults.removePersistentDomain(forName: "identity-tint-tests")
     }
 
-    // MARK: - The old rule still draws everybody
 
     func testTheDerivedColourIsStableForTheSameName() {
         XCTAssertEqual(
@@ -33,7 +30,6 @@ final class IdentityTintChoiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Your own pick
 
     func testPickingAColourOverridesTheDerivedOneForThatNameOnly() {
         let mine = "Cassie"
@@ -49,8 +45,6 @@ final class IdentityTintChoiceTests: XCTestCase {
             "somebody else's colour is not mine to change")
     }
 
-    /// The point of option A: your pick stands even when it collides with the
-    /// colour a friend in the room was given.
     func testACollisionWithSomebodyElsesColourIsAllowed() {
         let theirs = "Sam"
         let collision = Identity.derivedIndex(for: theirs)
@@ -61,8 +55,6 @@ final class IdentityTintChoiceTests: XCTestCase {
 
     func testRenamingYourselfDoesNotHandYourColourToTheNextPerson() {
         Identity.chooseTint(0, forName: "Cassie", in: defaults)
-        // The stored choice belongs to "Cassie"; a differently-named account
-        // reading the same device gets the derived colour.
         XCTAssertEqual(
             Identity.tintIndex(for: "Cassandra", in: defaults),
             Identity.derivedIndex(for: "Cassandra"))
@@ -76,8 +68,6 @@ final class IdentityTintChoiceTests: XCTestCase {
             Identity.derivedIndex(for: "Cassie"))
     }
 
-    /// A value from a build with a longer palette, or a corrupted one, must not
-    /// index past the end of the array.
     func testAnOutOfRangePickIsIgnoredRatherThanCrashing() {
         Identity.chooseTint(99, forName: "Cassie", in: defaults)
         XCTAssertEqual(

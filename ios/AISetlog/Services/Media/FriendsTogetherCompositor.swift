@@ -2,30 +2,12 @@ import AVFoundation
 import CoreImage
 import UIKit
 
-/// Where one person's take sits inside a shared-room frame, and which way up it
-/// was filmed.
-///
-/// `cell` is in render space with the origin at the top left, the same space
-/// `VideoStitcher.grid` already works in. Core Image counts from the bottom, so
-/// the flip happens once, inside the compositor, rather than in the layout maths
-/// that has tests against it.
 struct FriendsTogetherPlacement {
     let trackID: CMPersistentTrackID
     let cell: CGRect
     let orientation: CGImagePropertyOrientation
 
-    /// Which way a track has to be turned to be upright.
-    ///
-    /// `preferredTransform` is a display transform in a top-left coordinate
-    /// space; handing it straight to a `CIImage` (which counts from the bottom)
-    /// mirrors every rotation. `CIImage.oriented` takes the same four rotations
-    /// in a form that already knows about that difference, and fixes the extent
-    /// with them, so this reduces the transform to one of those four instead of
-    /// re-deriving the affine maths in the other space.
     static func orientation(for transform: CGAffineTransform) -> CGImagePropertyOrientation {
-        // Rounded, because a transform that came off a file is rarely exactly
-        // integral and the four cases are 90° apart — there is nothing in
-        // between for a tolerance to accidentally land on.
         let a = transform.a.rounded(), b = transform.b.rounded()
         let c = transform.c.rounded(), d = transform.d.rounded()
         switch (a, b, c, d) {
@@ -37,12 +19,6 @@ struct FriendsTogetherPlacement {
     }
 }
 
-/// One moment of the shared-room grid: everybody who filmed it, placed.
-///
-/// A custom instruction rather than `AVMutableVideoCompositionInstruction`
-/// because the layer instructions that class carries can only translate, scale,
-/// crop and fade. None of those can blur, and a blurred bed is the whole point
-/// of filling a cell without cutting anyone's head off.
 final class FriendsTogetherInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     let timeRange: CMTimeRange
     let enablePostProcessing = false
@@ -58,52 +34,18 @@ final class FriendsTogetherInstruction: NSObject, AVVideoCompositionInstructionP
     }
 }
 
-/// Draws the shared-room grid without cropping anybody.
-///
-/// A cell the same shape as the take — which is what `VideoStitcher`'s
-/// automatic canvas produces — is simply filled: the take covers it exactly,
-/// nothing cropped, nothing padded, and two cells meet without a seam.
-///
-/// When the cell is a different shape, because an aspect was asked for by name
-/// or because one person's phone films 4:3 while another's films 16:9, filling
-/// it would cut the difference off the take. So a small difference is absorbed
-/// by cropping (`cropAllowance`) and a large one isn't: the take is scaled down
-/// until all of it fits and sits on a blurred, slightly darkened copy of
-/// itself. The leftover space is that person's own colours — never a black bar.
 final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
-    /// Deep enough to soften a face past recognition, shallow enough that the
-    /// bed still reads as the same room. Proportional to the cell so it looks
-    /// the same in a preview render and a full-size export.
     private static let blurFraction = 0.05
-    /// The bed sits back a little, so two adjacent cells don't bleed into each
-    /// other and the sharp copy is clearly the subject.
     private static let backgroundDim = -0.08
-    /// How much of a take may be cropped to fill a cell of the wrong shape
-    /// before the fit-and-bed fallback takes over.
-    ///
-    /// An eighth covers the mismatch between the phone shapes people actually
-    /// film on — 4:3 against 16:9 is a fifth, which does not, and that is the
-    /// intent: a fifth of somebody's frame is a person's shoulder.
     static let cropAllowance: CGFloat = 0.125
 
-    /// Whether a take of shape `oriented` may simply cover `cell`, cropping
-    /// what hangs over, rather than being shown whole on a bed.
-    ///
-    /// The one rule for both films: the grid asks it per cell, and
-    /// `VideoStitcher`'s sequential film asks it of each take against the whole
-    /// canvas, so a take is cropped or kept whole by the same measure wherever
-    /// it ends up.
     static func coversByCropping(oriented: CGSize, cell: CGSize) -> Bool {
         guard oriented.width > 0, oriented.height > 0 else { return true }
         let fill = max(cell.width / oriented.width, cell.height / oriented.height)
         let fit = min(cell.width / oriented.width, cell.height / oriented.height)
-        // Filling costs `1 - fit / fill` of the take.
         return fill > 0 && 1 - fit / fill <= cropAllowance
     }
 
-    /// Where a take of shape `oriented`, scaled by `scale`, sits when centred
-    /// on `cell`. Centring is symmetric, so this holds in Core Image's
-    /// bottom-left space and in the stitcher's top-left one alike.
     static func frame(
         of oriented: CGSize, scaledBy scale: CGFloat, centredIn cell: CGRect
     ) -> CGRect {
@@ -155,9 +97,6 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
             let size = self.renderSize == .zero ? request.renderContext.size : self.renderSize
             let frame = CGRect(origin: .zero, size: size)
 
-            // Anything that isn't ours — the title card's source-less black
-            // segment — still comes through here, because a custom compositor
-            // replaces AVFoundation's, it doesn't sit beside it.
             let instruction = request.videoCompositionInstruction as? FriendsTogetherInstruction
             var image = CIImage(color: .black).cropped(to: frame)
 
@@ -173,20 +112,14 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
         }
     }
 
-    /// One person's cell: blurred bed, whole take centred on it.
     private func cell(
         _ source: CVPixelBuffer, placement: FriendsTogetherPlacement, in renderSize: CGSize
     ) -> CIImage? {
         var image = CIImage(cvPixelBuffer: source).oriented(placement.orientation)
         let extent = image.extent
-        // A CIImage can carry an infinite extent (a clamp, a solid colour).
-        // Scaling one is meaningless and crashes the render, so it is rejected
-        // before any of the geometry below runs.
         guard extent.width.isFinite, extent.height.isFinite,
               extent.width > 0, extent.height > 0
         else { return nil }
-        // `oriented` can leave the extent somewhere other than the origin, and
-        // every scale below assumes it starts there.
         image = image.transformed(
             by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
         let oriented = CGSize(width: extent.width, height: extent.height)
@@ -201,16 +134,11 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
         let fill = max(cell.width / oriented.width, cell.height / oriented.height)
         let fit = min(cell.width / oriented.width, cell.height / oriented.height)
 
-        // When the crop is affordable, the take covers the cell on its own and
-        // there is no bed to draw — which is also the fast path, and the
-        // common one.
         if Self.coversByCropping(oriented: oriented, cell: cell.size) {
             return scaled(image, by: fill, from: oriented, into: cell).cropped(to: cell)
         }
 
         let bed = scaled(image, by: fill, from: oriented, into: cell)
-            // Clamp before the blur, or it reads transparent black from past the
-            // edge of the scaled copy and rings the cell in shadow.
             .clampedToExtent()
             .applyingGaussianBlur(sigma: min(cell.width, cell.height) * Self.blurFraction)
             .applyingFilter(

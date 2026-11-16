@@ -3,9 +3,6 @@ import UIKit
 import AVFoundation
 import CoreImage
 
-/// Demo-only rendering of actual decoded frames, driven by AVPlayer's clock.
-/// Device diagnostics showed valid decode and advancing playback but a black
-/// AVPlayerLayer. This path does not use a static poster as a video substitute.
 final class RoomDemoPlaybackSurface: UIView {
     private static let imageContext = CIContext(options: [.cacheIntermediates: false])
     private let url: URL

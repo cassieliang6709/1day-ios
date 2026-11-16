@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Scrolling back through the days. Home used to group by state — in progress
-/// and finished — which can't answer "what did I film on the 31st". These pin
-/// the grouping, the order, and the fact that today's story doesn't appear
-/// twice on one screen.
 final class StoryTimelineTests: XCTestCase {
     private let calendar = Calendar(identifier: .gregorian)
 
@@ -13,7 +9,6 @@ final class StoryTimelineTests: XCTestCase {
         super.tearDown()
     }
 
-    /// 2026-09-01 is a Tuesday.
     private func september(_ day: Int, hour: Int = 10) -> Date {
         calendar.date(from: DateComponents(
             year: 2026, month: 9, day: day, hour: hour))!
@@ -44,7 +39,6 @@ final class StoryTimelineTests: XCTestCase {
             mode: .oneDay)
     }
 
-    // MARK: - Grouping
 
     func testStoriesFromTheSameDayLandInOneGroup() {
         let morning = story("早上", on: september(1, hour: 8))
@@ -76,8 +70,6 @@ final class StoryTimelineTests: XCTestCase {
             ])
     }
 
-    /// Finished and unfinished sit together: "when" is the axis, not "how far
-    /// along". The old two-list split is exactly what this replaces.
     func testFinishedAndUnfinishedShareADay() {
         let done = story("拍完了", on: august(31), recorded: 3, total: 3)
         let notDone = story("没拍完", on: august(31), recorded: 1, total: 3)
@@ -89,7 +81,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertEqual(timeline.days.first?.stories.count, 2)
     }
 
-    /// Within a day, whatever was filmed most recently reads first.
     func testMostRecentlyFilmedComesFirstWithinADay() {
         let early = story("早拍的", on: august(31), recorded: 1, filmedAt: august(31, hour: 9))
         let late = story("晚拍的", on: august(31), recorded: 1, filmedAt: august(31, hour: 22))
@@ -100,7 +91,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertEqual(timeline.days.first?.stories.map(\.id), [late.id, early.id])
     }
 
-    // MARK: - The hero
 
     func testTheHeroStoryIsNotRepeatedInTheTimeline() {
         let hero = story("今天", on: september(1))
@@ -116,8 +106,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertEqual(timeline.days.first?.stories.map(\.id), [older.id])
     }
 
-    /// A day that had only the hero in it disappears entirely, rather than
-    /// leaving an empty date label behind.
     func testADayEmptiedByTheHeroDoesNotAppear() {
         let hero = story("今天", on: september(1))
 
@@ -138,7 +126,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertTrue(timeline.isEmpty)
     }
 
-    // MARK: - Labels
 
     func testTodayAndYesterdayAreNamedNotDated() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
@@ -157,8 +144,6 @@ final class StoryTimelineTests: XCTestCase {
     }
 
     func testOlderDaysCarryTheirDateInBothLanguages() {
-        // Not the 31st: that's "yesterday" relative to the 1st, and yesterday
-        // is named rather than dated.
         let stories = [story("上周", on: august(24))]
 
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
@@ -177,8 +162,6 @@ final class StoryTimelineTests: XCTestCase {
         XCTAssertNotEqual(chinese, english)
     }
 
-    /// A seven-day challenge hangs off the day it started, whole — scattering
-    /// one film across seven entries would bury the thing you came for.
     func testASevenDayChallengeSitsOnOneDay() {
         let week = Challenge(
             id: UUID(),

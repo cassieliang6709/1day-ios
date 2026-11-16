@@ -2,14 +2,11 @@ import Foundation
 import Observation
 import UIKit
 
-/// The five moods the 我的 tab offers. Raw values are what goes to disk and to
-/// CloudKit, so never rename them.
 enum Mood: String, Codable, CaseIterable, Identifiable {
     case happy, calm, tired, sad, angry
 
     var id: String { rawValue }
 
-    /// Asset catalog name of the mascot face for this mood (`MoodHappy`, …).
     var imageName: String {
         switch self {
         case .happy: return "MoodHappy"
@@ -31,8 +28,6 @@ enum Mood: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// One day's mood. `day` is the local calendar day as `yyyy-MM-dd`, which is
-/// also the key everywhere (store, file, CloudKit record name).
 struct MoodEntry: Codable, Equatable {
     var day: String
     var mood: Mood
@@ -41,7 +36,6 @@ struct MoodEntry: Codable, Equatable {
 }
 
 enum MoodDay {
-    /// `yyyy-MM-dd` in the device's current calendar day.
     static func key(for date: Date, timeZone: TimeZone = .current) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -50,17 +44,10 @@ enum MoodDay {
     }
 }
 
-/// What the store needs from the cloud. `nil` in tests and previews, so they
-/// never touch CloudKit.
 protocol MoodSyncing {
-    /// Overwrite these entries remotely.
     func push(_ entries: [MoodEntry]) async throws
-    /// Every entry changed remotely since the last successful fetch.
     func fetchChanges() async throws -> [MoodEntry]
-    /// False when nobody is signed in; the store then stays local.
     func isAvailable() async -> Bool
-    /// True until every local entry has been sent once to this backend —
-    /// entries synced to an older one (CloudKit) were never pending here.
     func wantsFullUpload() -> Bool
     func didFullUpload()
 }
@@ -70,15 +57,10 @@ extension MoodSyncing {
     func didFullUpload() {}
 }
 
-/// Today's mood plus a one-line note, one entry per day.
-///
-/// Local JSON is the source of truth for the UI; CloudKit (private database)
-/// is a backup that other devices merge from, last write wins by `updatedAt`.
 @MainActor
 @Observable
 final class MoodStore {
     private(set) var entries: [String: MoodEntry] = [:]
-    /// Days changed locally that the cloud hasn't confirmed yet.
     private var pending: Set<String> = []
 
     private let fileURL: URL?
@@ -102,7 +84,6 @@ final class MoodStore {
         load()
         removeLegacyMascotChat()
         guard sync != nil else { return }
-        // Fetch on launch, and again whenever the app comes back to the front.
         Task { await syncNow() }
         foregroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
@@ -111,26 +92,20 @@ final class MoodStore {
         }
     }
 
-    // MARK: Reading
 
-    /// The entry for the calendar day containing `date`, if one was set.
     func mood(on date: Date) -> MoodEntry? {
         entries[MoodDay.key(for: date)]
     }
 
     var today: MoodEntry? { mood(on: now()) }
 
-    // MARK: Writing
 
-    /// Set (or change) today's mood. Keeps whatever note was already there.
     func setMood(_ mood: Mood, on date: Date? = nil) {
         let key = MoodDay.key(for: date ?? now())
         let note = entries[key]?.note ?? ""
         write(MoodEntry(day: key, mood: mood, note: note, updatedAt: now()))
     }
 
-    /// Change the note on a day that already has a mood. A note without a
-    /// mood isn't an entry, so this does nothing until a face is picked.
     func setNote(_ note: String, on date: Date? = nil) {
         let key = MoodDay.key(for: date ?? now())
         guard var entry = entries[key] else { return }
@@ -148,14 +123,9 @@ final class MoodStore {
         Task { await syncNow() }
     }
 
-    // MARK: Sync
 
-    /// Push what's pending, then merge in remote changes. Safe to call often:
-    /// launch, foreground, every edit. Failures leave `pending` as it was so
-    /// the next call retries.
     func syncNow() async {
         guard let sync else { return }
-        // An edit during a pass gets picked up by one more pass, not dropped.
         guard !isSyncing else { needsAnotherPass = true; return }
         isSyncing = true
         defer { isSyncing = false }
@@ -175,7 +145,6 @@ final class MoodStore {
             do {
                 try await sync.push(outgoing)
                 if full { sync.didFullUpload() }
-                // Only clear what we sent and that hasn't changed since.
                 for sent in outgoing where entries[sent.day] == sent {
                     pending.remove(sent.day)
                 }
@@ -192,7 +161,6 @@ final class MoodStore {
         }
     }
 
-    /// Last write wins. A remote entry replaces ours only if it's newer.
     func merge(_ remote: [MoodEntry]) {
         var changed = false
         for entry in remote {
@@ -204,7 +172,6 @@ final class MoodStore {
         if changed { save() }
     }
 
-    // MARK: Disk
 
     private func load() {
         guard let fileURL, let data = try? Data(contentsOf: fileURL),
@@ -230,9 +197,6 @@ final class MoodStore {
         }
     }
 
-    /// 和小方块聊两句 kept a per-day chat in a file next to the moods. The
-    /// feature is gone (1.5), so the file goes too: nothing reads it, and it
-    /// was the only copy of what someone typed to the mascot.
     private func removeLegacyMascotChat() {
         guard let url = fileURL?.deletingLastPathComponent()
             .appendingPathComponent("mascot-chat.json") else { return }
@@ -241,7 +205,6 @@ final class MoodStore {
         UserDefaults.standard.removeObject(forKey: "mascotNameAsked")
     }
 
-    // MARK: Defaults
 
     nonisolated static var defaultFileURL: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
@@ -249,7 +212,6 @@ final class MoodStore {
             .appendingPathComponent("moods.json")
     }
 
-    /// Live CloudKit sync, except under XCTest and SwiftUI previews.
     nonisolated static var defaultSync: MoodSyncing? {
         let env = ProcessInfo.processInfo.environment
         if env["XCTestConfigurationFilePath"] != nil { return nil }

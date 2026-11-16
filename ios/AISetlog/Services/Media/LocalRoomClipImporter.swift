@@ -2,8 +2,6 @@
 import AVFoundation
 import Foundation
 
-/// Reads a picker-owned copy (or test fixture); never deletes or modifies it.
-/// The caller owns the returned trimmed file. Failed/cancelled outputs are removed.
 enum LocalRoomClipImporter {
     static func trim(_ source: URL) async throws -> URL {
         try Task.checkCancellation()

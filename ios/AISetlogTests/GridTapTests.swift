@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// How the contact sheet stacks a moment several people filmed. Whether that
-/// moment is still open to me is `StoryAgendaTests`' question now — a
-/// thumbnail plays what's there and nothing else, so it no longer has to
-/// decide between watching and filming.
 final class GridTapTests: XCTestCase {
     private let myID = "me"
     private let friendID = "friend"
@@ -14,7 +10,6 @@ final class GridTapTests: XCTestCase {
                 authorName: authorID, authorID: authorID)
     }
 
-    // MARK: - Lanes
 
     private var roster: [(id: String, name: String)] {
         [(id: friendID, name: "Ada"), (id: myID, name: "Me"), (id: "zoe", name: "Zoe")]
@@ -50,8 +45,6 @@ final class GridTapTests: XCTestCase {
         XCTAssertNotNil(lanes[0].clip)
     }
 
-    /// Footage must never be dropped, even if its author is missing from the
-    /// roster the view was handed.
     func testAClipFromOutsideTheRosterStillGetsALane() {
         let lanes = StoryGridView.lanes(
             slotClips: [clip(day: 1, authorID: "ghost")],

@@ -3,10 +3,6 @@ import XCTest
 
 @testable import AISetlog
 
-/// The app's accent is the skin's colour (奶油黄 by default, 经典蓝 on
-/// request — see `AppSkin`), and picking a colour only moves your avatar. 1.3 wired the accent to the avatar pick; these tests pin the
-/// unwiring, because the two are one property apart and easy to reconnect by
-/// accident.
 final class BrandAccentTests: XCTestCase {
     private var defaults: UserDefaults!
     private let suite = "brand-accent-tests"
@@ -38,8 +34,6 @@ final class BrandAccentTests: XCTestCase {
         XCTAssertEqual(AppSkin.current, .cream)
     }
 
-    /// The whole point of the 1.3 revert: the avatar pick moves your avatar,
-    /// never the app's accent. `oneDayBrand` reads only the skin.
     func testAPickMovesYourAvatarAndLeavesTheAccentAlone() {
         let before = UIColor.oneDayBrand
         let wanted = Identity.paletteUIColors.count - 1
@@ -48,8 +42,6 @@ final class BrandAccentTests: XCTestCase {
         XCTAssertEqual(UIColor.oneDayBrand, before)
     }
 
-    /// Somebody else in the room keeps the colour their name hashes to — the
-    /// pick is yours, not the room's.
     func testAPickDoesNotMoveSomebodyElsesAvatar() {
         let wanted = Identity.paletteUIColors.count - 1
         Identity.chooseTint(wanted, forName: "Cassie", in: defaults)
@@ -58,8 +50,6 @@ final class BrandAccentTests: XCTestCase {
             Identity.derivedIndex(for: "Blue"))
     }
 
-    /// A pick with no name attached is not a pick — that pairing is what makes
-    /// the avatar override safe.
     func testAHalfWrittenPickIsIgnored() {
         defaults.set(2, forKey: Identity.myTintKey)
         XCTAssertEqual(
@@ -77,7 +67,6 @@ final class BrandAccentTests: XCTestCase {
             Identity.derivedIndex(for: "Cassie"))
     }
 
-    /// Clearing the pick goes back to the derived colour rather than to blank.
     func testClearingThePickGoesBackToTheDerivedColour() {
         Identity.chooseTint(4, forName: "Cassie", in: defaults)
         Identity.chooseTint(nil, forName: nil, in: defaults)
@@ -86,7 +75,6 @@ final class BrandAccentTests: XCTestCase {
             Identity.derivedIndex(for: "Cassie"))
     }
 
-    // MARK: - The lighter end of the gradient
 
     private func hsb(_ color: UIColor) -> (h: CGFloat, s: CGFloat, b: CGFloat) {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -94,8 +82,6 @@ final class BrandAccentTests: XCTestCase {
         return (h, s, b)
     }
 
-    /// The gradient still needs a second colour, and it is still derived
-    /// rather than listed — there is just only one accent to derive it from.
     func testTheGradientsSecondColourIsLighterAndLessSaturated() {
         let base = hsb(.oneDayBrand)
         let light = hsb(.oneDayBrandLight)
@@ -110,11 +96,7 @@ final class BrandAccentTests: XCTestCase {
         XCTAssertEqual(light.b, cyan.b, accuracy: 0.1)
     }
 
-    // MARK: - What must not follow the accent
 
-    /// Caption colours are pinned hexes on purpose: they get burned into an
-    /// exported film, and a caption somebody chose must not change colour
-    /// because they later re-themed the app.
     func testCaptionColoursDoNotFollowTheAccent() {
         Identity.chooseTint(3, forName: "Cassie", in: defaults)
         XCTAssertEqual(

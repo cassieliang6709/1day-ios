@@ -3,23 +3,15 @@ import UIKit
 import AVFoundation
 import Observation
 
-/// Wraps an `AVCaptureSession` for single-take clip capture: live preview,
-/// fixed-duration recording (the challenge's clip length), retake, teardown.
 @Observable
 final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unchecked Sendable {
     enum State { case idle, ready, recording, unavailable }
 
-    /// A multi-cam session on phones that have one, so the front camera can
-    /// be added next to the back one without rebuilding the session. Single
-    /// camera filming goes through it exactly as through a plain session.
     let session: AVCaptureSession = AVCaptureMultiCamSession.isMultiCamSupported
         ? AVCaptureMultiCamSession()
         : AVCaptureSession()
     private static let sessionQueue = DispatchQueue(label: "com.cassie.AISetlog.capture-session")
     private let movieOutput = AVCaptureMovieFileOutput()
-    /// The session queue swaps the inputs (flip, dual camera, setup) while
-    /// the main thread reads them for zoom and the torch. Unguarded, a read
-    /// landing mid-swap can retain a reference that is being released.
     @ObservationIgnored private let inputLock = NSLock()
     @ObservationIgnored private var _videoInput: AVCaptureDeviceInput?
     private var videoInput: AVCaptureDeviceInput? {
@@ -34,19 +26,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private var position: AVCaptureDevice.Position = .back
 
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
-    /// Re-applies the fixed angles whenever the session rebuilds its
-    /// connections. Switching camera, adding the second one or restarting the
-    /// session replaces them some time after `commitConfiguration`, and a new
-    /// connection starts at 0° — a portrait take filmed sideways. The angle
-    /// set straight after the commit doesn't survive that.
     @ObservationIgnored private var connectionObservers: [NSObjectProtocol] = []
 
-    // MARK: Dual camera (picture in picture)
-    //
-    // The second camera gets its own input, movie output and preview layer,
-    // wired with explicit connections so nothing auto-connects across the two.
-    // Each take writes two files; `PiPComposer` folds them into the one clip
-    // everything after the camera already expects.
     private let secondaryOutput = AVCaptureMovieFileOutput()
     @ObservationIgnored private var _secondaryInput: AVCaptureDeviceInput?
     private var secondaryInput: AVCaptureDeviceInput? {
@@ -61,48 +42,28 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     private var secondaryConnections: [AVCaptureConnection] = []
     private weak var secondaryPreviewLayer: AVCaptureVideoPreviewLayer?
 
-    /// Both cameras are filming: the main camera full frame, the other one in
-    /// the corner inset.
     private(set) var isDualCamera = false
-    /// In dual mode, true when the secondary camera is the big picture. Flip
-    /// toggles this instead of swapping inputs.
     private(set) var isSwapped = false
-    /// Where the inset sits, normalized to the frame (see `PiPInsetLayout`).
-    /// Dragged and pinched on the viewfinder, read by `PiPComposer` when the
-    /// take is folded into one file, and kept across launches — the spot you
-    /// picked is the spot you want next time.
     var insetRect: CGRect = PiPInsetLayout.load() {
         didSet { PiPInsetLayout.save(insetRect) }
     }
-    /// Files of the take in flight, collected as each output finishes.
     private var pendingPrimary: URL??
-    /// Which camera made each file of the take in flight, by `uniqueID`, so
-    /// the shape it came out in can be learned — see `CameraOrientation`.
     private var pendingPrimaryCamera: String?
     private var pendingSecondaryCamera: String?
-    /// Whether the take in flight is 横拍, as it was when it started.
     private var recordingSideways = false
     private var pendingSecondary: URL??
 
-    /// Whether this phone can film both cameras at once.
     var supportsDualCamera: Bool {
         session is AVCaptureMultiCamSession && !Self.isSimulated
     }
 
     private var isConfigured = false
-    /// Recording orientation — locks both the output file and the preview to
-    /// upright portrait or landscape. The UI never rotates (the app stays
-    /// portrait-locked), only the captured video's frame.
     var orientation: Challenge.Orientation = .portrait {
         didSet { applyOrientation() }
     }
-    /// 横拍: film as if the phone is held sideways (top to the left), whatever
-    /// the tilt reads. Only this switch decides the angle — see `captureAngle`.
     var forcedLandscape = false {
         didSet { applyAngles() }
     }
-    /// The camera picked in the viewfinder. Baked into each take as it lands —
-    /// see `CameraStyleBaker`.
     var cameraStyle: CameraStyle = .standard
 
     private(set) var state: State = .idle
@@ -115,37 +76,16 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
     private(set) var recordedAt: Date?
 
-    /// Bumped each time a take fails to reach a file. A counter rather than a
-    /// Bool so two failures in a row still read as two changes to whoever is
-    /// watching it — the camera turns each one into a toast and a haptic. The
-    /// failure path used to go straight back to `.ready`, which on screen is
-    /// indistinguishable from "the press didn't register".
     private(set) var failureCount = 0
-    /// When the latest failure happened; nil until there has been one.
     private(set) var lastFailure: Date?
 
-    /// Whether the microphone was granted at the last `configure()`. Without
-    /// it the session films silently, and nothing about a silent preview says
-    /// so — the camera reads this to put up a "no sound" chip.
     private(set) var hasAudioAccess = true
 
-    /// What the current lens can reach, and where it is pointed now — both in
-    /// display values (0.5, 1, 2), never in `videoZoomFactor`. See `CameraZoom`.
     private(set) var zoomCapabilities: CameraZoom = .unavailable
     private(set) var zoom: CGFloat = 1
 
-    /// The chips to draw. One entry means this camera has no zoom worth
-    /// offering, and the UI draws nothing.
     var zoomPresets: [CGFloat] { zoomCapabilities.presets() }
 
-    /// Lens preference for the back camera, widest reach first.
-    ///
-    /// A *virtual* device is what makes 0.5x exist at all: it spans the
-    /// ultra-wide, wide and telephoto lenses and hands over between them as
-    /// the zoom factor crosses their switch-over points, so the session sees
-    /// one input and the person gets three lenses. Asking for
-    /// `.builtInWideAngleCamera` — which is what this used to do — gets one
-    /// lens and a hard floor of 1x no matter what the phone has in it.
     private static let backCameraTypes: [AVCaptureDevice.DeviceType] = [
         .builtInTripleCamera,
         .builtInDualWideCamera,
@@ -153,14 +93,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         .builtInWideAngleCamera,
     ]
 
-    /// The front camera is a single lens on every phone — no ultra-wide to
-    /// reach for, so nothing virtual to ask for either.
     private static let frontCameraTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
 
-    /// Finds a camera for a position: the widest-reaching virtual device the
-    /// phone has, falling back through to a single wide-angle lens. The iOS 17+
-    /// Simulator has no built-in camera, but it can hand you the host Mac's
-    /// camera as an external device instead.
     private func camera(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
         let preferred = position == .front ? Self.frontCameraTypes : Self.backCameraTypes
         for type in preferred {
@@ -177,16 +111,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
     #if DEBUG && targetEnvironment(simulator)
-    /// A camera for screenshots on the simulator, which has none: launch with
-    /// `-simulatedCamera YES`. The preview is `SimulatedCameraPreview` and a
-    /// take is a `DemoClipFactory` clip, delivered through the same state
-    /// changes a real take goes through. Opt-in, so UI tests still get the
-    /// 相机不可用 screen and its 示例片段 button.
     static var isSimulated: Bool {
         UserDefaults.standard.bool(forKey: "simulatedCamera")
     }
     private var simulatedTake: Task<Void, Never>?
     private var simulatedSeconds: Double = 0
+    private var simulatedFinishing = false
     #else
     static var isSimulated: Bool { false }
     #endif
@@ -208,18 +138,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
 
         let configured = await withCheckedContinuation { continuation in
             Self.sessionQueue.async { [self] in
-                // SwiftUI can preserve this recorder while swapping the clip
-                // preview for the re-record screen. Reuse the existing graph
-                // instead of trying to add its inputs and output a second time.
                 if isConfigured {
-                    // The preview layer may not exist yet. Starting here can
-                    // leave the first camera page showing a black frame.
                     continuation.resume(returning: true)
                     return
                 }
 
                 session.beginConfiguration()
-                // A multi-cam session takes formats per device, not a preset.
                 if session.canSetSessionPreset(.high) {
                     session.sessionPreset = .high
                 }
@@ -249,8 +173,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 session.addOutput(movieOutput)
                 session.commitConfiguration()
                 isConfigured = true
-                // Start after `CameraPreview` attaches its layer. This avoids
-                // racing the first frame against SwiftUI view creation.
                 continuation.resume(returning: true)
             }
         }
@@ -282,17 +204,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         connectionObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
-    // MARK: - Torch (闪光灯)
 
-    /// 闪光灯 on the camera screen. Video has no flash, so this is the back
-    /// camera's light held on for as long as it's switched on — through the
-    /// preview and the take alike, which is what you want when the room is
-    /// dark. Kept while you flip to the front camera (which has no light) and
-    /// lit again when you flip back.
     private(set) var isTorchOn = false
 
-    /// Whether the camera on screen now has a light to turn on. The front
-    /// camera has none; in dual mode the back one still does.
     var canUseTorch: Bool { torchDevice != nil }
 
     private var torchDevice: AVCaptureDevice? {
@@ -306,12 +220,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         applyTorch()
     }
 
-    /// Sets the light to match `isTorchOn`. Called after anything that swaps
-    /// an input or starts the session, because a new input comes up dark.
     private func applyTorch() {
         guard let device = torchDevice else { return }
         let on = isTorchOn
-        // Same queue as zoom and session setup: `lockForConfiguration` blocks.
         Self.sessionQueue.async {
             do { try device.lockForConfiguration() } catch { return }
             device.torchMode = on ? .on : .off
@@ -319,31 +230,19 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    // MARK: - Zoom
 
-    /// Point the lens at a display zoom value — 0.5, 1, 2, or anything in
-    /// between and above that this camera can reach.
-    ///
-    /// Clamped here rather than by the caller, so a pinch can hand over a raw
-    /// running product and a slider can hand over its own bounds without
-    /// either of them knowing what lenses are behind the preview.
     func setZoom(_ display: CGFloat) {
         guard let device = videoInput?.device else { return }
         let clamped = zoomCapabilities.clampedDisplay(display)
         zoom = clamped
 
         let factor = zoomCapabilities.factor(forDisplay: clamped)
-        // Same queue as session setup and teardown: `lockForConfiguration`
-        // blocks, and a pinch runs it on every gesture frame.
         Self.sessionQueue.async {
             do {
                 try device.lockForConfiguration()
             } catch {
                 return
             }
-            // The device's own limits, not the UI's: `CameraZoom` caps the
-            // interactive range well below the hardware's, and setting a
-            // factor outside the real range raises.
             device.videoZoomFactor = min(
                 max(factor, device.minAvailableVideoZoomFactor),
                 device.maxAvailableVideoZoomFactor)
@@ -351,13 +250,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Re-reads the lens's zoom range and parks at 1x. Called on every input
-    /// change, because a different lens is a different range.
-    ///
-    /// 1x rather than keeping the number: the front camera's range has no
-    /// 0.5x in it, so carrying a display value across a flip would either
-    /// clamp to a picture the chips no longer describe or leave a 10x crop on
-    /// a lens with no optical reach to hide it.
     private func refreshZoom() {
         guard let device = videoInput?.device else {
             zoomCapabilities = .unavailable
@@ -368,40 +260,21 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         setZoom(1)
     }
 
-    // MARK: - Orientation
 
-    /// Called by `CameraPreview` once its layer exists so the preview's
-    /// rotation can be managed here alongside the recorded file's.
     func attachPreview(_ layer: AVCaptureVideoPreviewLayer) {
         previewLayer = layer
         applyOrientation()
         Self.sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
-            // A torch only lights on a running session.
             Task { @MainActor in self.applyTorch() }
         }
     }
 
-    /// Puts the fixed angles back on every connection; the device or the
-    /// preview may be new.
     private func applyOrientation() {
         applyAngles()
     }
 
-    /// Pushes the fixed angles onto the capture and preview connections of
-    /// both cameras. Safe to call repeatedly — the angles are absolute.
-    ///
-    /// How the phone is held is not read at all: 竖拍 and 横拍 each have one
-    /// angle per camera, and only the 横拍 switch picks between them. The
-    /// angle depends on which way that camera's sensor hands its frames over
-    /// — see `CameraOrientation`; one number for every camera filmed the
-    /// iPhone 17 front camera a quarter-turn off.
-    ///
-    /// Runs on the session queue, the one that adds and removes connections.
-    /// Set from the main thread, an angle could land on a connection the
-    /// queue was tearing down, and AVFoundation threw (NSRangeException,
-    /// "Cannot remove an observer … for the key path enabled").
     private func applyAngles() {
         let sideways = forcedLandscape
         Self.sessionQueue.async { [self] in
@@ -412,9 +285,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                     sideways: sideways, nativePortrait: native, front: device.position == .front),
                 mirrored: Self.mirrorsLikePreview(previewLayer?.connection, front: device.position == .front),
                 on: movieOutput.connection(with: .video))
-            // The viewfinder stays upright on the portrait-locked screen even
-            // in 横拍: the phone itself is turned, so the live picture already
-            // reads upright in the hand. Only the file is filmed sideways.
             Self.setAngle(
                 CameraOrientation.previewAngle(nativePortrait: native),
                 on: previewLayer?.connection)
@@ -423,7 +293,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 let otherNative = CameraOrientation.nativePortrait(other)
                 for connection in secondaryConnections {
                     if connection.videoPreviewLayer == nil {
-                        // Never mirrored, like the main camera's file.
                         Self.setFileAngle(
                             CameraOrientation.captureAngle(
                                 sideways: sideways, nativePortrait: otherNative,
@@ -441,19 +310,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Preview connections are left to AVFoundation's own mirroring: the
-    /// front camera's viewfinder reads like a mirror, as everywhere else on
-    /// the phone. Setting it by hand on the inset's connection made removing
-    /// that connection throw (turning 双摄 off crashed, 2026-11-07).
     private static func setAngle(_ angle: CGFloat, on connection: AVCaptureConnection?) {
         guard let connection, connection.isVideoRotationAngleSupported(angle) else { return }
         connection.videoRotationAngle = angle
     }
 
-    /// The file is never mirrored, front camera included — the iPhone
-    /// Camera app's default (2026-11-07): the viewfinder reads like a mirror
-    /// while filming, the clip shows the scene as someone facing you sees it,
-    /// so writing in it reads the right way round.
     private static func mirrorsLikePreview(_ preview: AVCaptureConnection?, front: Bool) -> Bool {
         false
     }
@@ -470,14 +331,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
     #if DEBUG
-    /// 诊断: printed and flushed at once — piped to `devicectl --console`,
-    /// stdout is buffered and the lines only arrived when the app quit.
     nonisolated static func diag(_ items: Any...) {
         print(items.map { "\($0)" }.joined(separator: " "))
         fflush(stdout)
     }
 
-    /// 诊断: which camera, and the shape its sensor hands over before rotation.
     nonisolated static func diagName(_ device: AVCaptureDevice?) -> String {
         guard let device else { return "none" }
         let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
@@ -486,7 +344,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             + "/nativePortrait=\(CameraOrientation.nativePortrait(device))"
     }
 
-    /// 诊断: what each connection reads back after the angles went on.
     private func logAngles(sideways: Bool) {
         let file = movieOutput.connection(with: .video)
         Self.diag("[诊断] angles sideways=\(sideways) primary=\(Self.diagName(videoInput?.device))",
@@ -501,7 +358,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     #endif
 
     #if DEBUG
-    /// Prints what a take actually is on disk, to check 横拍 lands landscape.
     nonisolated static func logTakeGeometry(_ url: URL, sideways: Bool, label: String = "final") {
         Task.detached {
             guard let track = try? await AVURLAsset(url: url).loadTracks(withMediaType: .video).first,
@@ -516,16 +372,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     #endif
     func flipCamera() {
         guard state == .ready else { return }
-        // Both cameras are already on: flipping means trading places.
         if isDualCamera {
             isSwapped.toggle()
             return
         }
         let newPosition: AVCaptureDevice.Position = position == .front ? .back : .front
-        // On the session queue with every other change to the session's
-        // inputs and connections, so an angle being set can't meet a
-        // connection being torn down. `sync`: the rest of this needs the new
-        // input, and nothing on that queue waits for the main thread.
         Self.sessionQueue.sync {
             session.beginConfiguration()
             if let videoInput { session.removeInput(videoInput) }
@@ -537,14 +388,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 videoInput = input
                 position = newPosition
             } else if let videoInput, session.canAddInput(videoInput) {
-                session.addInput(videoInput) // revert
+                session.addInput(videoInput)
             }
             session.commitConfiguration()
         }
-        // After the commit, never before: swapping an input rebuilds the
-        // session's connections, so an angle set inside the transaction is
-        // discarded and the connection falls back to 0° — which records a
-        // portrait clip sideways.
         applyOrientation()
         refreshZoom()
         applyTorch()
@@ -559,6 +406,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             simulatedSeconds = seconds
             simulatedTake = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(seconds))
+                guard !Task.isCancelled else { return }
                 await self?.finishSimulatedTake()
             }
             return
@@ -572,14 +420,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         let sideways = forcedLandscape
         recordingSideways = sideways
 
-        // Keep capture operations serialized with session startup/teardown.
-        // A re-record can arrive while the previous session is still releasing
-        // the camera; restart here before asking the movie output to record.
         Self.sessionQueue.async { [self] in
             if !session.isRunning { session.startRunning() }
-            // A running session can still have no live video connection — a
-            // flip whose revert also failed leaves no camera input — and
-            // `startRecording` raises on an output with nothing feeding it.
             guard session.isRunning,
                   movieOutput.connection(with: .video)?.isActive == true else {
                 Task { @MainActor in
@@ -592,9 +434,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             movieOutput.maxRecordedDuration = CMTime(
                 seconds: seconds,
                 preferredTimescale: 600)
-            // Last word on the file's angle, on the queue that records: a
-            // connection rebuilt since the viewfinder was set would otherwise
-            // film at 0°.
             if let device = videoInput?.device {
                 Self.setFileAngle(
                     CameraOrientation.captureAngle(
@@ -619,8 +458,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                   "inset=\(Self.diagName(secondaryInput?.device))",
                   "insetFileAngle=\(secondaryConnections.first { $0.videoPreviewLayer == nil }?.videoRotationAngle ?? -1)")
             #endif
-            // Same for the inset: without a live connection the take goes on
-            // as a single-camera one instead of raising.
             let dual = !secondaryConnections.isEmpty
                 && secondaryOutput.connection(with: .video)?.isActive == true
             Task { @MainActor in
@@ -638,8 +475,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Stop early (the "tap to stop" countdown ring) — the delegate fires
-    /// exactly as if the max-duration limit had been hit.
     func stopRecording() {
         guard state == .recording else { return }
         #if DEBUG && targetEnvironment(simulator)
@@ -656,16 +491,13 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
     #if DEBUG && targetEnvironment(simulator)
-    /// What the movie output's delegate does at the end of a real take: the
-    /// clip lands, then `.ready`. Length is how long the shutter was held.
     @MainActor
     private func finishSimulatedTake() async {
-        guard state == .recording, let started = recordedAt else { return }
+        guard state == .recording, !simulatedFinishing, let started = recordedAt else { return }
+        simulatedFinishing = true
+        defer { simulatedFinishing = false }
         simulatedTake = nil
         let held = min(max(Date.now.timeIntervalSince(started), 1), simulatedSeconds)
-        // `-storeShots YES` shows the sample footage in the viewfinder, so the
-        // take is cut from that too; a green test card after a real-looking
-        // preview would end up in every screenshot of 我的.
         let url: URL?
         if let sampleTake = await Self.sampleFootageTake(seconds: held) {
             url = sampleTake
@@ -686,8 +518,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         state = .ready
     }
 
-    /// The first `seconds` of the bundled sample film, or nil outside
-    /// `-storeShots` or when the cut fails (the caller falls back to the card).
     private static func sampleFootageTake(seconds: Double) async -> URL? {
         guard UserDefaults.standard.bool(forKey: "storeShots"),
               let source = Bundle.main.url(forResource: "sample-film", withExtension: "mp4")
@@ -696,8 +526,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             .appendingPathComponent("simulated-take-\(UUID()).mov")
         let asset = AVURLAsset(url: source)
         guard let duration = try? await asset.load(.duration).seconds, duration > 0,
-              // Passthrough: `CameraStyleBaker` re-encodes right after, so a
-              // second encode here only doubled the wait after the shutter.
               let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough)
         else { return nil }
         exporter.outputURL = output
@@ -714,23 +542,12 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     #endif
 
     #if DEBUG
-    /// Drop a generated clip in as if it had just been filmed, so the review
-    /// screen and everything downstream of it can be exercised on a simulator,
-    /// which has no camera.
     func acceptDemoClip(_ url: URL) {
         clipURL = url
         recordedAt = .now
     }
     #endif
 
-    /// Back to live preview after reviewing a take.
-    ///
-    /// Deletes the take's file when it is still in the temp directory. Every
-    /// caller that keeps the take — filing (`ClipFileStore.storeClip`) and
-    /// drafts (`ClipDraftStore.keep`) — copies synchronously *before* calling
-    /// this, so by now the temp file is a leftover; without this each retake
-    /// left a .mov behind until the OS got round to purging tmp. Anything
-    /// outside tmp is somebody else's file and is never touched.
     func retake() {
         if let clipURL, Self.isTemporary(clipURL) {
             try? FileManager.default.removeItem(at: clipURL)
@@ -783,7 +600,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 self.pendingSecondary = .some(file)
                 self.pendingSecondaryCamera = camera?.device.uniqueID
             }
-            // Wait for both outputs of a dual take before doing anything.
             guard case .some(let rawPrimary) = self.pendingPrimary,
                   case .some(let rawSecondary) = self.pendingSecondary
             else { return }
@@ -792,10 +608,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             let primaryCamera = self.pendingPrimaryCamera
             let secondaryCamera = self.pendingSecondaryCamera
 
-            // Every file leaves here the shape the switch asked for: 横拍
-            // landscape, otherwise upright. A camera met for the first time,
-            // or one whose sensor turned out the other way round, is turned
-            // right here and remembered, so its next take is filmed right.
             let wantLandscape = self.recordingSideways
             var learnedSomething = false
             func checked(_ url: URL?, camera: String?) async -> URL? {
@@ -819,33 +631,14 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
                 self.failureCount += 1
                 return
             }
-            // The crop happens here rather than on the way out of the review
-            // screen, so `clipURL` is the only thing anybody downstream — the
-            // review player, the draft store, the uploader, the stitcher —
-            // ever sees, and none of them has to ask what shape it is.
-            //
-            // `state` stays `.recording` while it runs. Going `.ready` with no
-            // clip yet puts the live preview and a live shutter back for the
-            // half second the export takes, which invites a second take over
-            // the top of the one being written.
-            //
-            // A dual take that cannot be composed falls back to the main
-            // camera's file alone: still the take, just without the inset.
             if let secondary,
                let composed = await PiPComposer.compose(
                    primary: primary,
                    secondary: secondary,
                    secondaryIsMain: self.isSwapped,
-                   // 横拍: the viewfinder is upright on the screen, but the
-                   // phone is held sideways and the file is landscape, so
-                   // the inset's place turns with it.
                    inset: wantLandscape
                        ? PiPComposer.sidewaysRect(self.insetRect)
                        : self.insetRect,
-                   // The shape the viewfinder showed: the camera style's
-                   // frame, else square or the full picture. Composed at
-                   // the full picture and cropped after, the inset moved
-                   // and changed shape from where it was placed.
                    aspect: self.cameraStyle.aspectRatio(for: self.orientation)
                        ?? (self.orientation.cropsAfterRecording ? 1 : nil)) {
                 self.clipURL = await CameraStyleBaker.bake(
@@ -865,11 +658,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    // MARK: - Dual camera
 
-    /// Puts the device on a 1080p, 30 fps format a multi-cam session can run.
-    /// A plain session uses its `.high` preset instead, so this does nothing
-    /// there. Returns false only when the device cannot be configured at all.
     static func prepare(_ device: AVCaptureDevice, for session: AVCaptureSession) -> Bool {
         guard session is AVCaptureMultiCamSession else { return true }
         let formats = device.formats.filter { format in
@@ -894,9 +683,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Turns the second camera on or off. Ignored mid-take and on phones that
-    /// cannot run two cameras; if the hardware refuses the pair, the camera
-    /// stays single and `isDualCamera` stays false.
     func setDualCamera(_ on: Bool) {
         guard state == .ready, clipURL == nil, supportsDualCamera, on != isDualCamera else { return }
         Self.sessionQueue.async { [self] in
@@ -911,7 +697,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
     }
 
-    /// Called by the inset's preview view once its layer exists.
     func attachSecondaryPreview(_ layer: AVCaptureVideoPreviewLayer) {
         Self.sessionQueue.async { [self] in
             secondaryPreviewLayer = layer
@@ -937,9 +722,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         ).first
     }
 
-    /// The opposite camera, plus — when the phone cannot pair it with the
-    /// current back lens set — a back lens it can pair with. Runs on the
-    /// session queue.
     private func addSecondaryCamera() -> Bool {
         guard let multi = session as? AVCaptureMultiCamSession,
               let primary = videoInput else { return false }
@@ -949,11 +731,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             position: .unspecified
         ).supportedMultiCamDeviceSets
 
-        // Keep the current lens if it pairs; otherwise step down the back
-        // lens list until one does.
-        // From the front camera, the single wide lens first: a virtual back
-        // device (triple / dual) has no one video port to wire into the
-        // inset, so the pair came up empty and dual mode silently failed.
         let backTypes = position == .back
             ? [primary.device.deviceType] + Self.backCameraTypes
             : [.builtInWideAngleCamera] + Self.backCameraTypes
@@ -1006,7 +783,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         }
         session.commitConfiguration()
 
-        // Two cameras at 1080p can still be over the phone's budget.
         guard !added.isEmpty, multi.hardwareCost <= 1, multi.systemPressureCost <= 1 else {
             secondaryInput = otherInput
             secondaryConnections = added
@@ -1019,15 +795,15 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         return true
     }
 
-    /// Runs on the session queue.
     private func removeSecondaryCamera() {
         session.beginConfiguration()
-        for connection in secondaryConnections { session.removeConnection(connection) }
+        for connection in secondaryConnections where session.connections.contains(where: { $0 === connection }) {
+            session.removeConnection(connection)
+        }
         secondaryConnections = []
         if let secondaryInput { session.removeInput(secondaryInput) }
         secondaryInput = nil
         if session.outputs.contains(secondaryOutput) { session.removeOutput(secondaryOutput) }
-        // Back to the widest back lens, so 0.5x is there again.
         if position == .back, let current = videoInput,
            let widest = camera(for: .back), widest != current.device,
            Self.prepare(widest, for: session) {
@@ -1043,20 +819,6 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 }
 
-/// Which way each camera's sensor hands its frames over, and the fixed
-/// angles that follow from it.
-///
-/// `videoRotationAngle` turns whatever the sensor delivers. The back cameras
-/// deliver landscape frames (1920×1080), so 竖拍 is 90° and 横拍 0°. The
-/// iPhone 17 front camera delivers portrait ones (1080×1920) while its format
-/// still says 1920×1080, so the same 90° filmed every selfie sideways —
-/// measured on Cassie's iPhone 17 Pro Max, 2026-10-27. Older front cameras
-/// are landscape like the back ones.
-///
-/// Nothing in the format tells the two apart, so each camera's answer is
-/// learned from its first take — the file's natural size is the sensor's
-/// shape, whatever angle was set — kept per device, and that first take is
-/// turned upright by `upright` on the way out. Unknown means landscape.
 enum CameraOrientation {
     static let storageKey = "camera.nativePortrait.v1"
 
@@ -1068,7 +830,6 @@ enum CameraOrientation {
         (defaults.dictionary(forKey: storageKey)?[uniqueID] as? Bool) ?? false
     }
 
-    /// Stores what a take showed. True when it changes what was known.
     @discardableResult
     static func remember(
         nativePortrait: Bool, for uniqueID: String, defaults: UserDefaults = .standard
@@ -1080,12 +841,6 @@ enum CameraOrientation {
         return before != nativePortrait
     }
 
-    /// The file's angle. 竖拍: a landscape sensor turns a quarter, a portrait
-    /// one is already upright. 横拍 (phone top to the left) turns a quarter
-    /// from there — back the other way for the front camera, which faces the
-    /// other way: the back camera ends at 0°, the front one at 180° (landscape
-    /// sensor) or 90° (portrait sensor). 270° filmed the iPhone 17's 横拍
-    /// selfies upside down.
     static func captureAngle(sideways: Bool, nativePortrait: Bool, front: Bool) -> CGFloat {
         let upright: CGFloat = nativePortrait ? 0 : 90
         guard sideways else { return upright }
@@ -1093,18 +848,10 @@ enum CameraOrientation {
         return (turned + 360).truncatingRemainder(dividingBy: 360)
     }
 
-    /// The viewfinder's angle: upright on the portrait-locked screen, in
-    /// 竖拍 and 横拍 alike.
     static func previewAngle(nativePortrait: Bool) -> CGFloat {
         nativePortrait ? 0 : 90
     }
 
-    /// The take's transform turned a quarter so it shows `landscape` (or
-    /// upright), or nil when it already does. A wrong shape means the
-    /// sensor was guessed the other way round, and the angle set was a
-    /// quarter-turn off in a known direction: a portrait sensor needed 90°
-    /// less than a landscape one. The turn goes on before the existing
-    /// transform, so a selfie's mirroring stays as it was.
     static func corrected(
         natural: CGSize, transform: CGAffineTransform, landscape: Bool
     ) -> CGAffineTransform? {
@@ -1117,16 +864,12 @@ enum CameraOrientation {
             a: transform.a, b: transform.b, c: transform.c, d: transform.d, tx: 0, ty: 0)
         let turned = CGAffineTransform(rotationAngle: turn).concatenating(linear)
         let box = CGRect(origin: .zero, size: natural).applying(turned)
-        // Snap: `rotationAngle` leaves 1e-17 where a 0 belongs.
         func snap(_ v: CGFloat) -> CGFloat { abs(v - v.rounded()) < 1e-9 ? v.rounded() : v }
         return CGAffineTransform(
             a: snap(turned.a), b: snap(turned.b), c: snap(turned.c), d: snap(turned.d),
             tx: -box.minX.rounded(), ty: -box.minY.rounded())
     }
 
-    /// `url` the shape asked for — re-muxed with a corrected transform when
-    /// it isn't, no re-encode — plus the sensor's shape it revealed (nil when
-    /// the file couldn't be read). On any failure the take is kept as it was.
     static func upright(_ url: URL, landscape: Bool) async -> (url: URL, nativePortrait: Bool?) {
         let asset = AVURLAsset(url: url)
         guard let video = try? await asset.loadTracks(withMediaType: .video).first,
@@ -1173,17 +916,7 @@ enum CameraOrientation {
     }
 }
 
-/// Folds a dual-camera take — two files, one per camera — into one clip: the
-/// main camera fills the frame, the other sits in a white-bordered inset
-/// wherever it was placed on the viewfinder (`PiPInsetLayout`).
-///
-/// Same reasoning as `SquareCrop`: done once, straight after the take, so
-/// every reader of `clipURL` still sees one ordinary file. The audio comes
-/// from the primary file, which is the only one with a microphone connected.
 enum PiPComposer {
-    /// The composed clip, or nil on any failure (inputs left in place for
-    /// the caller's fallback). Deletes both inputs on success. `inset` is the
-    /// normalized rect from the viewfinder.
     static func compose(
         primary: URL, secondary: URL, secondaryIsMain: Bool,
         inset: CGRect = PiPInsetLayout.defaultRect(), aspect: CGFloat?
@@ -1200,8 +933,6 @@ enum PiPComposer {
         return url
     }
 
-    /// Upright frame size, and the transform that puts the stored frame
-    /// upright at the origin.
     private static func upright(_ track: AVAssetTrack) async throws -> (CGSize, CGAffineTransform) {
         let natural = try await track.load(.naturalSize)
         let transform = try await track.load(.preferredTransform)
@@ -1248,7 +979,6 @@ enum PiPComposer {
 
         let canvas = canvasSize(main: mainSize, aspect: aspect)
 
-        // Main: aspect-fill the canvas, centred.
         let mainScale = max(canvas.width / mainSize.width, canvas.height / mainSize.height)
         let mainLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: mainOut)
         mainLayer.setTransform(
@@ -1259,9 +989,6 @@ enum PiPComposer {
                     y: (canvas.height - mainSize.height * mainScale) / 2)),
             at: .zero)
 
-        // Inset: same shape as the canvas, where it was placed, aspect-filled
-        // and cropped to the picture box inside the white border so it does
-        // not spill over the main picture.
         let box = pictureBox(insetRect, in: canvas)
         let insetScale = max(box.width / insetSize.width, box.height / insetSize.height)
         let visible = CGRect(
@@ -1281,7 +1008,6 @@ enum PiPComposer {
 
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = range
-        // First is on top.
         instruction.layerInstructions = [insetLayer, mainLayer]
 
         let video = AVMutableVideoComposition()
@@ -1309,19 +1035,10 @@ enum PiPComposer {
         return output
     }
 
-    /// The inset's place in a 横拍 file, from where it sat on the viewfinder.
-    /// The viewfinder is upright on the portrait screen while the phone is
-    /// held top to the left, so the screen's x runs up the world and its y
-    /// runs right: what sat at the screen's top right sits at the file's top
-    /// left. Width and height are the same share, so only the corner moves.
     static func sidewaysRect(_ rect: CGRect) -> CGRect {
         CGRect(x: rect.minY, y: 1 - rect.maxX, width: rect.height, height: rect.width)
     }
 
-    /// The composed frame: the main picture cut to `aspect` (width / height)
-    /// around its centre, the shape the viewfinder showed. The inset rect is
-    /// a share of that shape, so the file has to be that shape too — a crop
-    /// after composing moves the inset and changes its shape.
     static func canvasSize(main: CGSize, aspect: CGFloat?) -> CGSize {
         let full = CGSize(width: even(main.width), height: even(main.height))
         guard let aspect, let cut = CameraStyleBaker.centredCrop(of: full, aspect: aspect)
@@ -1329,7 +1046,6 @@ enum PiPComposer {
         return cut.size
     }
 
-    /// The picture box on the file's canvas, snapped to whole even pixels.
     static func pictureBox(_ rect: CGRect, in canvas: CGSize) -> CGRect {
         let box = PiPInsetLayout.pictureBox(rect, in: canvas)
         return CGRect(
@@ -1337,20 +1053,11 @@ enum PiPComposer {
             width: even(box.width), height: even(box.height))
     }
 
-    /// The white rounded frame burned over the inset, so the file has the
-    /// same snapshot border the viewfinder draws.
-    ///
-    /// A ring — the outer rounded rect minus the inner one, even-odd — laid
-    /// over the video. The picture under it is a plain rectangle; the ring
-    /// covers its square corners because the inner radius is kept small
-    /// enough (see `PiPInsetLayout.cornerShare`). The soft shadow falls
-    /// outward onto the main picture, as the viewfinder's does.
     private static func frameTool(
         around rect: CGRect, canvas: CGSize
     ) -> AVVideoCompositionCoreAnimationTool {
         let parent = CALayer()
         parent.frame = CGRect(origin: .zero, size: canvas)
-        // Top-left origin, to match the rect's coordinates.
         parent.isGeometryFlipped = true
         let videoLayer = CALayer()
         videoLayer.frame = parent.frame
@@ -1383,24 +1090,7 @@ enum PiPComposer {
     }
 }
 
-/// Turns a recorded take into a square one.
-///
-/// The camera cannot film a square: `AVCaptureMovieFileOutput` takes a rotation
-/// angle and nothing else, so the file it writes is always the sensor's whole
-/// frame. A square room therefore films upright and centre-crops immediately
-/// afterwards, and the cropped file is the only one that survives.
-///
-/// Cropping here rather than at export time means it happens once, to one clip,
-/// while the person is still looking at the review screen — and the stitcher
-/// then reads `sourceAspect` 1 off the file and builds a square canvas by the
-/// rules it already has, with no crop of its own.
 enum SquareCrop {
-    /// A square copy, or the original URL when there is nothing to gain.
-    ///
-    /// Returns the input on any failure. A take that could not be cropped is
-    /// still the take somebody just filmed: it goes to the review screen in the
-    /// shape it came out of the camera, which is worse than square and far
-    /// better than gone.
     static func copy(of url: URL) async -> URL {
         guard let cropped = try? await square(url) else { return url }
         try? FileManager.default.removeItem(at: url)
@@ -1414,24 +1104,15 @@ enum SquareCrop {
 
         let natural = try await track.load(.naturalSize)
         let transform = try await track.load(.preferredTransform)
-        // The frame as a viewer sees it, which is what has to end up square —
-        // a 1080×1920 file and a 1920×1080 file carrying a quarter turn are the
-        // same upright take, and cropping the stored dimensions would take the
-        // square out of the wrong axis on one of them.
         let upright = CGRect(origin: .zero, size: natural).applying(transform)
         let oriented = CGSize(width: abs(upright.width), height: abs(upright.height))
         guard oriented.width > 0, oriented.height > 0 else { throw CropError.noVideoTrack }
 
-        // H.264 wants even dimensions.
         let side = (min(oriented.width, oriented.height) / 2).rounded(.down) * 2
         guard side >= 2 else { throw CropError.noVideoTrack }
         let render = CGSize(width: side, height: side)
 
         let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
-        // Rotate upright, pull the rotated frame back to the origin, then slide
-        // the middle of it under the square. Two of the four rotations leave
-        // the extent in negative space, which is what `upright.minX/minY`
-        // absorbs — without it the take lands off-canvas and exports black.
         layer.setTransform(
             transform
                 .concatenating(CGAffineTransform(
@@ -1505,8 +1186,6 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: PreviewView, context: Context) {}
 }
 
-/// The inset's live picture. A no-connection layer: the recorder wires it to
-/// the second camera itself, so it never picks up the main camera.
 struct SecondaryCameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     var onLayer: (AVCaptureVideoPreviewLayer) -> Void = { _ in }

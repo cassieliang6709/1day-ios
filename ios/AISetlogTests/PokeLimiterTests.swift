@@ -25,11 +25,9 @@ final class PokeLimiterTests: XCTestCase {
         XCTAssertTrue(limiter.hasPoked(code: "ROOM", targetAuthorID: "amy", on: evening))
         XCTAssertFalse(limiter.claim(code: "ROOM", targetAuthorID: "amy", on: evening))
 
-        // A different friend, or the same friend in another room, is separate.
         XCTAssertTrue(limiter.claim(code: "ROOM", targetAuthorID: "ben", on: evening))
         XCTAssertTrue(limiter.claim(code: "OTHER", targetAuthorID: "amy", on: evening))
 
-        // Next day the poke is available again.
         XCTAssertFalse(limiter.hasPoked(code: "ROOM", targetAuthorID: "amy", on: tomorrow))
         XCTAssertTrue(limiter.claim(code: "ROOM", targetAuthorID: "amy", on: tomorrow))
     }

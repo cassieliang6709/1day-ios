@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day · 圆角和间距怎么定</title>
+<style>
+  :root {
+    --canvas: #FFF8E8;
+    --surface: #FFFFFF;
+    --soft: #FFF1CC;
+    --ink: #3A2B1B;
+    --ink-soft: #7A6650;
+    --ink-faint: #8F7C66;
+    --brand: #FFCB45;
+    --brand-text: #8A5A00;
+    --hairline: rgba(58, 43, 27, .08);
+    --phone: 440px;
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F3EBDB; }
+  main { max-width: 1480px; margin: 0 auto; padding: 32px 28px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  .lead { color: var(--ink-soft); font-size: 15px; margin: 0 0 20px; line-height: 1.55; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 28px; font-size: 14px; color: var(--ink-soft); }
+  .toolbar button {
+    font: inherit; font-weight: 700; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--hairline); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  }
+  .toolbar button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); }
+  section.q { margin-bottom: 56px; }
+  section.q > h2 { font-size: 21px; margin: 0 0 4px; }
+  section.q > .what { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 18px; line-height: 1.5; }
+  .row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; zoom: var(--zoom, 1); }
+  .option { width: var(--phone); }
+  .option header { margin-bottom: 10px; }
+  .option header b { font-size: 17px; }
+  .option header .tag { font-size: 12px; font-weight: 800; color: var(--brand-text); background: var(--soft); border-radius: 999px; padding: 2px 9px; margin-left: 6px; }
+  .option header p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.45; min-height: 2.9em; }
+
+  .phone {
+    width: var(--phone); background: var(--canvas); border-radius: 46px;
+    border: 10px solid #1c1712; overflow: hidden; position: relative;
+    box-shadow: 0 18px 40px rgba(58, 43, 27, .18);
+  }
+  .screen { padding: 18px 0 26px; }
+  .status { display: flex; justify-content: space-between; padding: 0 30px 10px; font-size: 15px; font-weight: 700; }
+
+  .me-row { display: flex; align-items: center; gap: var(--g-row); padding: 0 var(--page) ; font-weight: 700; font-size: 17px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: #6E12C6; color: #fff; display: grid; place-items: center; font-size: 15px; font-weight: 800; flex: none; }
+  .avatar.s { width: 26px; height: 26px; font-size: 11px; border: 2px solid var(--surface); margin-left: -8px; }
+  .avatar.s:first-child { margin-left: 0; }
+  .chev { margin-left: auto; color: var(--ink-faint); }
+  .divider { height: 1px; background: var(--hairline); margin: var(--g-row) var(--page) 0; }
+  .title-row { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--page); margin-top: var(--g-section); }
+  .title-row h3 { font-size: 30px; margin: 0; }
+  .pill { font-size: 14px; font-weight: 800; border-radius: 999px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--hairline); }
+  .pill.brand { background: var(--brand); border-color: var(--brand); }
+  .pills { display: flex; gap: var(--g-tight); }
+  .list { display: flex; flex-direction: column; gap: var(--g-cards); padding: 0 var(--page); margin-top: var(--g-title); }
+
+  .card { background: var(--surface); border-radius: 24px; border: 1px solid var(--hairline); overflow: hidden; }
+  .card .cover { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--g-tiles); padding: var(--card-pad) var(--card-pad) 0; }
+  .card .meta { display: flex; align-items: center; gap: var(--g-row); padding: var(--card-pad); }
+  .card .meta .name { font-weight: 800; font-size: 17px; }
+  .card .meta .sub { font-size: 13px; color: var(--ink-faint); font-weight: 600; margin-top: 2px; }
+  .faces { display: flex; }
+
+  .tile { position: relative; aspect-ratio: 9 / 16; overflow: hidden; border-radius: var(--tile); }
+  .tile .rec { position: absolute; top: 7px; right: 8px; font-size: 9px; font-weight: 800; color: #fff; opacity: .9; }
+  .tile .rec::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #FF3B30; margin-right: 3px; vertical-align: 1px; }
+  .tile .dur { position: absolute; left: 7px; bottom: 7px; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .tile .who { position: absolute; right: 6px; bottom: 6px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; font-size: 9px; font-weight: 800; color: #fff; display: grid; place-items: center; }
+  .f1 { background: linear-gradient(160deg, #C9B08F, #6B5845 60%, #3D3128); }
+  .f2 { background: linear-gradient(200deg, #E8D9C2, #B59B7C 55%, #5B4A3B); }
+  .f3 { background: linear-gradient(170deg, #9DB3B9, #5E7378 55%, #2F3B3E); }
+  .f4 { background: linear-gradient(150deg, #E7C7A3, #C2865A 60%, #6E432A); }
+  .f5 { background: linear-gradient(190deg, #D7D2C5, #8F8A7E 60%, #44413B); }
+  .f6 { background: linear-gradient(165deg, #F0D6B5, #D9A86E 50%, #7A5530); }
+
+  .label { font-size: 13px; font-weight: 800; color: var(--ink-soft); padding: 0 var(--page); margin: var(--g-section) 0 var(--g-title); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--g-grid); margin: 0 var(--page); border-radius: var(--grid-outer); overflow: hidden; }
+  .grid .tile { aspect-ratio: 3 / 4; border-radius: var(--grid-tile); }
+  .strip { display: flex; gap: var(--g-tight); padding: 0 var(--page); }
+  .strip .tile { width: 58px; aspect-ratio: 58 / 66; flex: none; border-radius: var(--strip-tile); }
+  .chat { margin: 0 var(--page); background: var(--soft); border-radius: 24px; padding: var(--card-pad); display: flex; gap: var(--g-row); align-items: flex-end; }
+  .chat .tile { width: 92px; flex: none; border-radius: var(--chat-tile); }
+  .bubble { background: var(--surface); border-radius: 18px 18px 18px 6px; padding: 9px 12px; font-size: 15px; }
+
+  .zoom-box { margin-top: 14px; background: var(--surface); border-radius: 18px; padding: 14px; border: 1px solid var(--hairline); }
+  .zoom-box .cap { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; font-weight: 700; }
+  .zoom-box .stage { height: 150px; overflow: hidden; position: relative; background: var(--canvas); border-radius: 10px; }
+  .zoom-box .card-corner {
+    position: absolute; left: 18px; top: 18px; width: 600px; height: 600px; transform: scale(3); transform-origin: 0 0;
+    background: var(--surface); border-radius: 24px; border: 1px solid rgba(58,43,27,.18);
+  }
+  .zoom-box .card-corner .tile { position: absolute; left: var(--card-pad); top: var(--card-pad); width: 200px; height: 400px; aspect-ratio: auto; }
+
+  .gap-label { display: none; }
+  body.show-gaps .gap-label {
+    display: inline-block; font-size: 11px; font-weight: 800; color: #fff; background: #E00B4C;
+    border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle;
+  }
+  body.show-gaps .spacing-demo .card, body.show-gaps .spacing-demo .title-row, body.show-gaps .spacing-demo .me-row { outline: 1px dashed rgba(224, 11, 76, .45); outline-offset: 0; }
+
+  .note { font-size: 13.5px; color: var(--ink-soft); line-height: 1.55; background: var(--surface); border-radius: 16px; padding: 14px 16px; border: 1px solid var(--hairline); max-width: 920px; }
+  .note b { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>圆角和间距怎么定</h1>
+  <p class="lead">DESIGN.md 里还有两项没定。下面每一项把几个选项并排画成手机界面，颜色、字体、版式照 App 里现在的写。画面里的视频用色块代替。看着选，告诉我选了哪个。</p>
+
+  <div class="toolbar">
+    <span>显示大小：</span>
+    <button type="button" data-zoom="1" aria-pressed="true">手机实际点数（1pt = 1px）</button>
+    <button type="button" data-zoom="0.72" aria-pressed="false">缩小，一屏看全</button>
+    <span style="margin-left:14px">间距：</span>
+    <button type="button" id="gaps" aria-pressed="false">标出间距数值</button>
+  </div>
+
+  <section class="q">
+    <h2>1. 片段小图的圆角</h2>
+    <p class="what">影响所有卡片里面的视频小图：房间卡片、「我的」网格、成片条、聊天里引用的片段。卡片本身的圆角已经定了（24）。</p>
+
+    <div class="row">
+      <div class="option" style="--tile:15px; --grid-outer:14px; --grid-tile:0px; --strip-tile:15px; --chat-tile:10px;">
+        <header><b>现在</b><p>各处自己写：房间卡 15、我的网格外框 14、成片条 15、聊天 10。</p></header>
+        <div class="phone"><div class="screen spacing-now" data-part="radius"></div></div>
+      </div>
+      <div class="option" style="--tile:12px; --grid-outer:12px; --grid-tile:0px; --strip-tile:12px; --chat-tile:12px;">
+        <header><b>A · 12</b><span class="tag">我推荐</span><p>卡片 24、内边距 12，里面的小图用 24 − 12 = 12，内外两条弧线平行，嵌套看着最顺。</p></header>
+        <div class="phone"><div class="screen spacing-now" data-part="radius"></div></div>
+      </div>
+      <div class="option" style="--tile:14px; --grid-outer:14px; --grid-tile:0px; --strip-tile:14px; --chat-tile:14px;">
+        <header><b>B · 14</b><p>和小标签、输入框共用 chip 的 14，少一个 token。嵌在卡片里时小图的角比卡片的角更圆，层次弱一点。</p></header>
+        <div class="phone"><div class="screen spacing-now" data-part="radius"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="q">
+    <h2>2. 间距要不要收成 6 档</h2>
+    <p class="what">现在各页面自己写 4、6、8、9、10、11、12、14、18、20、22、26、28……提议只留 4 / 8 / 12 / 16 / 20 / 28 六档。打开上面的「标出间距数值」看具体哪里变了。两边小图圆角都按 A（12）画，只比间距。</p>
+
+    <div class="row">
+      <div class="option spacing-demo" style="--tile:12px; --grid-outer:12px; --grid-tile:0px; --strip-tile:12px; --chat-tile:12px;">
+        <header><b>现在</b><p>卡片之间 18、分区之间 26、卡片内边距 12、头像和文字 14 / 11、网格缝 3。</p></header>
+        <div class="phone"><div class="screen spacing-now" data-part="spacing"></div></div>
+      </div>
+      <div class="option spacing-demo" style="--tile:12px; --grid-outer:12px; --grid-tile:0px; --strip-tile:12px; --chat-tile:12px;">
+        <header><b>收成 6 档</b><span class="tag">我推荐</span><p>卡片之间 16、分区之间 28、卡片内边距 12、头像和文字 12、网格缝 4。整体略紧一点，节奏更整齐。</p></header>
+        <div class="phone"><div class="screen spacing-six" data-part="spacing"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note"><b>怎么选：</b>两项各回我一个字母或一句话就行，比如「圆角 A，间距收」。定下来后我改 DESIGN.md 和 <code>Theme.swift</code>，再开始统一片段小图。<br>
+  <b>注意：</b>Mac 屏幕上的 1pt 比手机上的大一点，同样的圆角在手机上看会更小、更细。想看手机上的真实效果，我可以把选中的方案先做进 App 装到你手机上。</p>
+</main>
+
+<template id="screen">
+  <div class="status"><span>12:31</span><span>●●● 88</span></div>
+  <div class="me-row"><div class="avatar">Y</div><span>我的</span><span class="gap-label" data-gap="row"></span><span class="chev">›</span></div>
+  <div class="divider"></div>
+  <div class="title-row"><h3>房间<span class="gap-label" data-gap="section"></span></h3><div class="pills"><span class="pill">加入</span><span class="pill brand">＋ 新建房间</span></div></div>
+  <div class="list">
+    <div class="card">
+      <div class="cover">
+        <div class="tile f1"><span class="rec">REC</span><span class="dur">00:06</span><span class="who" style="background:#6E12C6">Y</span></div>
+        <div class="tile f2"><span class="rec">REC</span><span class="dur">00:29</span><span class="who" style="background:#007F91">尼</span></div>
+        <div class="tile f3"><span class="rec">REC</span><span class="dur">00:04</span><span class="who" style="background:#AD6102">贝</span></div>
+      </div>
+      <div class="meta">
+        <div class="faces"><span class="avatar s">Y</span><span class="avatar s" style="background:#007F91">尼</span><span class="avatar s" style="background:#AD6102">贝</span></div>
+        <div><div class="name">Cassie 和尼尼<span class="gap-label" data-gap="pad"></span></div><div class="sub">你 · 12:29</div></div>
+        <span class="chev">›</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cover">
+        <div class="tile f4"><span class="rec">REC</span><span class="dur">00:03</span></div>
+        <div class="tile f5"><span class="rec">REC</span><span class="dur">00:05</span></div>
+        <div class="tile f6"><span class="rec">REC</span><span class="dur">00:02</span></div>
+      </div>
+      <div class="meta">
+        <div class="faces"><span class="avatar s" style="background:#18652E">杨</span><span class="avatar s">Y</span></div>
+        <div><div class="name">和我过一天<span class="gap-label" data-gap="cards"></span></div><div class="sub">宝宝 · 昨天</div></div>
+        <span class="chev">›</span>
+      </div>
+    </div>
+  </div>
+  <div class="label">我的 · 所有片段<span class="gap-label" data-gap="grid"></span></div>
+  <div class="grid">
+    <div class="tile f2"><span class="dur">00:29</span></div><div class="tile f1"><span class="dur">00:06</span></div><div class="tile f4"><span class="dur">00:03</span></div>
+    <div class="tile f3"><span class="dur">00:04</span></div><div class="tile f6"><span class="dur">00:02</span></div><div class="tile f5"><span class="dur">00:05</span></div>
+  </div>
+  <div class="label">成片里的片段</div>
+  <div class="strip">
+    <div class="tile f1"></div><div class="tile f2"></div><div class="tile f3"></div><div class="tile f4"></div><div class="tile f5"></div>
+  </div>
+  <div class="label">聊天里引用的片段</div>
+  <div class="chat"><div class="tile f2"><span class="dur">00:29</span></div><div class="bubble">这段好可爱</div></div>
+</template>
+
+<template id="zoom">
+  <div class="zoom-box">
+    <div class="cap">卡片左上角放大 3 倍：外面是卡片（24），里面是小图</div>
+    <div class="stage"><div class="card-corner"><div class="tile f1"></div></div></div>
+  </div>
+</template>
+
+<script>
+  const SPACING = {
+    now: { page: 20, row: 14, section: 26, title: 14, cards: 18, pad: 12, tiles: 6, grid: 3, tight: 10 },
+    six: { page: 20, row: 12, section: 28, title: 12, cards: 16, pad: 12, tiles: 8, grid: 4, tight: 8 },
+  };
+
+  function apply(screen, set) {
+    const s = SPACING[set];
+    screen.style.cssText += `--page:${s.page}px;--g-row:${s.row}px;--g-section:${s.section}px;--g-title:${s.title}px;` +
+      `--g-cards:${s.cards}px;--card-pad:${s.pad}px;--g-tiles:${s.tiles}px;--g-grid:${s.grid}px;--g-tight:${s.tight}px;`;
+    screen.querySelectorAll('.gap-label').forEach((el) => {
+      const key = el.dataset.gap;
+      const names = { row: '头像↔文字', section: '分区之间', pad: '卡片内边距', cards: '卡片之间', grid: '网格缝' };
+      el.textContent = `${names[key]} ${s[key]}`;
+    });
+  }
+
+  const screenTpl = document.getElementById('screen');
+  const zoomTpl = document.getElementById('zoom');
+  document.querySelectorAll('.screen').forEach((screen) => {
+    screen.appendChild(screenTpl.content.cloneNode(true));
+    apply(screen, screen.classList.contains('spacing-six') ? 'six' : 'now');
+    if (screen.dataset.part === 'radius') {
+      screen.closest('.option').appendChild(zoomTpl.content.cloneNode(true));
+    }
+  });
+
+  document.querySelectorAll('[data-zoom]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      document.querySelectorAll('.row').forEach((row) => row.style.setProperty('--zoom', button.dataset.zoom));
+    });
+  });
+  const gaps = document.getElementById('gaps');
+  gaps.addEventListener('click', () => {
+    const on = document.body.classList.toggle('show-gaps');
+    gaps.setAttribute('aria-pressed', String(on));
+  });
+</script>
+</body>
+</html>

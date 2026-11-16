@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// My avatar and today's mood face go to my `Member` record in every room I'm
-/// in, once per change, and never block anything when CloudKit says no. A
-/// friend's mood shows only on the day they picked it. The mood's note is
-/// never part of what's sent.
 @MainActor
 final class MemberProfileSyncTests: XCTestCase {
     private var writes: [CloudKitService.MemberProfileWrite] = []
@@ -111,7 +107,6 @@ final class MemberProfileSyncTests: XCTestCase {
     private let avatar = URL(fileURLWithPath: "/tmp/avatar-test.png")
     private let picked = Date(timeIntervalSince1970: 1_760_000_000)
 
-    // MARK: - Publishing
 
     func testMoodAndAvatarGoToEveryRoomImIn() async {
         let profile = MyRoomProfile(avatarURL: avatar, avatarVersion: picked, mood: .happy, moodAt: picked)
@@ -178,8 +173,6 @@ final class MemberProfileSyncTests: XCTestCase {
     }
 
     func testOnlyTheMoodFaceIsSentNeverTheNote() async throws {
-        // The profile is built from a mood entry that has a note; nothing in
-        // the write can carry it.
         let entry = MoodEntry(day: MoodDay.key(for: picked), mood: .angry,
                               note: "secret diary line", updatedAt: picked)
         let profile = MyRoomProfile.make(avatar: AvatarStore(fileURL: nil), today: entry)
@@ -203,7 +196,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertTrue(writes.isEmpty)
     }
 
-    // MARK: - Room name
 
     func testRenamingARoomChangesItHereAndSendsIt() async {
         let store = store(rooms: ["AAAAAA"], profile: nil)
@@ -264,7 +256,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertTrue(titleWrites.isEmpty)
     }
 
-    // MARK: - Leaving
 
     func testLeavingARoomDeletesMyRecordsForEveryone() async throws {
         let store = store(rooms: ["AAAAAA"], profile: nil)
@@ -284,7 +275,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertTrue(deleted.isEmpty)
     }
 
-    // MARK: - Room size
 
     func testTheGridFollowsTheHeadCount() {
         XCTAssertTrue(RoomFrames.grid(for: 1) == (1, 1))
@@ -300,7 +290,7 @@ final class MemberProfileSyncTests: XCTestCase {
     }
 
     func testAFullRoomTurnsTheSeventhPersonAway() async {
-        fetched = (1...5).map { person("p\($0)") }   // plus the owner: six
+        fetched = (1...5).map { person("p\($0)") }
         let store = store(rooms: [], profile: nil)
         do {
             _ = try await store.joinRoom(code: "ABCDEF")
@@ -312,7 +302,7 @@ final class MemberProfileSyncTests: XCTestCase {
     }
 
     func testARoomWithSpaceLetsMeIn() async throws {
-        fetched = (1...4).map { person("p\($0)") }   // plus the owner: five
+        fetched = (1...4).map { person("p\($0)") }
         let store = store(rooms: [], profile: nil)
         _ = try await store.joinRoom(code: "ABCDEF")
         XCTAssertEqual(store.challenges.first?.roomCode, "ABCDEF")
@@ -333,7 +323,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertTrue(ids.contains("quiet"))
     }
 
-    // MARK: - Reading
 
     func testFriendsMoodShowsOnlyOnTheDayItWasPicked() async {
         let now = Date()
@@ -380,7 +369,6 @@ final class MemberProfileSyncTests: XCTestCase {
         fetched = [.init(userID: "a", displayName: "A", avatarURL: avatarFile, moodKind: nil, moodDay: nil)]
         await store(rooms: ["AAAAAA"], profile: nil, files: files).roomSync.syncMembers(code: "AAAAAA")
 
-        // Next launch: a fresh service, and CloudKit not answering yet.
         fetchFails = true
         let relaunched = store(rooms: ["AAAAAA"], profile: nil, files: files)
         relaunched.roomSync.restoreCachedMembers(code: "AAAAAA")
@@ -399,7 +387,46 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.roomSync.remoteMembers["AAAAAA"]?.isEmpty, true)
     }
 
-    // MARK: - Restoring rooms
+    func testRelaunchShowsAllCachedMembersBeforeNetworkReturns() async throws {
+        let files = ProfileTestFileStore()
+        let first = store(rooms: ["AAAAAA"], profile: nil, files: files)
+        let me = try XCTUnwrap(account.account)
+        fetched = [person("friend-a"), person("friend-b"), person(me.id)]
+        await first.roomSync.syncMembers(code: "AAAAAA")
+        let room = try XCTUnwrap(first.challenges.first)
+        let expected = Set(first.members(for: room.id).map(\.id))
+        XCTAssertEqual(expected.count, 4)
+        let repository = ProfileTestRepository()
+        repository.saveChallenges([room])
+        fetchFails = true
+        let relaunched = ChallengeStore(
+            repository: repository, fileStore: files,
+            roomSync: RoomSyncService(fileStore: files, transport: transport()),
+            effects: .isolated)
+        relaunched.account = account
+
+        XCTAssertEqual(Set(relaunched.members(for: room.id).map(\.id)), expected)
+        await relaunched.roomSync.syncMembers(code: "AAAAAA")
+        XCTAssertEqual(Set(relaunched.members(for: room.id).map(\.id)), expected)
+    }
+
+    func testAddingSavedRoomRestoresItsCachedRosterImmediately() async throws {
+        let files = ProfileTestFileStore()
+        let first = store(rooms: ["AAAAAA"], profile: nil, files: files)
+        fetched = [person("friend-a"), person("friend-b")]
+        await first.roomSync.syncMembers(code: "AAAAAA")
+        let room = try XCTUnwrap(first.challenges.first)
+        let expected = Set(first.members(for: room.id).map(\.id))
+        let reopened = store(rooms: [], profile: nil, files: files)
+
+        reopened.challenges.append(room)
+
+        XCTAssertEqual(Set(reopened.members(for: room.id).map(\.id)), expected)
+        reopened.roomSync.remoteMembers["AAAAAA"] = [:]
+        reopened.updatePlan(room.id, title: "Renamed", momentTitles: ["Morning"])
+        XCTAssertEqual(reopened.roomSync.remoteMembers["AAAAAA"]?.isEmpty, true)
+    }
+
 
     private func ownedRoom(_ code: String, startedOn start: Date) -> CloudKitService.RemoteRoom {
         CloudKitService.RemoteRoom(
@@ -408,8 +435,6 @@ final class MemberProfileSyncTests: XCTestCase {
             cameraStyle: nil, templateName: nil, momentTitles: nil)
     }
 
-    /// A new phone: the rooms my `Member` records name come back, and one
-    /// already here isn't added twice.
     func testRoomsIJoinedComeBackOnANewPhone() async {
         myRooms = .init(memberCodes: ["AAAAAA", "BBBBBB", "CCCCCC"], owned: [])
         let store = store(rooms: ["AAAAAA"], profile: nil)
@@ -420,8 +445,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.challenges.count, 3, "a second pass adds nothing")
     }
 
-    /// A room I made before owners got a `Member` record comes back through
-    /// its owner ID; one I made later and then left (no record) stays gone.
     func testOwnedRoomsComeBackUnlessILeftThem() async {
         let before = ChallengeStore.ownerMemberRecordsSince.addingTimeInterval(-86_400)
         let after = ChallengeStore.ownerMemberRecordsSince.addingTimeInterval(86_400)
@@ -435,7 +458,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.challenges.first { $0.roomCode == "OLDONE" }?.title, "我的房间")
     }
 
-    /// No answer from the cloud changes nothing — it never removes a room.
     func testAFailedLookupLeavesTheRoomListAlone() async {
         myRooms = nil
         let store = store(rooms: ["AAAAAA"], profile: nil)
@@ -443,7 +465,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(store.challenges.compactMap(\.roomCode), ["AAAAAA"])
     }
 
-    // MARK: - Another account on this phone
 
     private func defaults() throws -> UserDefaults {
         let d = try XCTUnwrap(UserDefaults(suiteName: "AccountRoomsTests"))
@@ -451,9 +472,6 @@ final class MemberProfileSyncTests: XCTestCase {
         return d
     }
 
-    /// Someone else signs in: the last person's shared rooms and avatar leave
-    /// this phone before anything syncs, so none of their takes go up under
-    /// the new account. Personal stories stay.
     func testAnotherAccountDoesNotInheritTheLastPersonsRooms() async throws {
         let d = try defaults()
         d.set("someone-else", forKey: ChallengeStore.roomsAccountKey)
@@ -469,9 +487,6 @@ final class MemberProfileSyncTests: XCTestCase {
         d.removePersistentDomain(forName: "AccountRoomsTests")
     }
 
-    /// The same person signing back in keeps everything, takes still
-    /// waiting to upload included; so does a phone that never recorded whose
-    /// rooms they were.
     func testTheSamePersonKeepsTheirRooms() async throws {
         let d = try defaults()
         myRooms = .init(memberCodes: [], owned: [])
@@ -485,8 +500,6 @@ final class MemberProfileSyncTests: XCTestCase {
         d.removePersistentDomain(forName: "AccountRoomsTests")
     }
 
-    /// A new phone: no name from Apple, no avatar file. Both come back from
-    /// my own `Member` records; a name I already have is never replaced.
     func testANewPhoneGetsMyNameAndAvatarBack() async {
         account.signInAsTester(named: "")
         myRooms = .init(memberCodes: [], owned: [], displayName: "Cassie", avatarFile: avatar)
@@ -502,8 +515,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(account.account?.displayName, "Cass")
     }
 
-    /// A take uploaded while its author had no name doesn't blank the name
-    /// their `Member` record shows.
     func testANamelessTakeDoesNotBlankAMembersName() async {
         fetched = [.init(userID: "leo", displayName: "Leo", avatarURL: nil, moodKind: nil, moodDay: nil)]
         let store = store(rooms: ["AAAAAA"], profile: nil)
@@ -534,7 +545,6 @@ final class MemberProfileSyncTests: XCTestCase {
         XCTAssertEqual(CloudKitService.memberAvatarFileName(userID: "001234.abcd/ef"), "avatar_001234_abcd_ef.png")
     }
 
-    // MARK: - Invite card
 
     func testTheInviteCardCarriesTheInvitersAvatar() {
         let room = Challenge(id: UUID(), title: "Day", startDate: .now, cards: [DayCard(day: 1)],
@@ -552,8 +562,6 @@ private final class ProfileTestRepository: ChallengeRepository {
 }
 
 private final class ProfileTestFileStore: ClipFileStore {
-    /// Its own folder per store, so a roster saved by one test is never
-    /// restored by another.
     private let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("profile-tests-\(UUID().uuidString)", isDirectory: true)
     func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String? { nil }

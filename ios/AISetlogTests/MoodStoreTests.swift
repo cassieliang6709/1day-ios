@@ -1,13 +1,10 @@
 import XCTest
 @testable import AISetlog
 
-/// 心情日记: one entry per day, changeable all day, survives a relaunch, and
-/// maps to the `MoodEntry` CloudKit record without loss. No test here touches
-/// CloudKit — the store is built with `sync: nil` or a fake.
 @MainActor
 final class MoodStoreTests: XCTestCase {
     private var tempDir: URL!
-    private var clock = Date(timeIntervalSince1970: 1_760_600_000) // 2025-10-16, mid-day UTC
+    private var clock = Date(timeIntervalSince1970: 1_760_600_000)
 
     override func setUp() {
         super.setUp()
@@ -27,7 +24,6 @@ final class MoodStoreTests: XCTestCase {
         MoodStore(fileURL: fileURL, sync: sync, now: { [unowned self] in self.clock })
     }
 
-    // MARK: - Setting and replacing
 
     func testSettingTodaysMoodCreatesOneEntry() {
         let store = makeStore()
@@ -74,7 +70,6 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.count, 2)
     }
 
-    // MARK: - Persistence
 
     func testEntriesSurviveARelaunch() {
         let first = makeStore()
@@ -87,7 +82,6 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertEqual(second.today, saved)
     }
 
-    // MARK: - Merge (last write wins)
 
     func testNewerRemoteEntryReplacesLocalOlderDoesNot() {
         let store = makeStore()
@@ -112,7 +106,6 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertEqual(fake.pushed.last?.mood, .tired)
     }
 
-    // MARK: - Record mapping
 
     func testRecordRoundTrip() throws {
         let entry = MoodEntry(day: "2026-10-16", mood: .calm, note: "tea", updatedAt: clock)
@@ -131,7 +124,6 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertNil(MoodSync.entry(from: row))
     }
 
-    // MARK: - Saved state
 
     func testASavedDayIsStillSavedAfterARelaunch() {
         let first = makeStore()
@@ -144,10 +136,7 @@ final class MoodStoreTests: XCTestCase {
         XCTAssertEqual(second.today?.note, "tea")
     }
 
-    // MARK: - Mascot chat (removed, 1.5)
 
-    /// 和小方块聊两句 is gone; the chat it saved next to the moods, and the
-    /// mascot's name, are cleared the next time the store opens.
     func testTheOldMascotChatIsDeletedOnLaunch() throws {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         let chat = tempDir.appendingPathComponent("mascot-chat.json")

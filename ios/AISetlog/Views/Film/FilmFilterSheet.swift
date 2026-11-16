@@ -1,21 +1,12 @@
 import SwiftUI
 import AVFoundation
 
-/// What the film page asked the filter sheet to open on: everyone, or one
-/// person's takes straight away.
 struct FilmFilterTarget: Identifiable {
-    /// `FilmPerson.id`, or nil for the list of everyone.
     let person: String?
     var id: String { person ?? "" }
 }
 
-// MARK: - The row on the film page
 
-/// Everyone in the room's film as a row of faces, under the player.
-///
-/// Tapping a face goes straight to that person's takes; 筛选 opens the list of
-/// everyone. Someone left out is drawn faded, so the row says who's in the
-/// film you're watching without opening anything.
 struct FilmPeopleRow: View {
     let people: [FilmPerson]
     let selection: FilmSelection
@@ -23,7 +14,6 @@ struct FilmPeopleRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // No 成片里有谁 title: the faces already say it.
             HStack {
                 Spacer()
                 Button {
@@ -38,8 +28,6 @@ struct FilmPeopleRow: View {
                 .accessibilityIdentifier("film-filter")
             }
 
-            // Six people at 64pt is wider than a phone, so the row scrolls
-            // rather than shrinking faces until they can't be told apart.
             ScrollView(.horizontal) {
                 HStack(spacing: 14) {
                     ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
@@ -61,7 +49,6 @@ struct FilmPeopleRow: View {
     }
 }
 
-/// One face, their name, and how many of their takes are in.
 private struct FilmPersonBadge: View {
     let person: FilmPerson
     let selection: FilmSelection
@@ -101,13 +88,7 @@ private struct FilmPersonBadge: View {
     }
 }
 
-// MARK: - The sheet
 
-/// Whose takes go in, which ones, and which stand still.
-///
-/// Edits a draft, like `AdjustFilmSheet` and for the same reason: the film
-/// re-renders whenever the selection changes, so nothing leaves the sheet
-/// until Apply.
 struct FilmFilterSheet: View {
     let people: [FilmPerson]
     let onApply: (FilmSelection) -> Void
@@ -184,7 +165,6 @@ struct FilmFilterSheet: View {
                     }
                 }
 
-                // 排顺序 (1.5): which moment plays first. Your copy only.
                 if Set(allClips.filter(draft.includes).map(\.day)).count > 1 {
                     Section {
                         NavigationLink(value: FilmOrderPage.route) {
@@ -239,9 +219,7 @@ struct FilmFilterSheet: View {
     }
 }
 
-// MARK: - One person
 
-/// One person's takes: in or out, one by one, and which of them stand still.
 private struct FilmPersonPage: View {
     let person: FilmPerson
     @Binding var draft: FilmSelection
@@ -255,7 +233,6 @@ private struct FilmPersonPage: View {
         } set: { hold in
             for clip in person.clips where draft.includes(clip) {
                 if hold {
-                    // Keep a frame already picked; a new hold starts on frame one.
                     if draft.freeze(of: clip.id) == nil { draft.set(freeze: 0, for: clip.id) }
                 } else {
                     draft.set(freeze: nil, for: clip.id)
@@ -290,13 +267,11 @@ private struct FilmPersonPage: View {
     }
 }
 
-/// One take: its picture and time, whether it's in, and where it stops.
 private struct FilmClipPickRow: View {
     let clip: DayClip
     let index: Int
     @Binding var draft: FilmSelection
 
-    /// Loaded from the file; the slider waits for it.
     @State private var duration: Double?
 
     private var inFilm: Binding<Bool> {
@@ -316,9 +291,8 @@ private struct FilmClipPickRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                ClipThumbnail(url: clip.url)
+                ClipTile(url: clip.url)
                     .frame(width: 48, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 Text(timeLabel)
                     .font(.body.weight(.semibold).monospacedDigit())
                 Spacer()
@@ -336,7 +310,11 @@ private struct FilmClipPickRow: View {
                     HStack(alignment: .top, spacing: 12) {
                         FrameThumbnail(url: clip.url, seconds: heldAt)
                             .frame(width: 72, height: 96)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous)
+                                    .strokeBorder(OneDay.hairline, lineWidth: 1)
+                            }
                         VStack(alignment: .leading, spacing: 6) {
                             Text(Strings.filmHeldAt(heldAt))
                                 .font(.footnote.weight(.semibold).monospacedDigit())
@@ -362,7 +340,6 @@ private struct FilmClipPickRow: View {
         .task(id: clip.url) {
             let seconds = (try? await AVURLAsset(url: clip.url).load(.duration))
                 .map(CMTimeGetSeconds) ?? 0
-            // Stop one frame short, so the end of the slider is a frame there is.
             duration = seconds.isFinite ? max(seconds - 1.0 / 30, 0) : 0
         }
     }
@@ -377,7 +354,6 @@ private struct FilmClipPickRow: View {
     }
 }
 
-/// One exact frame of a take, for showing where a hold stops.
 private struct FrameThumbnail: View {
     let url: URL
     let seconds: Double
@@ -391,35 +367,23 @@ private struct FrameThumbnail: View {
                 Image(uiImage: image).resizable().scaledToFill()
             }
         }
-        // Rounded so a drag doesn't ask for a new frame on every point of it.
         .task(id: (seconds * 10).rounded()) {
-            // Exact time and a smaller cap than `ClipThumbnail`: a hold
-            // marker has to be the frame you stopped on, not a nearby one.
-            if let cached = ClipThumbnailCache.imageIfCached(
-                url: url, refreshToken: nil, seconds: seconds,
-                maxSize: CGSize(width: 300, height: 300), exactTime: true)
-            {
-                image = cached
-                return
-            }
-            // Lets a fast drag settle before decoding a frame.
             try? await Task.sleep(for: .milliseconds(80))
             guard !Task.isCancelled else { return }
-            if let loaded = await ClipThumbnailCache.image(
-                url: url, refreshToken: nil, seconds: seconds,
-                maxSize: CGSize(width: 300, height: 300), exactTime: true)
-            {
-                image = loaded
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 300, height: 300)
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            let time = CMTime(seconds: seconds, preferredTimescale: 600)
+            if let cgImage = try? await generator.image(at: time).image, !Task.isCancelled {
+                image = UIImage(cgImage: cgImage)
             }
         }
     }
 }
 
-// MARK: - Order
 
-/// 排顺序: the film's moments, one row each with everyone's take in it,
-/// dragged into the order the film plays them. Kept on this phone with the
-/// rest of the selection.
 struct FilmOrderPage: View {
     static let route = "__film-order"
 
@@ -433,9 +397,8 @@ struct FilmOrderPage: View {
             ForEach(days, id: \.self) { day in
                 HStack(spacing: 6) {
                     ForEach(clips.filter { $0.day == day }) { clip in
-                        ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                        ClipTile(url: clip.url, refreshToken: clip.recordedAt)
                             .frame(width: 42, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     Spacer(minLength: 0)
                 }

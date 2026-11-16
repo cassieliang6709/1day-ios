@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The home header's date line. These used to be inline in the
-/// view, where the only way to check them was to look at a simulator in two
-/// languages.
 final class HomeHeaderSummaryTests: XCTestCase {
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey)
@@ -14,7 +11,6 @@ final class HomeHeaderSummaryTests: XCTestCase {
         UserDefaults.standard.set(language.rawValue, forKey: AppLanguage.storageKey)
     }
 
-    /// 2026-09-01, a Tuesday — the day the missing-date problem was reported.
     private var september1: Date {
         var components = DateComponents()
         components.year = 2026

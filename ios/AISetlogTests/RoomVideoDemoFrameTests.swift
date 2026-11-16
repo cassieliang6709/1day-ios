@@ -3,8 +3,6 @@ import AVFoundation
 import CoreGraphics
 @testable import AISetlog
 
-/// File-level evidence only: these assertions do not prove AVPlayer renders
-/// on a physical device. Keep the device black-screen issue open until E4.
 @MainActor
 final class RoomVideoDemoFrameTests: XCTestCase {
     func testGeneratedSourcesAndTogetherFilmsContainVisibleMovingFrames() async throws {
@@ -24,10 +22,6 @@ final class RoomVideoDemoFrameTests: XCTestCase {
             generator.appliesPreferredTrackTransform = true
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
-            // Near the start and near the end, in the clip's own terms. These
-            // used to be 0.2s and 2.5s, which silently required the stand-in
-            // generator to keep producing three-second clips — a fact this
-            // test is not about, and the one that broke when it changed.
             let duration = try await asset.load(.duration).seconds
             let first = try await generator.image(
                 at: CMTime(seconds: duration * 0.1, preferredTimescale: 600)).image

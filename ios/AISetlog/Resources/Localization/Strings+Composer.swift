@@ -1,11 +1,8 @@
 import Foundation
 
-/// The one-page composer's own copy (1.5). Kept apart from `Localization.swift`
-/// so the composer can change without touching the shared table.
 extension Strings {
     private static var isChinese: Bool { AppLanguage.effective.resolved == .chinese }
 
-    // MARK: The page
 
     static var composerWhatToFilm: String { isChinese ? "今天拍什么" : "What to film today" }
     static var composerWriteList: String { isChinese ? "写今天的清单" : "Write today's list" }
@@ -49,7 +46,6 @@ extension Strings {
     static var composerFilmSolo: String { isChinese ? "自己拍" : "Just me" }
     static var composerFilmTogether: String { isChinese ? "和朋友一起拍" : "With friends" }
 
-    // MARK: 写今天的清单
 
     static var listIntentPlaceholder: String { isChinese ? "今天想做什么？" : "What's today for?" }
     static var listHelpWrite: String { isChinese ? "帮我写" : "Draft it" }
@@ -61,7 +57,6 @@ extension Strings {
         isChinese ? "用这 \(count) 项" : "Use these \(count)"
     }
 
-    // MARK: 从提醒事项导入
 
     static var remindersImport: String { isChinese ? "从提醒事项导入" : "From Reminders" }
     static var remindersTitle: String { isChinese ? "提醒事项" : "Reminders" }
@@ -72,7 +67,6 @@ extension Strings {
     static var remindersNoAccess: String { isChinese ? "没有提醒事项权限" : "No access to Reminders" }
     static var remindersEmpty: String { isChinese ? "没有未完成的提醒" : "No open reminders" }
 
-    /// 按时间拍's default name: the day it's filmed, 「10月17日」 / 「Oct 17」.
     static func byTimeTitle(_ date: Date) -> String {
         date.formatted(.dateTime.month().day().locale(AppLanguage.effective.locale))
     }

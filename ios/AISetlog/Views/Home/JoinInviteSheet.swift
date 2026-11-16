@@ -1,15 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// The join-a-room sheet: six code slots over a hidden text field, with
-/// paste-from-clipboard and the app's primary join button, live at 6 chars.
 struct JoinInviteSheet: View {
     @Binding var code: String
     let onCancel: () -> Void
     let onJoin: () -> Void
 
     @FocusState private var codeFocused: Bool
-    /// Shown when 粘贴 found nothing to paste. See `Strings.noCodeOnClipboard`.
     @State private var pasteFailed = false
 
     private var normalizedCode: String { InviteCode.normalize(code) }
@@ -32,8 +29,6 @@ struct JoinInviteSheet: View {
                     .padding(.top, 22)
                     .padding(.bottom, 12)
 
-                // Scrolls rather than assuming 430pt: on an SE with the
-                // keyboard up, the fixed sheet cut the join button off.
                 ScrollView {
                     VStack(spacing: 24) {
                         if pasteFailed {
@@ -53,7 +48,6 @@ struct JoinInviteSheet: View {
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.never)
             }
-            // Pinned, so it rides above the keyboard however short the sheet is.
             .safeAreaInset(edge: .bottom) {
                 Button(action: join) {
                     Text(Strings.joinRoomButton)
@@ -73,8 +67,6 @@ struct JoinInviteSheet: View {
 
     private var isComplete: Bool { normalizedCode.count == 6 }
 
-    /// Both the button and the keyboard's 加入 key come through here, so the
-    /// six-character rule lives in one place.
     private func join() {
         guard isComplete else { return }
         onJoin()
@@ -91,11 +83,6 @@ struct JoinInviteSheet: View {
                 .accessibilityHidden(true)
             Spacer()
             Button(Strings.paste) {
-                // The `else` is the fix. Without it this button did
-                // nothing on an empty or codeless clipboard — same
-                // screen, same empty slots, no way to tell whether the
-                // tap registered, the clipboard was empty, or the
-                // message you copied just wasn't the right one.
                 if let pasted = UIPasteboard.general.string,
                    let found = InviteCode.extract(from: pasted) {
                     code = found
@@ -123,7 +110,6 @@ struct JoinInviteSheet: View {
             }
             .accessibilityHidden(true)
 
-            // Heavy, like every other screen title; black was this sheet alone.
             Text(Strings.enterInviteCode)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
@@ -139,8 +125,6 @@ struct JoinInviteSheet: View {
     private var codeEntry: some View {
         VStack(spacing: 10) {
             ZStack {
-                // Drawn, not read: VoiceOver gets the real field below, with
-                // the code as its value, instead of six unlabeled boxes.
                 HStack(spacing: 7) {
                     ForEach(0..<6, id: \.self) { index in
                         CodeSlot(character: character(at: index), isActive: normalizedCode.count == index)
@@ -178,7 +162,6 @@ struct JoinInviteSheet: View {
         }
     }
 
-    /// Spaced out so VoiceOver reads "A B 3 …" rather than trying a word.
     private var spokenCode: String {
         normalizedCode.map(String.init).joined(separator: " ")
     }

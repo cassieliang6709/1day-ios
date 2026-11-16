@@ -32,7 +32,7 @@ final class AccountDeletionCoordinatorTests: XCTestCase {
         try await resumed.advance()
         try await resumed.advance()
         try await resumed.advance()
-        try await resumed.advance() // completed is a no-op
+        try await resumed.advance()
         XCTAssertEqual(cursors, [nil, "page2"])
         XCTAssertEqual(batches, [["a", "b"], ["b"]])
         XCTAssertEqual(cleaned, 1)

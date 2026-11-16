@@ -1,24 +1,16 @@
 import Photos
 import SwiftUI
 
-/// A vlog from clips picked in 我的: any stories, any people. Opens on an
-/// arrange step — the clips in the order they were picked, draggable, each
-/// one previewable — and renders once 生成 vlog is tapped, in that order.
-/// No shape picker: the cameras decide the shape, so the stitcher builds the
-/// canvas from the takes themselves (`Options.aspect = nil`).
 struct LibraryVlogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var order: [LibraryClip]
     @State private var retryRevision = 0
     @State private var stage: Stage = .arrange
-    /// What the player lays out before the film is read; the film's own
-    /// shape wins once it is.
     private let layoutRatio: CGFloat
     @State private var phase: Phase = .rendering
     @State private var renderError: String?
     @State private var saveMessage: String?
     @State private var isSaving = false
-    /// The film remixed with music or voiceover; nil while it's the original.
     @State private var mixedURL: URL?
     @Environment(MoodStore.self) private var moodStore: MoodStore?
 
@@ -123,7 +115,7 @@ struct LibraryVlogSheet: View {
         options.layout = .sequential
         options.aspect = nil
         do {
-            let url = try await VideoStitcher.stitch(
+            let url = try await BackgroundFilmExport.shared.render(
                 clips: ClipLibrary.stitchable(order), options: options)
             guard !Task.isCancelled else {
                 try? FileManager.default.removeItem(at: url)
