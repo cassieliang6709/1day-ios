@@ -5,6 +5,10 @@ import XCTest
 @MainActor
 final class DualCameraLifecycleTests: XCTestCase {
     func testDisablingDualCameraAfterPreviewDisconnects() async throws {
+        // On CI's simulator `configure()` never returns, so the test hangs.
+        #if targetEnvironment(simulator)
+        throw XCTSkip("Requires a physical MultiCam device")
+        #endif
         let recorder = ClipRecorder()
         try XCTSkipUnless(recorder.supportsDualCamera, "Requires a physical MultiCam device")
         await recorder.configure()
