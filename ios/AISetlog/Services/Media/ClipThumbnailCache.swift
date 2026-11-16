@@ -20,9 +20,15 @@ actor ClipThumbnailCache {
         self.directory = directory
     }
 
+    /// Paths, not URLs: a directory URL stops comparing equal to itself once
+    /// the directory exists on disk, which silently dropped invalidations.
     private struct Scope: Hashable {
-        let cacheDirectory: URL
-        let sourceDirectory: URL
+        let cacheDirectory: String
+        let sourceDirectory: String
+        init(cacheDirectory: URL, sourceDirectory: URL) {
+            self.cacheDirectory = cacheDirectory.standardizedFileURL.path
+            self.sourceDirectory = sourceDirectory.standardizedFileURL.path
+        }
     }
 
     private struct Request: Hashable {
@@ -77,16 +83,16 @@ actor ClipThumbnailCache {
         let prefix = Self.hash(sourceDirectory.path) + "_" + Self.hash(url.lastPathComponent)
         let version = Self.hash("v1|\(size)|\(modifiedAt.timeIntervalSince1970)|\(refreshToken?.timeIntervalSince1970.description ?? "-")")
         let destination = directory.appendingPathComponent("\(prefix)-\(version).jpg")
-        let scope = Scope(cacheDirectory: directory.standardizedFileURL, sourceDirectory: sourceDirectory)
+        let scope = Scope(cacheDirectory: directory, sourceDirectory: sourceDirectory)
         return Request(source: url, refreshToken: refreshToken, modifiedAt: modifiedAt, size: size,
                        epoch: Self.epochs[scope], prefix: prefix, destination: destination)
     }
 
     nonisolated func removeImages(in sourceDirectory: URL) {
         Self.storageLock.withLock {
-            let scope = Scope(cacheDirectory: directory.standardizedFileURL, sourceDirectory: sourceDirectory.standardizedFileURL)
+            let scope = Scope(cacheDirectory: directory, sourceDirectory: sourceDirectory)
             Self.epochs[scope] = UUID()
-            let prefix = Self.hash(scope.sourceDirectory.path) + "_"
+            let prefix = Self.hash(sourceDirectory.standardizedFileURL.path) + "_"
             let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
             for file in files where file.lastPathComponent.hasPrefix(prefix) { try? FileManager.default.removeItem(at: file) }
         }

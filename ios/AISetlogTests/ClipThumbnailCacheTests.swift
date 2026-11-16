@@ -135,12 +135,13 @@ final class ClipThumbnailCacheTests: XCTestCase {
 
     func testSynchronousInvalidationRejectsLateGenerationAndAllowsImmediateReuse() async throws {
         let url = try source()
-        let probe = ThumbnailProbe(image: image)
+        let probe = ThumbnailProbe(image: image, holdFirstCall: true)
         let cache = ClipThumbnailCache(directory: thumbnailDirectory, generate: { await probe.generate($0) })
         let old = Task { await cache.image(for: url) }
         while await probe.calls == 0 { await Task.yield() }
         cache.removeImages(in: url.deletingLastPathComponent())
         let refreshed = await cache.image(for: url)
+        await probe.releaseFirstCall()
         let discarded = await old.value
         XCTAssertNil(discarded)
         XCTAssertNotNil(refreshed)
@@ -184,10 +185,24 @@ final class ClipThumbnailCacheTests: XCTestCase {
 private actor ThumbnailProbe {
     private(set) var calls = 0
     let image: UIImage
-    init(image: UIImage) { self.image = image }
+    private var holdsFirstCall: Bool
+    private var held: CheckedContinuation<Void, Never>?
+    init(image: UIImage, holdFirstCall: Bool = false) {
+        self.image = image
+        self.holdsFirstCall = holdFirstCall
+    }
     func generate(_ url: URL) async -> UIImage? {
         calls += 1
-        try? await Task.sleep(for: .milliseconds(30))
+        if holdsFirstCall {
+            holdsFirstCall = false
+            await withCheckedContinuation { held = $0 }
+        } else {
+            try? await Task.sleep(for: .milliseconds(30))
+        }
         return image
+    }
+    func releaseFirstCall() {
+        held?.resume()
+        held = nil
     }
 }
