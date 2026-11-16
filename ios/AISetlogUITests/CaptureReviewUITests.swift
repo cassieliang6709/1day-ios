@@ -1,6 +1,45 @@
 import XCTest
 
 final class CaptureReviewUITests: XCTestCase {
+    func testCaptureControlLaunchOpensCameraDirectly() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "chinese",
+                               "-simulatedCamera", "YES", "-capture.launchRequested", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["camera-shutter"].waitForExistence(timeout: 20))
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "capture-control-entry"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    func testEarlyStopProducesOneReviewAndAllowsRetake() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboarding.completed.v1", "YES", "-appLanguage", "chinese",
+                               "-simulatedCamera", "YES"]
+        app.launch()
+        let camera = app.buttons["tab-camera"]
+        XCTAssertTrue(camera.waitForExistence(timeout: 15))
+        camera.tap()
+        let shutter = app.buttons["camera-shutter"]
+        XCTAssertTrue(shutter.waitForExistence(timeout: 15))
+        shutter.tap()
+        let stop = app.buttons["camera-stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 2))
+        stop.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["capture-review-frame"]
+            .waitForExistence(timeout: UITestWait.media))
+        let retake = app.buttons["camera-retake"]
+        XCTAssertTrue(retake.waitForExistence(timeout: 5))
+        retake.tap()
+        XCTAssertTrue(shutter.waitForExistence(timeout: 5))
+        shutter.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["capture-review-frame"]
+            .waitForExistence(timeout: UITestWait.media))
+    }
+
     private func capture(landscape: Bool) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()

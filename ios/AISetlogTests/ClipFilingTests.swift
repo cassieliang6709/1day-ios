@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Where a loose clip is allowed to go. The camera and the drafts list both
-/// ask this, and they have to give the same answer — a clip you couldn't file
-/// on the day shouldn't become permanently unfilable once it's a draft.
 final class ClipFilingTests: XCTestCase {
     private let calendar = Calendar(identifier: .gregorian)
 
@@ -29,7 +26,6 @@ final class ClipFilingTests: XCTestCase {
             orientation: orientation)
     }
 
-    // MARK: - Candidates
 
     func testOnlyStoriesShotTheSameWayRoundCanTakeAClip() {
         let portrait = story(startDay: 1, orientation: .portrait)
@@ -41,9 +37,6 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertEqual(forLandscape.map(\.id), [landscape.id])
     }
 
-    /// Square is a third frame, not a kind of portrait. A square clip in a
-    /// portrait story would be the one thing the per-challenge lock exists to
-    /// prevent: two shapes in one film.
     func testSquareStoriesAndSquareClipsOnlyMatchEachOther() {
         let portrait = story(startDay: 1, orientation: .portrait)
         let landscape = story(startDay: 1, orientation: .landscape)
@@ -56,8 +49,6 @@ final class ClipFilingTests: XCTestCase {
             ClipFiling.candidates(in: all, orientation: .portrait).map(\.id), [portrait.id])
     }
 
-    /// Stories saved before the orientation field existed decode as nil and
-    /// are all portrait; they must still show up for a portrait clip.
     func testLegacyStoriesWithNoOrientationCountAsPortrait() {
         var legacy = story(startDay: 1)
         legacy.orientation = nil
@@ -72,8 +63,6 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertTrue(ClipFiling.candidates(in: [], orientation: .portrait).isEmpty)
     }
 
-    /// The data-loss bug, as a candidate list. A full story used to be offered,
-    /// and filing into it overwrote whatever was on the day the story was on.
     func testAFullStoryIsNotSomewhereToFile() {
         let full = story(startDay: 1, filled: 3, total: 3)
         let room = story(startDay: 1, filled: 2, total: 3)
@@ -83,7 +72,6 @@ final class ClipFilingTests: XCTestCase {
             [room.id])
     }
 
-    /// One empty slot is enough to be worth offering.
     func testAStoryWithOneSlotLeftIsStillACandidate() {
         let nearlyFull = story(startDay: 1, filled: 2, total: 3)
 
@@ -91,12 +79,7 @@ final class ClipFilingTests: XCTestCase {
             ClipFiling.candidates(in: [nearlyFull], orientation: .portrait).count, 1)
     }
 
-    // MARK: - Why there was nowhere to file
 
-    /// The two cases the drafts list has to tell apart. Both show up as an
-    /// empty candidate list, and the advice for them is opposite — so getting
-    /// this wrong sends someone to make a fourth portrait story when what they
-    /// need is to clear a moment in one of the three they have.
     func testNoStoryAtAllInThatFrameSaysSo() {
         let landscape = story(startDay: 1, orientation: .landscape)
 
@@ -114,8 +97,6 @@ final class ClipFilingTests: XCTestCase {
             .everyMatchingStoryIsFull)
     }
 
-    /// A story of the right frame that has no cards at all is still a story of
-    /// the right frame — "make one" would be wrong advice.
     func testAMatchingStoryWithNoSlotsCountsAsFullNotAsMissing() {
         var empty = story(startDay: 1, total: 1)
         empty.cards = []
@@ -125,8 +106,6 @@ final class ClipFilingTests: XCTestCase {
             .everyMatchingStoryIsFull)
     }
 
-    /// Legacy nil-orientation stories are portrait, so a portrait clip facing
-    /// only those is blocked on fullness, not on frame.
     func testLegacyStoriesCountAsPortraitWhenExplainingTheBlock() {
         var legacy = story(startDay: 1, filled: 3, total: 3)
         legacy.orientation = nil
@@ -145,15 +124,12 @@ final class ClipFilingTests: XCTestCase {
             .noStoryWithThisFrame)
     }
 
-    /// The guard that keeps the alert from ever replacing the picker: when
-    /// filing would work, there is no explanation to give.
     func testAFilableClipHasNoBlocker() {
         let room = story(startDay: 1, filled: 2, total: 3)
 
         XCTAssertNil(ClipFiling.blocker(in: [room], orientation: .portrait))
     }
 
-    /// One story with room is enough, even standing next to full ones.
     func testOneStoryWithRoomBeatsAnyNumberOfFullOnes() {
         let full = story(startDay: 1, filled: 3, total: 3)
         let room = story(startDay: 2, filled: 1, total: 3)
@@ -161,7 +137,6 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertNil(ClipFiling.blocker(in: [full, room], orientation: .portrait))
     }
 
-    // MARK: - Target day
 
     func testClipLandsInTheFirstEmptySlot() {
         let partly = story(startDay: 1, filled: 2, total: 3)
@@ -169,7 +144,6 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertEqual(ClipFiling.targetDay(in: partly), 3)
     }
 
-    /// Gaps count: day 2 being empty means day 2, not day 4.
     func testAGapIsFilledBeforeTheEnd() {
         var gapped = story(startDay: 1, filled: 3, total: 3)
         gapped.cards[1].clipFileName = nil
@@ -177,16 +151,12 @@ final class ClipFilingTests: XCTestCase {
         XCTAssertEqual(ClipFiling.targetDay(in: gapped), 2)
     }
 
-    /// The whole fix in one assertion. This used to answer "day 3" — a day that
-    /// already held a clip — and the caller wrote over it.
     func testAFullStoryHasNowhereToPutIt() {
         let full = story(startDay: 1, filled: 3, total: 3)
 
         XCTAssertNil(ClipFiling.targetDay(in: full))
     }
 
-    /// A story with no cards at all can't take a clip either, and mustn't
-    /// answer "day 1" for a card that doesn't exist.
     func testAStoryWithNoSlotsHasNowhereToPutItEither() {
         var empty = story(startDay: 1, total: 1)
         empty.cards = []

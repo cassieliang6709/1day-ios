@@ -1,33 +1,18 @@
 import Foundation
 
-/// Disk boundary for clip video files. Knows the directory layout under
-/// Documents/clips/; the store asks for URLs and copies, never touches
-/// FileManager itself.
 protocol ClipFileStore {
-    /// Copy a freshly recorded clip into permanent storage, replacing any
-    /// previous clip for that day (re-recording may switch container formats).
-    /// Returns the stored file name, or nil if the copy failed.
     @discardableResult
     func storeClip(from tempURL: URL, day: Int, challengeID: UUID) -> String?
-    /// Copy another take of a moment that already has one. The name carries
-    /// the take's id, so it cannot collide with take 1's `dayN.ext` or with
-    /// another take; the only file it replaces is this same take's own (重拍
-    /// on that take).
     @discardableResult
     func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String?
     func clipURL(fileName: String, challengeID: UUID) -> URL
     func deleteClips(challengeID: UUID)
-    /// Where downloaded remote (friends') clips for a room are cached.
     func remoteCacheDir(roomCode: String) -> URL
     func deleteRemoteCache(roomCode: String)
-    /// Move v1's loose clips/ files into a migrated challenge's directory.
     func migrateLegacyClips(_ fileNames: [String], into challengeID: UUID)
 }
 
 extension ClipFileStore {
-    /// Fails closed. A store that hasn't said how to keep a second take keeps
-    /// none, which `saveClip` reads as "nothing saved" — never as permission to
-    /// overwrite take 1.
     func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
         nil
     }
@@ -63,8 +48,6 @@ final class DiskClipFileStore: ClipFileStore {
     func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
         let dir = clipsDirectory(for: challengeID)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        // A take id already on disk is 重拍 on that take: same name, new
-        // footage. A fresh take id never finds one.
         for ext in ["mov", "mp4"] {
             try? FileManager.default.removeItem(
                 at: dir.appendingPathComponent("day\(day)_\(takeID.uuidString).\(ext)"))
@@ -84,7 +67,9 @@ final class DiskClipFileStore: ClipFileStore {
     }
 
     func deleteClips(challengeID: UUID) {
-        try? FileManager.default.removeItem(at: clipsDirectory(for: challengeID))
+        let directory = clipsDirectory(for: challengeID)
+        try? FileManager.default.removeItem(at: directory)
+        ClipThumbnailCache.shared.removeImages(in: directory)
     }
 
     func remoteCacheDir(roomCode: String) -> URL {

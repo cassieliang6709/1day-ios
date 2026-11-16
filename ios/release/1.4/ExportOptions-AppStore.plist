@@ -2,9 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- export, not upload: the archive is produced here and uploaded by hand
-	     from Organizer or Transporter. Sending a build to App Store Connect is
-	     not something a build script should do on its own. -->
 	<key>destination</key>
 	<string>export</string>
 	<key>iCloudContainerEnvironment</key>

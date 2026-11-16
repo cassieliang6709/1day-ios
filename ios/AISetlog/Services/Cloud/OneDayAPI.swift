@@ -1,22 +1,11 @@
 import Foundation
 
-/// The Worker in `workers/api`: every room, clip, message and mood goes
-/// through here now that CloudKit is gone.
-///
-/// Every request carries the 1Day session token from sign-in. There is no
-/// user id in any body — the Worker takes it from the token — so the only
-/// thing this type decides is which token to send.
 struct OneDayAPI {
     enum Failure: Error, Equatable {
-        /// No session on this phone, or the Worker no longer accepts it.
-        /// Signing in again is the only fix.
         case notSignedIn
         case notFound
-        /// The thing already exists (a room code someone else has).
         case conflict
-        /// Signed in, but this isn't yours to change.
         case forbidden
-        /// No network, timed out, the Worker is down.
         case unavailable
         case badResponse(Int)
     }
@@ -26,33 +15,22 @@ struct OneDayAPI {
     var baseURL: URL = AuthService.defaultBaseURL
     var session: URLSession = .shared
     var keychain: SessionKeychain = .standard
-    /// Sent instead of the keychain's session: sign-out uses it to unregister
-    /// the phone with the session that is about to be removed.
     var fixedSession: AuthService.Session? = nil
     var timeout: TimeInterval = 30
-    /// Uploads are a whole clip.
     var uploadTimeout: TimeInterval = 120
 
-    /// A session with less than this left is swapped for a fresh one.
     static let refreshWindow: TimeInterval = 14 * 24 * 60 * 60
 
-    /// Whether there is a session to send at all. Rooms need one.
     var isSignedIn: Bool {
         guard let saved = keychain.load() else { return false }
         return saved.expiresAt > .now
     }
 
-    /// The author id the app and every stored row use for a session's user:
-    /// Apple's bare `sub` (what CloudKit always had), `google:<sub>` as is.
-    /// Must match `authorIdFor` in `workers/api/src/http.js`.
     static func authorID(forSessionUser userId: String) -> String {
         userId.hasPrefix("apple:") ? String(userId.dropFirst("apple:".count)) : userId
     }
 
-    // MARK: Requests
 
-    /// Path components are escaped one by one: record names carry dots,
-    /// colons and underscores, never a slash.
     func url(_ components: [String], query: [URLQueryItem] = []) -> URL {
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove(charactersIn: "/?#")
@@ -91,8 +69,6 @@ struct OneDayAPI {
         }
     }
 
-    /// Puts a file in R2 and returns its key, for a clip or member row to
-    /// point at.
     func upload(_ file: URL, contentType: String) async throws -> String {
         var request = URLRequest(url: url(["media"]), timeoutInterval: uploadTimeout)
         request.httpMethod = "POST"
@@ -104,32 +80,37 @@ struct OneDayAPI {
         return try decode(Key.self, from: data).key
     }
 
-    /// Downloads a file from R2 to `destination`, replacing what's there.
     func download(key: String, to destination: URL) async throws {
         var request = URLRequest(
             url: url(["media"] + key.split(separator: "/").map(String.init)),
             timeoutInterval: uploadTimeout)
         request.httpMethod = "GET"
         request.setValue("Bearer \(try await token())", forHTTPHeaderField: "authorization")
+        let started = Date()
         let (temp, response): (URL, URLResponse)
         do {
             (temp, response) = try await session.download(for: request)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
+            Self.logFailure(request, started: started, error: error)
             throw Failure.unavailable
         }
+        defer { try? FileManager.default.removeItem(at: temp) }
+        Self.logResponse(request, response, started: started, bytes: nil)
         try check(response)
-        let fm = FileManager.default
-        try? fm.createDirectory(
+        try Task.checkCancellation()
+        try FileManager.default.createDirectory(
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? fm.removeItem(at: destination)
-        try fm.moveItem(at: temp, to: destination)
+        try RoomClipCache.install(temp, to: destination, consumingSource: true)
     }
 
     private func perform(_ request: URLRequest, uploading file: URL? = nil) async throws -> Data {
         var request = request
         request.setValue("Bearer \(try await token())", forHTTPHeaderField: "authorization")
+        let started = Date()
         let data: Data
         let response: URLResponse
         do {
@@ -143,10 +124,34 @@ struct OneDayAPI {
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
         } catch {
+            Self.logFailure(request, started: started, error: error)
             throw Failure.unavailable
         }
+        Self.logResponse(request, response, started: started, bytes: data.count)
         try check(response)
         return data
+    }
+
+    private static func logResponse(
+        _ request: URLRequest, _ response: URLResponse, started: Date, bytes: Int?
+    ) {
+        let ms = Int(Date().timeIntervalSince(started) * 1000)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? "?"
+        let size = bytes.map { " \($0)B" } ?? ""
+        if (200..<300).contains(status) {
+            Log.api.info("\(method, privacy: .public) \(path, privacy: .public) \(status) \(ms)ms\(size, privacy: .public)")
+        } else {
+            Log.api.error("\(method, privacy: .public) \(path, privacy: .public) \(status) \(ms)ms\(size, privacy: .public)")
+        }
+    }
+
+    private static func logFailure(_ request: URLRequest, started: Date, error: any Error) {
+        let ms = Int(Date().timeIntervalSince(started) * 1000)
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? "?"
+        Log.api.error("\(method, privacy: .public) \(path, privacy: .public) failed \(ms)ms: \(error.localizedDescription, privacy: .public)")
     }
 
     private func check(_ response: URLResponse) throws {
@@ -154,9 +159,6 @@ struct OneDayAPI {
         switch status {
         case 200..<300: return
         case 401:
-            // The Worker no longer takes this token (its secret changed, or it
-            // expired between the check and the request). Dropping it makes
-            // the app ask for a sign-in instead of failing every sync.
             if fixedSession == nil, keychain.service == SessionKeychain.standard.service {
                 keychain.delete()
                 DispatchQueue.main.async {
@@ -172,10 +174,7 @@ struct OneDayAPI {
         }
     }
 
-    // MARK: Session
 
-    /// The token to send, refreshed first when it's close to running out.
-    /// A refresh that fails keeps the old token: it's still good.
     func token() async throws -> String {
         if let fixedSession { return fixedSession.token }
         guard let saved = keychain.load(), saved.expiresAt > .now else { throw Failure.notSignedIn }
@@ -197,15 +196,12 @@ struct OneDayAPI {
         let fresh = AuthService.Session(
             token: body.token, userId: body.userId,
             expiresAt: Date(timeIntervalSince1970: body.expiresAt))
-        // Signed out, or in as someone else, while this was out.
         guard keychain.load()?.userId == saved.userId else { return nil }
         keychain.save(fresh)
         return fresh
     }
 }
 
-/// One refresh at a time: a room sync fires a dozen requests at once, and
-/// each would otherwise swap the token.
 private actor SessionRefresher {
     static let shared = SessionRefresher()
     private var running: Task<AuthService.Session?, Never>?
@@ -221,12 +217,9 @@ private actor SessionRefresher {
 }
 
 extension Notification.Name {
-    /// The Worker turned the session down; whoever was signed in has to sign
-    /// in again. Posted on the main queue.
     static let oneDaySessionEnded = Notification.Name("oneDaySessionEnded")
 }
 
-/// Times on the wire are milliseconds since 1970, as the Worker stores them.
 extension Date {
     var apiMillis: Int64 { Int64((timeIntervalSince1970 * 1000).rounded()) }
     init(apiMillis: Int64) { self.init(timeIntervalSince1970: TimeInterval(apiMillis) / 1000) }

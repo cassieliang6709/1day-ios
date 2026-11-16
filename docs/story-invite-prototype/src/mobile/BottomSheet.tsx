@@ -75,8 +75,8 @@ export function BottomSheet({
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      {/* Keep the portal mounted after `open` flips so AnimatePresence can run
-          the sheet and overlay exit animations before Radix removes them. */}
+      {
+                                                                             }
       <Dialog.Portal container={portalContainer} forceMount>
         <AnimatePresence>
           {open ? (

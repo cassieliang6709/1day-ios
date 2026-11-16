@@ -1,17 +1,3 @@
-/**
- * 1Day's own backend, replacing CloudKit.
- *
- *   POST /auth/apple | /auth/google   { identityToken }  → { token, userId, expiresAt }
- *   POST /auth/refresh                (bearer)           → a fresh token, same user
- *
- * Everything else needs `Authorization: Bearer <token>` — see README.md for
- * the full list. Rooms and clips are in `rooms.js`, files in `media.js`, the
- * mood diary in `moods.js`, pushes in `push.js`.
- *
- * The app never sends a user id of its own. The id comes out of a token
- * Apple or Google signed, so nobody can claim to be someone else by typing a
- * different string. Tokens are never logged.
- */
 import {
   AuthError,
   issueSessionToken,
@@ -24,10 +10,8 @@ import { moodRoutes } from './moods.js';
 import { pushRoutes } from './push.js';
 import { roomRoutes } from './rooms.js';
 
-/** Identity tokens are ~1KB. Anything much bigger isn't one. */
 const MAX_BODY_BYTES = 8 * 1024;
 
-/** Comma-separated in `wrangler.toml`, so adding a client ID is a config edit. */
 function list(value) {
   return String(value ?? '')
     .split(',')
@@ -66,7 +50,6 @@ async function signIn(provider, request, env) {
     return json({ token: session.token, userId, expiresAt: session.expiresAt });
   } catch (error) {
     if (error instanceof AuthError) {
-      // The reason, never the token.
       console.warn('sign-in rejected', provider, error.reason);
       if (error.reason === 'jwks_unavailable') return json({ error: 'unavailable' }, 502);
       if (error.reason === 'no_audience_configured' || error.reason === 'no_session_secret') {
@@ -79,8 +62,6 @@ async function signIn(provider, request, env) {
   }
 }
 
-/** A still-valid session buys a new one, so someone who opens the app at
- * least once every 90 days never has to sign in again. */
 async function refresh(request, env) {
   const { userId } = await caller(request, env);
   const session = await issueSessionToken(userId, env.SESSION_SECRET);
@@ -117,14 +98,34 @@ async function route(request, env, ctx) {
   return response ?? json({ error: 'not_found' }, 404);
 }
 
+async function handle(request, env, ctx) {
+  try {
+    return await route(request, env, ctx ?? { waitUntil() {} });
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.code }, error.status);
+    console.error('request failed', error?.name ?? 'error', error?.message ?? '');
+    return json({ error: 'unavailable' }, 500);
+  }
+}
+
+function logRequest(request, response, started) {
+  const { pathname } = new URL(request.url);
+  const line = {
+    msg: 'request',
+    method: request.method,
+    path: pathname,
+    status: response.status,
+    ms: Date.now() - started,
+  };
+  if (response.status >= 500) console.error(JSON.stringify(line));
+  else console.log(JSON.stringify(line));
+}
+
 export default {
   async fetch(request, env, ctx) {
-    try {
-      return await route(request, env, ctx ?? { waitUntil() {} });
-    } catch (error) {
-      if (error instanceof HttpError) return json({ error: error.code }, error.status);
-      console.error('request failed', error?.name ?? 'error', error?.message ?? '');
-      return json({ error: 'unavailable' }, 500);
-    }
+    const started = Date.now();
+    const response = await handle(request, env, ctx);
+    logRequest(request, response, started);
+    return response;
   },
 };

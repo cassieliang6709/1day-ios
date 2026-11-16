@@ -1,45 +1,32 @@
 import SwiftUI
 
-/// One moment, as it will look in the finished film: everyone who filmed it,
-/// stacked together.
-///
-/// A grid tile stands for the moment rather than for one person's take, so
-/// opening it and getting a single friend's clip answered the wrong question.
-/// This stitches the slot on the fly with the film's own layout, and falls
-/// straight through to plain playback when only one person filmed it.
 struct StitchedMomentPreview: View {
     let clips: [DayClip]
     let day: Int
     var slotTitle: String?
-    /// How many moments the story has, so playback can say "3 / 5".
     var momentCount = 0
     var clipLength: Challenge.ClipLength = .tiny
     var challengeID: UUID?
     var showsPrompt = true
     let myID: String
-    /// 重拍 on the moment as a whole replaces my take 1 — the one the
-    /// stitched version leads with. 再拍一段 adds one.
     let onRecord: (TakeTarget) -> Void
 
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @State private var stitched: URL?
     @State private var stitchFailed = false
+    /// Keep an evicted output alive for as long as this view still uses it.
+    @State private var productionOutput: MomentPreviewOutput?
 
-    /// Stitching two clips takes a second or so; keeping the result means
-    /// reopening the same moment is instant, and the temporary files don't
-    /// pile up one per tap.
-    private static var cache: [String: URL] = [:]
+    private static let cache = MomentPreviewCache()
 
     private var cacheKey: String {
-        if previewMedia != nil { return LocalRoomMediaKey.make(day: day, clips: clips) }
-        return "\(day)-" + clips.map(\.id).joined(separator: "-")
+        LocalRoomMediaKey.make(day: day, clips: clips)
     }
 
     private var mine: DayClip? {
         clips.first { $0.authorID == myID || $0.authorID == "local" }
     }
 
-    /// Whose takes are in this — the byline for the stitched version.
     private var authorLine: String? {
         let names = clips.compactMap(\.authorName).filter { !$0.isEmpty }
         return names.isEmpty ? nil : names.joined(separator: " · ")
@@ -50,11 +37,8 @@ struct StitchedMomentPreview: View {
             if clips.count <= 1, let only = clips.first {
                 preview(url: only.url, authorName: only.authorName, captions: only.captions)
             } else if let stitched {
-                // No caption of its own: the stitched moment has everybody's
-                // words burned into it already, each on their own half.
                 preview(url: stitched, authorName: authorLine, captions: [])
             } else if stitchFailed, let fallback = mine ?? clips.first {
-                // Better someone's clip than an empty sheet.
                 preview(url: fallback.url, authorName: fallback.authorName,
                         captions: fallback.captions)
             } else {
@@ -95,12 +79,17 @@ struct StitchedMomentPreview: View {
     }
 
     private func stitch() async {
-        guard clips.count > 1, stitched == nil else { return }
+        stitched = nil
+        productionOutput = nil
+        stitchFailed = false
+        guard clips.count > 1, !Task.isCancelled else { return }
+        let requested = cacheKey
         let cached: URL?
         if let previewMedia {
-            cached = previewMedia.cached(cacheKey)
+            cached = previewMedia.cached(requested)
         } else {
-            cached = Self.cache[cacheKey]
+            productionOutput = Self.cache.output(for: requested)
+            cached = productionOutput?.url
         }
         if let cached,
            FileManager.default.fileExists(atPath: cached.path) {
@@ -109,11 +98,8 @@ struct StitchedMomentPreview: View {
         }
         var options = VideoStitcher.Options()
         options.layout = .friendsTogether
-        // No captions or crossfade: this is one moment, not a film.
         options.showDayCaptions = false
         options.crossfadeSeconds = 0
-        // And no look, deliberately: this file goes to `ClipPreviewView`, which
-        // filters as it plays. Baking it in here would apply it twice.
         do {
             let url = try await VideoStitcher.stitch(clips: clips, options: options)
             guard !Task.isCancelled else {
@@ -121,26 +107,63 @@ struct StitchedMomentPreview: View {
                 return
             }
             if let previewMedia {
-                // A scope that closed mid-stitch throws the finished file away.
-                // Switching the 两人/三人 picker does exactly that, and the view
-                // that asked for the stitch can still be on screen afterwards —
-                // so this has to land on the fallback rather than return and
-                // leave the spinner up with nothing left to finish it.
-                guard previewMedia.accept(url, key: cacheKey) else {
+                guard previewMedia.accept(url, key: requested) else {
                     stitchFailed = true
                     return
                 }
             } else {
-                Self.cache[cacheKey] = url
+                let output = MomentPreviewOutput(url: url)
+                Self.cache.store(output, for: requested)
+                productionOutput = output
             }
             stitched = url
         } catch {
-            // Cancellation is the one silent exit: the view is going away, so
-            // there is nobody left to show a fallback to. Every other failure
-            // has to be terminal, closed scope included.
             guard !Task.isCancelled else { return }
             print("[moment] stitch failed: \(error)")
             stitchFailed = true
         }
+    }
+}
+
+/// Derived files only. The cache and any visible preview share ownership, so
+/// eviction never removes a file still being played by another preview.
+final class MomentPreviewOutput {
+    let url: URL
+
+    init(url: URL) { self.url = url }
+
+    deinit { try? FileManager.default.removeItem(at: url) }
+}
+
+@MainActor
+final class MomentPreviewCache {
+    private let capacity: Int
+    private var entries: [String: MomentPreviewOutput] = [:]
+    private var recent: [String] = []
+
+    init(capacity: Int = 8) { self.capacity = max(1, capacity) }
+
+    func output(for key: String) -> MomentPreviewOutput? {
+        guard let output = entries[key] else { return nil }
+        guard FileManager.default.fileExists(atPath: output.url.path) else {
+            entries[key] = nil
+            recent.removeAll { $0 == key }
+            return nil
+        }
+        touch(key)
+        return output
+    }
+
+    func store(_ output: MomentPreviewOutput, for key: String) {
+        entries[key] = output
+        touch(key)
+        while recent.count > capacity {
+            entries[recent.removeFirst()] = nil
+        }
+    }
+
+    private func touch(_ key: String) {
+        recent.removeAll { $0 == key }
+        recent.append(key)
     }
 }

@@ -1,11 +1,6 @@
 import Foundation
 import Security
 
-/// Trades an Apple or Google identity token for 1Day's own session token at
-/// the Cloudflare Worker in `workers/api`, and keeps that token in the keychain.
-///
-/// Every room request sends that token (`OneDayAPI`); without it nothing
-/// shared works.
 struct AuthService {
     enum Provider: String {
         case apple, google
@@ -13,20 +8,15 @@ struct AuthService {
 
     struct Session: Codable, Equatable {
         let token: String
-        /// `apple:<sub>` or `google:<sub>`, as the Worker issued it.
         let userId: String
         let expiresAt: Date
     }
 
     enum Failure: Error, Equatable {
-        /// The Worker looked at the token and said no (401). Retrying with the
-        /// same token won't change that.
         case rejected
-        /// No network, timed out, the Worker is down or misconfigured.
         case unavailable
     }
 
-    /// Own domain, not *.workers.dev: that one is blocked in mainland China.
     static let defaultBaseURL = URL(string: "https://auth.liangyue.site")!
     static let timeout: TimeInterval = 10
 
@@ -72,8 +62,6 @@ struct AuthService {
     }
 }
 
-/// The session token is a login: keychain, not UserDefaults. One item,
-/// replaced on every sign-in, removed on sign-out.
 struct SessionKeychain {
     static let standard = SessionKeychain(service: "com.cassie.oneday.session")
 
@@ -93,8 +81,6 @@ struct SessionKeychain {
         delete()
         var item = query
         item[kSecValueData as String] = data
-        // Readable in the background (a push waking the app to sync), never
-        // copied to another device by a backup restore.
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(item as CFDictionary, nil)
     }

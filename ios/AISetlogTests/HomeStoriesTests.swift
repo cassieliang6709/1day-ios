@@ -1,14 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The whole home screen's story list, not either half of it.
-///
-/// `HomeHeroChoice` and `StoryTimeline` were each correct on their own and
-/// still produced a screen where a story you just made had no section named
-/// after it: the hero is lifted out of the timeline, so on the one day you
-/// create a story the leftover list is all older days and gets headed
-/// 「往前翻」. These pin the two facts that matter — every story is reachable,
-/// and the list is called what it is.
 final class HomeStoriesTests: XCTestCase {
     private let calendar = Calendar(identifier: .gregorian)
 
@@ -17,7 +9,6 @@ final class HomeStoriesTests: XCTestCase {
         super.tearDown()
     }
 
-    /// 2026-09-01 is a Tuesday.
     private func september(_ day: Int, hour: Int = 14) -> Date {
         calendar.date(from: DateComponents(
             year: 2026, month: 9, day: day, hour: hour))!
@@ -28,8 +19,6 @@ final class HomeStoriesTests: XCTestCase {
             year: 2026, month: 8, day: day, hour: hour))!
     }
 
-    /// `recorded` moments filmed out of `total`. `recorded: 0` is the story in
-    /// the bug report: made, never filmed.
     private func story(
         _ title: String,
         on date: Date,
@@ -55,18 +44,13 @@ final class HomeStoriesTests: XCTestCase {
         HomeStories(challenges: challenges, now: now, calendar: calendar)
     }
 
-    /// Every id the screen shows anywhere — hero card plus every list row.
     private func shown(_ home: HomeStories) -> Set<UUID> {
         var ids = Set(home.timeline.days.flatMap { $0.stories.map(\.id) })
         if let hero = home.hero.challenge { ids.insert(hero.id) }
         return ids
     }
 
-    // MARK: - The reported bug: "even unfilmed, it should be in my stories"
 
-    /// The report, exactly: make a story, film nothing, go home. The list it
-    /// belongs to has to be called 「你的故事」 — not 「往前翻」, which is where
-    /// someone looking for what they just made will never think to look.
     func testTheListIsCalledYourStoriesWhenTodaysStoryIsOnScreen() {
         UserDefaults.standard.set(AppLanguage.chinese.rawValue, forKey: AppLanguage.storageKey)
         let now = september(1)
@@ -79,7 +63,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertEqual(home.sectionTitle, Strings.yourStories)
     }
 
-    /// The same screen in English, so the fix isn't a Chinese-only string.
     func testTheListIsCalledYourStoriesInEnglishToo() {
         UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppLanguage.storageKey)
         let now = september(1)
@@ -91,8 +74,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertEqual(home.sectionTitle, Strings.yourStories)
     }
 
-    /// An unfilmed story is on the screen somewhere. This is the invariant the
-    /// bug report is really about, and it has to hold whatever else is around.
     func testAnUnfilmedStoryIsAlwaysOnTheScreen() {
         let now = september(1)
         let unfilmed = story("没拍过", on: now)
@@ -119,8 +100,6 @@ final class HomeStoriesTests: XCTestCase {
         }
     }
 
-    /// Morning and evening take different branches through the hero rule, so
-    /// the invariant is checked on both sides of noon.
     func testAnUnfilmedStoryIsOnTheScreenAtEveryHour() {
         let unfilmedYesterday = story("昨天建的没拍", on: august(31, hour: 20))
         let older = story("上周", on: august(24), recorded: 3)
@@ -134,8 +113,6 @@ final class HomeStoriesTests: XCTestCase {
         }
     }
 
-    /// Nothing is on the screen twice: the hero is lifted out of the list
-    /// rather than repeated, which is the behaviour this fix must not undo.
     func testTheHeroIsNotAlsoAListRow() {
         let now = september(1)
         let hero = story("今天", on: now)
@@ -148,8 +125,6 @@ final class HomeStoriesTests: XCTestCase {
             home.timeline.days.flatMap { $0.stories.map(\.id) }.contains(hero.id))
     }
 
-    /// Every story, filmed or not, hero or row — nothing dropped, nothing
-    /// duplicated. The strongest form of "it should be visible".
     func testEveryStoryIsShownExactlyOnce() {
         let now = september(1)
         let all = [
@@ -170,9 +145,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertEqual(rows.count, all.count, "a story appeared twice")
     }
 
-    /// One story, never filmed, nothing else. It's the hero, so there's no
-    /// list at all — and that's the one case where "it's in your stories" has
-    /// to mean the card at the top rather than a row.
     func testASingleUnfilmedStoryIsTheHeroAndTheListIsEmpty() {
         let now = september(1)
         let only = story("唯一一个", on: now)
@@ -184,7 +156,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertFalse(home.showsSection)
     }
 
-    /// No stories at all: no section, no heading, no crash.
     func testAnEmptyShelfShowsNoSection() {
         let home = home([], now: september(1))
 
@@ -193,11 +164,7 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertFalse(home.showsSection)
     }
 
-    // MARK: - The heading only appears once something has been filmed
 
-    /// Two stories, neither filmed. The list still has a row — the heading
-    /// doesn't. Product call 2026-09-18: 「你的故事」 comes off the screen when
-    /// there's no footage under it.
     func testTheHeadingIsHiddenWhenNothingInTheListIsFilmed() {
         let now = september(1)
         let today = story("今天建的", on: now)
@@ -209,8 +176,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertNil(home.sectionTitle)
     }
 
-    /// One clip anywhere in the list brings the heading back. The hero is
-    /// excluded from the list, so the clip has to be on a row to count.
     func testOneFilmedRowBringsTheHeadingBack() {
         let now = september(1)
         let today = story("今天建的", on: now)
@@ -221,8 +186,6 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertEqual(home.sectionTitle, Strings.yourStories)
     }
 
-    /// Footage on the hero alone doesn't count: the heading labels the list,
-    /// and the hero isn't in it.
     func testFilmingOnlyTheHeroLeavesTheHeadingHidden() {
         let now = september(1)
         let today = story("今天拍过", on: now, recorded: 1, filmedAt: now)
@@ -235,12 +198,7 @@ final class HomeStoriesTests: XCTestCase {
         XCTAssertNil(home.sectionTitle)
     }
 
-    // MARK: - A story with no moments at all
 
-    /// `isComplete` is `recorded == cards.count`, which is vacuously true when
-    /// there are no cards — so a zero-moment story reads as "finished" and is
-    /// barred from the hero. It still has to appear in the list rather than
-    /// falling through both.
     func testAStoryWithNoMomentsStillAppears() {
         let now = september(1)
         let empty = Challenge(

@@ -48,9 +48,6 @@ enum NotificationPreferences {
 
     private static var defaults: UserDefaults { .standard }
 
-    /// Clears every stored preference. Part of account deletion — leaving a
-    /// reminder schedule behind after someone erases their account would keep
-    /// notifying a person who asked to be gone.
     static func resetAll() {
         for key in [
             eveningEnabledKey, eveningHourKey, eveningMinuteKey, primerSeenKey,
@@ -80,9 +77,6 @@ enum NotificationPreferences {
         set { defaults.set(newValue, forKey: primerSeenKey) }
     }
 
-    /// On unless someone turned it off. The switch that set it went with 1.3,
-    /// and the default `false` left every later install without a single room
-    /// alert — friends' messages arrived only if the chat happened to be open.
     static var sharedEnabled: Bool {
         get { defaults.object(forKey: sharedEnabledKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: sharedEnabledKey) }
@@ -201,8 +195,6 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
         if response.actionIdentifier == NotificationConstants.snoozeAction {
             ReminderService.snooze(response.notification.request.content)
         } else if response.actionIdentifier != UNNotificationDismissActionIdentifier {
-            // Local notifications carry the challenge ID; room alerts from
-            // the Worker carry the room code instead.
             let userInfo = response.notification.request.content.userInfo
             if let route = NotificationRecordRoute(userInfo: userInfo)
                 ?? SharedActivityNotificationService.route(forRemote: userInfo) {
@@ -212,8 +204,6 @@ final class NotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNoti
         completionHandler()
     }
 
-    /// APNs' address for this install. The Worker needs it to send room
-    /// alerts; CloudKit used to collect it on its own.
     func application(
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data

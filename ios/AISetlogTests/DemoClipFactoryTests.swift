@@ -2,10 +2,6 @@ import XCTest
 import AVFoundation
 @testable import AISetlog
 
-/// The recorder's simulator escape hatch is the only way to get footage into a
-/// shared room without a camera, so it has to produce something decodable —
-/// and something that visibly differs per author, or a stitched film can't
-/// show whose clip is whose.
 final class DemoClipFactoryTests: XCTestCase {
     private func makeClip(author: String, moment: Int = 1) async throws -> URL {
         let url = await DemoClipFactory.makeClip(
@@ -34,9 +30,6 @@ final class DemoClipFactoryTests: XCTestCase {
         XCTAssertNotEqual(minePixels, theirPixels)
     }
 
-    /// Regression: the palette used to fold the moment number into the colour
-    /// *choice*, so one author's moment 1 and the other's moment 2 came out
-    /// identically coloured in the stitched film.
     func testAuthorsStayDistinctAcrossAdjacentMoments() async throws {
         let mineFirst = try await makeClip(author: "iPhone 17 Pro Max", moment: 1)
         let theirsSecond = try await makeClip(author: "1DAY-B", moment: 2)

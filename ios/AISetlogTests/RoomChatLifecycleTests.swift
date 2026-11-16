@@ -1,7 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-// Test-only convenience: production callers must supply an identity lease.
 @MainActor
 extension RoomChatSession {
     convenience init(scope: RoomChatScope, directory: URL, transport: any RoomChatTransport) {
@@ -68,7 +67,7 @@ final class RoomChatLifecycleTests: XCTestCase {
         let transport = Transport()
         let session = RoomChatSession(scope: .init(accountID: "alice", roomCode: "ABCDEF"), directory: directory,
                                       transport: transport, identityIsCurrent: { false })
-        XCTAssertNil(session.state) // Even initial archive loading requires a valid lease.
+        XCTAssertNil(session.state)
         session.setDraft("must not persist")
         await session.send(authorName: "Alice")
         XCTAssertNil(session.state)

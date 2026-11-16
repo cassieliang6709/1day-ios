@@ -17,7 +17,6 @@ final class RoomChatSession: ObservableObject {
          identityIsCurrent: @escaping () -> Bool) {
         self.transport = transport
         self.identityIsCurrent = identityIsCurrent
-        // Hash the encoded tuple, not a concatenation that could collide at delimiters.
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let key = (try? encoder.encode(scope)) ?? Data()
@@ -29,8 +28,6 @@ final class RoomChatSession: ObservableObject {
         catch { self.error = .storage }
     }
 
-    /// Invalid sessions drop in-memory contents and stop disk mutations. The
-    /// archived draft/outbox is retained for an intentional later login.
     private func validateIdentity() -> Bool {
         guard identityIsCurrent() else {
             state = nil
@@ -40,10 +37,6 @@ final class RoomChatSession: ObservableObject {
         return state != nil
     }
 
-    /// Explicit recovery only: the caller must supply audited provenance. No
-    /// fetch omission is promoted to "never uploaded", and nothing is sent.
-    /// Synchronous on the session actor, so sends/refreshes cannot interleave
-    /// between taking current state and atomically saving the recovered state.
     @discardableResult
     func recoverLegacyComments(_ candidates: [LegacyRoomChatMigration.Candidate]) -> LegacyRoomChatMigration.Plan? {
         guard validateIdentity(), let current = state else { return nil }
@@ -62,7 +55,6 @@ final class RoomChatSession: ObservableObject {
     func setDraft(_ text: String) {
         guard validateIdentity(), var next = state else { return }
         next.draft = text
-        // Retain text on screen even on disk failure, and tell the user it isn't safe.
         state = next
         do { try archive.save(next); if error == .storage { error = nil } }
         catch { self.error = .storage }
@@ -72,7 +64,7 @@ final class RoomChatSession: ObservableObject {
         guard validateIdentity(), var next = state else { return }
         do {
             let message = try next.enqueue(authorName: authorName, moment: moment)
-            try archive.save(next) // Do not clear the composer before durable enqueue.
+            try archive.save(next)
             state = next
             await transmit(message)
         } catch RoomChatState.StateError.messageTooLong { self.error = .messageTooLong }
@@ -132,8 +124,6 @@ final class RoomChatSession: ObservableObject {
         guard validateIdentity(), !refreshing, let scope = state?.scope else { return }
         refreshing = true
         defer { refreshing = false }
-        // Capture before awaiting. A concurrently confirmed send must not be
-        // judged missing by a fetch that began before the message was sent.
         let candidates = Set(state?.entries.filter { $0.delivery == .sent }.map(\.id) ?? [])
         let messages: [RoomChatMessage]
         let missing: Set<UUID>

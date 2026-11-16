@@ -1,9 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// The sheet behind 从提醒事项导入: unfinished reminders, today's first. Tick
-/// some, 加入 copies their titles into the list. `room` is how many more
-/// the list can take.
 struct RemindersPicker: View {
     let room: Int
     let onAdd: ([String]) -> Void
@@ -94,7 +91,6 @@ struct RemindersPicker: View {
         .accessibilityIdentifier("reminder-row")
     }
 
-    /// Picked in the order tapped, so the list gets them in that order.
     private func title(of id: String) -> String? {
         if case .items(let items) = outcome { return items.first { $0.id == id }?.title }
         return nil

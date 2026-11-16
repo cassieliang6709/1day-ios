@@ -1,8 +1,6 @@
 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
 import SwiftUI
 
-/// The demo uses the production room, moment preview, film and chat views.
-/// Only this outer shell chooses fixtures and explains the local-only boundary.
 struct LocalRoomDemoView: View {
     let chinese: Bool
     @StateObject private var owner = LocalRoomDemoOwner()
@@ -13,9 +11,6 @@ struct LocalRoomDemoView: View {
 
     init(chinese: Bool) {
         self.chinese = chinese
-        // With the chrome hidden there is no picker to set this, so the count
-        // comes from however many members were named. Two, as before, when
-        // nobody said.
         let named = DemoRoomNaming.fromLaunchArguments().members.count
         _members = State(initialValue: (2...3).contains(named) ? named : 2)
     }
@@ -108,8 +103,6 @@ final class LocalRoomDemoOwner: ObservableObject {
     }
 }
 
-/// Dismantling means this shell was removed. onDisappear is intentionally NOT
-/// used: full-screen moment/camera previews may temporarily cover the room.
 private struct LocalRoomRemovalObserver: UIViewRepresentable {
     let onRemove: () -> Void
     final class Coordinator {
@@ -120,8 +113,6 @@ private struct LocalRoomRemovalObserver: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView { UIView(frame: .zero) }
     func updateUIView(_ uiView: UIView, context: Context) {}
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
-        // SwiftUI is still dismantling its graph. Runtime cleanup publishes
-        // store changes, so perform it on the next main turn, not mid-update.
         DispatchQueue.main.async { coordinator.onRemove() }
     }
 }

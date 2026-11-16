@@ -1,46 +1,25 @@
 import SwiftUI
 
-/// The story, as an object you can hold.
-///
-/// This is the home screen's centre of gravity: a cover frame from the film so
-/// far, the story's name, how much of the day is in, who's in it with you, and
-/// the one action that continues it. It is intentionally *not* a progress
-/// widget with a button bolted on — the progress lives inside the picture.
 
 struct StoryCard: View {
     let challenge: Challenge
     let memberNames: [String]
-    /// How far the day has got, over everyone in it. In a shared room this is
-    /// the difference between the card and the room agreeing about the day.
     let progress: RoomProgress
-    /// Most recent clip — the card's cover. Nil until the first moment lands.
     let coverURL: URL?
-    /// Re-records reuse the file name; this busts the cached first frame.
     var refreshToken: Date?
     let onContinue: () -> Void
     let onOpen: () -> Void
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-    /// One moment the day is still missing, named so the card has something
-    /// concrete on it. A default for the button below, not a position in a
-    /// queue — the story page lets you pick any of them.
     private var openMoment: String {
         challenge.isTimeOnly
             ? Strings.timeOnlyMoment
             : presenter.title(forSlot: offeredSlot)
     }
 
-    /// Which slot the button opens — today's in a multi-day story, see
-    /// `RoomProgress.slotToOffer`.
     private var todaySlot: Int? { challenge.isOneDay ? nil : challenge.currentDay }
     private var offeredSlot: Int { progress.slotToOffer(today: todaySlot) }
 
-    /// The film is watchable, and there's nothing left for me to add.
-    ///
-    /// The day being full isn't enough on its own: in a room where friends
-    /// filmed every moment and I filmed none, the card's only button became
-    /// "Watch your film" and there was no way to join in from the home screen
-    /// at all.
     private var isDone: Bool { progress.isComplete && challenge.isComplete }
 
     var body: some View {
@@ -56,7 +35,6 @@ struct StoryCard: View {
         .oneDaySoftShadow(strength: 1.3)
     }
 
-    // MARK: Cover
 
     private var cover: some View {
         ZStack(alignment: .bottomLeading) {
@@ -64,7 +42,6 @@ struct StoryCard: View {
                 if let coverURL {
                     ClipThumbnail(url: coverURL, refreshToken: refreshToken)
                 } else {
-                    // Nothing filmed yet: no poster any more (1.5), just the brand tint.
                     StoryCoverPlaceholder()
                 }
             }
@@ -105,9 +82,6 @@ struct StoryCard: View {
         }
     }
 
-    /// Members on the left, over the cover art. The 1/7 count and pips that
-    /// sat on the right are gone (1.5): nobody needs to be told how far
-    /// through a day they are.
     private var statusRow: some View {
         HStack(spacing: 12) {
             if memberNames.count > 1 {
@@ -118,7 +92,6 @@ struct StoryCard: View {
         }
     }
 
-    // MARK: Footer
 
     private var footer: some View {
         Button(action: isDone ? onOpen : onContinue) {
@@ -128,23 +101,14 @@ struct StoryCard: View {
         .padding(16)
     }
 
-    /// Says which day the tap opens. 继续今天的故事 was wrong whenever the
-    /// button actually opened an earlier, missed day — and the same story's
-    /// row in the list already said so.
     private var ctaTitle: String {
         if isDone { return Strings.watchYourFilm }
-        // A room doesn't number its days on screen (1.5), so 「接着拍 · 第 3
-        // 天」 can't be what its button says; and in a room the answer to
-        // "what now" is the same every time somebody opens it — film one.
         if challenge.isShared { return Strings.roomFeedFilm }
         if progress.filled == 0 { return Strings.startTodaysStory }
         guard todaySlot != nil else { return Strings.continueTodaysStory }
         return Strings.continueDayLabel(offeredSlot)
     }
 
-    /// The same sentence the list row shows for this story (see
-    /// `StoryRowCard.subtitle`), so moving a story between hero and list
-    /// doesn't change what it claims is next.
     private var caption: String {
         if challenge.isShared, !progress.isComplete { return roomCaption }
         if progress.isComplete || challenge.isTimeOnly || progress.offeringToday(today: todaySlot) {
@@ -153,40 +117,27 @@ struct StoryCard: View {
         return Strings.catchUpDayLabel(day: offeredSlot, moment: openMoment)
     }
 
-    /// A room's line on the card: the open moment when it has a name, and
-    /// otherwise just the act — never 「补第 2 天」 or a 「第 2 天」 standing in
-    /// for a name. See `ChallengePresenter.momentName(forSlot:)`.
     private var roomCaption: String {
         presenter.momentName(forSlot: offeredSlot).map { Strings.openMomentLabel($0) }
             ?? Strings.timeOnlyMoment
     }
 }
 
-// MARK: - Compact variant
 
-/// A story in a list: thumbnail, name, one status line, progress. Used for
-/// "your other plans" under the hero, and for finished films.
 struct StoryRowCard: View {
     let challenge: Challenge
     let progress: RoomProgress
     let coverURL: URL?
     var refreshToken: Date?
     var memberNames: [String] = []
-    /// 朋友's room list (1.5): everyone's faces, stacked, stand in for the
-    /// cover picture. A room is the people in it more than any one frame.
     var showsMembersAsCover = false
     var roomMembers: [(id: String, name: String)] = []
-    /// Avatars keyed by member ID, including people with the same name.
     var memberImages: [String: UIImage] = [:]
-    /// 朋友's list: who filmed last and when, 「尼尼 · 10月25日」.
     var latestLine: String?
     var latestCaption: String?
-    /// Someone else filmed since I last opened the room.
     var hasNew = false
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
-    /// Same rule as the hero card: the row names today's moment, and says
-    /// which day when today's is filmed and an earlier one isn't.
     private var todaySlot: Int? { challenge.isOneDay ? nil : challenge.currentDay }
     private var offeredSlot: Int { progress.slotToOffer(today: todaySlot) }
 
@@ -200,59 +151,12 @@ struct StoryRowCard: View {
     }
 
     private var roomPreviewCard: some View {
-        VStack(spacing: 0) {
-            if let coverURL {
-                ClipThumbnail(url: coverURL, refreshToken: refreshToken, bedsInsteadOfCrops: true)
-                    .frame(height: 132)
-                    .clipped()
-                    .overlay(alignment: .bottomLeading) {
-                        if let latestCaption, !latestCaption.isEmpty {
-                            Text(latestCaption)
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(2)
-                                .padding(.horizontal, 14)
-                                .padding(.top, 22)
-                                .padding(.bottom, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(LinearGradient(colors: [.clear, .black.opacity(0.65)],
-                                                           startPoint: .top, endPoint: .bottom))
-                        }
-                    }
-            }
-            HStack(spacing: 12) {
-                RoomAvatarCluster(members: roomMembers, images: memberImages)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                        .lineLimit(2)
-                    Text(latestLine ?? Strings.roomNobodyFilmed)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(OneDay.inkSoft)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                if hasNew {
-                    Circle().fill(Color.oneDayBrand).frame(width: 8, height: 8)
-                        .accessibilityLabel(Strings.roomHasNew)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(OneDay.inkFaint)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+        PortraitTile(
+            coverURL: coverURL, refreshToken: refreshToken, caption: latestCaption,
+            title: title, subtitle: latestLine ?? Strings.roomNobodyFilmed, hasNew: hasNew
+        ) {
+            RoomAvatarCluster(members: roomMembers, images: memberImages)
         }
-        .background(OneDay.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(OneDay.hairline, lineWidth: 1)
-        }
-        .oneDaySoftShadow(strength: 0.45)
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var compactRow: some View {
@@ -281,9 +185,6 @@ struct StoryRowCard: View {
         .contentShape(Rectangle())
     }
 
-    /// A room still called by the date it was made — the default before
-    /// 「某某的房间」 — is named after the people in it in 朋友's list. The
-    /// stored title is left alone.
     private var title: String {
         guard showsMembersAsCover,
               challenge.title == Strings.byTimeTitle(challenge.startDate),
@@ -293,16 +194,8 @@ struct StoryRowCard: View {
     }
 
     private var thumbnail: some View {
-        Group {
-            if let coverURL {
-                ClipThumbnail(url: coverURL, refreshToken: refreshToken)
-            } else {
-                // Nothing filmed yet: no poster any more (1.5), just the brand tint.
-                StoryCoverPlaceholder()
-            }
-        }
-        .frame(width: 58, height: 66)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        ClipTile(url: coverURL, refreshToken: refreshToken)
+            .frame(width: 58, height: 66)
     }
 
     private var subtitle: String {
@@ -311,28 +204,18 @@ struct StoryRowCard: View {
                 duration: StorySchedule(challenge).filmDuration(clipCount: progress.clipCount))
         }
         if challenge.isTimeOnly { return Strings.timeOnlyMoment }
-        // Same rule as the hero card's `roomCaption`: a room names a moment or
-        // says nothing about which one, and never counts days.
         if challenge.isShared {
             return presenter.momentName(forSlot: offeredSlot).map { Strings.openMomentLabel($0) }
                 ?? Strings.timeOnlyMoment
         }
         let moment = presenter.title(forSlot: offeredSlot)
-        // Says which day when it isn't today's. A seven-day story where
-        // Tuesday was missed now offers Tuesday explicitly rather than
-        // pretending it is what today is for.
         return progress.offeringToday(today: todaySlot)
             ? Strings.openMomentLabel(moment)
             : Strings.catchUpDayLabel(day: offeredSlot, moment: moment)
     }
 }
 
-// MARK: - Today row
 
-/// One of today's stories on 我的: cover on the left, name and how far it
-/// has got in the middle, 继续拍 on the right. Several stack vertically — the
-/// big swipeable card made the second story of the day something you had to
-/// know to swipe for.
 struct TodayStoryRow: View {
     let challenge: Challenge
     let progress: RoomProgress
@@ -374,16 +257,8 @@ struct TodayStoryRow: View {
     }
 
     private var cover: some View {
-        Group {
-            if let coverURL {
-                ClipThumbnail(url: coverURL, refreshToken: refreshToken)
-            } else {
-                // Nothing filmed yet: no poster any more (1.5), just the brand tint.
-                StoryCoverPlaceholder()
-            }
-        }
-        .frame(width: 52, height: 64)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        ClipTile(url: coverURL, refreshToken: refreshToken)
+            .frame(width: 52, height: 64)
     }
 
     private var details: some View {
@@ -403,9 +278,6 @@ struct TodayStoryRow: View {
     }
 }
 
-/// A story's cover before its first clip. The cover is that clip (1.5) —
-/// templates and their painted posters are gone — so until then it's a plain
-/// soft tint with the app's mark, not a picture standing in for one.
 struct StoryCoverPlaceholder: View {
     var body: some View {
         ZStack {

@@ -11,7 +11,6 @@ class SuggestionException implements Exception {
   final SuggestionFailure failure;
 }
 
-/// Only filming intent is sent; video files always remain on the device.
 class PromptSuggestions {
   PromptSuggestions({Uri? endpoint, this.timeout = const Duration(seconds: 20)})
     : endpoint =

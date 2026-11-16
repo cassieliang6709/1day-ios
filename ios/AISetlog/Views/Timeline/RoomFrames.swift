@@ -1,59 +1,24 @@
 import SwiftUI
 
-/// A shared room as one big frame per person (1.5).
-///
-/// A 横拍 room is Setlog's layout: each person a full-width 16:9 card,
-/// stacked, centred on the screen when they all fit — the same stack the
-/// room's vlog makes (`VideoStitcher.grid`).
-///
-/// A 竖拍 room fills the screen in the grid `RoomFrames.grid(for:)` picks
-/// for the head count: two side by side for two, one column of three, then
-/// two columns — 2×2 for four, 2×3 for five and six, the sixth place left empty for five
-/// with nothing drawn in it. Footage is cropped to fill each frame from the
-/// centre, never letterboxed.
-///
-/// Each frame is one person's clips, newest first, one clip per page —
-/// swipe sideways to go through them. The face and name at the top open
-/// that person's page (`RoomPersonPage`). Nobody's frame says who hasn't
-/// filmed: an empty friend's frame is just empty, and 拍一拍 is a long press
-/// on their frame. My own empty frame is a way into the camera.
-///
-/// Who goes in which frame, and in what order, is `RoomFeed.columns` — the
-/// same rule the column layout used, so the order didn't change with the
-/// shape.
 struct RoomFrames: View {
     let clips: [DayClip]
-    /// Everyone in the room, as `ChallengeStore.members(for:)` lists them.
     var members: [(id: String, name: String)] = []
     let myID: String
-    /// The slot to film next, or nil when every moment holds footage.
     let nextToFilm: Int?
-    /// The moment's name, when the story has named moments.
     var slotTitle: (Int) -> String? = { _ in nil }
-    /// The clip that was tapped. What opens is the caller's business.
     let onPlay: (DayClip) -> Void
     let onFilm: (Int) -> Void
-    /// The face or name at the top of a frame was tapped.
     let onOpenPerson: (RoomFeed.Column) -> Void
     var hasPoked: (String) -> Bool = { _ in false }
     var onPoke: (String) -> Void = { _ in }
-    /// The room's shape: landscape stacks 16:9 cards, portrait uses `grid`.
     var orientation: Challenge.Orientation = .portrait
-    /// The newest comment on a person's take, for the bubble on their card.
     var latestComment: (DayClip) -> ClipComment? = { _ in nil }
-    /// Signed out the room doesn't sync: a friend's empty frame says so and
-    /// signs in, rather than looking like they never filmed.
     var signedOut = false
     var onSignIn: () -> Void = {}
 
-    /// Below this a frame is too short to tell what is in the clip, and the
-    /// grid scrolls instead. Six people always fit; only a room from before
-    /// the cap, with more than six, can reach it.
     private static let minimumFrameHeight: CGFloat = 150
     private static let spacing: CGFloat = 12
 
-    /// Columns × rows for a head count, portrait (PRD 5.5): fewer columns
-    /// and more rows, never three columns of thin strips.
     static func grid(for count: Int) -> (columns: Int, rows: Int) {
         switch count {
         case ...1: return (1, 1)
@@ -76,8 +41,6 @@ struct RoomFrames: View {
         }
     }
 
-    /// 横拍: one 16:9 card per person, top to bottom. Centred when they fit,
-    /// scrolling when they don't (five or six people on a small phone).
     private var stacked: some View {
         let columns = columns
         return GeometryReader { proxy in
@@ -107,8 +70,6 @@ struct RoomFrames: View {
             let fit = (proxy.size.height - Self.spacing * (count - 1)) / count
             let cellWidth = (proxy.size.width - Self.spacing * CGFloat(grid.columns - 1))
                 / CGFloat(grid.columns)
-            // Two people: two 3:4 portrait cards from the top, not two
-            // frames stretched to whatever half the screen happens to be.
             let height = columns.count == 2
                 ? min(cellWidth * 4 / 3, proxy.size.height)
                 : max(fit, Self.minimumFrameHeight)
@@ -119,8 +80,6 @@ struct RoomFrames: View {
                             ForEach(rows[index]) { column in
                                 frame(column)
                             }
-                            // Five people: the sixth place stays empty —
-                            // no outline, no grey block, nothing to fill.
                             ForEach(0..<(grid.columns - rows[index].count), id: \.self) { _ in
                                 Color.clear.frame(maxWidth: .infinity)
                             }
@@ -130,8 +89,6 @@ struct RoomFrames: View {
                 }
             }
             .scrollIndicators(.hidden)
-            // Everyone fits: nothing to scroll, and a stray drag shouldn't
-            // rubber-band the frames.
             .scrollDisabled(fit >= Self.minimumFrameHeight)
         }
     }
@@ -152,7 +109,6 @@ struct RoomFrames: View {
     }
 }
 
-/// One person's frame: their clips as sideways pages, their face on top.
 private struct PersonFrame: View {
     let column: RoomFeed.Column
     let nextToFilm: Int?
@@ -166,8 +122,6 @@ private struct PersonFrame: View {
     let signedOut: Bool
     let onSignIn: () -> Void
 
-    /// The clip on screen. Only that one plays; the others are stills, so a
-    /// room with thirty clips isn't thirty players decoding at once.
     @State private var page: String?
     @State private var pokedNow = false
 
@@ -192,7 +146,6 @@ private struct PersonFrame: View {
         .accessibilityIdentifier("room-frame")
     }
 
-    /// 拍一拍 is a long press on a friend's frame, once a day per person.
     @ViewBuilder
     private var pokeMenu: some View {
         if !column.isMine {
@@ -245,8 +198,6 @@ private struct PersonFrame: View {
                         colors: [.black.opacity(0.35), .clear, .clear, .black.opacity(0.5)],
                         startPoint: .top, endPoint: .bottom)
                 }
-                // Setlog's card: the time and the caption in the middle of
-                // the picture, the newest comment as a bubble bottom-left.
                 .overlay {
                     VStack(spacing: 2) {
                         if let at = clip.recordedAt, !Calendar.current.isDateInToday(at) {
@@ -298,7 +249,6 @@ private struct PersonFrame: View {
         .accessibilityIdentifier("room-clip-tile")
     }
 
-    /// Face and name, one button: both open this person's page.
     private var person: some View {
         let onVideo = !column.clips.isEmpty
         return Button(action: onOpenPerson) {
@@ -317,7 +267,6 @@ private struct PersonFrame: View {
         .accessibilityIdentifier("room-frame-person")
     }
 
-    /// On my own frame, a way to film another.
     @ViewBuilder
     private var topTrailing: some View {
         HStack(spacing: 8) {
@@ -339,8 +288,6 @@ private struct PersonFrame: View {
         .padding(6)
     }
 
-    /// More than one take: a dot each, the one on screen filled. Not
-    /// 「1 / 3」 — a count reads as a score.
     @ViewBuilder
     private var pageDots: some View {
         if column.clips.count > 1 {
@@ -356,8 +303,6 @@ private struct PersonFrame: View {
         }
     }
 
-    /// Nothing filmed yet. Mine is a camera button; somebody else's is
-    /// just the empty frame — it never says they haven't filmed.
     @ViewBuilder
     private var empty: some View {
         if column.isMine, let nextToFilm {
@@ -391,8 +336,6 @@ private struct PersonFrame: View {
     }
 }
 
-/// One person's clips in a room, all of them, newest first, as a two-wide
-/// grid. Reached from the face or name on their frame.
 struct RoomPersonPage: View {
     let column: RoomFeed.Column
     var slotTitle: (Int) -> String? = { _ in nil }
@@ -422,8 +365,6 @@ struct RoomPersonPage: View {
                         }
                     }
 
-                    // Nothing filmed: the page is just empty (nobody is
-                    // told who hasn't filmed).
                     if !column.clips.isEmpty {
                         LazyVGrid(
                             columns: [GridItem(.flexible(), spacing: 10),

@@ -1,13 +1,5 @@
 import Foundation
 
-/// Every clip the app knows about, in one list: yours and your friends', from
-/// every story and room, plus the drafts nobody filed. 我的 (1.5) is built on
-/// it — the archive, with stories as one way of filtering it rather than the
-/// only way in — and shows only your own clips (`scoped(includingFriends:)`);
-/// a room's feed uses the whole thing.
-///
-/// Pure value type so the filtering and the calendar grouping can be tested
-/// without a store.
 struct LibraryClip: Identifiable, Hashable {
     enum Source: Hashable {
         case story(id: UUID, title: String, isShared: Bool)
@@ -21,7 +13,6 @@ struct LibraryClip: Identifiable, Hashable {
     let isMine: Bool
     let source: Source
     let orientation: Challenge.Orientation
-    /// The clip as the stitcher wants it.
     let clip: DayClip
 
     static func == (lhs: LibraryClip, rhs: LibraryClip) -> Bool { lhs.id == rhs.id }
@@ -32,20 +23,14 @@ struct LibraryClip: Identifiable, Hashable {
         return nil
     }
 
-    /// What `ClipCameraIndex` files this clip's camera under. The file, plus
-    /// its date, so a re-recorded take at the same path is read again.
     var cameraKey: String { ClipCameraIndex.key(url: url, recordedAt: recordedAt) }
 }
 
-/// Which clips to show: one camera, whose clips, drafts only. `.all` is none
-/// of them — every clip, everyone's — which is what a room's feed wants.
 struct LibraryFilter: Hashable {
     enum People: Hashable, CaseIterable { case everyone, mine, friends }
 
-    /// Nil = every camera.
     var camera: CameraStyle?
     var people: People = .everyone
-    /// 待归档: only the drafts nobody has filed into a story yet.
     var draftsOnly = false
 
     static let drafts = LibraryFilter(draftsOnly: true)
@@ -59,16 +44,10 @@ struct LibraryFilter: Hashable {
 struct ClipLibrary {
     let clips: [LibraryClip]
 
-    /// Newest first. Clips without a recorded date sort by the story's start,
-    /// which is the best date the app has for them.
     init(clips: [LibraryClip]) {
         self.clips = clips.sorted { $0.recordedAt > $1.recordedAt }
     }
 
-    /// - Parameters:
-    ///   - storyClips: what `ChallengeStore.recordedClips(for:)` returns, per story.
-    ///   - myIDs: every author ID that means "me" — the account's, and the
-    ///     solo placeholder used before sign-in.
     init(
         stories: [(challenge: Challenge, clips: [DayClip])],
         drafts: [(draft: ClipDraft, url: URL)],
@@ -106,8 +85,6 @@ struct ClipLibrary {
         self.init(clips: all)
     }
 
-    /// - Parameter cameras: each clip's camera, keyed by `cameraKey`. A clip
-    ///   not in it yet (its metadata hasn't been read) matches no camera.
     func filtered(
         _ filter: LibraryFilter, cameras: [String: CameraStyle] = [:],
         on day: Date? = nil, calendar: Calendar = .current
@@ -126,15 +103,6 @@ struct ClipLibrary {
         }
     }
 
-    /// The same library with friends' clips dropped unless `includingFriends`.
-    /// 我的 draws everything from `scoped(includingFriends: false)` — the grid,
-    /// the calendar's covers, what can be picked for a vlog — so nothing on
-    /// that page is ever computed from a friend's clip. Drafts are always
-    /// yours, so they stay.
-    ///
-    /// One take sent to several rooms is a copy per room, all stamped with the
-    /// same recording time. 我的 shows it once: four tiles of one clip read as
-    /// "I filmed this four times".
     func scoped(includingFriends: Bool) -> ClipLibrary {
         guard !includingFriends else { return self }
         var seen: Set<Date> = []
@@ -145,11 +113,8 @@ struct ClipLibrary {
         })
     }
 
-    /// How many drafts (clips in no story) there are.
     var draftCount: Int { clips.filter { $0.storyID == nil }.count }
 
-    /// The first clip filmed on each day that has any — what a calendar cell
-    /// shows as its picture. Keyed by start of day.
     func coverByDay(_ clips: [LibraryClip], calendar: Calendar = .current) -> [Date: LibraryClip] {
         var covers: [Date: LibraryClip] = [:]
         for clip in clips {
@@ -160,8 +125,6 @@ struct ClipLibrary {
         return covers
     }
 
-    /// The film shape most of `clips` were shot in; portrait on a tie, since
-    /// that is the camera's default.
     static func dominantAspect(of clips: [LibraryClip]) -> VideoStitcher.Aspect {
         let counts = Dictionary(grouping: clips, by: \.orientation).mapValues(\.count)
         let best = counts.max { a, b in
@@ -174,10 +137,6 @@ struct ClipLibrary {
         }
     }
 
-    /// Clips from different stories share `day` numbers; the stitcher's
-    /// captions and grouping read them. Renumber in the order given — the
-    /// order they were picked in, then dragged into — so every clip is its own
-    /// moment and the film plays them in that order.
     static func stitchable(_ clips: [LibraryClip]) -> [DayClip] {
         clips
             .enumerated()

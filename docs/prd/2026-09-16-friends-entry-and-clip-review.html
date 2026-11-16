@@ -18,7 +18,6 @@
     --next:           #2a78d6;
     --good:           #0ca30c;
     --stop:           #c0392b;
-    /* app 自己的色板，取自 ios/AISetlog/Resources/Theme.swift */
     --c-blue:    #1677ff;
     --c-cyan:    #38b6ff;
     --c-lav:     #b3a4ff;
@@ -86,7 +85,6 @@
   td.n { color: var(--text-muted); font-variant-numeric: tabular-nums; width: 28px; }
   .rec { background: rgba(12,163,12,0.07); }
 
-  /* 手机框 */
   .phones { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 8px; }
   .ph-wrap { width: 268px; }
   .phone {
@@ -108,7 +106,6 @@
   .h1s { font-size: 19px; font-weight: 850; letter-spacing: -0.01em; margin: 2px 0 2px; }
   .lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-inkfaint); margin: 10px 0 5px; }
 
-  /* app 组件 */
   .glass { background: var(--c-surface); border: 1px solid var(--c-hair); border-radius: 15px; box-shadow: 0 3px 12px rgba(15,46,107,0.06); }
   .row { display: flex; align-items: center; gap: 9px; padding: 9px 11px; }
   .row + .row { border-top: 1px solid var(--c-hair); }
@@ -123,7 +120,6 @@
   .seg b.on { background: var(--c-blue); color: #fff; }
   .cta { border-radius: 99px; padding: 10px 0; text-align: center; font-size: 12px; font-weight: 800; color: #fff; background: linear-gradient(100deg, var(--c-blue), var(--c-cyan)); box-shadow: 0 5px 16px rgba(22,119,255,0.32); }
 
-  /* composer 专用 */
   .gradcard { border-radius: 17px; padding: 10px 11px; background: linear-gradient(100deg, var(--c-blue), var(--c-cyan)); color: #fff; display: flex; gap: 9px; align-items: center; box-shadow: 0 6px 18px rgba(22,119,255,0.28); }
   .gradcard .gi { width: 30px; height: 30px; border-radius: 10px; background: rgba(255,255,255,0.22); display: grid; place-items: center; font-size: 13px; flex: none; }
   .gradcard .gt { font-size: 11.5px; font-weight: 850; }
@@ -142,7 +138,6 @@
   .gear { position: absolute; top: 5px; right: 5px; width: 17px; height: 17px; border-radius: 50%; background: rgba(255,255,255,0.82); color: var(--c-ink); font-size: 8px; display: grid; place-items: center; text-shadow: none; }
   .gear.hot { outline: 2px solid var(--now); outline-offset: 2px; }
 
-  /* 回看 */
   .vfsmall { border-radius: 18px; overflow: hidden; position: relative; height: 248px; background: linear-gradient(150deg, #2a3f63, #4a6aa8 55%, #7d6ba8); }
   .vfsmall.short { height: 196px; }
   .vcap { position: absolute; left: 50%; transform: translateX(-50%); top: 42%; font-size: 12px; font-weight: 850; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,0.55); white-space: nowrap; }
@@ -166,7 +161,6 @@
   .field { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 14px; background: #fff; border: 1.5px solid rgba(22,119,255,0.35); font-size: 10.5px; }
   .field .fx { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--c-blue); }
 
-  /* 调色板 */
   .pal { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
   .pal .d { aspect-ratio: 1; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.75), 0 1px 4px rgba(0,0,0,0.25); }
   .pal .d.sel { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2.5px var(--c-blue), 0 1px 4px rgba(0,0,0,0.25); }
@@ -175,7 +169,6 @@
   .swatchtable td { vertical-align: middle; }
   .sq { display: inline-block; width: 15px; height: 15px; border-radius: 4px; margin-right: 7px; vertical-align: -3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
 
-  /* 单行 + 菜单 */
   .onerow { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 16px; background: var(--c-surface); border: 1px solid var(--c-hair); box-shadow: 0 3px 12px rgba(15,46,107,0.06); }
   .onerow .who { font-size: 11.5px; font-weight: 850; }
   .onerow .hint { font-size: 9px; color: var(--c-inksoft); font-weight: 700; margin-top: 1px; }
@@ -186,7 +179,6 @@
   .menu .mi .ms { font-size: 8.5px; color: var(--c-inksoft); font-weight: 700; }
   .dim { position: absolute; inset: 0; background: rgba(11,18,32,0.14); }
 
-  /* 底部悬浮 */
   .botbar { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; justify-content: center; }
   .miniseg { display: inline-flex; gap: 3px; padding: 4px; border-radius: 99px; background: rgba(252,252,251,0.92); box-shadow: 0 6px 20px rgba(15,46,107,0.18); border: 1px solid var(--c-hair); }
   .miniseg b { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 850; padding: 7px 13px; border-radius: 99px; color: var(--c-inksoft); }
@@ -196,7 +188,6 @@
   .abovebar { position: absolute; left: 14px; right: 14px; bottom: 58px; text-align: center; font-size: 9px; font-weight: 800; color: var(--c-inksoft); }
   .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; background: linear-gradient(to top, rgba(245,248,255,0.96), rgba(245,248,255,0)); }
 
-  /* 手势示意 */
   .trash { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.5); display: grid; place-items: center; font-size: 13px; color: #fff; }
   .guide { position: absolute; left: 50%; top: 8%; bottom: 8%; width: 1px; background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.85) 0 5px, transparent 5px 10px); }
   .killx { position: absolute; left: -7px; top: -7px; width: 15px; height: 15px; border-radius: 50%; background: #fff; color: var(--c-ink); font-size: 9px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }

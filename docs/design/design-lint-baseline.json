@@ -1,0 +1,380 @@
+{
+ "Avatar/AvatarSetupFlow.swift": {
+  "font": 10,
+  "hex": 1,
+  "padding": 15,
+  "radius": 1,
+  "spacing": 7
+ },
+ "Components/AvatarStack.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 0
+ },
+ "Components/FloatingTabBar.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 2,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Components/PortraitTile.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 7,
+  "radius": 3,
+  "spacing": 3
+ },
+ "Components/StoryCard.swift": {
+  "font": 9,
+  "hex": 0,
+  "padding": 6,
+  "radius": 0,
+  "spacing": 9
+ },
+ "Components/TimelineClip.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 15,
+  "radius": 0,
+  "spacing": 8
+ },
+ "Components/VlogPlayer.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 4,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Compose/ComposerSteps.swift": {
+  "font": 11,
+  "hex": 0,
+  "padding": 6,
+  "radius": 0,
+  "spacing": 10
+ },
+ "Compose/GuidedMomentsView.swift": {
+  "font": 7,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 6
+ },
+ "Compose/RemindersPicker.swift": {
+  "font": 4,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Compose/StoryComposerView.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 5,
+  "radius": 4,
+  "spacing": 10
+ },
+ "Film/FilmFilterSheet.swift": {
+  "font": 5,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 10
+ },
+ "Film/FilmSoundtrackPanel.swift": {
+  "font": 6,
+  "hex": 0,
+  "padding": 5,
+  "radius": 1,
+  "spacing": 4
+ },
+ "Film/FilmView.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Film/FinalFilmTimeline.swift": {
+  "font": 10,
+  "hex": 0,
+  "padding": 7,
+  "radius": 0,
+  "spacing": 9
+ },
+ "Film/GeneratingFilm.swift": {
+  "font": 8,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 9
+ },
+ "Home/FirstRunOnboardingView.swift": {
+  "font": 6,
+  "hex": 0,
+  "padding": 1,
+  "radius": 2,
+  "spacing": 4
+ },
+ "Home/JoinInviteSheet.swift": {
+  "font": 5,
+  "hex": 0,
+  "padding": 8,
+  "radius": 3,
+  "spacing": 5
+ },
+ "Home/PermissionPrimerView.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 2,
+  "radius": 0,
+  "spacing": 3
+ },
+ "Library/DraftFiling.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 2,
+  "radius": 0,
+  "spacing": 0
+ },
+ "Library/LibrarySection.swift": {
+  "font": 12,
+  "hex": 0,
+  "padding": 9,
+  "radius": 0,
+  "spacing": 12
+ },
+ "Library/LibraryVlogArrange.swift": {
+  "font": 4,
+  "hex": 0,
+  "padding": 4,
+  "radius": 1,
+  "spacing": 4
+ },
+ "Library/LibraryVlogSheet.swift": {
+  "font": 4,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 3
+ },
+ "Mood/MoodNoteField.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 3
+ },
+ "Mood/MoodTodayCard.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 6
+ },
+ "Plans/DayStrip.swift": {
+  "font": 5,
+  "hex": 0,
+  "padding": 2,
+  "radius": 1,
+  "spacing": 6
+ },
+ "Plans/FriendsInviteSheet.swift": {
+  "font": 10,
+  "hex": 0,
+  "padding": 5,
+  "radius": 2,
+  "spacing": 6
+ },
+ "Plans/PlansHomeView.swift": {
+  "font": 26,
+  "hex": 0,
+  "padding": 43,
+  "radius": 1,
+  "spacing": 32
+ },
+ "Plans/RoomInviteCard.swift": {
+  "font": 7,
+  "hex": 4,
+  "padding": 4,
+  "radius": 1,
+  "spacing": 4
+ },
+ "Plans/TodayPlanCard.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Record/CameraComponents.swift": {
+  "font": 10,
+  "hex": 0,
+  "padding": 12,
+  "radius": 6,
+  "spacing": 9
+ },
+ "Record/ClipDraftsView.swift": {
+  "font": 13,
+  "hex": 0,
+  "padding": 11,
+  "radius": 0,
+  "spacing": 8
+ },
+ "Record/ClipPreviewComponents.swift": {
+  "font": 7,
+  "hex": 0,
+  "padding": 8,
+  "radius": 2,
+  "spacing": 11
+ },
+ "Record/ClipPreviewView.swift": {
+  "font": 12,
+  "hex": 1,
+  "padding": 15,
+  "radius": 6,
+  "spacing": 12
+ },
+ "Record/LookPanel.swift": {
+  "font": 7,
+  "hex": 1,
+  "padding": 8,
+  "radius": 2,
+  "spacing": 6
+ },
+ "Record/RecordClipView.swift": {
+  "font": 5,
+  "hex": 0,
+  "padding": 22,
+  "radius": 1,
+  "spacing": 12
+ },
+ "Recording/CenteredCaptureControl.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 1
+ },
+ "RootShellView.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 3,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Settings/SettingsView.swift": {
+  "font": 15,
+  "hex": 0,
+  "padding": 24,
+  "radius": 1,
+  "spacing": 15
+ },
+ "Settings/SignInView.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 2,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Timeline/DiaryTimelineRow.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Timeline/LocalRoomDemoView.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Timeline/LocalRoomImportControls.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Timeline/MomentFilmstrip.swift": {
+  "font": 7,
+  "hex": 0,
+  "padding": 5,
+  "radius": 1,
+  "spacing": 4
+ },
+ "Timeline/MomentTimeline.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 4
+ },
+ "Timeline/RoomChatView.swift": {
+  "font": 18,
+  "hex": 0,
+  "padding": 16,
+  "radius": 3,
+  "spacing": 14
+ },
+ "Timeline/RoomFeed.swift": {
+  "font": 13,
+  "hex": 0,
+  "padding": 8,
+  "radius": 4,
+  "spacing": 8
+ },
+ "Timeline/RoomFrames.swift": {
+  "font": 14,
+  "hex": 0,
+  "padding": 15,
+  "radius": 2,
+  "spacing": 16
+ },
+ "Timeline/RoomStories.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 1,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Timeline/StitchedMomentPreview.swift": {
+  "font": 1,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 1
+ },
+ "Timeline/StoryGridView.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 2
+ },
+ "Timeline/StoryPieces.swift": {
+  "font": 14,
+  "hex": 0,
+  "padding": 11,
+  "radius": 0,
+  "spacing": 7
+ },
+ "Timeline/StoryTimelineView.swift": {
+  "font": 7,
+  "hex": 0,
+  "padding": 14,
+  "radius": 0,
+  "spacing": 8
+ },
+ "Timeline/TimelineHeader.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 1
+ }
+}

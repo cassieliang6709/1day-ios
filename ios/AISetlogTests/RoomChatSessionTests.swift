@@ -101,7 +101,7 @@ final class RoomChatSessionTests: XCTestCase {
         XCTAssertTrue(transport.deleted.isEmpty)
         transport.fetched = []
         await session.refresh()
-        XCTAssertEqual(session.state?.entries.count, 1) // Query omission alone is insufficient.
+        XCTAssertEqual(session.state?.entries.count, 1)
         transport.missing = [message.id]
         await session.refresh()
         XCTAssertTrue(session.state?.entries.isEmpty == true)
@@ -135,7 +135,6 @@ final class RoomChatSessionTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let transport = FakeTransport()
         let session = RoomChatSession(scope: .init(accountID: "alice", roomCode: "ABCDEF"), directory: directory, transport: transport)
-        // A regular file blocks creation of the archive directory.
         try Data("blocked".utf8).write(to: directory)
         session.setDraft("keep me")
         await session.send(authorName: "Alice")

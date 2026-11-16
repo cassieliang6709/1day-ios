@@ -4,28 +4,15 @@ import Foundation
 import ImageIO
 import Vision
 
-/// A head on a transparent background, plus where its face is — what the
-/// decoration layer needs from whoever made it.
 struct AvatarHead {
     let image: CGImage
-    /// The face inside `image`, unit square, top-left origin. Nil when none was found.
     let face: CGRect?
-    /// Cheek centres from facial landmarks, same unit square. Nil without landmarks.
     let cheeks: [CGPoint]?
 }
 
-/// Cuts the head out of a picture with Vision: the subject's mask
-/// (`VNGenerateForegroundInstanceMaskRequest`, falling back to person
-/// segmentation), intersected with an oval around the face
-/// (`VNDetectFaceLandmarksRequest`) so the shoulders and the background go.
-///
-/// Used both on the original photo (the fallback path) and on the picture
-/// Apple's model drew (to get rid of its background and anything below the
-/// chin). Runs entirely on the phone.
 enum AvatarHeadExtractor {
     enum Failure: Error { case unreadableImage, renderFailed }
 
-    /// Longest side the work is done at. Plenty for a 768pt avatar.
     static let workingSide: CGFloat = 1024
 
     static func extract(from source: CGImage) throws -> AvatarHead {
@@ -35,11 +22,8 @@ enum AvatarHeadExtractor {
         let face = largestFace(in: image)
         let mask = subjectMask(for: image)
 
-        // The head's box, in pixels, top-left origin.
         let headBox: CGRect = {
             if let face {
-                // A circle on the face, a little high for the hair, so the
-                // sticker comes out round with the face in the middle.
                 let f = face.rect
                 let side = max(f.width, f.height) * 1.8
                 return CGRect(
@@ -47,7 +31,6 @@ enum AvatarHeadExtractor {
                     width: side, height: side)
             }
             if let bounds = mask.flatMap({ maskBounds($0, size: size) }) {
-                // No face: the top of whatever stands out, roughly head-shaped.
                 let w = min(bounds.width, bounds.height * 0.62)
                 return CGRect(x: bounds.midX - w / 2, y: bounds.minY, width: w, height: w * 1.12)
             }
@@ -57,7 +40,6 @@ enum AvatarHeadExtractor {
         let crop = headBox.intersection(CGRect(origin: .zero, size: size)).integral
         guard !crop.isNull, crop.width > 8, crop.height > 8 else { throw Failure.renderFailed }
 
-        // The oval, soft at the edge, drawn at full size.
         let oval = ovalMask(size: size, oval: headBox.insetBy(dx: headBox.width * 0.02, dy: 0))
         var alpha = oval
         if let mask {
@@ -69,7 +51,6 @@ enum AvatarHeadExtractor {
             kCIInputBackgroundImageKey: CIImage.empty(),
             kCIInputMaskImageKey: alpha,
         ])
-        // Core Image is bottom-left; the crop box is top-left.
         let ciCrop = CGRect(x: crop.minX, y: size.height - crop.maxY, width: crop.width, height: crop.height)
         let context = CIContext(options: [.useSoftwareRenderer: false])
         guard let out = context.createCGImage(
@@ -87,10 +68,8 @@ enum AvatarHeadExtractor {
         return AvatarHead(image: out, face: faceUnit, cheeks: face?.cheeks?.map(unit))
     }
 
-    // MARK: - Face
 
     private struct Face {
-        /// Pixels, top-left origin.
         let rect: CGRect
         let cheeks: [CGPoint]?
     }
@@ -112,8 +91,6 @@ enum AvatarHeadExtractor {
         return Face(rect: rect, cheeks: cheeks(of: best, imageSize: CGSize(width: w, height: h)))
     }
 
-    /// Below each eye and a little outward, level with the nose's middle.
-    /// Vision has no cheek landmark; this is where blush goes on a drawn face.
     private static func cheeks(of face: VNFaceObservation, imageSize: CGSize) -> [CGPoint]? {
         guard let landmarks = face.landmarks,
               let left = landmarks.leftEye, let right = landmarks.rightEye,
@@ -123,7 +100,6 @@ enum AvatarHeadExtractor {
             let pts = region.pointsInImage(imageSize: imageSize)
             guard !pts.isEmpty else { return .zero }
             let sx = pts.reduce(0) { $0 + $1.x }, sy = pts.reduce(0) { $0 + $1.y }
-            // Vision's image points are bottom-left.
             return CGPoint(x: sx / CGFloat(pts.count), y: imageSize.height - sy / CGFloat(pts.count))
         }
         let l = center(left), r = center(right), n = center(nose)
@@ -133,9 +109,6 @@ enum AvatarHeadExtractor {
         return [CGPoint(x: l.x - outward, y: y), CGPoint(x: r.x + outward, y: y)]
     }
 
-    /// The Simulator has no Neural Engine, and Vision's default device fails
-    /// there with "Could not create inference context". The CPU works. A phone
-    /// keeps Vision's own choice.
     private static func onCPUInSimulator(_ request: VNRequest) {
         #if targetEnvironment(simulator)
         guard let stages = try? request.supportedComputeStageDevices else { return }
@@ -149,9 +122,7 @@ enum AvatarHeadExtractor {
         #endif
     }
 
-    // MARK: - Masks
 
-    /// The picture's main subject as a grey mask (white = keep), image-sized.
     private static func subjectMask(for image: CGImage) -> CIImage? {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         let extent = CGRect(x: 0, y: 0, width: image.width, height: image.height)
@@ -182,7 +153,6 @@ enum AvatarHeadExtractor {
         return nil
     }
 
-    /// Bounding box of the mask's bright area, top-left origin.
     private static func maskBounds(_ mask: CIImage, size: CGSize) -> CGRect? {
         let w = 64, h = 64
         let scaled = mask.transformed(by: CGAffineTransform(
@@ -195,13 +165,11 @@ enum AvatarHeadExtractor {
             minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
         } }
         guard maxX >= minX, maxY >= minY else { return nil }
-        // Rows came out bottom-up.
         let fx = size.width / CGFloat(w), fy = size.height / CGFloat(h)
         return CGRect(x: CGFloat(minX) * fx, y: size.height - CGFloat(maxY + 1) * fy,
                       width: CGFloat(maxX - minX + 1) * fx, height: CGFloat(maxY - minY + 1) * fy)
     }
 
-    /// White oval on black, blurred a little at the edge. `oval` is top-left.
     private static func ovalMask(size: CGSize, oval: CGRect) -> CIImage {
         let w = Int(size.width), h = Int(size.height)
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
@@ -211,7 +179,6 @@ enum AvatarHeadExtractor {
         ctx.setFillColor(gray: 0, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         ctx.setFillColor(gray: 1, alpha: 1)
-        // CGContext is bottom-left too.
         ctx.fillEllipse(in: CGRect(x: oval.minX, y: size.height - oval.maxY, width: oval.width, height: oval.height))
         guard let cg = ctx.makeImage() else {
             return CIImage(color: .white).cropped(to: CGRect(origin: .zero, size: size))

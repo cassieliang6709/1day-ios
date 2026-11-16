@@ -106,7 +106,7 @@ const Logo: React.FC = () => {
           boxShadow: '0 54px 110px rgba(0,16,105,.42), 0 0 65px rgba(180,231,255,.42)',
         }}
       />
-      {/* A short eyelid overlay creates one restrained blink while preserving the original mark. */}
+      {                                                                                             }
       <div style={{position: 'absolute', left: 221, top: 250, width: 18, height: 18, borderRadius: 20, background: '#1575F6', scale: `1 ${blink}`}} />
       <div style={{position: 'absolute', left: 331, top: 250, width: 18, height: 18, borderRadius: 20, background: '#1575F6', scale: `1 ${blink}`}} />
     </div>

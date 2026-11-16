@@ -2,13 +2,6 @@ import AVFoundation
 import XCTest
 @testable import AISetlog
 
-/// Your dials are yours.
-///
-/// A shared film is stitched on your phone out of everybody's takes. Before
-/// `lookAuthorID` existed the grade you set for your own face was baked onto
-/// your friends' footage on the way through — they filmed in their light, not
-/// yours, and they never agreed to it. These tests film two clips under
-/// different authors and check which of them came out changed.
 final class PersonalEffectScopeTests: XCTestCase {
     private var owned: [URL] = []
 
@@ -48,11 +41,7 @@ final class PersonalEffectScopeTests: XCTestCase {
         XCTAssertGreaterThan(graded.theirs, ungraded.theirs + 0.02)
     }
 
-    // MARK: - Helpers
 
-    /// Stitches the two clips side by side and reads back how bright each half
-    /// came out. Sequential would overwrite one with the other; the grid keeps
-    /// both on screen at once, which is also the layout a shared room uses.
     private func luminances(
         mine: URL, theirs: URL, look: PersonalEffectParameters, authorID: String?
     ) async throws -> (mine: Double, theirs: Double) {
@@ -78,7 +67,6 @@ final class PersonalEffectScopeTests: XCTestCase {
         let image = try await generator.image(
             at: CMTime(seconds: 0.2, preferredTimescale: 600)).image
 
-        // A square canvas with two clips stacks them, so "mine" is the top half.
         let height = CGFloat(image.height), width = CGFloat(image.width)
         return (
             mine: try luminance(of: image, in: CGRect(
@@ -109,8 +97,6 @@ final class PersonalEffectScopeTests: XCTestCase {
         return total / Double(width * height)
     }
 
-    /// A mid-grey clip, so a brightness change is unambiguous in either
-    /// direction — a clip that is already near white cannot get lifted.
     private func fixture(index: Int) async throws -> URL {
         let size = CGSize(width: 480, height: 480)
         let url = FileManager.default.temporaryDirectory

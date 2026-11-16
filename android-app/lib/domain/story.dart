@@ -4,7 +4,6 @@ enum StoryMode { oneDay, sevenDay }
 
 enum StoryOrientation { portrait, landscape }
 
-/// A slot has a stable key. Its translated label is never used as its identity.
 class StoryMoment {
   const StoryMoment({
     required this.key,
@@ -66,7 +65,6 @@ class Story {
   final String templateKey;
   final List<StoryMoment> moments;
 
-  /// Reserved for a future shared backend. A local story is always null.
   final String? roomCode;
 
   int get recordedCount => moments.where((moment) => moment.isRecorded).length;

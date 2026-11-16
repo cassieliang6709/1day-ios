@@ -1,24 +1,10 @@
 import Foundation
 
-/// What the top of the home screen leads with.
-///
-/// It used to lead with `min(by: recordedCount)` — "fewest moments filmed
-/// wins" — so a story that had sat untouched for three days permanently
-/// outranked the one being filmed today. That's why a story filmed on the 1st
-/// was nowhere to be found on the 1st: an empty story was sitting on top of it.
-///
-/// The decision lives here rather than in the view because it depends on the
-/// time of day, and a rule that behaves differently before and after noon is
-/// only trustworthy if it can be tested at both.
 enum HomeHeroChoice: Equatable {
-    /// The story today is for. Titled 「今天的故事」.
     case today(Challenge)
-    /// Nothing started today, but something is unfinished. Titled 「接着拍」.
     case resume(Challenge)
-    /// Nothing to lead with — offer to start.
     case startToday
 
-    /// The story being led with, if any.
     var challenge: Challenge? {
         switch self {
         case .today(let challenge), .resume(let challenge): challenge
@@ -26,9 +12,6 @@ enum HomeHeroChoice: Equatable {
         }
     }
 
-    /// Hand-written because `Challenge` isn't `Equatable` and making it so
-    /// would drag in reactions and comments, which have nothing to do with
-    /// "is this the same story on the same footing".
     static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.today(l), .today(r)): l.id == r.id
@@ -38,10 +21,6 @@ enum HomeHeroChoice: Equatable {
         }
     }
 
-    /// Hour of day after which an unfinished story is presented as something to
-    /// pick back up rather than as yesterday's leftovers. Before noon, a story
-    /// started yesterday and left unfinished still reads as the current thing;
-    /// the morning shouldn't pretend it's a clean slate.
     private static let afternoonHour = 12
 
     init(challenges: [Challenge], now: Date = .now, calendar: Calendar = .current) {
@@ -51,7 +30,6 @@ enum HomeHeroChoice: Equatable {
             return
         }
 
-        // 1. Anything today is actually for wins outright.
         let forToday = unfinished.filter {
             Self.isForToday($0, now: now, calendar: calendar)
         }
@@ -60,7 +38,6 @@ enum HomeHeroChoice: Equatable {
             return
         }
 
-        // 2. Otherwise it depends on the time of day.
         let hour = calendar.component(.hour, from: now)
         if hour < Self.afternoonHour {
             let leftFromYesterday = unfinished.filter {
@@ -81,25 +58,16 @@ enum HomeHeroChoice: Equatable {
         self = .startToday
     }
 
-    /// Is this the story today is for?
-    ///
-    /// Seven-day challenges spanning a week is normal, so `startDate` being
-    /// last Tuesday says nothing — what matters is whether today falls inside
-    /// the week. One-day stories are the opposite: they're only today's if
-    /// they started today.
     private static func isForToday(
         _ challenge: Challenge, now: Date, calendar: Calendar
     ) -> Bool {
         if challenge.isOneDay {
             return calendar.isDate(challenge.startDate, inSameDayAs: now)
         }
-        // Deliberately not `challenge.currentDay`: that reads the clock itself,
-        // which would make this untestable at a chosen time.
         let day = dayIndex(of: challenge, now: now, calendar: calendar)
         return (1...max(challenge.cards.count, 1)).contains(day)
     }
 
-    /// 1-based day within the challenge, measured against `now`.
     private static func dayIndex(
         of challenge: Challenge, now: Date, calendar: Calendar
     ) -> Int {
@@ -120,8 +88,6 @@ enum HomeHeroChoice: Equatable {
         return calendar.isDate(challenge.startDate, inSameDayAs: then)
     }
 
-    /// Most recently filmed wins; nothing filmed yet falls back to the newest
-    /// story, because that's the one the person just set up.
     private static func mostRecentlyActive(
         _ challenges: [Challenge], calendar: Calendar
     ) -> Challenge? {
@@ -130,7 +96,6 @@ enum HomeHeroChoice: Equatable {
             let r = rhs.cards.compactMap(\.recordedAt).max()
             switch (l, r) {
             case let (l?, r?): return l < r
-            // Something filmed always beats something untouched.
             case (nil, _?): return true
             case (_?, nil): return false
             case (nil, nil): return lhs.startDate < rhs.startDate

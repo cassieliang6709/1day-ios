@@ -2,12 +2,6 @@ import AVFoundation
 import AVKit
 import SwiftUI
 
-/// Under a finished film: 原声 / 音乐 / 混合, 换一首, and 加旁白. Each change
-/// remixes `baseURL` into a new file and hands it back through `mixedURL`;
-/// the film's player, save and share use that file once it lands.
-///
-/// Starts on 混合 with a track picked for the day's mood, so a film has music
-/// without anyone asking for it.
 struct FilmSoundtrackPanel: View {
     let baseURL: URL
     let mood: Mood?
@@ -115,8 +109,6 @@ struct FilmSoundtrackPanel: View {
     }
 }
 
-/// Plays the film from the top while recording the microphone, and stops
-/// when the film ends. The take is handed back only on 用这段.
 private struct VoiceoverRecorder: View {
     let film: URL
     let onUse: (URL) -> Void
@@ -197,7 +189,6 @@ private struct VoiceoverRecorder: View {
         }
         do {
             let session = AVAudioSession.sharedInstance()
-            // Speaker, not the earpiece, so the film is heard while talking.
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true)
             let url = FileManager.default.temporaryDirectory

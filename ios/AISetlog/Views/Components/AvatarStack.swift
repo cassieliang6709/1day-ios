@@ -1,26 +1,13 @@
 import SwiftUI
 
-/// Who's in the story. Identity color comes from `Identity`, so a person is
-/// the same color in the avatar, the timeline node, and their clip's byline.
 
-/// A single person as a colored initial. A pending dot (their moment isn't in
-/// yet) hollows out instead of disappearing — the group is always visible,
-/// what changes is who has filmed.
 struct AvatarDot: View {
     let name: String?
     var size: CGFloat = 34
     var isPending = false
-    /// Draws a bright ring around the dot — used for "this is you".
     var isYou = false
-    /// The person's avatar (`AvatarStore`, or a friend's from their `Member`
-    /// record). Nil keeps the initial — which is what everyone without an
-    /// avatar, and every caller that doesn't pass one, still sees.
     var image: UIImage? = nil
 
-    /// Bound, not read: picking your own colour in Settings has to repaint
-    /// every avatar of you on the screen behind it — the header, your clips'
-    /// bylines, your dot in the roster. `Identity` reads the same key, so
-    /// observing it here is what makes all of them update at once.
     @AppStorage(Identity.myTintKey) private var myTintIndex = -1
 
     private var tint: Color { Identity.tint(for: name) }
@@ -29,8 +16,6 @@ struct AvatarDot: View {
     var body: some View {
         Group {
             if let image {
-                // The avatar is a die-cut sticker on a transparent square; a
-                // little inset so its rainbow edge isn't cut by the circle.
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -38,8 +23,6 @@ struct AvatarDot: View {
                     .opacity(isPending ? 0.58 : 1)
                     .accessibilityHidden(true)
             } else if hasName {
-                // Fixed, relative to the dot: an initial that grew with
-                // Dynamic Type would burst out of a circle that doesn't.
                 Text(Identity.initial(for: name))
                     .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
                     .foregroundStyle(isPending ? tint : .white)
@@ -60,8 +43,6 @@ struct AvatarDot: View {
                 } else if hasName {
                     Circle().fill(tint.gradient)
                 } else {
-                    // The mascot brings its own colour; behind it, the skin's
-                    // soft fill rather than an identity hue nobody chose.
                     Circle().fill(Color.oneDayMist)
                 }
             }
@@ -86,7 +67,6 @@ struct AvatarDot: View {
     }
 }
 
-/// The "+N" overflow bubble at the end of a stack.
 private struct AvatarOverflowDot: View {
     let count: Int
     var size: CGFloat = 34
@@ -101,19 +81,12 @@ private struct AvatarOverflowDot: View {
     }
 }
 
-/// Overlapping identity circles for everyone in a room, capped with "+N".
 struct AvatarStack: View {
     let names: [String]
     var maxShown: Int = 4
     var size: CGFloat = 30
-    /// Names still waiting to contribute — drawn hollow.
     var pending: Set<String> = []
-    /// Which of these names is mine, so a roster can ring my own face. Nil
-    /// where the stack is a list of other people and pointing at one of them
-    /// would be pointing at nobody.
     var you: String?
-    /// Avatars by name (`ChallengeStore.memberAvatars(for:)`). A name with no
-    /// picture keeps its initial.
     var images: [String: UIImage] = [:]
 
     var body: some View {
@@ -130,9 +103,6 @@ struct AvatarStack: View {
                 AvatarOverflowDot(count: names.count - maxShown, size: size)
             }
         }
-        // One element reading the names. Left alone, VoiceOver walked the
-        // dots and read each initial as a letter — "A, L, plus two" — and
-        // skipped the mascot faces of unnamed people entirely.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(spokenNames))
     }
@@ -142,7 +112,6 @@ struct AvatarStack: View {
     }
 }
 
-/// Compact room identities: pair, triangle, square, five rings, then a grid.
 struct RoomAvatarCluster: View {
     let members: [(id: String, name: String)]
     var you: String?

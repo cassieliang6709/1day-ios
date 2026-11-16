@@ -1,28 +1,17 @@
 import AVFoundation
 import Foundation
 
-/// What a finished film sounds like: its own clips' sound, a music track, or
-/// both with the clips turned down — plus an optional voiceover on top.
-///
-/// Runs after `VideoStitcher` on the film it made, so the stitcher stays about
-/// pictures. The video is copied across untouched; only the audio is remixed.
 enum FilmSoundtrack {
     enum Mode: String, CaseIterable, Identifiable {
-        /// The clips' own sound only.
         case original
-        /// Music only.
         case music
-        /// Music, with the clips' sound kept underneath.
         case mix
 
         var id: String { rawValue }
     }
 
-    /// A bundled track. The six shipped now are placeholders synthesized for
-    /// development; licensed music replaces them before release.
     struct Track: Identifiable, Equatable {
         let id: String
-        /// Moods this track suits. A track with none suits any day.
         let moods: [Mood]
 
         var url: URL? { Bundle.main.url(forResource: id, withExtension: "m4a") }
@@ -37,15 +26,10 @@ enum FilmSoundtrack {
         Track(id: "film", moods: []),
     ]
 
-    /// Clips' sound under music in `.mix`: laughter and voices still come
-    /// through, the two-second cuts in it don't.
     static let originalUnderMusic: Float = 0.3
-    /// Everything else under a voiceover, so the person talking is on top.
     static let underVoiceover: Float = 0.35
     static let fadeOutSeconds = 1.0
 
-    /// A track for the day's mood, skipping `current` so 换一首 always changes
-    /// something. With no mood, any track.
     static func pick(for mood: Mood?, excluding current: Track? = nil) -> Track {
         let suited = catalog.filter { track in
             guard let mood else { return true }
@@ -57,8 +41,6 @@ enum FilmSoundtrack {
 
     enum RenderError: Error { case noVideo, exportFailed }
 
-    /// A new file with `film`'s pictures and the chosen sound. `.original`
-    /// with no voiceover hands back `film` itself: there is nothing to remix.
     static func render(
         film: URL, mode: Mode, track: Track?, voiceover: URL?
     ) async throws -> URL {
@@ -135,7 +117,6 @@ enum FilmSoundtrack {
         return outURL
     }
 
-    /// The music laid end to end until the film is covered, the last pass cut short.
     private static func loop(_ url: URL, into track: AVMutableCompositionTrack, filling duration: CMTime) async throws {
         let asset = AVURLAsset(url: url)
         guard let audio = try await asset.loadTracks(withMediaType: .audio).first else { return }

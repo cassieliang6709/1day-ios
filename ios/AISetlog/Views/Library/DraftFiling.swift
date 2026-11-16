@@ -1,36 +1,15 @@
 import SwiftUI
 
-/// Filing and deleting a draft, shared by `ClipDraftsView` and 我的's grid so
-/// both take the same path: the clip lands in a story before the draft and its
-/// file are dropped.
 @MainActor
 enum DraftFiler {
-    /// Where a clip in 我的 can go: the rooms (1.5). Stories are filmed
-    /// from their own list now, not filed into.
     static func candidates(for draft: ClipDraft, in store: ChallengeStore) -> [Challenge] {
         ClipFiling.rooms(in: store.challenges, orientation: draft.orientation)
     }
 
-    /// Why 归档 can't run. Only asked when there are no candidates, so
-    /// `blocker` never answers nil here — but a made-up explanation would be
-    /// worse than none, so the nil case falls back to the symptom.
     static func blocked(for draft: ClipDraft, in store: ChallengeStore) -> DraftFilingBlocked {
-        // Only rooms take a clip now, and a room is never full: the one
-        // reason left is that there isn't a room.
         DraftFilingBlocked(title: Strings.draftNoPlace, message: "")
     }
 
-    /// File the draft into every chosen story, then drop it — but only once at
-    /// least one copy has actually landed. `saveClip` reports failure by doing
-    /// nothing, so deleting first would throw away the only remaining copy.
-    ///
-    /// Each story gets its own copy in its own first open slot;
-    /// `ClipFileStore.storeClip` copies the file, so the same draft URL can be
-    /// handed to `saveClip` once per story. Partial success is a success for
-    /// the draft: once the clip is somewhere, keeping it here too leaves a copy
-    /// nobody will come back for.
-    ///
-    /// - Returns: the toast to show.
     static func archive(
         _ draft: ClipDraft, to challenges: [Challenge],
         store: ChallengeStore, drafts: ClipDraftStore
@@ -45,14 +24,10 @@ enum DraftFiler {
                 }
                 continue
             }
-            // No open slot means no filing: filing into the story's current
-            // day overwrote a clip that was already there.
             guard let day = ClipFiling.targetDay(in: challenge) else { continue }
             store.saveClip(
                 from: drafts.url(for: draft), day: day,
                 challengeID: challenge.id, captions: draft.captions,
-                // The draft's own time. Filing is not filming: a take kept as a
-                // draft at 2:06 and filed at 3:21 happened at 2:06.
                 recordedAt: draft.recordedAt)
             if store.challenge(challenge.id)?.cards
                 .first(where: { $0.day == day })?.clipFileName != nil {
@@ -72,8 +47,6 @@ enum DraftFiler {
     }
 }
 
-/// The explanation 归档 gives when it can't run. Carries its own text so the
-/// alert doesn't re-derive it from a draft that may already be gone.
 struct DraftFilingBlocked: Identifiable {
     let id = UUID()
     let title: String
@@ -81,9 +54,6 @@ struct DraftFilingBlocked: Identifiable {
 }
 
 extension View {
-    /// Tapping a draft in 我的: 放进故事 or 删除, the delete confirmed first.
-    /// `send` and `delete` skip the question and go straight to that step —
-    /// the day player's own buttons.
     func draftActions(
         for draft: Binding<ClipDraft?>,
         send: Binding<ClipDraft?> = .constant(nil),
@@ -141,7 +111,6 @@ private struct DraftActionsModifier: ViewModifier {
             }
     }
 
-    /// On a background view: two confirmation dialogs on one view fight.
     private var deleteConfirmation: some View {
         Color.clear.confirmationDialog(
             Strings.deleteDraftQuestion,

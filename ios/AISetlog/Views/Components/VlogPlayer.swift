@@ -2,12 +2,6 @@ import SwiftUI
 import AVKit
 import Observation
 
-/// The finished film, with chrome that matches the rest of the app.
-///
-/// `VideoPlayer` brings UIKit's control bar, which drops a grey system slab
-/// into an otherwise soft blue screen. This wraps `AVPlayer` directly so the
-/// transport is ours: a capsule scrubber, rounded corners, and no chrome at
-/// all until you reach for it.
 
 @Observable
 final class VlogPlayback {
@@ -15,7 +9,6 @@ final class VlogPlayback {
     var isPlaying = false
     var current: Double = 0
     var duration: Double = 0
-    /// True while the user drags, so the observer doesn't fight the thumb.
     var isScrubbing = false
 
     private var timeObserver: Any?
@@ -57,7 +50,6 @@ final class VlogPlayback {
         if isPlaying {
             player.pause()
         } else {
-            // Replaying from the end should start over, not sit on the last frame.
             if duration > 0, current >= duration - 0.05 { seek(to: 0) }
             player.play()
         }
@@ -89,17 +81,10 @@ final class VlogPlayback {
 }
 
 struct VlogPlayer: View {
-    /// Re-renders the transport's spoken labels when the language changes
-    /// (see the `Strings` convention).
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     let url: URL
-    /// What shape to lay out before the file has been read. The film's own
-    /// shape wins as soon as it's known: a shared-room film is a mosaic, and a
-    /// mosaic of portrait takes is not portrait — two of them make a 9:8 frame,
-    /// which in a 9:16 box is a thick black bar top and bottom.
     var aspectRatio: CGFloat = 9 / 16
-    /// Autoplay once the film first appears — the payoff shouldn't need a tap.
     var autoplay = true
 
     @State private var playback: VlogPlayback
@@ -117,9 +102,6 @@ struct VlogPlayer: View {
     }
 
     var body: some View {
-        // Chrome hangs off the player as overlays rather than sitting beside it
-        // in a ZStack: the video is aspect-fit, so it's narrower than the space
-        // it's given, and a sibling control bar would overhang its corners.
         PlayerSurface(player: playback.player)
             .aspectRatio(shape, contentMode: .fit)
             .task(id: url) { measuredAspect = await ClipGeometry.aspect(of: url) }
@@ -155,7 +137,6 @@ struct VlogPlayer: View {
 
     private var bigPlayButton: some View {
         Button { playback.toggle() } label: {
-            // Fixed size: the glyph is centred in a fixed 62pt disc.
             Image(systemName: "play.fill")
                 .font(.system(size: 24))
                 .foregroundStyle(OneDay.brandText)
@@ -169,15 +150,9 @@ struct VlogPlayer: View {
         .transition(.scale.combined(with: .opacity))
     }
 
-    /// The transport bar. Both buttons draw small — a 30pt disc, a bare
-    /// glyph — and are hit as 44pt squares: the bar is a thin strip along the
-    /// bottom of a film, and a 12pt fullscreen glyph with nothing around it
-    /// was a target you had to aim for. Negative padding claws back the extra
-    /// so the capsule stays as slim as it was.
     private var controls: some View {
         HStack(spacing: 12) {
             Button { playback.toggle() } label: {
-                // Fixed size: centred in a fixed 30pt disc.
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
@@ -197,8 +172,6 @@ struct VlogPlayer: View {
                 .font(OneDay.Font.micro)
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
-                // The scrubber already speaks the position; reading the
-                // timecode again straight after is noise.
                 .accessibilityHidden(true)
 
             Button { expanded = true } label: {
@@ -209,7 +182,6 @@ struct VlogPlayer: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            // ~16pt glyph inside the 44pt target.
             .padding(-(Self.hitTarget - 16) / 2)
             .accessibilityLabel(Strings.fullScreen)
         }
@@ -222,8 +194,6 @@ struct VlogPlayer: View {
     private static let hitTarget: CGFloat = 44
 }
 
-/// A capsule progress track you can drag. Grows under the finger so the thumb
-/// never hides the position it's setting.
 private struct Scrubber: View {
     @Bindable var playback: VlogPlayback
     @GestureState private var isDragging = false
@@ -257,9 +227,6 @@ private struct Scrubber: View {
             .animation(OneDay.Motion.snap, value: isDragging)
         }
         .frame(height: 22)
-        // A drag gesture is invisible to VoiceOver. As an adjustable element
-        // it reads "Playback position, 0:12 of 0:45" and a swipe up or down
-        // moves a second either way — the same thing the thumb does.
         .accessibilityElement()
         .accessibilityLabel(Strings.playbackPosition)
         .accessibilityValue(
@@ -277,7 +244,6 @@ private struct Scrubber: View {
     }
 }
 
-/// AVPlayerLayer without UIKit's transport controls.
 private struct PlayerSurface: UIViewRepresentable {
     let player: AVPlayer
 
@@ -301,8 +267,6 @@ private struct PlayerSurface: UIViewRepresentable {
     }
 }
 
-/// Fullscreen playback falls back to the system player — at that point the
-/// user wants scrubbing, AirPlay and PiP more than they want our styling.
 private struct FullscreenFilm: View {
     let url: URL
     let onClose: () -> Void

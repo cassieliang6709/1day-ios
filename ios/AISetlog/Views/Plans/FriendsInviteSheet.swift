@@ -1,12 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// 朋友's 邀请朋友一起拍, once there is a room to invite to.
-///
-/// One room: its code, straight away. Two or more: a list to pick from, with
-/// 新建房间 at the end for the case where none of them is the right one.
-/// Picking a room hands it back (`onPick`) so the screen behind can open it,
-/// then this sheet shows that room's code.
 struct FriendsInviteSheet: View {
     let rooms: [Challenge]
     let memberCount: (Challenge) -> Int
@@ -113,16 +107,11 @@ struct FriendsInviteSheet: View {
     }
 }
 
-/// A room's invite code, large, with copy and the system share sheet.
-/// Also used by the debug test room in Settings.
 struct RoomInviteCodeCard: View {
     let challenge: Challenge
     var members: Int? = nil
 
     @State private var copied = false
-    /// Optional because this card is also shown from places (Settings' debug
-    /// test room, previews) that may not inject the account; the invite card
-    /// then simply says "来 1Day 一起拍" instead of naming you.
     @Environment(AccountStore.self) private var account: AccountStore?
 
     private var code: String { challenge.roomCode ?? "" }
@@ -159,8 +148,6 @@ struct RoomInviteCodeCard: View {
 
     private var buttons: some View {
         VStack(spacing: 10) {
-            // The card image, not the text: WeChat refuses a text share
-            // outright. See `RoomInviteCard.swift`.
             RoomInviteShareLink(
                 content: RoomInviteCardContent(
                     challenge: challenge, inviter: account?.account?.displayName),
@@ -178,7 +165,6 @@ struct RoomInviteCodeCard: View {
         }
     }
 
-    /// The same words the room's own 邀请 button sends.
     private var shareText: String {
         let presenter = ChallengePresenter(challenge: challenge)
         if challenge.recordedCount > 0 {

@@ -2,8 +2,6 @@ import AVFoundation
 import XCTest
 @testable import AISetlog
 
-/// Picking whose takes go into a room's film, and which stand still: the
-/// choices themselves, where they're kept, and how a grid cell is filled.
 final class FilmSelectionTests: XCTestCase {
     private func clip(_ id: String, day: Int, author: String?) -> DayClip {
         DayClip(
@@ -19,7 +17,6 @@ final class FilmSelectionTests: XCTestCase {
         clip("b3", day: 3, author: "Bo"),
     ]
 
-    // MARK: - Who and which
 
     func testAnUntouchedSelectionKeepsEveryTake() {
         XCTAssertEqual(FilmSelection().applied(to: room).map(\.id), ["a1", "b1", "a2", "c2", "b3"])
@@ -30,7 +27,6 @@ final class FilmSelectionTests: XCTestCase {
         selection.set(person: "id-Bo", included: false)
         XCTAssertEqual(selection.applied(to: room).map(\.id), ["a1", "a2", "c2"])
 
-        // A take they film later is out too: it's the person that's out.
         let later = room + [clip("b4", day: 4, author: "Bo")]
         XCTAssertFalse(selection.applied(to: later).contains { $0.id == "b4" })
 
@@ -45,7 +41,6 @@ final class FilmSelectionTests: XCTestCase {
     }
 
     func testAPersonIsKeyedByAccountNotName() {
-        // Two people who both typed "Sam" stay two people.
         let twins = [
             DayClip(day: 1, url: URL(fileURLWithPath: "/tmp/x.mov"),
                     authorName: "Sam", authorID: "one", key: "x"),
@@ -59,8 +54,6 @@ final class FilmSelectionTests: XCTestCase {
     }
 
     func testASelectionThatLeavesNothingGivesEverythingBack() {
-        // The room changed under a saved pick; the film page must still make
-        // a film, or there is no way back to the sheet that would fix it.
         var selection = FilmSelection()
         for person in ["id-Ann", "id-Bo", "id-Cy"] { selection.set(person: person, included: false) }
         XCTAssertEqual(selection.applied(to: room).count, room.count)
@@ -72,7 +65,6 @@ final class FilmSelectionTests: XCTestCase {
         XCTAssertEqual(people.map { $0.clips.map(\.id) }, [["a1", "a2"], ["b1", "b3"], ["c2"]])
     }
 
-    // MARK: - Holds
 
     func testHoldsOnlyReachTheStitcherForTakesInTheFilm() {
         var selection = FilmSelection()
@@ -120,7 +112,6 @@ final class FilmSelectionTests: XCTestCase {
         XCTAssertNotEqual(one.cacheKey, held, "a different frame is a different film")
     }
 
-    // MARK: - Kept on this phone
 
     func testTheSelectionIsKeptPerStory() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "FilmSelectionTests"))
@@ -137,12 +128,10 @@ final class FilmSelectionTests: XCTestCase {
         XCTAssertEqual(FilmSelectionStore.load(for: story, defaults: defaults), selection)
         XCTAssertEqual(FilmSelectionStore.load(for: other, defaults: defaults), FilmSelection())
 
-        // Back to the default leaves nothing behind.
         FilmSelectionStore.save(FilmSelection(), for: story, defaults: defaults)
         XCTAssertNil(defaults.data(forKey: FilmSelectionStore.key(for: story)))
     }
 
-    // MARK: - Filling a grid cell
 
     private func t(_ seconds: Double) -> CMTime { CMTime(seconds: seconds, preferredTimescale: 600) }
 
@@ -152,7 +141,6 @@ final class FilmSelectionTests: XCTestCase {
             momentDuration: t(2.5), freezeAt: nil, frameDuration: .invalid)
         XCTAssertEqual(segments.map { $0.offset.seconds }, [0, 1, 2])
         XCTAssertEqual(segments.map { $0.duration.seconds }, [1, 1, 0.5])
-        // Never stretched: each piece lasts as long as the footage in it.
         XCTAssertTrue(segments.allSatisfy { $0.duration == $0.source.duration })
     }
 
@@ -166,7 +154,6 @@ final class FilmSelectionTests: XCTestCase {
         XCTAssertEqual(only.offset, .zero)
         XCTAssertEqual(only.duration.seconds, 3, accuracy: 0.001)
         XCTAssertEqual(only.source.duration, frame)
-        // Measured from the take's own start, not the file's.
         XCTAssertEqual(only.source.start.seconds, 0.6, accuracy: 0.001)
     }
 
@@ -175,7 +162,6 @@ final class FilmSelectionTests: XCTestCase {
             videoRange: CMTimeRange(start: .zero, duration: t(2)),
             momentDuration: t(2), freezeAt: 9, frameDuration: .invalid)
         let only = try XCTUnwrap(segments.first)
-        // No frame duration from the track: one frame at 30 fps.
         XCTAssertEqual(only.source.duration.seconds, 1.0 / 30, accuracy: 0.001)
         XCTAssertEqual(only.source.end.seconds, 2, accuracy: 0.002)
         XCTAssertLessThanOrEqual(only.source.end, t(2))
@@ -196,8 +182,6 @@ final class FilmSelectionTests: XCTestCase {
     }
 }
 
-/// The real stitch: a held cell stands still while its neighbour plays, and a
-/// take left out is really gone from the film.
 final class FilmHoldStitchTests: XCTestCase {
     private let ann = "1DAY-A"
     private let bo = "1DAY-B"
@@ -228,9 +212,6 @@ final class FilmHoldStitchTests: XCTestCase {
 
         let early = try await image(of: film, at: 0.4)
         let late = try await image(of: film, at: 1.6)
-        // The demo takes print how far through they are ("MOMENT 1 · 10%")
-        // just under the middle, so that band of a playing cell changes over
-        // a second while a held one changes only by encoder noise.
         let held = band(early, x: 0.05..<0.45).diff(band(late, x: 0.05..<0.45))
         let playing = band(early, x: 0.55..<0.95).diff(band(late, x: 0.55..<0.95))
         XCTAssertGreaterThan(playing, held * 4, "held \(held) vs playing \(playing)")
@@ -255,7 +236,6 @@ final class FilmHoldStitchTests: XCTestCase {
         generator.requestedTimeToleranceAfter = .zero
         let image = try await generator.image(
             at: CMTime(seconds: seconds, preferredTimescale: 600)).image
-        // Into Caches, so a failure can be looked at rather than guessed at.
         if let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first,
            let data = UIImage(cgImage: image).pngData() {
             try? data.write(to: caches.appendingPathComponent("film-hold-\(seconds).png"))
@@ -263,8 +243,6 @@ final class FilmHoldStitchTests: XCTestCase {
         return image
     }
 
-    /// Colours across the band where the demo take prints its progress,
-    /// between the proportional `x` bounds.
     private func band(_ image: CGImage, x: Range<Double>) -> [Int] {
         guard let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return [] }
         let step = image.bitsPerPixel / 8
@@ -282,7 +260,6 @@ final class FilmHoldStitchTests: XCTestCase {
 private extension Array where Element == Int {
     func diff(_ other: [Int]) -> Int { zip(self, other).reduce(0) { $0 + abs($1.0 - $1.1) } }
 
-    // MARK: - 排顺序
 
     func testDraggedSlotsPlayFirstTheRestBySlot() {
         var selection = FilmSelection()

@@ -11,7 +11,6 @@
     --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
     --gridline:#e1e0d9; --border:rgba(11,11,11,0.10);
     --now:#eb6834; --next:#2a78d6; --good:#0ca30c; --stop:#c0392b;
-    /* app 色板：ios/AISetlog/Resources/Theme.swift */
     --c-blue:#1677ff; --c-cyan:#38b6ff; --c-lav:#b3a4ff; --c-mint:#4fd1a5;
     --c-canvas:#f5f8ff; --c-ink:#0f2e6b; --c-inksoft:#4a6aa8; --c-inkfaint:#8ea4cd;
     --c-surface:#fff; --c-hair:rgba(15,46,107,0.10);
@@ -70,7 +69,6 @@
   .prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c-blue),var(--c-cyan))}
   .lbl{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--c-inkfaint);margin:10px 0 6px}
 
-  /* 胶片带（现状） */
   .strip{display:flex;gap:7px;overflow:hidden;padding-bottom:4px}
   .cell{flex:none;width:74px}
   .cellimg{height:96px;border-radius:11px;overflow:hidden;position:relative}
@@ -82,7 +80,6 @@
   .celllbl{font-size:9px;font-weight:700;color:var(--c-inksoft);margin-top:4px;text-align:center}
   .celllbl.blank{color:transparent}
 
-  /* 竖轨 */
   .rail{position:relative;padding-left:22px}
   .rail::before{content:"";position:absolute;left:5.5px;top:6px;bottom:14px;width:2px;
     border-radius:99px;background:rgba(15,46,107,.10)}
@@ -102,7 +99,6 @@
   .openbox{margin-top:4px;border:1.5px dashed rgba(22,119,255,.3);border-radius:10px;
     padding:7px 9px;font-size:10px;font-weight:800;color:var(--c-blue);background:rgba(22,119,255,.05)}
 
-  /* 卷（C） */
   .rollend{margin-top:4px;border:1.5px dashed rgba(22,119,255,.35);border-radius:12px;
     padding:11px 9px;text-align:center;font-size:11px;font-weight:800;color:var(--c-blue);
     background:rgba(22,119,255,.06)}
@@ -111,7 +107,6 @@
   .ghost{border-radius:99px;padding:10px 0;text-align:center;font-size:11.5px;font-weight:800;
     color:var(--c-inksoft);background:rgba(15,46,107,.05);margin-top:7px}
 
-  /* 新建页 tab */
   .seg{display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(15,46,107,.05)}
   .seg b{flex:1;text-align:center;font-size:9.5px;font-weight:800;padding:6px 0;border-radius:99px;color:var(--c-inksoft)}
   .seg b.on{background:var(--c-blue);color:#fff}
@@ -150,7 +145,6 @@
 
 <div class="phones">
 
-  <!-- 现状 -->
   <div class="ph">
     <div class="phone"><div class="screen">
       <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>
@@ -179,7 +173,6 @@
       两个格子在屏幕外，要横滑才知道还剩几个。</div>
   </div>
 
-  <!-- D -->
   <div class="ph">
     <div class="phone"><div class="screen">
       <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>
@@ -216,7 +209,6 @@
       <code>title</code>/<code>icon</code> fallback 一直存在，只是从来没被调用过。</div>
   </div>
 
-  <!-- C -->
   <div class="ph">
     <div class="phone"><div class="screen">
       <div class="sbar"><span>9:41</span><span class="island"></span><span>▮▮</span></div>

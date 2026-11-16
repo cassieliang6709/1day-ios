@@ -1,8 +1,5 @@
 import Foundation
 
-/// Non-destructive migration planning. No transport or disk access: callers must
-/// persist the result before retiring legacy data. A missing query result is NOT
-/// proof that a comment was never uploaded.
 enum LegacyRoomChatMigration {
     enum Evidence: Equatable {
         case confirmedNeverUploaded
@@ -24,10 +21,8 @@ enum LegacyRoomChatMigration {
     }
 
     struct Plan: Equatable {
-        /// Explicitly unsent own comments only. Failed means manual retry, never auto-send.
         var recoverable: [RoomChatEntry] = []
         var confirmedRemote: [RoomChatMessage] = []
-        /// Preserve these in legacy storage until provenance/conflicts are resolved.
         var unresolved: Set<UUID> = []
         var tombstones: Set<UUID> = []
     }
@@ -38,7 +33,6 @@ enum LegacyRoomChatMigration {
         let grouped = Dictionary(grouping: candidates, by: { $0.message.id })
         for id in grouped.keys.sorted(by: { $0.uuidString < $1.uuidString }) {
             let group = grouped[id]!
-            // Reject cross-room evidence before it can suppress an in-scope record.
             guard group.allSatisfy({ $0.message.roomCode == archive.scope.roomCode }) else {
                 result.unresolved.insert(id)
                 continue
@@ -67,7 +61,6 @@ enum LegacyRoomChatMigration {
                 }
                 result.recoverable.append(RoomChatEntry(message: message, delivery: .failed))
             case .remote(let remote):
-                // Stable ID alone does not authorize replacing another author's content.
                 guard remote == candidate.message else {
                     result.unresolved.insert(id)
                     continue

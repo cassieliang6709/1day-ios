@@ -1,17 +1,11 @@
 import SwiftUI
 
-/// Everyone in the room as one small row under the title, Setlog style.
-/// Whoever filmed that day is their face, ringed; whoever hasn't is a grey
-/// dot — no names, no count. Tap a face to pick that person; the others
-/// fade while one is picked.
 struct RoomStoriesRow: View {
     let columns: [RoomFeed.Column]
     var selected: String?
     let onOpen: (String) -> Void
 
     var body: some View {
-        // Six people at most, so the row always fits: no scroll view, just
-        // centred.
         HStack(spacing: 8) {
             ForEach(columns) { column in
                 let filmed = !column.clips.isEmpty

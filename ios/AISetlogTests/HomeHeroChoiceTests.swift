@@ -1,16 +1,9 @@
 import XCTest
 @testable import AISetlog
 
-/// What the home screen leads with.
-///
-/// The bug these exist for: on 2026-09-01 a story filmed that morning was
-/// nowhere on the home screen, because an empty story from three days earlier
-/// had fewer moments filmed and the old rule was "fewest wins". Every case
-/// below pins a chosen `now`, since the rule reads the clock.
 final class HomeHeroChoiceTests: XCTestCase {
     private let calendar = Calendar(identifier: .gregorian)
 
-    /// 2026-09-01, a Tuesday. Two times of day, because the rule differs.
     private func september1(hour: Int) -> Date {
         var components = DateComponents()
         components.year = 2026
@@ -24,7 +17,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         calendar.date(byAdding: .day, value: -days, to: date)!
     }
 
-    /// `recorded` moments filmed out of `total`, each stamped `filmedAt`.
     private func story(
         _ title: String,
         startDate: Date,
@@ -46,7 +38,6 @@ final class HomeHeroChoiceTests: XCTestCase {
             mode: mode)
     }
 
-    // MARK: - The reported bug
 
     func testTodaysStoryBeatsAnOlderUntouchedOne() {
         let now = september1(hour: 14)
@@ -59,8 +50,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .today(today))
     }
 
-    /// Same shape as above, before noon — the morning must not demote today
-    /// either. This is the exact hour the bug was reported at.
     func testTodaysStoryWinsInTheMorningToo() {
         let now = september1(hour: 9)
         let today = story("今天", startDate: now, recorded: 1, filmedAt: now)
@@ -72,10 +61,7 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice.challenge?.id, today.id)
     }
 
-    // MARK: - Seven-day challenges
 
-    /// A week-long challenge on its fourth day is still what today is for,
-    /// even though it started last Saturday.
     func testSevenDayChallengeMidWeekCountsAsToday() {
         let now = september1(hour: 15)
         let week = story(
@@ -91,7 +77,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .today(week))
     }
 
-    /// Past its last day, the same challenge is leftovers, not today's plan.
     func testSevenDayChallengePastItsWeekIsOnlySomethingToResume() {
         let now = september1(hour: 15)
         let week = story(
@@ -107,7 +92,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .resume(week))
     }
 
-    // MARK: - Time of day
 
     func testMorningWithYesterdaysUnfinishedStoryOffersToResume() {
         let now = september1(hour: 9)
@@ -119,8 +103,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .resume(leftover))
     }
 
-    /// Before noon, something from last week is not "the current thing" —
-    /// the morning gets a clean slate.
     func testMorningWithOnlyOldStoriesOffersToStartToday() {
         let now = september1(hour: 9)
         let old = story("上周", startDate: daysBefore(6, now), recorded: 1)
@@ -130,8 +112,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .startToday)
     }
 
-    /// After noon it's the other way round: if the day is half gone and
-    /// something is unfinished, that's what you'd pick back up.
     func testAfternoonWithAnyUnfinishedStoryOffersToResume() {
         let now = september1(hour: 15)
         let old = story("上周", startDate: daysBefore(6, now), recorded: 1)
@@ -141,7 +121,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .resume(old))
     }
 
-    // MARK: - Nothing to lead with
 
     func testNoStoriesAtAllOffersToStartToday() {
         let choice = HomeHeroChoice(
@@ -159,9 +138,7 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .startToday)
     }
 
-    // MARK: - Tie-breaks
 
-    /// Two stories both for today: the one being filmed wins.
     func testMostRecentlyFilmedWinsAmongTodaysStories() {
         let now = september1(hour: 16)
         let touched = story("刚拍过", startDate: now, recorded: 1, filmedAt: now)
@@ -173,8 +150,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .today(touched))
     }
 
-    /// Nothing filmed in either: the one just set up wins, because that's the
-    /// one the person was last looking at.
     func testNewestWinsWhenNothingHasBeenFilmed() {
         let now = september1(hour: 16)
         let earlier = story("早点建的", startDate: daysBefore(2, now), mode: .sevenDay)
@@ -186,8 +161,6 @@ final class HomeHeroChoiceTests: XCTestCase {
         XCTAssertEqual(choice, .today(later))
     }
 
-    /// A story with no moments at all can't be led with — there'd be nothing
-    /// to press. It shouldn't block a real one either.
     func testStoryWithNoMomentsIsIgnored() {
         let now = september1(hour: 16)
         let hollow = Challenge(

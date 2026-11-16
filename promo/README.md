@@ -7,11 +7,11 @@
 
 ```bash
 npm install
-npm run dev              # 浏览器里预览，改代码即时生效
-npm run render:all       # 三条一起
-npm run render:solo      # out/1day-solo-xhs.mp4
-npm run render:appstore  # out/1day-solo-appstore.mp4
-npm run render:friends   # out/1day-friends-xhs.mp4
+npm run dev
+npm run render:all
+npm run render:solo
+npm run render:appstore
+npm run render:friends
 ```
 
 ## 三个成片
@@ -63,7 +63,7 @@ xcodebuild -project AISetlog.xcodeproj -scheme AISetlog \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
   -derivedDataPath /tmp/1day-dd CODE_SIGNING_ALLOWED=NO build
 xcrun simctl install booted /tmp/1day-dd/Build/Products/Debug-iphonesimulator/AISetlog.app
-./record.sh take-c 90   # 录 90 秒到 raw/take-c.mp4
+./record.sh take-c 90
 ```
 
 模拟器录屏是变帧率的，直接裁会错位。先转成固定 30fps 再裁：
@@ -86,8 +86,8 @@ ffmpeg -i raw/take-c-cfr.mp4 -vf "fps=1,scale=150:-1,tile=8x4" -frames:v 1 raw/c
 房间演示可以整个预填好、并且不画任何演示外壳，录出来和真实房间没有区别。
 
 ```bash
-npm run render:demo          # 渲 6 条 960x540 / 3 秒素材到 out/demo/
-./stage-clips.sh             # 推进 App 容器的 Documents/demo-clips/
+npm run render:demo
+./stage-clips.sh
 xcrun simctl launch booted com.cassie.AISetlog --args \
   -demoEntries YES \
   -demoRoomTitle "我们的一天" \

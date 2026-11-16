@@ -1,11 +1,6 @@
 import UIKit
 import XCTest
 
-/// The avatar's three steps, opened straight from launch with
-/// `-debugAvatarFlow YES` (the Simulator has no camera, and its photo library
-/// has no faces). `-debugAvatarSample` hands the flow a picture; with no face
-/// in it the Vision path still cuts out the middle and decorates it, which is
-/// enough to walk upload → generating → confirm.
 final class AvatarFlowUITests: XCTestCase {
     private func launch(sample: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
@@ -23,7 +18,6 @@ final class AvatarFlowUITests: XCTestCase {
     func testUploadStepSaysWhatTheSpecSaysAndCanBeSkipped() {
         let app = launch()
         XCTAssertTrue(app.staticTexts["用一张照片，画一个你。"].waitForExistence(timeout: 30))
-        // Copy audit: the title, the second line and the hint are gone.
         XCTAssertFalse(app.staticTexts["给我看看你"].exists)
         XCTAssertFalse(app.staticTexts["正面照效果最好"].exists)
         XCTAssertTrue(app.buttons["avatar-take-photo"].exists)
@@ -107,8 +101,6 @@ final class AvatarFlowUITests: XCTestCase {
         capture(app, "Avatar still open")
     }
 
-    /// A plain drawn "face" — a skin-coloured oval on a coloured background.
-    /// Written where the app (another Simulator process on this Mac) can read it.
     private static func writeSample() throws -> String {
         let size = CGSize(width: 600, height: 800)
         let image = UIGraphicsImageRenderer(size: size).image { ctx in

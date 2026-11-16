@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""Builds the copy table Cassie edits by hand: `docs/1day-copy.csv` and
-`docs/1day-copy-editor.html`.
-
-Source of truth is `Strings` in Localization.swift. Everything else this script
-touches is an annotation on top of it:
-
-- which page a string shows up on, scanned out of the view files
-- `docs/1day-copy-notes.json`: hand-written per-key notes, the two entries whose
-  English the literal scanner cannot read whole, and which strings are small
-  print that could be deleted outright rather than reworded
-- the rewrite options from `docs/1day-copy-rewrites.json`
-- her own edits so far, from `docs/1day-copy-edits.json`, pre-filled back in
-
-Run it after editing Localization.swift:
-
-    python3 scripts/build-copy-editor.py
-"""
 
 from __future__ import annotations
 
@@ -34,8 +17,6 @@ REWRITES = ROOT / "docs/1day-copy-rewrites.json"
 EDITS = ROOT / "docs/1day-copy-edits.json"
 NOTES = ROOT / "docs/1day-copy-notes.json"
 
-# Which page / moment each file is. Read off the view hierarchy once, by hand,
-# because a file name alone ("StoryPieces.swift") does not tell her anything.
 SCENES = {
     "Views/Plans/PlansHomeView.swift": "首页",
     "Views/Components/StoryCard.swift": "首页 · 故事卡片",
@@ -92,7 +73,6 @@ CJK = re.compile(r"[　-〿一-鿿＀-￯]")
 
 
 def literals(block: str) -> list[str]:
-    """String literals in a `Strings` entry, in source order."""
     out, i = [], 0
     while i < len(block):
         if block[i] == '"':
@@ -112,11 +92,8 @@ def literals(block: str) -> list[str]:
 
 
 def entries() -> list[dict]:
-    """Every `Strings` member, with its MARK group and doc comment."""
     text = SRC.read_text(encoding="utf-8")
     start = text.index("enum Strings {")
-    # Stop at the enum's closing brace: the file has helper types after it whose
-    # members are not copy.
     end = text.index("\n}", start)
     lines = text[start:end].splitlines()
 
@@ -134,8 +111,6 @@ def entries() -> list[dict]:
             doc.append(re.sub(r"\s*///\s?", "", line).strip())
             i += 1
             continue
-        # `private` members are plumbing that other entries call (name lists,
-        # plural helpers); their text reaches the screen through the public one.
         member = re.match(r"\s{4}static\s+(?:var|func)\s+(\w+)", line)
         if not member:
             if line.strip():
@@ -143,8 +118,6 @@ def entries() -> list[dict]:
             i += 1
             continue
 
-        # Take the whole declaration: a one-liner, or up to the closing brace
-        # at the member's indentation.
         chunk = [line]
         if not (line.count("{") == line.count("}") and line.rstrip().endswith("}")):
             j = i + 1
@@ -203,8 +176,6 @@ def build() -> list[dict]:
     rows = entries()
     notes = json.loads(NOTES.read_text(encoding="utf-8"))
 
-    # The one entry that is two sentences in one function: the else branch shows
-    # when nothing has been filmed yet, and she needs to edit it separately.
     for extra in notes["extra"]:
         row = {
             "k": extra["k"], "zh": extra["zh"], "en": extra["en"],
@@ -220,8 +191,6 @@ def build() -> list[dict]:
 
     for row in rows:
         hand = notes["rows"].get(row["k"], {})
-        # An entry whose English interpolates a quoted string reads as
-        # truncated to the literal scanner; the sidecar carries the whole one.
         row["en"] = hand.get("en", row["en"])
         row["note"] = hand.get("note") or row["note"]
         row["lockEn"] = bool(hand.get("lockEn"))
@@ -235,7 +204,6 @@ def build() -> list[dict]:
     return rows
 
 
-# MARK: - Output
 
 
 def write_csv(rows: list[dict]) -> None:
@@ -379,9 +347,6 @@ function collect(){
     .map(d => ({ key: d.k, zh: d.zh, en: d.en }));
   window.__1dayCopyAsk = [...ask].map(i => DATA[i].k);
   window.__1dayCopyDrop = [...drop].map(i => ({ key: DATA[i].k, optional: DATA[i].opt }));
-  // Survives a reload, which is the whole point: the page holds no server and
-  // half-finished edits used to die on refresh. Guarded because a page opened
-  // from a `data:` URL is not allowed to rewrite its own location.
   if (location.protocol === 'data:') return;
   try {
     location.replace('#' + encodeURIComponent(JSON.stringify({
@@ -510,24 +475,17 @@ refresh();
 def write_html(rows: list[dict]) -> None:
     data = []
     for r in rows:
-        # Line breaks are real ones in the editing box; they get escaped back to
-        # `\n` when the edits land in Localization.swift.
         soft = lambda s: s.replace("\\n", "\n")
         zh = soft(r.get("mine", {}).get("zh", r["zh"]))
         en = soft(r.get("mine", {}).get("en", r["en"]))
         data.append(
             {
                 "k": r["k"], "zh": zh, "en": en,
-                # Originals, so "edited" means edited relative to the shipped
-                # string rather than to whatever the page last rendered.
                 "zh0": soft(r["zh"]), "en0": soft(r["en"]),
                 "ph": r["ph"], "g": r["g"], "note": r["note"], "s": r["s"],
                 "o": r["o"], "lockEn": r["lockEn"], "opt": r["opt"],
             }
         )
-    # Embedded as JSON in a non-executing script tag: a `\(name)` placeholder in
-    # a JS string literal would have its backslash eaten by the parser and she
-    # would edit, and save back, a broken placeholder.
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     page = (
         PAGE.replace("__DATA__", blob)

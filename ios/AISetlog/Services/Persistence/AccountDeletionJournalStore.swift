@@ -1,8 +1,5 @@
 import Foundation
 
-/// One owner on the main actor; not a cross-process lock. No default live path:
-/// the account-deletion composition root must explicitly supply private storage.
-/// A missing journal is distinct from corrupt/unsupported data (which throws).
 @MainActor
 final class AccountDeletionJournalStore {
     enum Failure: Error { case invalidAccount, wrongAccount, unsupportedVersion, missingJournal }
@@ -33,8 +30,6 @@ final class AccountDeletionJournalStore {
         return envelope.journal
     }
 
-    /// Resume existing progress, never reset a partially completed deletion.
-    /// Persist this before freezing writers is reported as durable to the UI.
     func begin(inFlightWrites: Set<UUID>) throws -> AccountDeletionCoordinator.Journal {
         if let existing = try load() { return existing }
         let journal = AccountDeletionCoordinator.Journal(
@@ -43,8 +38,6 @@ final class AccountDeletionJournalStore {
         return journal
     }
 
-    /// Suitable for Coordinator.Dependencies.save. Refuses to silently replace
-    /// missing, corrupt, future-version or another account's journal.
     func save(_ journal: AccountDeletionCoordinator.Journal) throws {
         try validate(journal)
         guard try load() != nil else { throw Failure.missingJournal }

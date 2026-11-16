@@ -1,23 +1,19 @@
 .DS_Store
-.claude/
+# .claude/ 里只有 skills 进 git；worktrees、settings.local.json、launch.json 仍然忽略
+.claude/*
+!.claude/skills/
 /package-lock.json
 
-# Xcode
 DerivedData/
 *.xcuserstate
 xcuserdata/
 
-# XcodeGen output. `project.yml` is the source of truth and uses directory
-# globs, so the project is a build artifact — regenerate it, never merge it.
-#   cd ios && xcodegen generate --spec project.yml
 ios/AISetlog.xcodeproj/
 
-# Web dependencies and build output
 node_modules/
 .npm-cache/
 dist/
 
-# Local visual QA artifacts
 tmp-ui-check/
 landing-page/qa-*.png
 landing-page/implementation-*.png
@@ -27,29 +23,20 @@ landing-page/design-qa.md
 landing-page/.playwright-cli/
 landing-page/output/
 
-# Generated video proof output
 poc/clips/
 poc/output/
 
-# Xcode local build output
 ios/build/
 
-# Teammate/worktree build output
 build-teammate/
 
-# Repo-root xcodebuild output
 /build/
 
-# Local Playwright QA scratch (root)
 .playwright-cli/
 
-# Wrangler local state
 .wrangler/
 
-# Packaged App Store deliverable. The unpacked `ios/release/*/store-kit/` is the
-# source of truth; the zip is the same 55MB of screenshots a second time.
 ios/release/*/*App-Store-Kit-*.zip
 
-# Python
 __pycache__/
 *.pyc

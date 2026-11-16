@@ -1,15 +1,5 @@
 import Foundation
 
-/// Time labels for the story timeline.
-///
-/// There is no schedule. You film a moment whenever it happens, and the
-/// timeline stamps it with when that was — an earlier version spread slots
-/// evenly across an invented 16-hour day, which put confident times next to
-/// moments nobody had filmed yet. A slot with no clip has no time, and says so
-/// by showing nothing.
-///
-/// A 7-day story is the exception: "Day 3" is a real fact about the plan, not
-/// a guess, so the rail keeps showing it whether or not the clip exists.
 struct StorySchedule {
     let challenge: Challenge
 
@@ -17,21 +7,12 @@ struct StorySchedule {
         self.challenge = challenge
     }
 
-    /// The rail label. Nil for a 1-day moment that hasn't been filmed —
-    /// the caller leaves the column blank rather than inventing a time.
     func railLabel(forSlot slot: Int, recordedAt: Date?) -> String? {
-        // A shared room is stamped by time even when it runs seven days
-        // (1.5): the room page shows each clip with when it was filmed and
-        // never a day number, so the vlog screens it opens can't bring
-        // 「第 3 天」 back on their rail. `railCaption` still adds the date,
-        // which is what tells a week of afternoons apart.
         guard challenge.isOneDay || challenge.isShared else { return Strings.dayN(slot) }
         guard let recordedAt else { return nil }
         return Self.timeFormatter.string(from: recordedAt)
     }
 
-    /// Secondary line under the rail label — the date for a 7-day story, so a
-    /// week still reads as a stretch of real time.
     func railCaption(forSlot slot: Int, recordedAt: Date?) -> String? {
         guard !challenge.isOneDay else { return nil }
         guard let recordedAt else { return nil }
@@ -39,8 +20,6 @@ struct StorySchedule {
             .dateTime.month(.abbreviated).day().locale(AppLanguage.effective.locale))
     }
 
-    /// A glyph for the part of the day a moment landed in. Atmospheric — it's
-    /// what makes a filled rail read as a day passing. Nil until it's filmed.
     func dayPartIcon(recordedAt: Date?) -> String? {
         guard let recordedAt else { return nil }
         switch Calendar.current.component(.hour, from: recordedAt) {
@@ -52,12 +31,6 @@ struct StorySchedule {
         }
     }
 
-    /// Total runtime of the finished film, for the "14s" chip.
-    ///
-    /// - Parameter clipCount: how many clips the film will actually contain.
-    ///   Defaults to my own cards, which is the whole film in a solo story and
-    ///   an undercount in a shared room — a friend's clip runs for the same
-    ///   two seconds as mine.
     func filmDuration(clipCount: Int? = nil) -> String {
         let count = clipCount ?? challenge.recordedCount
         let seconds = Int(
@@ -65,8 +38,6 @@ struct StorySchedule {
         return Strings.seconds(max(seconds, 0))
     }
 
-    /// The header line: the real span of what's been filmed so far
-    /// ("9:15 AM – 6:40 PM"), or the story's date before anything exists.
     var spanLabel: String {
         let stamps = challenge.cards.compactMap(\.recordedAt).sorted()
         let dateFmt = Date.FormatStyle()
@@ -84,8 +55,6 @@ struct StorySchedule {
         }
         let from = Self.timeFormatter.string(from: first)
         let to = Self.timeFormatter.string(from: last)
-        // Everything so far landed in the same minute — "10:00 PM – 10:00 PM"
-        // is a range of nothing.
         guard from != to else { return from }
         return "\(from) – \(to)"
     }

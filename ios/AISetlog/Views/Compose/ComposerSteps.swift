@@ -1,32 +1,17 @@
 import SwiftUI
 
-/// The pieces of `StoryComposerView`'s one page. Stateless — the composer owns
-/// every choice; these just render it.
-///
-/// 1.5 shape, top to bottom: 拍什么 (写今天的清单 / 从模板开始 / 按时间拍),
-/// 名字, 自己拍 / 和朋友一起拍, 用哪台相机拍, and a single pinned 开始拍.
-/// The templates themselves live on `TemplatesPage`, pushed from 从模板开始.
-/// Every section uses the same 16pt side margin; `ComposerLayout.margin` is
-/// that number.
 
 enum ComposerLayout {
     static let margin: CGFloat = 16
     static let rowRadius: CGFloat = 16
 }
 
-// MARK: - 拍什么
 
-/// Where the story's prompts come from.
 enum ComposerEntry: Hashable {
-    /// 写今天的清单 — the list editor, typed or drafted by AI. A template
-    /// fills the same list.
     case writeList
-    /// 不写，按时间拍 — no prompts at all.
     case byTime
 }
 
-/// The two ways in, as two rows. 从模板开始 used to sit between them; it's
-/// gone with templates (1.5).
 struct WhatToFilmSection: View {
     let entry: ComposerEntry
     let onWriteList: () -> Void
@@ -49,7 +34,6 @@ struct WhatToFilmSection: View {
     }
 }
 
-// MARK: - 拍几天
 
 struct DaysSection: View {
     @Binding var days: Challenge.Mode
@@ -70,14 +54,11 @@ struct DaysSection: View {
     }
 }
 
-/// One radio row: a check, a title, one line under it.
 private struct ChoiceRow: View {
     let title: String
     let lead: String
     let isOn: Bool
-    /// A chevron on the end: tapping opens a page, not just a selection.
     var opensPage = false
-    /// A small picture for the choice: a checklist, a cute alarm clock.
     var icon: String? = nil
     let action: () -> Void
 
@@ -133,25 +114,17 @@ private struct ChoiceRow: View {
     }
 }
 
-// MARK: - 名字, who's filming
 
-/// The rest of the page: the story's name (with the list's summary row under
-/// it) and 自己拍 / 和朋友一起拍. 用哪台相机拍 is gone (1.5): there is one
-/// camera, DV.
 struct SetupStep: View {
     @Binding var title: String
     @Binding var titleEdited: Bool
     let isOneDay: Bool
-    /// Nil when the story films by time — then nothing shows under the name.
     let listCount: Int?
     let onOpenList: () -> Void
 
     @FocusState private var titleFocused: Bool
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// The shape of the frame, as a glyph. Shared with the camera's own
-    /// orientation button so the row that sets it and the button that switches
-    /// it are never showing two different pictures of the same choice.
     static func orientationIcon(_ orientation: Challenge.Orientation) -> String {
         switch orientation {
         case .portrait: "rectangle.portrait"
@@ -197,7 +170,6 @@ struct SetupStep: View {
     }
 }
 
-/// 清单 · 5 项 > — the list, folded to one row. Opens the editor.
 private struct ListSummaryRow: View {
     let count: Int
     let action: () -> Void
@@ -232,8 +204,6 @@ private struct ListSummaryRow: View {
     }
 }
 
-/// 自己拍 | 和朋友一起拍 — a two-part segmented control. Built by hand so each
-/// half can carry its own accessibility id.
 private struct CompanySegment: View {
     @Binding var withFriends: Bool
 

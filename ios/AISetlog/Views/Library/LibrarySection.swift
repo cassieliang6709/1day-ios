@@ -239,7 +239,7 @@ struct LibrarySection<Chrome: View>: View {
                     cell(clip)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous))
             .padding(.horizontal, LibrarySectionMetrics.inset)
         }
     }
@@ -312,41 +312,17 @@ struct LibrarySection<Chrome: View>: View {
                 play(from: clip)
             }
         } label: {
-            // A fixed 3:4 box with the thumbnail fitted into it: given the
-            // thumbnail itself as the sizing view, a portrait clip grew the
-            // cell past its column and over the row above.
-            Color.clear
+            ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true,
+                     edge: .flush, isSelected: order != nil)
                 .aspectRatio(3 / 4, contentMode: .fit)
-                .overlay {
-                    ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
-                }
-                .clipped()
-                .overlay(alignment: .bottomLeading) { caption(clip) }
+                .overlay(alignment: .bottomLeading) { ClipTileLabel(text: clockTime(clip.recordedAt)) }
                 .overlay(alignment: .topTrailing) {
                     if isSelecting { pickMark(order) }
                 }
-                .overlay {
-                    if order != nil {
-                        Rectangle().strokeBorder(Color.oneDayBrand, lineWidth: 3)
-                    }
-                }
-                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibility(clip))
         .accessibilityAddTraits(order != nil ? .isSelected : [])
-    }
-
-    /// Just the time, small. Where the clip lives is in the accessibility
-    /// label and one tap away; on the tile it was a second line of text on
-    /// every picture.
-    private func caption(_ clip: LibraryClip) -> some View {
-        Text(clockTime(clip.recordedAt))
-            .font(.system(size: 11.5, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
-            .padding(6)
     }
 
     /// 24-hour 「17:05」. `.dateTime.hour(.twoDigits(amPM: .omitted)).minute()`

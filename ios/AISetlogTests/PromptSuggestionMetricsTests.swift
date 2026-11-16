@@ -1,8 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The numbers this feature exists to produce: do people film what a model
-/// tells them to film, and which parts of it do they throw away.
 final class PromptSuggestionMetricsTests: XCTestCase {
     private let suite = "prompt-metrics-tests"
     private var defaults: UserDefaults!
@@ -46,8 +44,6 @@ final class PromptSuggestionMetricsTests: XCTestCase {
         XCTAssertTrue(metrics.snapshot.editsByPosition.isEmpty)
     }
 
-    /// Which slots get rewritten is the interesting half. If it's always the
-    /// last two, the model is bad at endings, not bad at prompts.
     func testEditsAreRecordedByPosition() {
         let metrics = metrics()
 
@@ -60,7 +56,6 @@ final class PromptSuggestionMetricsTests: XCTestCase {
         XCTAssertEqual(metrics.snapshot.editRate, 1.0 / 3.0)
     }
 
-    /// Deleting a prompt is the strongest edit there is, so it counts as one.
     func testADeletedPromptCountsAsAnEdit() {
         let metrics = metrics()
 
@@ -70,7 +65,6 @@ final class PromptSuggestionMetricsTests: XCTestCase {
         XCTAssertEqual(metrics.snapshot.editsByPosition, [2: 1])
     }
 
-    /// A story written entirely by hand has nothing to say about the model.
     func testAStoryWithNoGeneratedPromptsIsNotCountedAsAdopted() {
         let metrics = metrics()
 
@@ -100,7 +94,6 @@ final class PromptSuggestionMetricsTests: XCTestCase {
         first.reset()
 
         XCTAssertEqual(first.snapshot, PromptSuggestionMetrics.Snapshot())
-        // And the clearing reached disk, not just this instance.
         XCTAssertEqual(metrics().snapshot, PromptSuggestionMetrics.Snapshot())
     }
 }

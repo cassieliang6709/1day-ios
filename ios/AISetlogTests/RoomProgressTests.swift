@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The header's numbers. A shared room used to report only my own cards, so a
-/// room three friends had been filming in all morning read "0/5" to whoever
-/// hadn't filmed yet.
 final class RoomProgressTests: XCTestCase {
     private let me = "me"
 
@@ -34,8 +31,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertFalse(progress.hasOthers, "nobody else is in a solo story")
     }
 
-    /// The bug, in one assertion: three moments have been filmed and none of
-    /// them are mine.
     func testFriendsClipsCountTowardTheDay() {
         let progress = RoomProgress(
             momentCount: 5,
@@ -51,8 +46,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertTrue(progress.hasOthers)
     }
 
-    /// Two people on the same moment is one moment, and two clips: the day
-    /// hasn't got further along, but the film got longer.
     func testTwoTakesOfOneMomentIsStillOneMoment() {
         let progress = RoomProgress(
             momentCount: 5,
@@ -65,8 +58,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertFalse(progress.hasOthers, "same moment — the counts agree")
     }
 
-    /// The home card used to say "Next: Morning light" while Morning light was
-    /// on the screen below it, filmed by a friend an hour earlier.
     func testTheNextMomentIsTheOneNobodyHasFilmed() {
         let progress = RoomProgress(
             momentCount: 5,
@@ -80,8 +71,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(progress.nextOpenMoment, 4)
     }
 
-    /// Gaps count. Filming the last moment first shouldn't send everyone past
-    /// the four that are still empty.
     func testItPointsAtTheFirstGapNotThePileEnd() {
         let progress = RoomProgress(
             momentCount: 5, clips: [clip(day: 5, author: "ana")], myID: me)
@@ -90,7 +79,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertFalse(progress.isComplete)
     }
 
-    /// In a room the day finishes when the day finishes, not when I do.
     func testTheDayIsCompleteWhenEveryMomentIsIn() {
         let progress = RoomProgress(
             momentCount: 3,
@@ -110,8 +98,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(RoomProgress(momentCount: 0, clips: [], myID: me).nextOpenMoment, 1)
     }
 
-    /// A room can outlive an edit that shortened the prompt list. Reporting
-    /// "6/5" would be a bug report about arithmetic instead of about editing.
     func testItNeverClaimsMoreMomentsThanExist() {
         let progress = RoomProgress(
             momentCount: 2,
@@ -122,9 +108,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(progress.clipCount, 6)
     }
 
-    /// Clamping instead of excluding would have called this "2/2, watch your
-    /// film" while both real moments sat empty — a number that is wrong, not
-    /// merely stale.
     func testClipsPastTheEndDontFillTheMomentsBeforeThem() {
         let progress = RoomProgress(
             momentCount: 2,
@@ -137,7 +120,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(progress.clipCount, 2, "they still exist, they just don't count")
     }
 
-    /// A clip with no author is somebody's, but not demonstrably mine.
     func testAnAuthorlessClipCountsForTheDayButNotForMe() {
         let progress = RoomProgress(
             momentCount: 3, clips: [clip(day: 1, author: nil)], myID: me)
@@ -146,9 +128,6 @@ final class RoomProgressTests: XCTestCase {
         XCTAssertEqual(progress.mine, 0)
     }
 
-    /// Signing out changes who I am. The room cache is cleared with it now, so
-    /// this is the shape of the bug rather than a live path — but if the two
-    /// ever drift apart again, my own takes get credited to a stranger.
     func testMyOwnClipsArentMineUnderADifferentIdentity() {
         let clips = [clip(day: 1, author: "apple-id-123")]
 

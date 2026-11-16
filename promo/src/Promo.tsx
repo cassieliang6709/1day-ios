@@ -41,7 +41,6 @@ const ShotView: React.FC<{shot: Shot; variant: Variant}> = ({shot, variant}) => 
     );
   }
 
-  // A 16:9 clip (the film the app renders) shown as a card, never cropped to 9:16.
   if (shot.filmCard && shot.src) {
     const cardWidth = xhs ? width * 0.86 : width;
     return (
@@ -73,11 +72,9 @@ const ShotView: React.FC<{shot: Shot; variant: Variant}> = ({shot, variant}) => 
     );
   }
 
-  // Phone-in-frame shot.
   const phoneWidth = xhs ? width * 0.66 : width;
 
   if (!xhs) {
-    // App Store: the recording fills the frame, caption floats near the bottom.
     return (
       <AbsoluteFill>
         {shot.src ? (

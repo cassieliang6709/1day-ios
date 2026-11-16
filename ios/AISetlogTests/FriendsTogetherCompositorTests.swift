@@ -3,15 +3,6 @@ import UIKit
 import XCTest
 @testable import AISetlog
 
-/// The shared-room grid must show all of everybody.
-///
-/// The layout this replaced scaled each take until it covered its cell and cut
-/// off whatever hung over the edge, which for a portrait take in a landscape
-/// cell is the top and bottom — the head and the hands. These tests film a
-/// banded clip so the two ends are a different colour from the middle, and then
-/// look for those ends in the finished film. A cropping layout cannot pass them:
-/// the blurred bed is a cover-scaled copy of the same take, so it does not
-/// contain the bands either.
 final class FriendsTogetherCompositorTests: XCTestCase {
     private var owned: [URL] = []
 
@@ -21,7 +12,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Orientation
 
     func testOrientationCoversTheFourRotationsACameraProduces() {
         let cases: [(CGAffineTransform, CGImagePropertyOrientation)] = [
@@ -38,22 +28,17 @@ final class FriendsTogetherCompositorTests: XCTestCase {
     }
 
     func testOrientationToleratesTheNonIntegralTransformsFilesCarry() {
-        // A transform read back off a file is rarely exactly integral. The four
-        // rotations are 90° apart, so rounding cannot land on the wrong one.
         let almostRight = CGAffineTransform(
             a: 0.0000001, b: 0.9999998, c: -0.9999999, d: 0.0000002, tx: 540, ty: 0)
         XCTAssertEqual(FriendsTogetherPlacement.orientation(for: almostRight), .right)
     }
 
-    // MARK: - No crop
 
     func testPortraitTakesKeepTheirTopAndBottomInALandscapeFilm() async throws {
         let banded = try await bandedClip()
         let film = try await render([banded, banded], aspect: .landscape)
         let frame = try await sample(film)
 
-        // Cell 0 is the left half of a two-up landscape grid. Down its middle,
-        // the ends of the take have to still be there.
         let column = frame.size.width * 0.25
         XCTAssertTrue(
             frame.contains(.red, alongColumn: column, in: 0...0.15),
@@ -64,8 +49,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
     }
 
     func testLandscapeTakesKeepTheirEdgesInAPortraitFilm() async throws {
-        // Same clip turned on its side: the bands now run down the left and
-        // right, and a cover-scaled cell would cut those off instead.
         let banded = try await bandedClip(landscape: true)
         let film = try await render([banded, banded], aspect: .portrait)
         let frame = try await sample(film)
@@ -79,9 +62,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
             "The right edge of a landscape take was cut off in a portrait cell")
     }
 
-    /// The automatic canvas is built so that a cell is the take's own shape, so
-    /// two portrait takes are whole *and* fill the frame — no bed, no bars, and
-    /// the bands land exactly where they do in the take.
     func testTwoPortraitTakesFillTheAutomaticCanvasWholeAndUncropped() async throws {
         let banded = try await bandedClip()
         let film = try await render([banded, banded])
@@ -89,8 +69,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
 
         XCTAssertEqual(frame.size.width / frame.size.height, 9.0 / 8, accuracy: 0.02)
         for column in [frame.size.width * 0.25, frame.size.width * 0.75] {
-            // 0...0.04 and 0.96...1 are inside the take's own 8% bands only if
-            // nothing was cropped off the ends and nothing was padded onto them.
             XCTAssertTrue(
                 frame.contains(.red, alongColumn: column, in: 0...0.04),
                 "the top of a take is missing from the automatic canvas")
@@ -105,10 +83,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         let film = try await render([banded, banded])
         let frame = try await sample(film)
 
-        // Across the join, at the green middle of both takes. The cells used to
-        // be inset by a fraction of the width, which put a black bar here — a
-        // hairline in the export, a thick seam once a player had scaled the
-        // film up to a phone.
         let middle = frame.size.height / 2
         for offset in -2...2 {
             let seam = frame.pixel(x: frame.size.width / 2 + CGFloat(offset), y: middle)
@@ -117,18 +91,12 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         }
     }
 
-    // MARK: - Sequential film
 
-    /// A diary that starts portrait is a portrait film, and a landscape take
-    /// later in it used to be cover-scaled into it — the middle strip, both
-    /// edges gone. It has to come through whole, on a bed rather than black.
     func testLandscapeTakeKeepsItsEdgesInAPortraitDiary() async throws {
         let portrait = try await bandedClip()
         let landscape = try await bandedClip(landscape: true)
         let film = try await render([portrait, landscape], layout: .sequential)
 
-        // The first take is the canvas's own shape: it still fills it, bands
-        // right at the top and bottom, exactly as before.
         let first = try await sample(film, at: 0.2)
         XCTAssertEqual(first.size.width / first.size.height, 9.0 / 16, accuracy: 0.02)
         let column = first.size.width / 2
@@ -139,7 +107,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
             first.contains(.blue, alongColumn: column, in: 0.96...1),
             "a take of the canvas's shape no longer fills it")
 
-        // Each fixture is half a second, and there is no crossfade.
         let second = try await sample(film, at: 0.7)
         let middle = second.size.height / 2
         XCTAssertTrue(
@@ -148,20 +115,11 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         XCTAssertTrue(
             second.contains(.blue, alongRow: middle, in: 0.85...1),
             "the right edge of a landscape take was cut off in a portrait diary")
-        // Above the fitted take is the bed — the take's own green, blurred —
-        // not a black bar.
         let above = second.pixel(x: second.size.width / 2, y: second.size.height * 0.1)
         XCTAssertGreaterThan(above.g, 100, "black above a fitted take: \(above)")
     }
 
-    // MARK: - Fixtures
 
-    /// A clip banded at both ends: red for the first 8%, blue for the last 8%,
-    /// green in between.
-    ///
-    /// 8% is chosen against the cover-scaled bed. For a 9:16 take in a 16:9
-    /// half-cell the bed shows the middle ~63%, so neither band is inside it,
-    /// and finding one in the film proves it came from the fitted copy.
     private func bandedClip(landscape: Bool = false) async throws -> URL {
         let size = landscape
             ? CGSize(width: 960, height: 540)
@@ -223,7 +181,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         context.setFillColor(UIColor.green.cgColor)
         context.fill(CGRect(origin: .zero, size: size))
 
-        // CGContext counts from the bottom, so "first band" is drawn last.
         let band = 0.08
         if landscape {
             context.setFillColor(UIColor.red.cgColor)
@@ -243,9 +200,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         return buffer
     }
 
-    /// `aspect: nil` is the product's own path: the canvas is computed from the
-    /// takes. Naming one is what a person does in the room demo, and it is the
-    /// case where a cell stops matching the take.
     private func render(
         _ urls: [URL], aspect: VideoStitcher.Aspect? = nil,
         layout: VideoStitcher.Layout = .friendsTogether
@@ -255,7 +209,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         options.aspect = aspect
         options.showDayCaptions = false
         options.crossfadeSeconds = 0
-        // One moment for the grid; one day each for a diary, played in turn.
         let sequential = layout == .sequential
         let clips = urls.enumerated().map { index, url in
             DayClip(
@@ -267,7 +220,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
         return film
     }
 
-    /// One frame of the finished film, as pixels.
     private func sample(_ film: URL, at seconds: Double = 0.2) async throws -> Frame {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: film))
         generator.appliesPreferredTrackTransform = true
@@ -280,7 +232,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
 
     private enum Failure: Error { case writer }
 
-    // MARK: - Reading pixels
 
     private struct Frame {
         enum Band { case red, blue }
@@ -312,11 +263,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
             return (Int(pixels[offset]), Int(pixels[offset + 1]), Int(pixels[offset + 2]))
         }
 
-        /// Whether `band` shows up anywhere in a fraction of one column.
-        ///
-        /// A range rather than a point: the exact row depends on the cell inset
-        /// and the scale, and the claim under test is that the band survived at
-        /// all, not where to the pixel it landed.
         func contains(
             _ band: Band, alongColumn x: CGFloat, in range: ClosedRange<CGFloat>
         ) -> Bool {
@@ -335,9 +281,6 @@ final class FriendsTogetherCompositorTests: XCTestCase {
             return columns.contains { matches(band, pixel(x: $0, y: y)) }
         }
 
-        /// Dominance rather than equality: the film is H.264, so a pure red
-        /// comes back a few values off, and the bed is a dimmed copy. What
-        /// separates the bands from the green middle is which channel leads.
         private func matches(_ band: Band, _ pixel: (r: Int, g: Int, b: Int)) -> Bool {
             switch band {
             case .red: pixel.r > pixel.g + 40 && pixel.r > pixel.b + 40

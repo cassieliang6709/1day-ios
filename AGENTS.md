@@ -2,6 +2,10 @@
 
 写给在这个仓库里干活的 AI agent。每条都是从踩过的坑里来的，附了为什么。
 
+## 代码注释
+
+- 不写代码注释、文档注释或 docstring；需要解释时写在文档或对话里。保留 shebang、编译指令等执行所需的语法。
+
 ## 分层铁律（CI 会卡）
 
 - `ios/AISetlog/Models/` 里不许出现 `Strings.`。CI 用 `grep -rn` 直接卡这条，展示文案属于 `ChallengePresenter` 或视图层。

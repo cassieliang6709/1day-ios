@@ -143,7 +143,6 @@
 * **合成核心类**：`ios/AISetlog/Services/Media/VideoStitcher.swift`。
 * **智能画幅裁决**：
   ```swift
-  // VideoStitcher.swift
   static func defaultForSource(_ size: CGSize) -> Aspect? {
       if size.height > size.width { return .landscape }
       if size.width > size.height { return .portrait }
@@ -197,9 +196,9 @@
 * **参数存储模型**：`ios/AISetlog/Models/DayClip.swift` 中的 `PersonalEffectRecipe`：
   ```swift
   struct PersonalEffectRecipe: Codable, Equatable {
-      var exposure: Float = 0.0    // -50 ~ +50
-      var temperature: Float = 0.0 // -50 ~ +50
-      var contrast: Float = 0.0    // -50 ~ +50
+      var exposure: Float = 0.0
+      var temperature: Float = 0.0
+      var contrast: Float = 0.0
       var isIdentity: Bool { exposure == 0 && temperature == 0 && contrast == 0 }
   }
   ```
@@ -262,10 +261,8 @@
   * 存储路径：`Application Support/RoomChat/<scope>/state.json`；
 * **防复活合并逻辑**：
   ```swift
-  // RoomChatState.swift
   mutating func mergeRemote(incoming: [RoomChatMessage]) {
       let filtered = incoming.filter { !deletedIDs.contains($0.id) }
-      // 依靠唯一 UUID 进行集合去重与时间排序，严防历史快照复活已删消息
   }
   ```
 * **账号租约隔离**：`AccountStore.identityRevision`，切号或登出时租约递增，旧会话的迟到异步回调全部判定失效，禁止写穿。
@@ -304,7 +301,6 @@
 * **客户端服务**：`ios/AISetlog/Services/PromptSuggestionService.swift`。
 * **双向容错契约模型**：
   ```swift
-  // PromptSuggestionService.swift
   struct Request: Codable {
       let intent: String
       let count: Int
@@ -313,7 +309,7 @@
   }
   struct Response: Codable {
       let prompts: [String]
-      let title: String? // 重点：可选解码，完美兼容返回旧格式与新格式
+      let title: String?
   }
   ```
 * **服务端逻辑**：`workers/suggest-prompts/src/index.js`，运行在 Cloudflare Workers 上，持有服务端专用 API 秘钥，客户端无鉴权泄露风险。
@@ -354,9 +350,8 @@
 * **本地注销日志 (Journaling)**：在沙盒根目录写入 `deletion_journal.json`，记录 `[stage, pendingRemoteRecords, attempts]`。
 * **防串号写穿防护**：
   ```swift
-  // AccountStore.swift
   func signOut() {
-      Self.identityRevision &+= 1 // 租约失效
+      Self.identityRevision &+= 1
       account = nil
       UserDefaults.standard.removeObject(forKey: Self.key)
   }

@@ -1,20 +1,7 @@
-/**
- * Room pushes, sent straight to APNs when something is written — what
- * CloudKit's query subscriptions used to do.
- *
- * A phone registers the rooms it wants to hear about and the alert copy for
- * each kind (`format` plus which fields fill it). The copy stays the app's:
- * the Worker sends it as `loc-key`/`loc-args`, and iOS formats it on the
- * phone exactly as it formatted CloudKit's.
- *
- * Nobody is pushed about their own record; a poke reaches only its target.
- * Only the deployed Worker can reach APNs — `wrangler dev` has no HTTP/2.
- */
 import { bad, json, readJson, roomCode, str } from './http.js';
 
 const KINDS = ['clip', 'comment', 'reaction', 'poke'];
 const ARG_FIELDS = new Set(['authorName', 'text']);
-/** APNs refuses payloads over 4KB; a chat line is cut well before that. */
 const MAX_ALERT_TEXT = 500;
 
 function list(value) {
@@ -38,11 +25,6 @@ function readAlerts(value) {
   return alerts;
 }
 
-/**
- * Replaces everything this phone asked for. An empty room list removes the
- * phone: notifications off has to mean nothing arrives, since a pushed alert
- * can't check a setting on the phone.
- */
 async function putDevice(request, env, { me }) {
   const b = await readJson(request);
   const token = str(b.token, 200);
@@ -92,12 +74,7 @@ export async function pushRoutes(request, env, who, segments) {
   return null;
 }
 
-// MARK: - Sending
 
-/**
- * @param event {{ kind, code, authorID, authorName, day, text?, targetAuthorID?, recordName }}
- * Never throws: a push that can't go out must not fail the write behind it.
- */
 export async function notifyRoom(env, event, { send = sendToAPNs } = {}) {
   try {
     const { results } = await env.DB.prepare(
@@ -113,7 +90,6 @@ export async function notifyRoom(env, event, { send = sendToAPNs } = {}) {
       if (!alert) continue;
       const payload = buildPayload(event, alert, device.title);
       const { status, reason } = await send(env, device, payload, event);
-      // The phone uninstalled, or the token belongs to another app or environment.
       if (status === 410 || (status === 400 && /BadDeviceToken|DeviceTokenNotForTopic/.test(reason))) {
         await env.DB.batch([
           env.DB.prepare('DELETE FROM device_rooms WHERE token = ?1').bind(device.token),
@@ -137,7 +113,6 @@ export function buildPayload(event, alert, title) {
       sound: 'default',
       category: 'ROOM_ACTIVITY',
       'thread-id': event.code,
-      // So an open app hears about it and refreshes the room.
       'content-available': 1,
     },
     oneday: {
@@ -153,7 +128,6 @@ export function buildPayload(event, alert, title) {
 let cachedJwt = null;
 
 async function providerToken(env, now = Math.floor(Date.now() / 1000)) {
-  // Apple wants a new one at most every 20 minutes and refuses one over an hour old.
   if (cachedJwt && now - cachedJwt.iat < 40 * 60) return cachedJwt.token;
   const pem = String(env.APNS_PRIVATE_KEY ?? '')
     .replace(/-----[^-]+-----/g, '')
@@ -180,8 +154,6 @@ async function sendToAPNs(env, device, payload, event) {
     'apns-push-type': 'alert',
     'apns-priority': '10',
   };
-  // Several uploads or reactions are one piece of news per room; messages and
-  // pokes are each for someone, so they don't collapse.
   if (event.kind === 'clip' || event.kind === 'reaction') headers['apns-collapse-id'] = event.code;
   const response = await fetch(`https://${host}/3/device/${device.token}`, {
     method: 'POST',

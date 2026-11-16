@@ -1,29 +1,15 @@
 import SwiftUI
 
-/// Screen 6 — the finished film.
-///
-/// The stitched video plays at the top, and below it the same day runs down
-/// the page as a scrollable timeline. That pairing is the point: the film is
-/// the artefact you share, the timeline is the memory you scroll. Neither a
-/// collage nor a grid — the day keeps its shape all the way to the end.
 struct FinalFilmTimeline: View {
     let challenge: Challenge
     let clips: [DayClip]
     let filmURL: URL
     let isSaving: Bool
-    /// This exact render is already in Photos. The button says so and stops
-    /// taking taps until a new render replaces the file.
     var isSaved = false
     let saveMessage: String?
-    /// Set when the message is a permission refusal, so the line can carry the
-    /// way out of it. Nil for "saved" and for an ordinary failure, neither of
-    /// which iOS Settings can do anything about.
     var onOpenSettings: (() -> Void)?
-    /// Saves the film as it sounds now: with its music and voiceover, if any.
     let onSave: (URL) -> Void
     let onAdjust: () -> Void
-    /// Everyone in a room's film, for the row of faces under the player.
-    /// Empty for a solo film, which has no row.
     var people: [FilmPerson] = []
     var selection = FilmSelection()
     var onFilter: ((FilmFilterTarget) -> Void)?
@@ -31,7 +17,6 @@ struct FinalFilmTimeline: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.roomPreviewMediaScope) private var previewMedia
     @Environment(MoodStore.self) private var moodStore: MoodStore?
-    /// `filmURL` remixed by `FilmSoundtrackPanel`; nil while it's the original.
     @State private var mixedURL: URL?
 
     private var shownURL: URL { mixedURL ?? filmURL }
@@ -45,7 +30,6 @@ struct FinalFilmTimeline: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 22) {
-                // No 片子好了 heading: the film playing says it.
                 player
                 if let onFilter, !people.isEmpty {
                     FilmPeopleRow(people: people, selection: selection, onOpen: onFilter)
@@ -63,9 +47,6 @@ struct FinalFilmTimeline: View {
             .padding(.bottom, OneDay.tabBarClearance + 24)
         }
         .scrollIndicators(.hidden)
-        // Over the page, above the tab bar, rather than hung under the
-        // buttons with an offset — that version overlapped the facts strip
-        // and needed a padding hack on it to make room.
         .overlay(alignment: .bottom) {
             if let saveMessage, onOpenSettings == nil {
                 toast(saveMessage)
@@ -76,9 +57,6 @@ struct FinalFilmTimeline: View {
         .animation(OneDay.Motion.soft, value: saveMessage)
     }
 
-    /// Just the title. The line under it — 「属于你这一天的小影片。」 — said
-    /// nothing the player below doesn't, and the facts strip already gives the
-    /// real numbers.
     private var heading: some View {
         Text(Strings.filmReadyTitle)
             .font(.system(size: 26, weight: .heavy, design: .rounded))
@@ -104,13 +82,10 @@ struct FinalFilmTimeline: View {
         VlogPlayer(
             url: shownURL,
             aspectRatio: challenge.resolvedOrientation == .landscape ? 16 / 9 : 9 / 16)
-            // The player reads its URL once; a remix is a new player.
             .id(shownURL)
             .frame(maxHeight: 460)
     }
 
-    /// Save, share, adjust — three equal-weight actions, because at this point
-    /// there's no single "correct" next step.
     private var actions: some View {
         VStack(spacing: 8) {
             HStack(spacing: 11) {
@@ -145,7 +120,6 @@ struct FinalFilmTimeline: View {
                     .accessibilityIdentifier("film-adjust")
             }
 
-            // Two greyed-out buttons with no reason given read as broken.
             if previewMedia != nil {
                 Text(Strings.sampleCantSaveOrShare)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -153,10 +127,6 @@ struct FinalFilmTimeline: View {
                     .multilineTextAlignment(.center)
             }
 
-            // A refusal is not a toast: it stays, in the flow of the page,
-            // because it carries the way out. "需要相册权限才能保存视频。"
-            // used to be the whole of it — a sentence about a switch in
-            // another app, with no way to reach the switch.
             if let saveMessage, let onOpenSettings {
                 VStack(spacing: 4) {
                     Text(saveMessage)
@@ -174,7 +144,6 @@ struct FinalFilmTimeline: View {
         }
     }
 
-    /// Duration, moment count, people — the film's stats in one strip.
     private var facts: some View {
         HStack(spacing: 0) {
             fact(icon: "clock", title: Strings.durationLabel, value: schedule.filmDuration())
@@ -182,7 +151,6 @@ struct FinalFilmTimeline: View {
             fact(
                 icon: "circle.grid.2x2.fill",
                 title: Strings.momentsLabel,
-                // Moments, not clips — three people on one moment is one.
                 value: "\(Set(clips.map(\.day)).count)")
             divider
             fact(
@@ -216,8 +184,6 @@ struct FinalFilmTimeline: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// The day again, scrollable. Same rail, same stamps as the room timeline
-    /// — a finished film should still read as the day it came from.
     private var timeline: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: Strings.wholeDayHeader)
@@ -239,9 +205,6 @@ struct FinalFilmTimeline: View {
                         isFilled: true
                     ) {
                         TimelineClip(
-                            // `clip.label` is 「第 N 天」 for a room slot
-                            // with no name (it is built for the solo story's
-                            // wording); a room says the name or nothing.
                             momentTitle: challenge.isShared
                                 ? (presenter.momentName(forSlot: clip.day) ?? "")
                                 : (clip.label ?? presenter.title(forSlot: clip.day)),
@@ -262,7 +225,6 @@ struct FinalFilmTimeline: View {
     }
 }
 
-// MARK: - Actions
 
 private struct FilmActionLabel: View {
     let icon: String

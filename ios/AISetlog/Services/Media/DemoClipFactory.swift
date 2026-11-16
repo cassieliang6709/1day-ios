@@ -2,20 +2,7 @@
 import AVFoundation
 import UIKit
 
-/// Stand-in footage for the simulator, which has no camera.
-///
-/// The recorder's debug escape hatch used to load one of seven `day*.mp4`
-/// fixtures from the app bundle. Those left the bundle when the stitcher tests
-/// got their own generator (`ClipFixtureFactory`) — shipping test footage to
-/// users was the thing being fixed — and the button has been silently doing
-/// nothing ever since. It draws its clip on the spot now.
-///
-/// Each clip is stamped with who recorded it and which moment it fills, and
-/// tinted per author, so two simulators in the same room contribute visibly
-/// different footage and a stitched film shows at a glance whose clip is whose.
 enum DemoClipFactory {
-    /// One flat colour per author. Seven is enough to keep two or three
-    /// testers apart without the palette drifting into "real footage" territory.
     private static let palette: [UIColor] = [
         .systemTeal, .systemIndigo, .systemOrange,
         .systemPink, .systemPurple, .systemBrown, .systemGreen,
@@ -23,30 +10,12 @@ enum DemoClipFactory {
 
     private static let frameRate: Int32 = 30
 
-    /// How long a stand-in clip runs when nobody says otherwise.
-    ///
-    /// Three seconds is a length a person can watch. It is not a length a test
-    /// needs: render cost is per output frame, the CI runner has no GPU, and
-    /// the suites that drive this harness pass `DemoHarness.clipSeconds`
-    /// instead — which is the difference between a 39-minute lane and a
-    /// 7-minute one.
-    ///
-    /// Named rather than written as `3` at each call site because two tests
-    /// had hardcoded the number in assertions that were not about it (a film
-    /// duration, a frame sampled at 2.5s) and both broke the first time it
-    /// moved.
     static let standInSeconds: Double = 3
 
-    /// `String.hashValue` is seeded per process, so two simulators would pick
-    /// unrelated colours for the same name — and could collide on the same one.
     private static func stableHash(_ text: String) -> Int {
         text.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFF_FFFF }
     }
 
-    /// Hue identifies the author, brightness identifies the moment. Folding
-    /// the moment into the colour *choice* instead let one author's moment N
-    /// land on the same colour as the other author's moment N+1 — exactly the
-    /// confusion the palette exists to prevent.
     private static func tint(author: String, moment: Int) -> UIColor {
         let base = palette[stableHash(author) % palette.count]
         var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
@@ -68,8 +37,6 @@ enum DemoClipFactory {
         let size: CGSize = switch orientation {
         case .landscape: CGSize(width: 960, height: 540)
         case .portrait: CGSize(width: 540, height: 960)
-        // Generated already square, the way a square room's files arrive after
-        // `SquareCrop` — the demo has no camera to crop from.
         case .square: CGSize(width: 720, height: 720)
         }
         let name = author ?? "Tester"
@@ -122,14 +89,6 @@ enum DemoClipFactory {
         return writer.status == .completed ? url : nil
     }
 
-    /// A flat card: who, which moment, and how far through it is — the
-    /// percentage is what makes it obvious the clip is playing rather than
-    /// frozen on its first frame.
-    ///
-    /// It used to be a white bar sweeping across 82% of the height as well,
-    /// which read as part of the app rather than part of the footage: in a
-    /// two-up film it drew a white line across somebody's take, and the first
-    /// question it got asked was what that line was.
     private static func render(
         size: CGSize,
         color: UIColor,
@@ -156,9 +115,6 @@ enum DemoClipFactory {
             }
 
             draw(author, y: size.height * 0.36, size: size.width * 0.09, weight: .heavy)
-            // Kept in the middle of the frame, where a cell of any shape still
-            // shows it. Anything near an edge can be cropped away by a mosaic
-            // and take the only sign of movement with it.
             draw("MOMENT \(moment) · \(Int(progress * 100))%", y: size.height * 0.46, size: size.width * 0.055, weight: .bold)
             draw(label, y: size.height * 0.53, size: size.width * 0.045, weight: .medium)
         }

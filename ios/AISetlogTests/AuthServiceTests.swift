@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Trading an Apple or Google token for 1Day's own session at
-/// `workers/api`. The Worker's side (what it accepts and rejects) is tested
-/// in `workers/api/test`; these cover what the app sends and how it reads
-/// every kind of answer.
 final class AuthServiceTests: XCTestCase {
     private var session: URLSession!
 
@@ -28,7 +24,6 @@ final class AuthServiceTests: XCTestCase {
         AuthService(session: session, baseURL: URL(string: "https://example.test")!)
     }
 
-    // MARK: - The request
 
     func testItPostsTheTokenToTheProvidersPath() async throws {
         AuthStubProtocol.respond(
@@ -54,7 +49,6 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertEqual(AuthStubProtocol.lastURL?.path, "/auth/google")
     }
 
-    // MARK: - The answer
 
     func testASuccessfulAnswerBecomesASession() async throws {
         AuthStubProtocol.respond(
@@ -86,8 +80,6 @@ final class AuthServiceTests: XCTestCase {
         await assertThrows(.unavailable) { try await self.service().exchange("x", from: .apple) }
     }
 
-    /// A 200 that isn't a session (a captive portal, a misrouted domain) must
-    /// not be stored as one.
     func testA200WithoutASessionIsUnavailable() async {
         for body in ["<html>hotel wifi</html>", #"{"token":"","userId":"apple:1","expiresAt":1}"#, "{}"] {
             AuthStubProtocol.respond(status: 200, body: body)
@@ -95,11 +87,8 @@ final class AuthServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Keychain
 
     func testTheSessionSurvivesAndCanBeRemoved() throws {
-        // An unsigned test host (CI runs with CODE_SIGNING_ALLOWED=NO) has no
-        // keychain entitlement, so SecItemAdd fails silently and load() is nil.
         let probe: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.testService + ".probe",
@@ -117,14 +106,12 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertNil(keychain.load())
         keychain.save(first)
         XCTAssertEqual(keychain.load(), first)
-        // Signing in again replaces it rather than failing on a duplicate.
         keychain.save(second)
         XCTAssertEqual(keychain.load(), second)
         keychain.delete()
         XCTAssertNil(keychain.load())
     }
 
-    // MARK: -
 
     private func assertThrows(
         _ expected: AuthService.Failure,
@@ -141,7 +128,6 @@ final class AuthServiceTests: XCTestCase {
     }
 }
 
-/// Stands in for the Worker.
 private final class AuthStubProtocol: URLProtocol {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()

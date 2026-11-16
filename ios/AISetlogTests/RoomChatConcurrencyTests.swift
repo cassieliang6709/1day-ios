@@ -1,7 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Deterministic races at the real session/archive boundary; no CloudKit calls.
 @MainActor
 final class RoomChatConcurrencyTests: XCTestCase {
     private final class Transport: RoomChatTransport {
