@@ -12,10 +12,10 @@
   width: clamp(132px, 14vw, 174px);
   aspect-ratio: 1;
   overflow: hidden;
-  border: 4px solid rgba(230, 243, 255, 0.94);
+  border: 4px solid #fffef9;
   border-radius: 22px;
-  background: #0b376d;
-  box-shadow: 0 20px 42px rgba(0, 10, 43, 0.3);
+  background: var(--surface);
+  box-shadow: 0 20px 42px rgba(58, 43, 27, 0.15);
   transform-origin: center;
 }
 
