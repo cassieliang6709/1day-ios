@@ -1,13 +1,3 @@
-/**
- * Sign-in has one job: an identity token gets in only if Apple or Google
- * really issued it, to this app, and it hasn't expired. Most of these tests
- * are the ways a token can fail that, each of which must end in a rejection.
- *
- * Real Apple/Google keys can't sign test tokens, so each test makes its own
- * RSA key pair and serves it as the provider's key set.
- *
- *   npm test
- */
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
@@ -71,8 +61,8 @@ const googleClaims = (overrides = {}) => ({
   ...overrides,
 });
 
-let provider; // { privateKey, jwk } served as the provider's only key
-let attacker; // a key pair nobody published
+let provider;
+let attacker;
 
 beforeEach(async () => {
   provider = await makeKeyPair('real-kid');
@@ -98,7 +88,6 @@ async function rejects(promise, reason) {
 
 const header = { alg: 'RS256', kid: 'real-kid' };
 
-// MARK: - Accepted
 
 test('a genuine Apple token is accepted', async () => {
   const token = await sign(provider.privateKey, header, appleClaims());
@@ -119,7 +108,6 @@ test('a token a few seconds past exp still passes inside the clock skew', async 
   assert.equal((await verify('apple', token)).sub, '001234.abcd');
 });
 
-// MARK: - Rejected: not really from Apple/Google
 
 test('forged: signed by a key nobody published, same kid', async () => {
   const token = await sign(attacker.privateKey, header, appleClaims());
@@ -163,7 +151,6 @@ test('no kid at all', async () => {
   await rejects(verify('apple', token), 'no_kid');
 });
 
-// MARK: - Rejected: real, but not for us or not now
 
 test('expired', async () => {
   const token = await sign(provider.privateKey, header, appleClaims({ exp: NOW - 120 }));
@@ -216,7 +203,6 @@ test('no audiences configured refuses everything', async () => {
   await rejects(verify('apple', token, { audiences: [] }), 'no_audience_configured');
 });
 
-// MARK: - Key set fetching
 
 test('key source caches, and refetches once for an unknown kid', async () => {
   let fetches = 0;
@@ -232,12 +218,10 @@ test('key source caches, and refetches once for an unknown kid', async () => {
   assert.equal((await source('real-kid', t0 + 1000)).kid, 'real-kid');
   assert.equal(fetches, 1);
 
-  // A rotation: the new key appears after the first fetch.
   keys.push({ ...provider.jwk, kid: 'rotated' });
   assert.equal((await source('rotated', t0 + 2 * 60 * 1000)).kid, 'rotated');
   assert.equal(fetches, 2);
 
-  // Made-up kids right after a fetch don't trigger another one.
   assert.equal(await source('made-up', t0 + 2 * 60 * 1000 + 10), null);
   assert.equal(fetches, 2);
 });
@@ -249,7 +233,6 @@ test('key source failure is reported, not treated as "no such key"', async () =>
   await rejects(source('real-kid'), 'jwks_unavailable');
 });
 
-// MARK: - 1Day session tokens
 
 test('session token round trip', async () => {
   const { token, expiresAt } = await issueSessionToken('apple:001234.abcd', SECRET, NOW);
@@ -283,7 +266,6 @@ test('a short session secret is refused', async () => {
   await rejects(issueSessionToken('apple:me', 'short', NOW), 'no_session_secret');
 });
 
-// MARK: - The endpoints
 
 const env = (overrides = {}) => ({
   SESSION_SECRET: SECRET,
@@ -300,9 +282,6 @@ const post = (path, body, init = {}) =>
     ...init,
   });
 
-// The endpoints use the real key sources, which fetch the provider's key set
-// once per isolate and cache it. So they get one key pair for the whole file,
-// served at whichever provider URL is asked for.
 let endpointKey;
 const realFetch = globalThis.fetch;
 const realWarn = console.warn;
@@ -320,7 +299,6 @@ afterEach(() => {
 
 const endpointHeader = { alg: 'RS256', kid: 'endpoint-kid' };
 
-// The endpoints check against the real clock.
 const nowClaims = (claims) => {
   const now = Math.floor(Date.now() / 1000);
   return { ...claims, iat: now - 10, exp: now + 600 };

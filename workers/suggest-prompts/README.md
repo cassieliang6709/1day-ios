@@ -39,9 +39,9 @@ a config edit rather than a code change.
 ## Working on it
 
 ```bash
-npm test                                          # stubbed upstream
-node --env-file=.dev.vars --test test/*.test.mjs  # + one real DeepSeek call
-npm run dev                                       # wrangler dev, needs .dev.vars
+npm test
+node --env-file=.dev.vars --test test/*.test.mjs
+npm run dev
 npm run deploy
 ```
 

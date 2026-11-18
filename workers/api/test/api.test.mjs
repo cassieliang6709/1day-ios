@@ -1,10 +1,3 @@
-/**
- * The room API against a real schema (node:sqlite standing in for D1). Most
- * tests are about who may write what: the caller is whoever the session
- * token says, and nothing in a body can change that.
- *
- *   npm test
- */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
@@ -15,8 +8,8 @@ import { makeD1, makeR2 } from './support/d1.mjs';
 
 const SECRET = 'y'.repeat(48);
 const BASE = 'https://api.test';
-const ALICE = 'apple:001.alice';   // app id "001.alice"
-const BOB = 'google:bob';          // app id "google:bob"
+const ALICE = 'apple:001.alice';
+const BOB = 'google:bob';
 const A = '001.alice';
 const B = 'google:bob';
 
@@ -236,12 +229,10 @@ test('push: others in the room hear it, the author does not, a poke reaches only
   await notifyRoom(env, { kind: 'poke', code: 'ABCDEF', authorID: B, authorName: 'Bob', targetAuthorID: 'someone-else', recordName: 'p' }, { send });
   assert.equal(sent.length, 0);
 
-  // A dead token is dropped.
   const dead = async () => ({ status: 410, reason: 'Unregistered' });
   await notifyRoom(env, { kind: 'clip', code: 'ABCDEF', authorID: A, authorName: 'Alice', recordName: 'x' }, { send: dead });
   assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first()).n, 1);
 
-  // Turning notifications off is an empty room list.
   await call(ALICE, 'PUT', '/push/device', { ...device('aa'.repeat(32)), rooms: [] });
   assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first()).n, 0);
 });
