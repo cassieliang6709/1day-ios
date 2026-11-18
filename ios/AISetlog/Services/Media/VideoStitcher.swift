@@ -1,42 +1,23 @@
 import AVFoundation
 import UIKit
 
-/// Stitches the daily clips into one short diary film, entirely on-device.
-///
-/// Features:
-/// - sequential layout with crossfade cuts
-/// - optional opening title card (challenge name + date range)
-/// - "DAY N" captions burned in via AVVideoCompositionCoreAnimationTool
-///
-/// Simulator note: CoreAnimationTool overlays (captions + title card) crash
-/// the simulator's software render path, so they are device-only.
 enum VideoStitcher {
 
-    enum Layout {
+    enum Layout: Codable {
         case sequential
-        /// Shared-room clips are grouped by moment, with every friend shown
-        /// simultaneously before advancing to the next moment.
         case friendsTogether
     }
 
-    struct TitleCard {
+    struct TitleCard: Codable {
         let title: String
         let subtitle: String
     }
 
-    /// The shape of the finished film, when somebody asks for one by name.
-    ///
-    /// A property of the finished film, separate from source capture direction.
-    /// Left unset, the canvas is computed from the takes instead — see
-    /// `mosaicRenderSize`. An explicit choice overrides that, and then the cells
-    /// stop matching the takes, so the compositor's fit-and-bed fallback is what
-    /// keeps everybody whole. Changing the canvas does not rotate the source.
-    enum Aspect: String, CaseIterable, Identifiable {
+    enum Aspect: String, Codable, CaseIterable, Identifiable {
         case portrait, landscape, square
 
         var id: String { rawValue }
 
-        /// width / height
         var ratio: CGFloat {
             switch self {
             case .portrait: 9.0 / 16.0
@@ -45,9 +26,6 @@ enum VideoStitcher {
             }
         }
 
-        /// Render size for a film whose source clips have this long edge.
-        /// All three land on the same short edge, so switching aspect doesn't
-        /// change how heavy the export is.
         func renderSize(sourceLongEdge: CGFloat) -> CGSize {
             let short = (sourceLongEdge * 9 / 16).rounded()
             let long = sourceLongEdge.rounded()
@@ -56,45 +34,23 @@ enum VideoStitcher {
             case .landscape: CGSize(width: long, height: short)
             case .square: CGSize(width: short, height: short)
             }
-            // H.264 wants even dimensions.
             return CGSize(
                 width: (raw.width / 2).rounded(.down) * 2,
                 height: (raw.height / 2).rounded(.down) * 2)
         }
     }
 
-    struct Options {
+    struct Options: Codable {
         var crossfadeSeconds: Double = 0.35
         var showDayCaptions = true
         var layout: Layout = .sequential
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
-        /// nil builds the canvas from the takes, so that every cell of the
-        /// mosaic comes out the shape the takes were filmed in and nothing is
-        /// cropped — see `mosaicRenderSize`. An explicit aspect always wins.
         var aspect: Aspect?
-        /// How you want your own footage graded, the same value the review
-        /// screen plays with. Costs an extra pass over your clips when it isn't
-        /// `.none` — see `filteredClips`.
         var look: PersonalEffectParameters = .none
-        /// Whose clips `look` is allowed to touch.
-        ///
-        /// Your dials are yours. In a shared room the film is stitched on your
-        /// phone out of everybody's takes, and without this the grade you set
-        /// for your own face was baked onto your friends' footage too — they
-        /// filmed in their light, not yours, and they never agreed to it. Nil
-        /// means a solo film, where every clip is already yours.
         var lookAuthorID: String?
-        /// Which takes make the film, by `DayClip.id`. Nil keeps every take
-        /// handed in — the film as it always was.
         var keptClipIDs: Set<String>?
-        /// Takes that stand still in the shared-room grid: `DayClip.id` →
-        /// seconds into the take. That cell shows the one frame for the whole
-        /// moment while everyone else keeps playing, and its sound is left
-        /// out. The sequential film has no cells, so it ignores this.
         var freezeFrames: [String: Double] = [:]
-        /// The shared-room grid's moments in play order, by slot. Nil plays
-        /// them by slot number, as always.
         var dayOrder: [Int]?
         static let `default` = Options()
     }
@@ -114,19 +70,14 @@ enum VideoStitcher {
     }
 
     private struct LoadedClip {
-        /// `DayClip.id`, so `Options.freezeFrames` can find its take.
         let id: String
         let day: Int
         let label: String?
         let authorName: String?
-        /// The clip's own words, every one of them, each burned where it was put.
         let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
         let comments: [String]
-        /// Kept alive on purpose: AVAssetTrack does NOT retain its parent
-        /// asset, and insertTimeRange fails (-12780) on a track whose asset
-        /// has been deallocated.
         let asset: AVURLAsset
         let videoRange: CMTimeRange
         let videoTrack: AVAssetTrack
@@ -134,16 +85,8 @@ enum VideoStitcher {
         let audioRange: CMTimeRange
         let naturalSize: CGSize
         let preferredTransform: CGAffineTransform
-        /// One frame of the take, for holding it still. Invalid when the track
-        /// didn't say; `cellSegments` falls back to 1/30 s.
         var frameDuration: CMTime = .invalid
-        /// Baked by a camera that prints its own date (`CameraStyle`), so the
-        /// film's date pill stays off this clip.
         var hasCameraStamp = false
-        /// Where the whole take sits on the canvas, in render space with the
-        /// origin at the top left, when it was too different a shape to fill
-        /// it and was laid on a bed instead — see `reframed`. Nil for a take
-        /// that fills the canvas.
         var shownWhole: CGRect?
 
         var duration: CMTime { videoRange.duration }
@@ -154,31 +97,18 @@ enum VideoStitcher {
         }
     }
 
-    /// One person's own words, over their own half of a shared frame.
-    ///
-    /// The moment caption is one pill across the bottom of the whole film, so
-    /// in a shared room only one person's caption could ever be shown — whoever
-    /// typed first took the slot and the second person's words went nowhere.
-    /// These are per cell instead: two people filming the same moment each get
-    /// to say their own thing about it.
     private struct AuthorCaptionWindow {
         let text: String
-        /// Where in the cell the words go. The fractions are measured against
-        /// the cell, not the canvas, so a sticker somebody dragged to the top
-        /// left of their own take is at the top left of their own cell.
         let sticker: CaptionSticker
-        /// In render space, origin top-left, matching the grid's own maths.
         let cell: CGRect
         let start: Double
         let end: Double
     }
 
-    /// A caption to draw later: which day, over which time window.
     private struct CaptionWindow {
         let day: Int
         let label: String?
         let authorName: String?
-        /// The clip's own words, every one of them, each burned where it was put.
         let captions: [Caption]
         let recordedAt: Date?
         let emoji: [String]
@@ -186,16 +116,15 @@ enum VideoStitcher {
         let start: Double
         let end: Double
         var hasCameraStamp = false
-        /// What the clip's own captions are measured against. Nil is the whole
-        /// canvas; a take shown whole on a bed sets it to where that take sits,
-        /// so words placed on the footage stay on the footage.
         var captionFrame: CGRect?
     }
 
-    // MARK: - Entry point
 
-    static func stitch(clips allClips: [DayClip], options: Options = .default) async throws -> URL {
-        // Before the look pass, so a take left out of the film isn't graded.
+    static func stitch(
+        clips allClips: [DayClip], options: Options = .default,
+        progress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> URL {
+        try Task.checkCancellation()
         let clips = kept(allClips, ids: options.keptClipIDs)
         guard !clips.isEmpty else { throw StitchError.noClips }
 
@@ -204,26 +133,20 @@ enum VideoStitcher {
         let titleCard = options.titleCard
         #endif
 
-        // Read before the look pass: its graded copies aren't promised to carry
-        // the original's metadata.
         var cameraStamped: Set<String> = []
         for clip in clips where await CameraStyleBaker.hasCameraStamp(clip.url) {
             cameraStamped.insert(clip.id)
         }
 
-        // ---- The look, one clip at a time, before anything is stitched ------
         let (source, scratch) = try await filteredClips(
             clips, look: options.look, authorID: options.lookAuthorID)
         defer { discard(scratch) }
+        progress?(0.2)
 
-        // ---- Load track info for every clip --------------------------------
         var loaded: [LoadedClip] = []
         for clip in source {
             let asset = AVURLAsset(url: clip.url)
             guard let video = try await asset.loadTracks(withMediaType: .video).first else { continue }
-            // Use each track's own timeRange, NOT the container duration —
-            // AAC audio is usually a few ms shorter than the video, and
-            // inserting past a source track's end throws.
             let videoRange = try await video.load(.timeRange)
             let naturalSize = try await video.load(.naturalSize)
             let transform = try await video.load(.preferredTransform)
@@ -246,9 +169,6 @@ enum VideoStitcher {
 
         let firstSize = loaded[0].orientedSize
         let sourceAspect = firstSize.height > 0 ? firstSize.width / firstSize.height : 1
-        // How many takes ever share one frame. A film's canvas is one shape for
-        // its whole length, so the busiest moment is the one that sets it; a
-        // quieter moment inside the same film falls back to fit-and-bed.
         let widestMoment: Int = switch options.layout {
         case .sequential: 1
         case .friendsTogether:
@@ -260,14 +180,10 @@ enum VideoStitcher {
                 count: widestMoment, sourceAspect: sourceAspect,
                 longEdge: max(firstSize.width, firstSize.height))
 
-        // The sequential film's canvas is the first take's shape, and every
-        // later take used to be cropped to it: a landscape take in a portrait
-        // diary came out as a narrow strip from its middle. A take too
-        // different to fill the canvas is redrawn whole onto a bed first.
         var reframeScratch: [URL] = []
         defer { discard(reframeScratch) }
         if case .sequential = options.layout {
-            (loaded, reframeScratch) = await reframed(loaded, canvas: renderSize)
+            (loaded, reframeScratch) = try await reframed(loaded, canvas: renderSize)
         }
 
         #if targetEnvironment(simulator)
@@ -278,7 +194,6 @@ enum VideoStitcher {
             : CMTime(seconds: options.titleSeconds, preferredTimescale: 600)
         #endif
 
-        // ---- Build the track layout ----------------------------------------
         let composition = AVMutableComposition()
         var instructions: [any AVVideoCompositionInstructionProtocol] = []
         var audioParams: [AVMutableAudioMixInputParameters] = []
@@ -301,7 +216,6 @@ enum VideoStitcher {
                 authorCaptions: &authorCaptions)
         }
 
-        // ---- Title card: a source-less black segment up front ---------------
         if titleOffset > .zero {
             let inst = AVMutableVideoCompositionInstruction()
             inst.timeRange = CMTimeRange(start: .zero, duration: titleOffset)
@@ -315,17 +229,12 @@ enum VideoStitcher {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.instructions = instructions
         if case .friendsTogether = options.layout {
-            // Only the grid needs it. A custom compositor replaces AVFoundation's
-            // own for the whole composition, so the sequential film — which is
-            // nothing but transforms and fades, the things layer instructions
-            // are good at — keeps the built-in path.
             videoComposition.customVideoCompositorClass = FriendsTogetherCompositor.self
         }
 
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = audioParams
 
-        // ---- Overlays: title card text + DAY N captions + watermark ---------
         #if !targetEnvironment(simulator)
         do {
             let videoLayer = CALayer()
@@ -340,8 +249,6 @@ enum VideoStitcher {
                     duration: options.titleSeconds)
             }
             if drawCaptions {
-                // Solo diaries don't need a "who filmed this" avatar — it's
-                // always you. Only the multi-friend room finale earns one.
                 let multiAuthor = Set(
                     loaded.compactMap { $0.authorName?.trimmingCharacters(in: .whitespaces) }
                         .filter { !$0.isEmpty }
@@ -350,8 +257,6 @@ enum VideoStitcher {
                     addCaption(caption, to: parentLayer, renderSize: renderSize, showAuthorMark: multiAuthor)
                 }
             }
-            // Drawn whether or not day captions are on: this is something a
-            // person typed about their own clip, not a label the app added.
             for caption in authorCaptions {
                 addAuthorCaption(caption, to: parentLayer, renderSize: renderSize)
             }
@@ -362,7 +267,6 @@ enum VideoStitcher {
         }
         #endif
 
-        // ---- Export ----------------------------------------------------------
         let outURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("daily_film_\(UUID().uuidString).mp4")
 
@@ -376,8 +280,8 @@ enum VideoStitcher {
         export.audioMix = audioMix
 
         print("[stitch] exporting clips=\(loaded.count) renderSize=\(renderSize)")
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
+        try await VideoExportSession.run(export) { fraction in
+            progress?(0.2 + fraction * 0.8)
         }
         guard export.status == .completed else {
             print("[stitch] export status=\(export.status.rawValue) error=\(String(describing: export.error))")
@@ -386,20 +290,7 @@ enum VideoStitcher {
         return outURL
     }
 
-    // MARK: - The look pass
 
-    /// Graded copies of your own clips, plus the files to delete afterwards.
-    ///
-    /// The grade can't ride along on the film's own composition: that one has
-    /// hand-written instructions for the crossfades and the grid, and an
-    /// `animationTool` holding the title card, the captions and the stickers,
-    /// while a Core Image composition builds an instruction set of its own —
-    /// one asset gets one. Grading the finished film instead would grade the
-    /// words along with the faces. So each clip is graded on its own first, and
-    /// the stitcher never learns that anything happened.
-    ///
-    /// A clip is two seconds. Even fifteen of them is a short wait, and it only
-    /// happens when a dial has been moved.
     private static func filteredClips(
         _ clips: [DayClip], look: PersonalEffectParameters, authorID: String?
     ) async throws -> (clips: [DayClip], scratch: [URL]) {
@@ -408,8 +299,6 @@ enum VideoStitcher {
         var out: [DayClip] = []
         var scratch: [URL] = []
         for clip in clips {
-            // Somebody else's take goes in as they filmed it. Nil authorID is a
-            // solo film, where the question doesn't arise.
             guard authorID == nil || clip.authorID == authorID else {
                 out.append(clip)
                 continue
@@ -420,9 +309,10 @@ enum VideoStitcher {
                 guard filtered != clip.url else { out.append(clip); continue }
                 scratch.append(filtered)
                 out.append(clip.replacingURL(filtered))
+            } catch is CancellationError {
+                discard(scratch)
+                throw CancellationError()
             } catch {
-                // One clip the grade couldn't handle is not a reason to lose the
-                // whole film. It goes in as the camera saw it.
                 print("[stitch] look pass failed for day \(clip.day): \(error)")
                 out.append(clip)
             }
@@ -434,7 +324,6 @@ enum VideoStitcher {
         for url in urls { try? FileManager.default.removeItem(at: url) }
     }
 
-    // MARK: - Sequential layout (crossfades)
 
     private struct Placement {
         let clip: LoadedClip
@@ -453,7 +342,6 @@ enum VideoStitcher {
         audioParams: inout [AVMutableAudioMixInputParameters],
         captions: inout [CaptionWindow]
     ) throws {
-        // Fade can't be longer than half the shortest clip.
         var fade = CMTime(seconds: crossfadeSeconds, preferredTimescale: 600)
         if let shortest = loaded.map(\.duration).min() {
             let cap = CMTimeMultiplyByFloat64(shortest, multiplier: 0.45)
@@ -538,13 +426,6 @@ enum VideoStitcher {
                 captionFrame: p.clip.shownWhole))
         }
 
-        // Audio tracks are added up front but only filled for clips that have
-        // sound. Any that stay empty — every clip filmed with the microphone
-        // denied, say — must come back out: an empty audio track fails the
-        // export with AVError -11838 instead of producing a silent film.
-        //
-        // Keyed by the original track index rather than compacted, because
-        // placements refer to tracks by that index.
         var params: [Int: AVMutableAudioMixInputParameters] = [:]
         for (index, track) in audioTracks.enumerated() {
             if track.segments.isEmpty {
@@ -575,27 +456,12 @@ enum VideoStitcher {
         audioParams.append(contentsOf: params.values)
     }
 
-    // MARK: - Sequential layout (takes of another shape)
 
-    /// How one take goes onto the sequential film's canvas.
     enum SequentialFraming: Equatable {
-        /// Covers the canvas, the little that hangs over cropped off — what
-        /// every take got before, and still what a take of the canvas's own
-        /// shape gets.
         case fill
-        /// All of it, centred at `subject` (render space, origin top left),
-        /// over a blurred copy of itself.
         case fitOnBed(subject: CGRect)
     }
 
-    /// Fill or fit-and-bed, by the shared-room grid's own rule
-    /// (`FriendsTogetherCompositor.coversByCropping`), with the whole canvas
-    /// as the one cell.
-    ///
-    /// The tolerance is the grid's too: up to an eighth of the take may go, so
-    /// a take a few pixels off the canvas's shape still simply fills it. A
-    /// landscape take in a portrait diary, or a 3:4 camera-style take in a
-    /// 9:16 one, is well past that.
     static func sequentialFraming(orientedSize: CGSize, canvas: CGSize) -> SequentialFraming {
         guard orientedSize.width > 0, orientedSize.height > 0,
               !FriendsTogetherCompositor.coversByCropping(
@@ -607,24 +473,9 @@ enum VideoStitcher {
             centredIn: CGRect(origin: .zero, size: canvas)))
     }
 
-    /// The takes, with every one that can't fill `canvas` swapped for a
-    /// canvas-sized copy of itself, whole on its bed. Plus the copies, to
-    /// delete afterwards.
-    ///
-    /// Done as a pass of its own, like the look, rather than by running the
-    /// whole film through the custom compositor. The film's crossfades are
-    /// opacity ramps on layer instructions, which the compositor knows nothing
-    /// about, and it would replace AVFoundation's renderer for every frame of
-    /// every film that had one odd take in it. Instead the copy comes out the
-    /// canvas's exact shape, so `fillTransform` places it with no crop and the
-    /// fades, captions and sound downstream work as they always have. The
-    /// copy's pixels come from `FriendsTogetherCompositor` itself, so a take
-    /// shown whole looks the same in a diary as in a shared-room cell.
-    ///
-    /// Only odd takes pay for it; an all-portrait diary does no extra work.
     private static func reframed(
         _ loaded: [LoadedClip], canvas: CGSize
-    ) async -> (clips: [LoadedClip], scratch: [URL]) {
+    ) async throws -> (clips: [LoadedClip], scratch: [URL]) {
         var out: [LoadedClip] = []
         var scratch: [URL] = []
         for clip in loaded {
@@ -640,9 +491,10 @@ enum VideoStitcher {
                 var copy = try await reloaded(clip, from: url)
                 copy.shownWhole = subject
                 out.append(copy)
+            } catch is CancellationError {
+                discard(scratch)
+                throw CancellationError()
             } catch {
-                // A take cropped is better than a film lost: it goes in the way
-                // it always did.
                 print("[stitch] reframe failed for day \(clip.day): \(error)")
                 out.append(clip)
             }
@@ -650,8 +502,6 @@ enum VideoStitcher {
         return (out, scratch)
     }
 
-    /// One take, rendered canvas-sized: whole, centred, over a blurred copy of
-    /// itself. Its sound comes along untouched.
     private static func bedCopy(of clip: LoadedClip, canvas: CGSize) async throws -> URL {
         let composition = AVMutableComposition()
         guard let video = composition.addMutableTrack(
@@ -667,9 +517,6 @@ enum VideoStitcher {
                 of: audio, at: .zero)
         }
 
-        // One cell the size of the whole canvas. The take's rotation travels
-        // as an orientation, the way the grid hands it over, because the
-        // compositor reads raw source frames rather than transformed ones.
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = canvas
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
@@ -690,9 +537,7 @@ enum VideoStitcher {
         export.outputURL = url
         export.outputFileType = .mov
         export.videoComposition = videoComposition
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            export.exportAsynchronously { cont.resume() }
-        }
+        try await VideoExportSession.run(export)
         guard export.status == .completed else {
             try? FileManager.default.removeItem(at: url)
             throw StitchError.exportFailed(export.error?.localizedDescription ?? "unknown")
@@ -700,8 +545,6 @@ enum VideoStitcher {
         return url
     }
 
-    /// `clip` with its footage read from `url` instead, and everything said
-    /// about it — day, captions, stamp — kept.
     private static func reloaded(_ clip: LoadedClip, from url: URL) async throws -> LoadedClip {
         let asset = AVURLAsset(url: url)
         guard let video = try await asset.loadTracks(withMediaType: .video).first
@@ -724,10 +567,7 @@ enum VideoStitcher {
             hasCameraStamp: clip.hasCameraStamp)
     }
 
-    // MARK: - Shared-room layout
 
-    /// Plays each moment once, placing every friend's contribution for that
-    /// moment side by side. Shorter takes loop until the longest take ends.
     private static func buildFriendsTogether(
         loaded: [LoadedClip],
         into composition: AVMutableComposition,
@@ -753,11 +593,6 @@ enum VideoStitcher {
             var placements: [FriendsTogetherPlacement] = []
 
             let (rows, columns) = grid(for: clips.count, sourceAspect: sourceAspect)
-            // Cells meet on rounded pixel boundaries and tile the canvas
-            // exactly. They used to be inset by a gap, which drew a black bar
-            // down the middle of the film — and the fraction that looks like a
-            // hairline in an export is a thick seam once a player has scaled
-            // the film up to a phone.
             func edge(_ step: Int, of count: Int, across total: CGFloat) -> CGFloat {
                 (total * CGFloat(step) / CGFloat(count)).rounded()
             }
@@ -776,9 +611,6 @@ enum VideoStitcher {
                     let at = CMTimeAdd(cursor, segment.offset)
                     try videoTrack.insertTimeRange(
                         segment.source, of: clip.videoTrack, at: at)
-                    // A held frame: one frame inserted, then stretched over the
-                    // whole moment. No still image is made, so the cell keeps
-                    // the take's own orientation and the compositor's maths.
                     if segment.duration != segment.source.duration {
                         videoTrack.scaleTimeRange(
                             CMTimeRange(start: at, duration: segment.source.duration),
@@ -795,9 +627,6 @@ enum VideoStitcher {
                     y: top,
                     width: edge(column + 1, of: columns, across: renderSize.width) - left,
                     height: edge(row + 1, of: rows, across: renderSize.height) - top)
-                // The cell is handed over as geometry, not as a transform: the
-                // compositor has to scale the take twice — once to cover, once
-                // to fit — and a layer instruction can only carry one.
                 placements.append(FriendsTogetherPlacement(
                     trackID: videoTrack.trackID,
                     cell: cell,
@@ -811,8 +640,6 @@ enum VideoStitcher {
                         start: CMTimeGetSeconds(cursor), end: CMTimeGetSeconds(end)))
                 }
 
-                // A still picture with sound running under it reads as broken,
-                // so a held cell is silent and the others carry the moment.
                 if freezeAt == nil,
                    let audio = clip.audioTrack,
                    let audioTrack = composition.addMutableTrack(
@@ -853,22 +680,12 @@ enum VideoStitcher {
         }
     }
 
-    /// One stretch of a grid cell's track: a piece of the take, where it
-    /// lands in the moment, and how long it lasts there. `duration` longer
-    /// than `source.duration` means the piece is held — stretched to fill.
     struct CellSegment: Equatable {
         let source: CMTimeRange
         let offset: CMTime
         let duration: CMTime
     }
 
-    /// How one take fills a moment `momentDuration` long.
-    ///
-    /// Playing: the take from its start, looped until the moment ends — a
-    /// shorter take repeats under the longest one. Held (`freezeAt` set): one
-    /// frame, `freezeAt` seconds into the take, stretched over the whole
-    /// moment. The frame is clamped inside the take so a time past its end
-    /// still lands on its last frame.
     static func cellSegments(
         videoRange: CMTimeRange,
         momentDuration: CMTime,
@@ -907,15 +724,12 @@ enum VideoStitcher {
         return segments
     }
 
-    /// The takes `ids` keeps, in their order. Nil keeps them all.
     static func kept(_ clips: [DayClip], ids: Set<String>?) -> [DayClip] {
         guard let ids else { return clips }
         return clips.filter { ids.contains($0.id) }
     }
 
-    // MARK: - Geometry
 
-    /// Applies the clip's own rotation, then aspect-fills it into `rect`.
     private static func fillTransform(for clip: LoadedClip, into rect: CGRect) -> CGAffineTransform {
         let r = CGRect(origin: .zero, size: clip.naturalSize).applying(clip.preferredTransform)
         var transform = clip.preferredTransform.concatenating(
@@ -930,18 +744,6 @@ enum VideoStitcher {
         return transform
     }
 
-    /// How a moment's clips share the frame when everyone filmed it.
-    ///
-    /// The split runs across the take's short edge, so a cell comes out the
-    /// same shape as the take going into it: portrait takes stand side by side,
-    /// landscape takes stack. That is the whole trick behind a crop-free
-    /// mosaic — see `mosaicRenderSize`, which sizes the canvas to match.
-    ///
-    /// Past three the strip gets too narrow to see a person in, so it squares
-    /// off into a grid, which for four portrait takes is 2×2 and lands back on
-    /// a 9:16 canvas exactly.
-    ///
-    /// `sourceAspect` is width / height of the takes *after* rotation.
     static func grid(for count: Int, sourceAspect: CGFloat) -> (rows: Int, columns: Int) {
         guard count > 1 else { return (1, 1) }
         if count <= 3 {
@@ -952,28 +754,6 @@ enum VideoStitcher {
         return (rows, columns)
     }
 
-    /// The canvas that makes every cell of a `count`-up mosaic exactly the
-    /// shape of the takes filling it — so nothing is cropped and nothing is
-    /// padded.
-    ///
-    /// Two portrait takes side by side need a canvas twice as wide as one of
-    /// them: 9:8. Three need 27:16, which is all but 16:9. Four go 2×2 and land
-    /// on 9:16 again. This is what the old "automatic output is the opposite of
-    /// the source" rule was reaching for — it flipped portrait takes into a
-    /// 16:9 film, which is right for three people and wrong for two, and it
-    /// flipped a one-person diary too, where the opposite orientation is the
-    /// one thing it cannot be.
-    ///
-    /// `longEdge` caps the result, so a four-up film isn't four times the
-    /// pixels of a one-up.
-    /// How far from square a canvas may go before matching the cells to the
-    /// takes costs more than it earns.
-    ///
-    /// Only square takes ever reach it. Three of them in a strip want a 1:3
-    /// canvas, which is a crop-free film nobody can watch on a phone — and the
-    /// two shapes a phone actually films, 9:16 and 16:9, never get past 27:16
-    /// either way. Past the limit the canvas becomes the take's own shape and
-    /// the compositor's fit-and-bed keeps everybody whole instead.
     private static let elongationLimit: CGFloat = 2
 
     static func mosaicRenderSize(
@@ -990,26 +770,18 @@ enum VideoStitcher {
         let raw = ratio >= 1
             ? CGSize(width: longEdge, height: longEdge / ratio)
             : CGSize(width: longEdge * ratio, height: longEdge)
-        // H.264 wants even dimensions, and a zero would take the export with it.
         return CGSize(
             width: max((raw.width / 2).rounded(.down) * 2, 2),
             height: max((raw.height / 2).rounded(.down) * 2, 2))
     }
 
-    // MARK: - Overlays (device only)
 
-    /// Internal rather than private so `FilmMarkPreviewTests` can draw the
-    /// real layers into a bitmap: the export path that normally shows them is
-    /// device-only (see the note at the top of this file), so a screenshot of
-    /// the actual thing is otherwise impossible to get on a Mac.
     static func addTitleCard(
         _ card: TitleCard, to parentLayer: CALayer, renderSize: CGSize, duration: Double
     ) {
         let titleSize = renderSize.height * 0.05
         let subtitleSize = titleSize * 0.45
 
-        // Shrink long titles until they fit (with side margins) instead of
-        // letting CATextLayer clip them at the frame edges.
         func textLayer(_ string: String, size: CGFloat, weight: UIFont.Weight, alpha: CGFloat) -> (CATextLayer, CGSize) {
             let maxWidth = renderSize.width * 0.88
             var fontSize = size
@@ -1034,13 +806,8 @@ enum VideoStitcher {
             return (layer, attributed.size())
         }
 
-        // CA coordinates: origin bottom-left.
         let (title, titleTextSize) = textLayer(card.title, size: titleSize, weight: .heavy, alpha: 1)
 
-        // The mascot, above the title. The opening card was the story's name
-        // and its dates in white type on black — the one place every viewer
-        // looks at for a full second, and the only thing on it that said which
-        // app made this was nothing at all.
         var layers: [CALayer] = [title]
         if let mark = mascotLayer(
             size: renderSize.height * 0.115,
@@ -1074,37 +841,13 @@ enum VideoStitcher {
         }
     }
 
-    /// A rounded "DAY N" pill at the bottom center, visible only during its
-    /// time window.
-    /// One person's words, sized and placed against their own cell rather than
-    /// the whole frame.
-    ///
-    /// Everything is measured off the cell: the pill can't be wider than the
-    /// cell it belongs to, and it sits just inside that cell's bottom edge. In a
-    /// two-up grid that puts each person's line under their own face, which is
-    /// the only arrangement where both can be read at once.
-    /// One person's words, drawn where they put them and the way they chose.
-    ///
-    /// `frame` is what the sticker's fractions are measured against, in render
-    /// space with the origin at the top left: the whole canvas for a film
-    /// nobody shares the frame in, one cell for a mosaic. The returned layer is
-    /// already placed in Core Animation's coordinates (which count from the
-    /// bottom) and carries no animation — the caller owns the fade, because the
-    /// two callers fade on different clocks.
     private static func captionLayer(
         text: String, sticker: CaptionSticker, in frame: CGRect, renderSize: CGSize
     ) -> CALayer {
         let minEdge = min(frame.width, frame.height)
         let maxWidth = frame.width * 0.76
-        // The bar behind the words, described once in `CaptionSticker.Style`
-        // and read here and on the review screen. Four styles have one shape
-        // each; two have none.
         let plate = sticker.style.plate
         let banded = plate != nil
-        // `scale` is what the pinch gesture committed. It goes in here rather
-        // than as a layer transform so the shrink-to-fit loop below sees the
-        // real size: scaling the layer afterwards would push a caption
-        // somebody enlarged straight back out past `maxWidth`.
         var fontSize = minEdge * (sticker.style == .headline ? 0.092 : 0.062) * sticker.scale
         let weight: UIFont.Weight = sticker.style == .headline ? .heavy : .bold
         let ink = sticker.tint.uiColor
@@ -1126,8 +869,6 @@ enum VideoStitcher {
             width: min(textSize.width, maxWidth) + padH * 2,
             height: textSize.height + padV * 2)
 
-        // Kept off the edge of its frame, and clamped in an order that survives
-        // a sticker wider than the space left for it: the lower bound wins.
         let inset = frame.width * 0.03
         let lower = frame.minX + inset
         let upper = max(lower, frame.maxX - inset - box.width)
@@ -1142,15 +883,6 @@ enum VideoStitcher {
             container.cornerRadius = box.height * plate.radius
         }
         if sticker.angle != 0 {
-            // Around the container's own middle, which is already where the
-            // sticker's fractions placed it — the default anchor point — so
-            // turning the words doesn't also move them.
-            //
-            // Negated: this layer tree counts y from the bottom (see the
-            // `renderSize.height -` above), so a positive z-rotation here
-            // turns anticlockwise, while SwiftUI's `.rotationEffect` on the
-            // review screen turns clockwise. Same number, opposite sign, so
-            // the export matches what was placed.
             container.transform = CATransform3DMakeRotation(
                 -sticker.angle * .pi / 180, 0, 0, 1)
         }
@@ -1163,8 +895,6 @@ enum VideoStitcher {
         layer.frame = CGRect(
             x: padH, y: padV, width: box.width - padH * 2, height: textSize.height)
         if !banded {
-            // Nothing behind the words, so they need their own edge to stay
-            // readable over whatever they landed on.
             layer.shadowColor = UIColor.black.withAlphaComponent(0.32).cgColor
             layer.shadowOpacity = 1
             layer.shadowRadius = max(fontSize * 0.08, 3)
@@ -1177,11 +907,6 @@ enum VideoStitcher {
     private static func addAuthorCaption(
         _ caption: AuthorCaptionWindow, to parentLayer: CALayer, renderSize: CGSize
     ) {
-        // Measured against this person's cell rather than the canvas, so their
-        // words land on their own footage wherever they dragged them. This used
-        // to be a dark pill pinned to the bottom of the cell whatever the
-        // review screen had shown, which is the one place a caption could be
-        // that nobody had chosen.
         let pill = captionLayer(
             text: caption.text, sticker: caption.sticker,
             in: caption.cell, renderSize: renderSize)
@@ -1229,7 +954,6 @@ enum VideoStitcher {
         let padV = fontSize * 0.45
         let pillSize = CGSize(width: textSize.width + padH * 2, height: textSize.height + padV * 2)
 
-        // CA coordinates: origin bottom-left.
         let pillOrigin = CGPoint(
             x: (renderSize.width - pillSize.width) / 2,
             y: renderSize.height * 0.075)
@@ -1288,8 +1012,6 @@ enum VideoStitcher {
             edge: edge)
     }
 
-    /// Floats the clip's emoji reactions up the left edge — each pops in with a
-    /// little stagger so a reacted-on clip feels alive in the final film.
     private static func addEmojiStickers(
         for caption: CaptionWindow,
         to parentLayer: CALayer,
@@ -1297,7 +1019,6 @@ enum VideoStitcher {
         duration: Double,
         edge: Double
     ) {
-        // Distinct emoji, first-seen order, capped so they never crowd the frame.
         var seen = Set<String>()
         let emoji = caption.emoji.filter { seen.insert($0).inserted }.prefix(5)
         guard !emoji.isEmpty else { return }
@@ -1307,7 +1028,6 @@ enum VideoStitcher {
         let size = max(minEdge * 0.11, 26)
         let spacing = size * 1.15
         let leftX = target.minX + minEdge * 0.07
-        // CA coords (origin bottom-left): stack upward from the lower third.
         let baseY = renderSize.height - target.maxY + target.height * 0.28
 
         for (i, glyph) in emoji.enumerated() {
@@ -1322,7 +1042,6 @@ enum VideoStitcher {
                 y: baseY + CGFloat(i) * spacing,
                 width: size, height: size)
 
-            // Stagger each pop-in, but keep every glyph inside its clip's window.
             let stagger = min(Double(i) * 0.12, max(duration - 0.4, 0))
             let begin = caption.start <= 0
                 ? AVCoreAnimationBeginTimeAtZero + stagger
@@ -1357,8 +1076,6 @@ enum VideoStitcher {
         }
     }
 
-    /// The latest few comments rise as little bubbles above the watermark —
-    /// the friends' voices become part of the film, not just the app.
     private static func addCommentBubbles(
         for caption: CaptionWindow,
         to parentLayer: CALayer,
@@ -1377,8 +1094,6 @@ enum VideoStitcher {
         let leftX = renderSize.width * 0.045
         let maxWidth = renderSize.width * 0.62
 
-        // CA coordinates: origin bottom-left. Stack upward from just above
-        // the watermark line.
         var y = renderSize.height * 0.028 + fontSize * 1.6
 
         for (i, line) in lines.enumerated() {
@@ -1411,7 +1126,6 @@ enum VideoStitcher {
                 width: bubbleSize.width, height: textSize.height)
             bubble.addSublayer(text)
 
-            // Stagger each bubble's rise, keeping it inside the clip's window.
             let stagger = min(Double(i) * 0.25, max(duration - 0.5, 0))
             let begin = caption.start <= 0
                 ? AVCoreAnimationBeginTimeAtZero + stagger
@@ -1441,9 +1155,6 @@ enum VideoStitcher {
         duration: Double,
         edge: Double
     ) {
-        // Every caption on the clip, each where it was put, all over the same
-        // window: they were placed together on one frame, so they come and go
-        // together.
         for line in caption.captions {
             guard let rawText = line.trimmedText else { continue }
 
@@ -1479,10 +1190,7 @@ enum VideoStitcher {
         edge: Double,
         showAuthorMark: Bool
     ) {
-        // Solo diaries: a clean, BeReal-style "date · time" pill — no avatar,
-        // no colored ring, just a quiet timestamp for that real-moment feel.
         guard showAuthorMark else {
-            // The camera already printed its own date onto the picture.
             if caption.hasCameraStamp { return }
             addTimestampPill(
                 for: caption, to: parentLayer, renderSize: renderSize,
@@ -1593,8 +1301,6 @@ enum VideoStitcher {
         parentLayer.addSublayer(group)
     }
 
-    /// A single quiet capsule — "Jul 24 · 2:30 PM" — pinned to the top-right,
-    /// mirroring the avatar stamp's corner so solo and room films sit alike.
     private static func addTimestampPill(
         for caption: CaptionWindow,
         to parentLayer: CALayer,
@@ -1617,7 +1323,6 @@ enum VideoStitcher {
         let padV = fontSize * 0.42
         let pillSize = CGSize(width: textSize.width + padH * 2, height: textSize.height + padV * 2)
 
-        // CA coordinates: origin bottom-left.
         let origin = CGPoint(
             x: renderSize.width - pillSize.width - renderSize.width * 0.06,
             y: renderSize.height - pillSize.height - renderSize.height * 0.06)
@@ -1649,8 +1354,6 @@ enum VideoStitcher {
         parentLayer.addSublayer(pill)
     }
 
-    /// The mascot as a layer, or nil when the artwork can't be loaded — a film
-    /// without a mark on it still has to export.
     private static func mascotLayer(
         size: CGFloat, centredIn renderSize: CGSize, y: CGFloat
     ) -> CALayer? {
@@ -1663,8 +1366,6 @@ enum VideoStitcher {
         return layer
     }
 
-    /// A tiny mascot and "1Day" in the bottom-left corner, present for the
-    /// whole film — every shared vlog quietly advertises where it came from.
     static func addWatermark(to parentLayer: CALayer, renderSize: CGSize) {
         let fontSize = max(renderSize.height * 0.016, 11)
         let attributed = NSAttributedString(string: "1Day", attributes: [
@@ -1675,12 +1376,6 @@ enum VideoStitcher {
         let textSize = attributed.size()
         let left = renderSize.width * 0.045
         let bottom = renderSize.height * 0.028
-        // CA coordinates: origin bottom-left.
-        //
-        // "made with 1Day" in 55% white was three words of small print. The
-        // mark people recognise is the face, so the face goes first and the
-        // name shrinks to one word beside it — same corner, same restraint,
-        // and now legible as a logo at a glance on a phone.
         if let mascot = UIImage(named: "OneDayMascot")?.cgImage {
             let glyph = fontSize * 1.7
             let layer = CALayer()
