@@ -1,38 +1,29 @@
 import AVFoundation
 import PhotosUI
 import SwiftUI
+import ImagePlayground
 import UIKit
 
-/// 注册里的头像三步：给我看看你 → 正在画你 → 画好了。
-///
-/// Shown once after sign-in (skippable), and again whenever someone taps
-/// their own avatar in Settings. The photo stays in memory on this screen and
-/// is dropped when it closes; only the finished avatar is saved
-/// (`AvatarStore`) and, from there, synced to rooms.
 struct AvatarSetupFlow: View {
-    /// `true` when an avatar was saved, `false` for 「先不用头像」 / close.
     let onFinish: (Bool) -> Void
-    /// The skip line on the first step. Settings shows a close button instead.
     var skipLabel: String = Strings.avatarSkip
 
     enum Step: Equatable { case upload, generating, confirm, done }
 
     @State private var step: Step = .upload
     @State private var photo: CGImage?
-    /// Layer one's output, kept so 「重画一张」 on the Vision path only
-    /// re-decorates instead of cutting the photo out again.
     @State private var head: AvatarHeadResult?
     @State private var seed = UInt64.random(in: 1...UInt64.max)
-    /// The finished avatar.
     @State private var result: CGImage?
-    /// What the generating screen is showing: the photo, then the head
-    /// growing its outline and stickers.
     @State private var frame: CGImage?
     @State private var error: String?
     @State private var pickerItem: PhotosPickerItem?
     @State private var showsPicker = false
     @State private var showsCamera = false
     @State private var work: Task<Void, Never>?
+    @State private var showsPlayground = false
+    @State private var showsEmojiPlayground = false
+    @State private var showsStickerPicker = false
 
     var body: some View {
         ZStack {
@@ -65,7 +56,6 @@ struct AvatarSetupFlow: View {
         .onDisappear { work?.cancel() }
     }
 
-    // MARK: - 1. 给我看看你
 
     private var upload: some View {
         VStack(spacing: 0) {
@@ -80,7 +70,6 @@ struct AvatarSetupFlow: View {
                 .frame(width: 240, height: 240)
                 .padding(.top, 40)
 
-            // Only a failure says anything here.
             if let error {
                 Text(error)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -98,8 +87,6 @@ struct AvatarSetupFlow: View {
                 .buttonStyle(.primaryAction)
                 .accessibilityIdentifier("avatar-take-photo")
 
-                // A line under the one button, not a second button as heavy
-                // as 拍一张: there is one thing to do first on this screen.
                 Button { showsPicker = true } label: {
                     Label(Strings.avatarPickPhoto, systemImage: "photo.on.rectangle")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -109,9 +96,47 @@ struct AvatarSetupFlow: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("avatar-pick-photo")
 
-                // No photo: one of the buddies, as is. Not the mood faces —
-                // a room pins today's mood on the avatar's corner. The line
-                // above says so; three faces on their own read as decoration.
+                HStack(spacing: 10) {
+                    Button { showsStickerPicker = true } label: {
+                        Label(Strings.avatarUseMemoji, systemImage: "face.smiling")
+                    }
+                    .buttonStyle(.softAction)
+                    .accessibilityIdentifier("avatar-memoji")
+                    if Self.playgroundAvailable {
+                        Button { showsEmojiPlayground = true } label: {
+                            Label(Strings.avatarMakeEmoji, systemImage: "sparkles")
+                        }
+                        .buttonStyle(.softAction)
+                        .accessibilityIdentifier("avatar-genmoji")
+                    }
+                }
+
+                if !AvatarStore.shared.history.isEmpty {
+                    Text(Strings.avatarHistory)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .padding(.top, 10)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 12) {
+                            ForEach(AvatarStore.shared.history, id: \.self) { url in
+                                Button { restore(url) } label: {
+                                    Group {
+                                        if let image = UIImage(contentsOfFile: url.path) {
+                                            Image(uiImage: image).resizable().scaledToFit()
+                                        }
+                                    }
+                                    .padding(4)
+                                    .frame(width: 56, height: 56)
+                                    .background(Circle().fill(AvatarCard<EmptyView>.cardColor))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(Strings.avatarUseEarlier)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                }
+
                 Text(Strings.avatarOrBuddy)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(OneDay.inkSoft)
@@ -145,20 +170,60 @@ struct AvatarSetupFlow: View {
             .padding(.bottom, 18)
         }
         .padding(.horizontal, 28)
+        .sheet(isPresented: $showsStickerPicker) {
+            StickerPickerSheet(onPick: useSticker)
+                .presentationDetents([.large])
+        }
+        .modifier(PlaygroundSheet(
+            isPresented: $showsEmojiPlayground, photo: nil, emoji: true, onImage: useEmojiImage))
     }
 
-    /// The camera explains itself before iOS asks, in the spec's words.
+    private func restore(_ url: URL) {
+        AvatarStore.shared.restore(url)
+        onFinish(true)
+    }
+
+    private func useSticker(_ image: UIImage) {
+        showsStickerPicker = false
+        guard let cg = AvatarComposer.upright(image), let framed = Self.centred(cg) else {
+            error = Strings.avatarFailed
+            return
+        }
+        work?.cancel()
+        error = nil
+        head = AvatarHeadResult(head: AvatarHead(image: cg, face: nil, cheeks: nil), path: .sticker)
+        result = framed
+        step = .confirm
+    }
+
+    private func useEmojiImage(_ url: URL) {
+        guard let image = UIImage(contentsOfFile: url.path) else { error = Strings.avatarFailed; return }
+        useSticker(image)
+    }
+
+    static func centred(_ image: CGImage, side: CGFloat = 768) -> CGImage? {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let inset = side * 0.06
+        let box = CGRect(x: inset, y: inset, width: side - inset * 2, height: side - inset * 2)
+        let w = CGFloat(image.width), h = CGFloat(image.height)
+        let scale = min(box.width / w, box.height / h)
+        let rect = CGRect(x: box.midX - w * scale / 2, y: box.midY - h * scale / 2,
+                          width: w * scale, height: h * scale)
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            UIImage(cgImage: image).draw(in: rect)
+        }.cgImage
+    }
+
     private func takePhoto() {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-            // The Simulator, or a device with the camera restricted.
             showsPicker = true
             return
         }
-        // The system prompt explains the camera; nothing of ours before it.
         showsCamera = true
     }
 
-    // MARK: - 2. 正在画你
 
     private var generating: some View {
         VStack(spacing: 0) {
@@ -175,7 +240,6 @@ struct AvatarSetupFlow: View {
                         .transition(.opacity)
                         .id(ObjectIdentifier(frame))
                 } else if let photo {
-                    // Before the head is cut out: the photo itself, softened.
                     Image(decorative: photo, scale: 1)
                         .resizable()
                         .scaledToFill()
@@ -193,7 +257,6 @@ struct AvatarSetupFlow: View {
         .padding(.horizontal, 28)
     }
 
-    // MARK: - 3. 画好了
 
     private var confirm: some View {
         VStack(spacing: 0) {
@@ -202,8 +265,6 @@ struct AvatarSetupFlow: View {
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
 
-            // Straight on the page, as large as it fits: the sticker has its
-            // own outline, and a pale card around it was a frame in a frame.
             if let result {
                 Image(decorative: result, scale: 1)
                     .resizable()
@@ -214,9 +275,6 @@ struct AvatarSetupFlow: View {
                     .accessibilityIdentifier("avatar-result")
             }
 
-            // Which drawing path ran, for working on the drawing. Off unless
-            // `-debugAvatarPath YES`: every Debug build is one Cassie uses, and
-            // 「Vision fallback: notSupported」 under her face read as an error.
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "debugAvatarPath"), let path = head?.path {
                 Text(Self.debugLabel(path))
@@ -236,8 +294,11 @@ struct AvatarSetupFlow: View {
                 Button(action: redraw) { Text(Strings.avatarRedraw) }
                     .buttonStyle(.softAction)
                     .accessibilityIdentifier("avatar-redraw")
-                // 重画一张 keeps the photo and draws it again; this is the way
-                // back when the photo itself was the problem.
+                if Self.playgroundAvailable, photo != nil {
+                    Button { showsPlayground = true } label: { Text(Strings.avatarApplePlayground) }
+                        .buttonStyle(.softAction)
+                        .accessibilityIdentifier("avatar-image-playground")
+                }
                 Button(action: newPhoto) {
                     Text(Strings.avatarNewPhoto)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -250,6 +311,22 @@ struct AvatarSetupFlow: View {
             .padding(.bottom, 18)
         }
         .padding(.horizontal, 28)
+        .modifier(PlaygroundSheet(
+            isPresented: $showsPlayground, photo: photo, emoji: false, onImage: usePlaygroundImage))
+    }
+
+    static var playgroundAvailable: Bool {
+        if #available(iOS 18.1, *) { return ImagePlaygroundViewController.isAvailable }
+        return false
+    }
+
+    private func usePlaygroundImage(_ url: URL) {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let cut = try? AvatarHeadExtractor.extract(from: image)
+        else { error = Strings.avatarFailed; return }
+        head = AvatarHeadResult(head: cut, path: .imagePlayground)
+        run(minimum: Self.redrawSeconds)
     }
 
     private var done: some View {
@@ -264,14 +341,9 @@ struct AvatarSetupFlow: View {
         }
     }
 
-    // MARK: - Work
 
-    /// The generating screen lasts at least this long, so the drawing is
-    /// something you watch rather than a flash. The spec says 8–15 seconds.
     static let minimumDrawSeconds: Double = 9
-    /// 「重画一张」 is quicker: the photo has been looked at already.
     static let redrawSeconds: Double = 4
-    /// Steps of the outline-and-stickers growing in.
     static let frames = 12
 
     private func start(with image: UIImage) {
@@ -283,8 +355,6 @@ struct AvatarSetupFlow: View {
 
     private func redraw() {
         seed = UInt64.random(in: 1...UInt64.max)
-        // A model drawing is drawn again; a cut-out keeps the cut and gets
-        // new stickers and a new wobble.
         if head?.path == .imageCreator { head = nil }
         run(minimum: head == nil ? Self.minimumDrawSeconds : Self.redrawSeconds)
     }
@@ -329,7 +399,6 @@ struct AvatarSetupFlow: View {
                     }
                 }.value
                 guard let last = images.last else { throw AvatarHeadExtractor.Failure.renderFailed }
-                // Whatever time is left of the minimum goes to the growing.
                 let left = max(minimum - Date.now.timeIntervalSince(started), 2.5)
                 let pause = left / Double(images.count)
                 for image in images {
@@ -352,7 +421,6 @@ struct AvatarSetupFlow: View {
     private func accept() {
         guard let result, let data = AvatarComposer.pngData(result) else { return }
         AvatarStore.shared.save(pngData: data)
-        // The photo is done with.
         photo = nil
         head = nil
         step = .done
@@ -364,7 +432,6 @@ struct AvatarSetupFlow: View {
 
     static let builtInAvatars = ["OneDayBuddyYellow", "OneDayBuddyBlue", "OneDayBuddyMint"]
 
-    /// Saved like a drawn avatar, so rooms get it the same way.
     private func pickBuiltIn(_ name: String) {
         guard let cg = UIImage(named: name)?.cgImage else { return }
         work?.cancel()
@@ -372,7 +439,6 @@ struct AvatarSetupFlow: View {
         accept()
     }
 
-    // MARK: - Debug
 
     private static var forcesFallback: Bool {
         #if DEBUG
@@ -382,8 +448,6 @@ struct AvatarSetupFlow: View {
         #endif
     }
 
-    /// `-debugAvatarSample /path/to/photo.jpg` feeds a photo straight in, for
-    /// screenshots on a Simulator with no camera and no faces in its library.
     private func startDebugSampleIfAsked() {
         #if DEBUG
         guard photo == nil, step == .upload,
@@ -398,13 +462,14 @@ struct AvatarSetupFlow: View {
     static func debugLabel(_ path: AvatarPath) -> String {
         switch path {
         case .imageCreator: return "ImageCreator"
+        case .imagePlayground: return "Image Playground"
+        case .sticker: return "Memoji / Genmoji sticker"
         case .visionFallback(let reason): return "Vision fallback: \(reason.rawValue)"
         }
     }
     #endif
 }
 
-/// The pale yellow card the avatar sits on (`#FDF3D8`, from the spec).
 struct AvatarCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
@@ -419,9 +484,6 @@ struct AvatarCard<Content: View>: View {
     }
 }
 
-/// The upload step's picture: an empty face waiting to be drawn.
-/// Straight on the page, no card: a card behind a dashed circle on a
-/// cream page was a box in a box.
 private struct AvatarPlaceholderCard: View {
     var body: some View {
         ZStack {
@@ -438,7 +500,6 @@ private struct AvatarPlaceholderCard: View {
     }
 }
 
-/// The system camera, front-facing, one still.
 private struct CameraPhotoPicker: UIViewControllerRepresentable {
     let onDone: (UIImage?) -> Void
 
@@ -462,9 +523,6 @@ private struct CameraPhotoPicker: UIViewControllerRepresentable {
         func imagePickerController(_ picker: UIImagePickerController,
                                    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             let image = info[.originalImage] as? UIImage
-            // The front camera's preview is a mirror and its photo isn't, so
-            // the avatar came out the other way round from the face you saw.
-            // Flip it to match the preview.
             onDone(picker.cameraDevice == .front ? image.map(Self.mirrored) : image)
         }
 
@@ -480,5 +538,108 @@ private struct CameraPhotoPicker: UIViewControllerRepresentable {
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onDone(nil) }
+    }
+}
+
+private struct PlaygroundSheet: ViewModifier {
+    @Binding var isPresented: Bool
+    let photo: CGImage?
+    let emoji: Bool
+    let onImage: (URL) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.4, *) {
+            sheet(content)
+                .imagePlaygroundGenerationStyle(
+                    emoji ? .emoji : .animation,
+                    in: emoji ? [.emoji] : [.animation, .illustration, .sketch])
+                .imagePlaygroundPersonalizationPolicy(.enabled)
+        } else if #available(iOS 18.1, *) {
+            sheet(content)
+        } else {
+            content
+        }
+    }
+
+    @available(iOS 18.1, *)
+    private func sheet(_ content: Content) -> some View {
+        content.imagePlaygroundSheet(
+            isPresented: $isPresented,
+            concepts: [],
+            sourceImage: photo.map { Image(decorative: $0, scale: 1) },
+            onCompletion: onImage)
+    }
+}
+
+private struct StickerPickerSheet: View {
+    let onPick: (UIImage) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(Strings.avatarMemojiHint)
+                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .foregroundStyle(OneDay.ink)
+                ForEach(Array(Strings.avatarMemojiSteps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .foregroundStyle(OneDay.onBrand)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.oneDayBrand))
+                        Text(step)
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                StickerField(onPick: onPick)
+                    .frame(height: 64)
+                    .padding(.horizontal, 12)
+                    .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                Text(Strings.avatarMemojiNone)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(24)
+        }
+    }
+}
+
+private struct StickerField: UIViewRepresentable {
+    let onPick: (UIImage) -> Void
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.font = .systemFont(ofSize: 40)
+        view.backgroundColor = .clear
+        if #available(iOS 18.0, *) { view.supportsAdaptiveImageGlyph = true }
+        view.delegate = context.coordinator
+        DispatchQueue.main.async { view.becomeFirstResponder() }
+        return view
+    }
+
+    func updateUIView(_ view: UITextView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        let onPick: (UIImage) -> Void
+        init(onPick: @escaping (UIImage) -> Void) { self.onPick = onPick }
+
+        func textViewDidChange(_ view: UITextView) {
+            guard #available(iOS 18.0, *) else { return }
+            let text = view.attributedText ?? NSAttributedString()
+            var found: UIImage?
+            text.enumerateAttribute(.adaptiveImageGlyph, in: NSRange(location: 0, length: text.length)) { value, _, stop in
+                if let glyph = value as? NSAdaptiveImageGlyph, let image = UIImage(data: glyph.imageContent) {
+                    found = image
+                    stop.pointee = true
+                }
+            }
+            if let found { onPick(found) }
+        }
     }
 }
