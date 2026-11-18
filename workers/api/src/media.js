@@ -1,24 +1,14 @@
-/**
- * Videos and avatars, in R2. Uploading is its own step: the app sends the
- * file, gets a key back, then writes the clip or member row that points at
- * it. A key carries its uploader, so a row can only point at your own files.
- */
 import { bad, HttpError, json, notFound } from './http.js';
 
-/** A clip is a few seconds of 1080p; anything near this isn't one. */
 export const MAX_MEDIA_BYTES = 80 * 1024 * 1024;
 
 const ALLOWED_TYPES = new Set(['video/mp4', 'video/quicktime', 'image/png', 'image/jpeg']);
 
-/** `u/<first 16 hex of sha256(author id)>/` — readable as a folder, without
- * putting an Apple id in a URL. */
 export function mediaPrefix(me) {
   return `u/${hexPrefix(me)}/`;
 }
 
 function hexPrefix(text) {
-  // FNV-1a, 64 bits as two halves. Only for grouping; ownership is checked
-  // against this exact string, not inferred from it.
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (const byte of new TextEncoder().encode(text)) {
@@ -50,7 +40,6 @@ async function download(env, key) {
     headers: {
       'content-type': object.httpMetadata?.contentType ?? 'application/octet-stream',
       'content-length': String(object.size),
-      // Keys never get new contents, so a phone can keep what it has.
       'cache-control': 'private, max-age=31536000, immutable',
       etag: object.httpEtag ?? '',
     },

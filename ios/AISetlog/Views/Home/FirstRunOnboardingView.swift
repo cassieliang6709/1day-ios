@@ -1,22 +1,15 @@
 import AuthenticationServices
 import SwiftUI
 
-/// The first screen is deliberately a promise, not a tutorial: a few moments
-/// become one film. More capable creation stays available after the
-/// first film, once there is something meaningful to build on.
 struct FirstRunOnboardingView: View {
     let onCreateStory: () -> Void
 
     @Environment(AccountStore.self) private var account
     @Environment(\.colorScheme) private var colorScheme
     @State private var signInError: String?
-    /// The avatar's three steps, between signing in and the camera.
     @State private var showsAvatarSetup = false
-    /// The permission page, right after signing in.
     @State private var showsPermissions = false
 
-    /// Bound so Settings changes immediately redraw the localized lockup and
-    /// copy even before someone has made their first story.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
@@ -41,13 +34,8 @@ struct FirstRunOnboardingView: View {
                             .padding(.top, isCompactHeight ? 20 : 26)
 
 
-                        // The name sits in the middle, the button at the
-                        // bottom where the thumb is: two spacers share the
-                        // room the animation used to take.
                         Spacer(minLength: isCompactHeight ? 26 : 38)
 
-                        // One way on from here: 通过 Apple 继续. Joining by
-                        // code and filming solo both wait until after sign-in.
                         primaryAction
 
                         Spacer().frame(height: 18)
@@ -59,9 +47,7 @@ struct FirstRunOnboardingView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
         }
-        // A reinstall gets its Apple ID offered before anything is tapped.
         .task { account.offerExistingAccount() }
-        // Made or skipped, the camera is next.
         .fullScreenCover(isPresented: $showsPermissions, onDismiss: afterPermissions) {
             PermissionPrimerView { showsPermissions = false }
         }
@@ -70,10 +56,6 @@ struct FirstRunOnboardingView: View {
         }
     }
 
-    /// Signing in comes first, because filming together is what most people
-    /// come for, and asking halfway through a join — a sheet over a sheet — is
-    /// where it kept going wrong. It is the only button on the page.
-    /// An avatar already on this phone skips the three steps.
     private func afterPermissions() {
         if AvatarStore.shared.image == nil {
             showsAvatarSetup = true
@@ -124,33 +106,11 @@ struct FirstRunOnboardingView: View {
         }
     }
 
-    /// The brand artwork, not an imitation of it.
-    ///
-    /// This was `OneDayBuddy` beside `Text("1Day")` in the system rounded face,
-    /// with a hand-picked gap — a lockup assembled in code, and the only place
-    /// in the product where the name appears at all. It drew a different
-    /// character from the one on the app icon the person had just tapped: a
-    /// gradient tile with no arms against a flat blue blob with two of them.
-    /// Every proportion in it was also somebody's guess, and the next guess
-    /// would have been a different one.
-    ///
-    /// `OneDayBrandLogo` has been in the app since the artwork was added and
-    /// had no callers. The relationship between the mark and the word lives in
-    /// the asset now, where nothing here can drift it.
     private var brand: some View {
         OneDayBrandLogo(width: 196)
     }
 }
 
-/// The headline, shown: three people each film their own take of the same
-/// moment, and the takes slide together into one split frame that plays —
-/// which is exactly what a shared room's film looks like at that moment.
-///
-/// It replaced a strip of film with a play button. That one said "clips become
-/// a film", which the line under it already says; this says the part only
-/// 1Day does, that the film is everyone's at once.
-///
-/// Drawn, not filmed: nothing to bundle, and it follows light and dark.
 private struct SameDayAnimation: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -160,8 +120,6 @@ private struct SameDayAnimation: View {
 
     private struct Take {
         let name: String
-        /// nil draws a person glyph: the viewer has no name yet on this screen,
-        /// and 「你」 in the dot beside 「你」 read twice.
         let initial: String?
         let tint: Color
         let colors: [Color]
@@ -170,16 +128,10 @@ private struct SameDayAnimation: View {
         let together: CGPoint
     }
 
-    /// Laid out on this canvas and scaled to the room the screen gives it, so
-    /// the choreography never has to be re-measured.
     private static let canvas = CGSize(width: 260, height: 250)
     private static let take = CGSize(width: 68, height: 124)
-    /// The three takes side by side, edge to edge, like the film's split frame.
     private static let frame = CGRect(x: 28, y: 52, width: 204, height: 124)
 
-    /// Stepped by a loop rather than `PhaseAnimator`: the drawn people inside
-    /// each take redraw every frame, and under `PhaseAnimator` that kept the
-    /// sequence from ever leaving its first step.
     @State private var phase: Phase = .empty
 
     private var takes: [Take] {
@@ -208,7 +160,6 @@ private struct SameDayAnimation: View {
                             proxy.size.height / Self.canvas.height)
             Group {
                 if reduceMotion {
-                    // The end state, still: the point survives without the motion.
                     drawing(at: .playing)
                 } else {
                     drawing(at: phase)
@@ -223,8 +174,6 @@ private struct SameDayAnimation: View {
         .accessibilityLabel(Strings.firstRunAnimationAccessibility)
     }
 
-    /// Each step: wait, then animate into it. The progress bar's run is the
-    /// `.playing` step's length.
     private func run() async {
         let steps: [(Phase, Animation, Double)] = [
             (.first, .spring(duration: 0.5, bounce: 0.3), 0.5),
@@ -246,7 +195,6 @@ private struct SameDayAnimation: View {
     private func drawing(at phase: Phase) -> some View {
         let joined = phase.rawValue >= Phase.together.rawValue
         return ZStack(alignment: .topLeading) {
-            // The split frame's border, drawn behind so the takes fill it.
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(OneDay.surface)
                 .frame(width: Self.frame.width + 10, height: Self.frame.height + 10)
@@ -271,8 +219,6 @@ private struct SameDayAnimation: View {
         .frame(width: Self.canvas.width, height: Self.canvas.height, alignment: .topLeading)
     }
 
-    /// Apart, each take is its own rounded card with its owner on it; joined,
-    /// only the outer corners stay round, so the three read as one picture.
     private func takeCard(_ take: Take, index: Int, joined: Bool) -> some View {
         let r: CGFloat = 16
         let shape = UnevenRoundedRectangle(
@@ -283,8 +229,6 @@ private struct SameDayAnimation: View {
             style: .continuous)
         return ZStack(alignment: .bottomLeading) {
             LinearGradient(colors: take.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-            // A person in each take, so the three read as three people's
-            // moments rather than three coloured blocks.
             TakeScene(kind: TakeScene.Kind(rawValue: index) ?? .wave)
             HStack(spacing: 5) {
                 Group {
@@ -311,7 +255,6 @@ private struct SameDayAnimation: View {
         .shadow(color: .black.opacity(joined ? 0 : 0.14), radius: 8, y: 4)
     }
 
-    /// Under the joined frame: the film playing, not a button promising it will.
     private func playbackBar(progress: CGFloat) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "play.fill")
@@ -329,9 +272,6 @@ private struct SameDayAnimation: View {
     }
 }
 
-/// One take's picture on the first-run animation: a 1day mascot in a small
-/// place, moving. Yellow waves under a sun, blue sways beside a steaming cup,
-/// mint bounces in a park. Still under Reduce Motion.
 private struct TakeScene: View {
     enum Kind: Int { case wave, coffee, park }
     let kind: Kind
@@ -379,7 +319,6 @@ private struct TakeScene: View {
         kind == .park ? CGFloat(-abs(sin(t * 3.2)) * 9) : CGFloat(sin(t * 2) * 1.2)
     }
 
-    /// A little squash at the bottom of each hop, so the bounce lands.
     private func squash(_ t: Double) -> CGFloat {
         guard kind == .park else { return 1 }
         let ground = 1 - abs(sin(t * 3.2))
@@ -400,7 +339,6 @@ private struct TakeScene: View {
                 .frame(width: 26, height: 9)
                 .position(x: w * 0.3 + CGFloat(sin(t / 2)) * 4, y: 40)
         case .coffee:
-            // A cup on the right, steam rising off it.
             RoundedRectangle(cornerRadius: 3)
                 .fill(.white)
                 .frame(width: 13, height: 14)

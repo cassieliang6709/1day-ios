@@ -1,6 +1,5 @@
 import Foundation
 
-/// Copy for picking whose takes go into a room's film, and holding one still.
 extension Strings {
     private static func filterCopy(_ zh: String, _ en: String) -> String {
         AppLanguage.effective.resolved == .chinese ? zh : en

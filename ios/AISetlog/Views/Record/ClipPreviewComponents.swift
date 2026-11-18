@@ -1,19 +1,6 @@
 import SwiftUI
 
-/// Social pieces of `ClipPreviewView` — emoji reactions and the comment
-/// thread. Stateless: the parent owns the store calls.
 
-/// What people have left on this clip, and one button to add to it.
-///
-/// It used to draw all six of `ClipReaction.palette` as always-on pills —
-/// six dark capsules across a clip nobody had reacted to, and the only six
-/// emoji the app would ever accept. Now it shows *what is there*: one light
-/// chip per emoji with its count, yours outlined, and a single `+` that opens
-/// a picker whose first row is the emoji you actually use.
-///
-/// Mounted inside the moment card on a white surface, so the untouched state
-/// is light glass rather than the dark glass it needed when it floated over
-/// the footage.
 struct ReactionBar: View {
     let reactions: [ClipReaction]
     let myID: String
@@ -22,16 +9,10 @@ struct ReactionBar: View {
     @State private var picking = false
     @AppStorage(ClipReactionRecents.storageKey) private var recentsData = ""
 
-    /// `@AppStorage` can't hold an array, and this list is short enough that a
-    /// separator-joined string beats a JSON round trip. Emoji never contain a
-    /// newline, so it can't be ambiguous.
     private var recents: [String] {
         recentsData.split(separator: "\n").map(String.init)
     }
 
-    /// One row entry per distinct emoji. A named type rather than a tuple:
-    /// grouping, mapping and sorting tuples in one expression is what the type
-    /// checker gives up on.
     struct Tally: Identifiable {
         let emoji: String
         let count: Int
@@ -39,8 +20,6 @@ struct ReactionBar: View {
         var id: String { emoji }
     }
 
-    /// Distinct emoji on this clip, most-reacted first, ties alphabetical so
-    /// the row doesn't reshuffle every time somebody adds the same one.
     private var present: [Tally] {
         let groups: [String: [ClipReaction]] = Dictionary(grouping: reactions, by: \.emoji)
         let tallies: [Tally] = groups.map { emoji, group in
@@ -113,9 +92,6 @@ struct ReactionBar: View {
         .accessibilityIdentifier("add-reaction")
     }
 
-    /// Your own history first, then whatever of the six defaults you haven't
-    /// used, then a field for anything else — the system emoji keyboard has no
-    /// API to summon on its own, so the way to reach it is a field to type in.
     private var picker: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
@@ -149,12 +125,6 @@ struct ReactionBar: View {
     }
 }
 
-/// One character in, one reaction out.
-///
-/// There is no public way to present just the emoji keyboard, so this is a
-/// field you tap and then switch to it yourself. It takes the first emoji
-/// typed and clears immediately, which is why it has no submit button: a
-/// one-character field with a Done key is two taps for one emoji.
 private struct AnyEmojiField: View {
     let onPick: (String) -> Void
 
@@ -173,9 +143,6 @@ private struct AnyEmojiField: View {
                 .textInputAutocapitalization(.never)
                 .accessibilityIdentifier("any-emoji")
                 .onChange(of: typed) { _, new in
-                    // First grapheme only. Typing letters is a no-op rather
-                    // than an error: "a" is not a reaction, and telling
-                    // somebody off for it would be worse than ignoring it.
                     guard let first = new.first else { return }
                     typed = ""
                     guard String(first).containsEmoji else { return }
@@ -189,18 +156,11 @@ private struct AnyEmojiField: View {
 }
 
 extension String {
-    /// Whether this string's first scalar is pictographic — enough to tell an
-    /// emoji from a letter somebody typed by accident.
     var containsEmoji: Bool {
         unicodeScalars.contains { $0.properties.isEmojiPresentation || $0.value > 0x238C }
     }
 }
 
-/// The comment list, or a "be the first" placeholder when empty.
-///
-/// No header of its own — it's presented in a sheet whose title already says
-/// "Comments", and saying it twice in the same 60 points was how the sheet
-/// looked when it was still an inline section under the video.
 struct CommentsSection: View {
     let comments: [ClipComment]
     let myID: String
@@ -257,7 +217,6 @@ struct CommentRow: View {
     }
 }
 
-/// Bottom input bar; owns its draft text and focus, reports sends upward.
 struct CommentInputBar: View {
     let onSend: (String) -> Void
 

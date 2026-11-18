@@ -1,11 +1,3 @@
-/**
- * 心情日记 backup: one row per person per day, readable only by its owner —
- * what CloudKit's private database held. The newest `updatedAt` wins, on the
- * server as on the phone (`MoodStore.merge`).
- *
- * `seq` grows with every write, so a phone reads "everything after the last
- * seq I saw", the way it used to read CloudKit zone changes.
- */
 import { bad, json, readJson, str, time } from './http.js';
 
 const PAGE = 500;
@@ -35,7 +27,6 @@ async function putMoods(request, env, { me }) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw bad();
     return { day, mood: str(e.mood, 32), note: str(e.note ?? '', 4000), updatedAt: time(e.updatedAt) };
   });
-  // One statement per entry, in order, so each takes the next seq.
   await env.DB.batch(
     entries.map((e) =>
       env.DB.prepare(
@@ -51,8 +42,6 @@ async function putMoods(request, env, { me }) {
   return json({ ok: true });
 }
 
-/** Account deletion: the diary and every registered phone. Rooms are
- * deleted by name through `/records/delete`, under the app's journal. */
 async function deletePrivate(env, { me }) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM moods WHERE user_id = ?1').bind(me),

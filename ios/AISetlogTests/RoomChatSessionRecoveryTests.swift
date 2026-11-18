@@ -52,7 +52,6 @@ final class RoomChatSessionRecoveryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let session = RoomChatSession(scope: scope, directory: directory, transport: Transport(), identityIsCurrent: { true })
         let before = session.state
-        // A file where a directory belongs deterministically rejects archive save.
         try Data("block directory".utf8).write(to: directory)
         XCTAssertNil(session.recoverLegacyComments([candidate()]))
         XCTAssertEqual(session.state, before)

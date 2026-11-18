@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/story.dart';
 
-/// The solo app keeps metadata and original clips in private app storage.
-/// Writing a new clip never removes the previous take until metadata is saved.
 class StoryStore extends ChangeNotifier {
   StoryStore._(this.root, this._stories);
 
@@ -86,14 +84,12 @@ class StoryStore extends ChangeNotifier {
       try {
         if (await oldFile.exists()) await oldFile.delete();
       } on FileSystemException {
-        // The new take is already committed; cleanup can happen later.
       }
     }
     final oldFilm = filmFile(story);
     try {
       if (await oldFilm.exists()) await oldFilm.delete();
     } on FileSystemException {
-      // The stale film stays playable until the next export replaces it.
     }
   }
 

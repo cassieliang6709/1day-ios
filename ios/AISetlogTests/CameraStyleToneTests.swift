@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Pins the no-grey decision: a camera is its frame and date, plus at most a
-/// slight warmth on film. Lifting exposure or flattening contrast is what made
-/// every take look washed out.
 final class CameraStyleToneTests: XCTestCase {
     func testCamcorderAndInstantBakeNoTone() {
         XCTAssertTrue(CameraStyle.camcorder.tone.isIdentity)
@@ -34,7 +31,6 @@ final class CameraStyleToneTests: XCTestCase {
             data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        // Top-left corner of the card: border, must be fully opaque.
         context.draw(cg, in: CGRect(x: 0, y: -399, width: 300, height: 400))
         XCTAssertEqual(pixel[3], 255)
     }

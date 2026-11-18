@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# record.sh <name> <seconds>  — records the booted simulator screen to promo/raw/<name>.mp4
 set -euo pipefail
 NAME="${1:?name}"; SECS="${2:-10}"
 OUT="$(cd "$(dirname "$0")" && pwd)/raw/${NAME}.mp4"

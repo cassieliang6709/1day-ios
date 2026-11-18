@@ -3,25 +3,12 @@ import UIKit
 import UserNotifications
 
 extension Notification.Name {
-    /// Posted on the main queue whenever a room's push reaches the running app,
-    /// so an open room can refetch instead of waiting for the next foreground.
-    /// `userInfo["roomCode"]` names the room. May arrive twice for one push
-    /// (once from the remote-notification callback, once from `willPresent`).
     static let roomActivityArrived = Notification.Name("roomActivityArrived")
 }
 
-/// Room pushes. The Worker sends them through APNs the moment someone films,
-/// writes, reacts or pokes; this phone only tells it which rooms to alert it
-/// about and what the alert says (`PUT /push/device`).
-///
-/// The copy is still the app's: it goes up as a format plus which fields fill
-/// it, the Worker sends it back as `loc-key`/`loc-args`, and iOS formats it
-/// on the phone. Nobody is alerted about their own record; a poke reaches
-/// only the person poked — both decided on the server.
 enum SharedActivityNotificationService {
     private static let registrar = DeviceRegistrar()
     static let deviceTokenKey = "notifications.shared.apnsToken"
-    /// Info.plist mirrors `aps-environment`, which the app can't read itself.
     static var isSandbox: Bool {
         Bundle.main.object(forInfoDictionaryKey: "OneDayAPNsEnvironment") as? String == "development"
     }
@@ -36,7 +23,6 @@ enum SharedActivityNotificationService {
         case poke
     }
 
-    /// One kind's alert: the format and which fields fill its `%n$@`s.
     struct AlertCopy: Codable, Equatable {
         let format: String
         let args: [String]
@@ -47,9 +33,6 @@ enum SharedActivityNotificationService {
         let title: String
     }
 
-    /// Everything the Worker keeps for this phone. An empty `rooms` removes
-    /// the phone: "off" has to mean no alerts, since an alert APNs shows
-    /// can't check a setting here first.
     struct DeviceRegistration: Codable, Equatable {
         let token: String
         let topic: String
@@ -92,17 +75,13 @@ enum SharedActivityNotificationService {
             rooms: rooms.sorted { $0.key < $1.key }.map { RoomRegistration(code: $0.key, title: $0.value) })
     }
 
-    // MARK: Registering
 
-    /// Called by the app delegate with APNs' token for this install.
     static func didRegister(deviceToken: Data) {
         let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
         UserDefaults.standard.set(hex, forKey: deviceTokenKey)
         reconcileSavedRooms()
     }
 
-    /// Re-registers with the rooms saved on this phone — after a sign-in,
-    /// when nothing else has the list to hand.
     static func reconcileSavedRooms() {
         reconcileSubscriptions(for: persistedChallenges())
     }
@@ -113,8 +92,6 @@ enum SharedActivityNotificationService {
         Task { await registrar.reconcile(rooms: rooms) }
     }
 
-    /// Sign-out: this phone stops getting the last person's room alerts. Takes
-    /// the session explicitly because the keychain is about to lose it.
     static func removeSubscriptions(session: AuthService.Session?) {
         guard !isRunningTests,
               let session,
@@ -128,9 +105,7 @@ enum SharedActivityNotificationService {
         }
     }
 
-    // MARK: Receiving
 
-    /// What a room push carries besides the alert (`oneday` in the payload).
     struct RemoteContext: Equatable {
         let roomCode: String
         let kind: ActivityKind?
@@ -148,8 +123,6 @@ enum SharedActivityNotificationService {
             day: max(day, 1))
     }
 
-    /// APNs has already put the alert on screen; all that's left is telling
-    /// an open room to refetch.
     static func handleRemoteNotification(
         _ userInfo: [AnyHashable: Any]
     ) async -> UIBackgroundFetchResult {
@@ -158,12 +131,10 @@ enum SharedActivityNotificationService {
         return .newData
     }
 
-    /// The room code of a room push, or nil for anything else.
     static func roomCode(forRemote userInfo: [AnyHashable: Any]) -> String? {
         context(forRemote: userInfo)?.roomCode
     }
 
-    /// Where tapping a room alert should land.
     static func route(forRemote userInfo: [AnyHashable: Any]) -> NotificationRecordRoute? {
         guard let context = context(forRemote: userInfo) else { return nil }
         return route(roomCode: context.roomCode, day: context.day, challenges: persistedChallenges())
@@ -181,7 +152,6 @@ enum SharedActivityNotificationService {
         }
     }
 
-    // MARK: Helpers
 
     private static func roomTitles(for challenges: [Challenge]) -> [String: String] {
         var titles: [String: String] = [:]
@@ -201,8 +171,6 @@ enum SharedActivityNotificationService {
     }
 
     private actor DeviceRegistrar {
-        /// What the Worker last accepted, so an unchanged list isn't sent on
-        /// every foreground.
         private var lastSent: DeviceRegistration?
 
         func reconcile(rooms: [String: String]) async {

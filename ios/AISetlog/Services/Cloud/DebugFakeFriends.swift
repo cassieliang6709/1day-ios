@@ -1,10 +1,6 @@
 #if DEBUG
 import Foundation
 
-/// Debug-only stand-ins for friends, so a real shared room on a single phone
-/// shows both a live tile and a grey one (with 拍一拍). Off unless the app is
-/// launched with `-debugFakeFriends YES`; nothing is uploaded — the clips are
-/// appended to the local copy after every sync.
 @MainActor
 enum DebugFakeFriends {
     static let flagKey = "debugFakeFriends"
@@ -13,7 +9,6 @@ enum DebugFakeFriends {
     private struct Friend {
         let id: String
         let name: String
-        /// Days ago their takes were filmed. 0 = today.
         let daysAgo: [Int]
     }
 
@@ -22,7 +17,6 @@ enum DebugFakeFriends {
         Friend(id: "debug-friend-xiaoming", name: "小明", daysAgo: [3, 5]),
     ]
 
-    /// Rendered files, made once per launch.
     private static var rendered: [String: URL] = [:]
 
     static func clips(for code: String, orientation: Challenge.Orientation = .portrait) async -> [CloudKitService.RemoteClip] {

@@ -2,8 +2,6 @@ import XCTest
 import CoreGraphics
 @testable import AISetlog
 
-/// The dual-camera inset's geometry — the numbers the viewfinder and the
-/// composed file both read, so a drift here is a preview that lies.
 final class PiPInsetTests: XCTestCase {
     private let phone = CGSize(width: 360, height: 640)
     private let file = CGSize(width: 1080, height: 1920)
@@ -60,10 +58,6 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertEqual(PiPInsetLayout.resized(start, by: 0.1).width, PiPInsetLayout.minShare, accuracy: 1e-9)
     }
 
-    /// A drag in flight is always start + the fingers' total translation.
-    /// Fed a finger moving steadily across the stage, the inset moves the
-    /// same points per update and never steps back — the jitter was the
-    /// translation being read in the moving inset's own space instead.
     func testDragInFlightIsStartPlusTranslationAndNeverStepsBack() {
         let start = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3)
         var lastX = PiPInsetLayout.box(start, in: phone).minX
@@ -75,14 +69,11 @@ final class PiPInsetTests: XCTestCase {
             XCTAssertEqual(box.minY, start.minY * phone.height + translation.height, accuracy: 1e-6)
             lastX = box.minX
         }
-        // Same total translation, same rect, however many updates came first.
         let oneShot = PiPInsetLayout.adjusted(
             start, scale: 1, translation: CGSize(width: 100, height: 50), in: phone)
         XCTAssertEqual(PiPInsetLayout.box(oneShot, in: phone).minX, lastX, accuracy: 1e-6)
     }
 
-    /// Pinch and drag together: grown around the start rect's centre, then
-    /// moved, both measured from where the fingers went down.
     func testPinchAndDragTogetherShareOneStartRect() {
         let start = CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.3)
         let rect = PiPInsetLayout.adjusted(
@@ -95,8 +86,6 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertEqual(still.minY, start.minY, accuracy: 1e-9)
     }
 
-    /// Preview and file are different sizes; the same normalized rect has to
-    /// land on the same proportion of each.
     func testPreviewAndFileBoxesAreTheSameProportion() {
         let rect = CGRect(x: 0.1, y: 0.5, width: 0.4, height: 0.4)
         let preview = PiPInsetLayout.box(rect, in: phone)
@@ -111,9 +100,6 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertEqual(PiPInsetLayout.border(in: phone), 4, accuracy: 0.5)
     }
 
-    /// The exported picture is a plain rectangle under the ring. Its corners
-    /// stay hidden only while the inner radius (outer minus border) is at
-    /// most (1 + √2) × border.
     func testCornerRadiusKeepsSquareVideoCornersUnderTheRing() {
         let inner = PiPInsetLayout.cornerShare - PiPInsetLayout.borderShare
         XCTAssertLessThanOrEqual(inner / PiPInsetLayout.borderShare, 1 + 2.squareRoot())
@@ -128,9 +114,6 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertTrue(outer.contains(box))
     }
 
-    /// A camera style's frame is the viewfinder's shape, so the dual take is
-    /// composed in it — not at the full picture and cropped after, which
-    /// moved the inset and changed its shape.
     func testComposerCanvasIsTheShapeTheViewfinderShowed() {
         let main = CGSize(width: 1080, height: 1920)
         XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: nil), main)
@@ -141,8 +124,6 @@ final class PiPInsetTests: XCTestCase {
         XCTAssertEqual(PiPComposer.canvasSize(main: main, aspect: film), CGSize(width: 1080, height: 1620))
     }
 
-    /// The style bake after composing then has nothing left to cut, so the
-    /// inset stays where it was placed.
     func testStyleBakeDoesNotCropAComposedDualTakeAgain() {
         let main = CGSize(width: 1080, height: 1920)
         for style in [CameraStyle.camcorder, .film, .instant] {
@@ -152,8 +133,6 @@ final class PiPInsetTests: XCTestCase {
         }
     }
 
-    /// 横拍 holds the phone top to the left: the screen's top right is the
-    /// world's top left, and the inset lands there in the landscape file.
     func testSidewaysInsetTurnsWithThePhone() {
         let topRight = CGRect(x: 0.66, y: 0.02, width: 0.3, height: 0.3)
         let turned = PiPComposer.sidewaysRect(topRight)

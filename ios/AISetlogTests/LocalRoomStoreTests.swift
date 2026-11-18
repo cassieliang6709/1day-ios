@@ -8,7 +8,6 @@ final class LocalRoomStoreTests: XCTestCase {
         defer { files.close() }
         var reminderCalls = 0
         var subscriptionCalls = 0
-        // Start with the actual live policy, replacing external calls with spies.
         var effects = ChallengeStoreEffects.live
         XCTAssertTrue(effects.allowsCloudRoomManagement)
         effects.reconcileReminders = { _ in reminderCalls += 1 }

@@ -1,15 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Account deletion, end to end, with CloudKit stood in for.
-///
-/// `AccountDeletionCoordinatorTests` covers the protocol and
-/// `AccountDeletionJournalStoreTests` the durability. What neither could cover
-/// is the thing that was actually wrong: the app had both of those and used
-/// neither, deleting through an older path that wrapped the cloud step in
-/// `try?`, swept the device either way and reported success. These tests are
-/// about the ordering that stops that — local data last, and no success unless
-/// it is true.
 @MainActor
 final class AccountDeletionServiceTests: XCTestCase {
     private var journalURL: URL!
@@ -25,7 +16,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         try await super.tearDown()
     }
 
-    // MARK: - The failure that used to be silent
 
     func testAFailedCloudDeleteLeavesEveryStoryOnTheDeviceAlone() async throws {
         let store = try makeStore()
@@ -46,7 +36,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         }
     }
 
-    /// The journal is what makes "try again" more than a hopeful button.
     func testAFailedRunLeavesAJournalToResumeFrom() async throws {
         let store = try makeStore()
         let service = AccountDeletionService(
@@ -56,8 +45,6 @@ final class AccountDeletionServiceTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: journalURL.path))
 
-        // A second attempt resumes that journal rather than starting a fresh
-        // operation, which is what stops a retry re-deleting from scratch.
         var seen: Set<String> = []
         let retry = AccountDeletionService(
             store: store, journalURL: journalURL,
@@ -68,7 +55,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertFalse(seen.isEmpty, "the retry should have had records to delete")
     }
 
-    // MARK: - The success path
 
     func testASuccessfulRunDeletesTheCloudRecordsThenTheDevice() async throws {
         let store = try makeStore()
@@ -78,9 +64,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         let service = AccountDeletionService(
             store: store, journalURL: journalURL,
             deleteRecords: { batch in
-                // The ordering under test: the device must still be intact
-                // while the cloud step is running, or a failure here would
-                // have nothing to go back to.
                 deviceStillFullWhenCloudRan = !store.challenges.isEmpty
                 deleted.formUnion(batch)
                 return batch
@@ -99,9 +82,6 @@ final class AccountDeletionServiceTests: XCTestCase {
             "a finished deletion should not leave a journal behind")
     }
 
-    /// A record CloudKit reports as already absent is the state we asked for.
-    /// Treating it as a failure would wedge a retry forever on records the
-    /// previous attempt had already removed.
     func testRecordsTheCloudNoLongerHasCountAsDeleted() async throws {
         let store = try makeStore()
         let service = AccountDeletionService(
@@ -111,7 +91,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertTrue(gone)
     }
 
-    // MARK: - Refusals
 
     func testAPreviewRuntimeCanNeverReachARealAccount() async throws {
         let store = try makeStore(effects: .isolated)
@@ -132,10 +111,7 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertFalse(gone)
     }
 
-    // MARK: - The inventory
 
-    /// A room someone created holds their friends' clips too. Destroying it is
-    /// not what "delete my account" means, so it is not in the inventory.
     func testTheInventoryCoversMyClipsAndNotTheRoomItself() throws {
         let store = try makeStore()
         let me = try XCTUnwrap(store.account?.account?.id)
@@ -146,13 +122,9 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertFalse(names.contains("ROOM01"), "the room record must survive")
         XCTAssertTrue(
             names.contains(CloudKitService.clipRecordName(code: "ROOM01", authorID: me, day: 1)))
-        // Stable order, so a resumed run pages the same list the same way.
         XCTAssertEqual(names, names.sorted())
     }
 
-    /// A take of mine the room holds but this phone never kept — filmed on
-    /// another phone, or a later take — is still mine to delete. A friend's
-    /// take in the same room is not.
     func testTheInventoryCoversMyTakesThisPhoneNeverKept() throws {
         let store = try makeStore()
         let me = try XCTUnwrap(store.account?.account?.id)
@@ -168,8 +140,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertFalse(names.contains(friends))
     }
 
-    /// Joining a room leaves a `Member` record under my name. It is mine, so
-    /// deleting the account deletes it — and it goes to CloudKit with the rest.
     func testDeletingMyAccountDeletesMyMemberRecord() async throws {
         let store = try makeStore()
         let me = try XCTUnwrap(store.account?.account?.id)
@@ -186,7 +156,6 @@ final class AccountDeletionServiceTests: XCTestCase {
         XCTAssertTrue(deleted.contains(member), "my Member record was left in the room: \(deleted)")
     }
 
-    // MARK: - Fixtures
 
     private func makeStore(
         effects: ChallengeStoreEffects = .live, signedIn: Bool = true

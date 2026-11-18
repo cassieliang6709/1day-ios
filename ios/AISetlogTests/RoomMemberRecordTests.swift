@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Joining a room by code leaves a `Member` record behind — once, under a
-/// name that doesn't change, and never at the cost of the join itself.
-/// CloudKit is stood in for by a transport that keeps records by name, the
-/// way the public database does.
 @MainActor
 final class RoomMemberRecordTests: XCTestCase {
     private struct Member: Equatable {
@@ -33,7 +29,6 @@ final class RoomMemberRecordTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Fixtures
 
     private func room(_ code: String) -> CloudKitService.RemoteRoom {
         CloudKitService.RemoteRoom(
@@ -76,7 +71,6 @@ final class RoomMemberRecordTests: XCTestCase {
         return store
     }
 
-    // MARK: - Tests
 
     func testJoiningWritesOneMemberRecord() async throws {
         let store = store()
@@ -94,12 +88,9 @@ final class RoomMemberRecordTests: XCTestCase {
     func testJoiningAgainDoesNotAddASecondRecord() async throws {
         let store = store()
         let first = try await store.joinRoom(code: "KPADC7")
-        // A room already on this phone opens without another write.
         _ = try await store.joinRoom(code: "KPADC7")
         XCTAssertEqual(memberWrites, 1)
 
-        // Gone from this phone and joined again (a reinstall, a second device):
-        // the write lands on the same record.
         store.challenges.removeAll { $0.id == first.id }
         _ = try await store.joinRoom(code: "KPADC7")
         XCTAssertEqual(memberWrites, 2)
@@ -142,7 +133,6 @@ final class RoomMemberRecordTests: XCTestCase {
             XCTFail("a demo room is not joined by code")
         } catch LocalRoomSyncSource.Failure.readOnly {}
 
-        // And through the service: logged, swallowed, nothing thrown.
         let service = RoomSyncService(fileStore: MemberTestFileStore(), transport: transport)
         await service.recordMembership(code: "LOCAL", authorID: "me", displayName: "Me")
 
@@ -161,7 +151,6 @@ final class RoomMemberRecordTests: XCTestCase {
 }
 
 private extension ChallengeStoreEffects {
-    /// Rooms allowed, everything else on this machine left alone.
     static var isolatedButAllowingRooms: ChallengeStoreEffects {
         ChallengeStoreEffects(
             allowsCloudRoomManagement: true,

@@ -126,9 +126,6 @@ function collect(){
     .map(d => ({ key: d.k, zh: d.zh, en: d.en }));
   window.__1dayCopyAsk = [...ask].map(i => DATA[i].k);
   window.__1dayCopyDrop = [...drop].map(i => ({ key: DATA[i].k, optional: DATA[i].opt }));
-  // Survives a reload, which is the whole point: the page holds no server and
-  // half-finished edits used to die on refresh. Guarded because a page opened
-  // from a `data:` URL is not allowed to rewrite its own location.
   if (location.protocol === 'data:') return;
   try {
     location.replace('#' + encodeURIComponent(JSON.stringify({

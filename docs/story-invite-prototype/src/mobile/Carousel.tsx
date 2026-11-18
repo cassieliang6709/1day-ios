@@ -124,8 +124,6 @@ export function Carousel({
       const maximum = maxOffset(node);
       if (next < 0 || next > maximum) {
         setOffset(node, Math.max(0, Math.min(maximum, next)));
-        // Match MobileScroll's edge convention: positive displacement at the
-        // leading edge, negative displacement at the trailing edge.
         setRubberBand((next < 0 ? -next : maximum - next) * physics.overdragScale);
         springBack(velocity * physics.overdragScale);
         return;
@@ -177,18 +175,11 @@ export function Carousel({
     const delta = primary(event) - session.startPrimary;
     const crossDelta = cross(event) - session.startCross;
     if (!session.dragged) {
-      // Keep the gesture pending until it clears tap slop. Pointer-down and
-      // these early moves must bubble so a parent MobileScroll can still win.
       if (Math.max(Math.abs(delta), Math.abs(crossDelta)) < physics.dragThreshold) return;
       if (Math.abs(crossDelta) > Math.abs(delta)) {
-        // The cross axis won. Abandon this session without capturing or
-        // canceling the event so the parent can handle this move and release.
         sessionRef.current = null;
         return;
       }
-      // The scroller owns the gesture from this move onward. Capture keeps
-      // delivery stable outside its bounds; stopping propagation prevents the
-      // parent from accumulating vertical drift or release momentum.
       event.currentTarget.setPointerCapture(event.pointerId);
       session.captured = true;
     }

@@ -1,19 +1,5 @@
 name: iOS Tests
 
-# Three lanes instead of one, because one lane was 68 minutes and 95% of that
-# was a single `xcodebuild test` step. The measurement, from run 35519844647:
-#
-#   checkout 16s · generate 10s · layer check 0s · pick simulator 3m
-#   run tests 1h4m49s
-#
-# Inside those 65 minutes, twelve tests accounted for 46. All twelve render
-# video, and all twelve are 10–20x slower here than on a laptop — the runner
-# has no GPU, so the stitcher's per-clip look pass is software Core Image.
-# Nothing is wrong with the tests' own speed; the machine is the cost.
-#
-# So: split by what the tests need, run the lanes in parallel, and keep the
-# expensive lane off the pull-request path. A PR now waits for the longest of
-# `unit` and `ui` rather than the sum of everything.
 
 on:
   push:
@@ -23,15 +9,6 @@ on:
     paths: ['ios/**', '.github/workflows/ios-tests.yml', '.github/actions/**']
 
 env:
-  # The shared-room integration tests. They drive the real ChallengeStore,
-  # RoomSyncService and VideoStitcher through the local-room harness, so they
-  # are testing the shipping two- and three-person room, not the demo
-  # scaffolding that stands in for CloudKit. They are also 39 of the 65
-  # minutes, which is why they wait for the merge instead of the PR.
-  #
-  # Defined once and used twice — `-only-testing` for the room lane and
-  # `-skip-testing` for the others — so the lanes always partition the suite
-  # and a new file cannot quietly land in both or neither.
   ROOM_SUITES: >-
     AISetlogTests/LocalRoomRuntimeTests
     AISetlogTests/LocalRoomRuntimeBoundaryTests
@@ -47,12 +24,6 @@ env:
     AISetlogUITests/LocalFormalMomentUITests
     AISetlogUITests/LocalRoomImportUITests
 
-  # Skipped in every lane. These four talk to the real CloudKit development
-  # database. They already skip on a simulator that isn't signed into iCloud —
-  # but here they can't even ask: unsigned means no iCloud entitlement, and
-  # `accountStatus()` on an unentitled container kills the test host rather
-  # than returning an error, so there's nothing left alive to skip from.
-  # Run them on a machine with an iCloud-signed simulator instead.
   ALWAYS_SKIP: >-
     AISetlogTests/CloudKitIdempotencyTests
     AISetlogTests/CloudKitPaginationTests
@@ -60,14 +31,11 @@ env:
     AISetlogTests/JoinedRoomTests
 
 jobs:
-  # Cheap and first to fail: no simulator, no build.
   layers:
     name: Layer boundaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Models must stay UI-agnostic: no localized display strings in there
-      # (presentation text belongs to ChallengePresenter / the view layer).
       - name: Verify layer boundaries
         run: |
           if grep -rn "Strings\." ios/AISetlog/Models/; then
@@ -123,9 +91,6 @@ jobs:
             $flags \
             CODE_SIGNING_ALLOWED=NO
 
-  # The 39-minute lane. Not on pull requests — a PR that breaks it is caught
-  # here on the way into main, before anything ships, and nobody sits watching
-  # a merge the way they sit watching a PR.
   room:
     name: Shared-room integration
     if: github.event_name == 'push'

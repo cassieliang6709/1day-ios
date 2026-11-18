@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Wraps children onto multiple lines, left-to-right, like text. Used by the
-/// list editor's moment suggestions and the composer's collapsed list summary.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
 

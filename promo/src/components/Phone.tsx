@@ -2,15 +2,9 @@ import React from 'react';
 import {OffthreadVideo, staticFile, useCurrentFrame, interpolate} from 'remotion';
 import {APP_H, APP_W} from '../theme';
 
-/**
- * The recording inside a soft-edged screen. No drawn bezel: the source is a
- * clean full-screen capture, so a rounded mask reads as a phone without the
- * plastic-looking fake hardware that dates a promo video.
- */
 export const Phone: React.FC<{
   src: string;
   width: number;
-  /** Slow push-in; 0 disables it. */
   zoom?: number;
 }> = ({src, width, zoom = 0.04}) => {
   const frame = useCurrentFrame();

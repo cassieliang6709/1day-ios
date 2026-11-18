@@ -1,8 +1,5 @@
 import XCTest
 
-/// The room page as one frame per person (1.5, `RoomFrames`): a two-member
-/// room shows two frames, three shows three, and the face on a frame opens
-/// that person's page. Uses the local demo room, so nothing is uploaded.
 final class RoomFramesUITests: XCTestCase {
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
@@ -26,13 +23,11 @@ final class RoomFramesUITests: XCTestCase {
         XCTAssertTrue(demo.waitForExistence(timeout: 15))
         demo.tap()
 
-        // 生成 vlog and 聊天 are in the nav bar's 「…」 now.
         XCTAssertTrue(app.buttons["room-more"].waitForExistence(timeout: UITestWait.media))
         XCTAssertTrue(frames(app).firstMatch.waitForExistence(timeout: 15))
         XCTAssertEqual(frames(app).count, 2)
         capture(app, "room-frames-2")
 
-        // The face on the first frame opens that person's page.
         let person = app.buttons.matching(identifier: "room-frame-person").firstMatch
         XCTAssertTrue(person.exists)
         person.tap()

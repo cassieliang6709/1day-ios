@@ -1,6 +1,5 @@
 import Foundation
 
-/// Centers in the room list's fixed-size identity area. Every member is shown.
 struct RoomAvatarLayout {
     static let width: CGFloat = 86
     static let height: CGFloat = 68

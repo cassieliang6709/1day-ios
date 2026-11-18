@@ -43,7 +43,6 @@ final class VideoStitcherTests: XCTestCase {
         XCTAssertGreaterThan(try fileSize(output), 0)
     }
 
-    // MARK: - Sequential framing
 
     private let portraitCanvas = CGSize(width: 1080, height: 1920)
 
@@ -66,7 +65,6 @@ final class VideoStitcherTests: XCTestCase {
         XCTAssertEqual(
             VideoStitcher.sequentialFraming(orientedSize: portraitCanvas, canvas: portraitCanvas),
             .fill)
-        // A few pixels off the canvas's shape is inside the tolerance.
         XCTAssertEqual(
             VideoStitcher.sequentialFraming(
                 orientedSize: CGSize(width: 1072, height: 1920), canvas: portraitCanvas),
@@ -78,7 +76,6 @@ final class VideoStitcherTests: XCTestCase {
             guard case .fitOnBed(let subject) = VideoStitcher.sequentialFraming(
                 orientedSize: take, canvas: portraitCanvas)
             else { return XCTFail("\(take) was cropped to fill a 9:16 film") }
-            // Taller than wide but wider than the canvas: fitted to the width.
             XCTAssertEqual(subject.width, 1080, accuracy: 0.5)
             XCTAssertEqual(subject.midY, 960, accuracy: 0.5)
         }
@@ -89,14 +86,11 @@ final class VideoStitcherTests: XCTestCase {
             _ = try await VideoStitcher.stitch(clips: [])
             XCTFail("Expected an empty-input error")
         } catch VideoStitcher.StitchError.noClips {
-            // Expected.
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
     }
 
-    /// Fixtures are generated rather than bundled: the seven `day*.mp4` files
-    /// these used to load shipped inside every release build.
     private func sampleClips(count: Int) async throws -> [DayClip] {
         var clips: [DayClip] = []
         for day in 1...count {

@@ -297,10 +297,6 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
 
     if (!scroll || !session.active || session.pointerId !== event.pointerId) return;
 
-    // A nested horizontal scroller can let pointer-down bubble, then claim
-    // pointer-move. Its pointer-up may still reach this parent. Without a
-    // completed parent drag there is no valid release velocity or click to
-    // suppress, so discard the pending session without starting motion.
     if (!session.hasDragged) {
       dragSamplesRef.current = [];
       dragSessionRef.current = {
@@ -320,7 +316,6 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
-        // Pointer capture can already be gone after a browser-level cancel.
       }
     }
 
@@ -391,7 +386,6 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
         event.currentTarget.setPointerCapture(event.pointerId);
         session.captured = true;
       } catch {
-        // Pointer capture can fail if the browser has already canceled the pointer.
       }
     }
 

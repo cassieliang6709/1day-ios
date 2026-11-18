@@ -1,12 +1,3 @@
-/**
- * Rooms, members, clips, reactions, comments and pokes — everything that used
- * to live in CloudKit's public database, in D1, with videos and avatars in R2.
- *
- * Two rules hold everywhere:
- * - Whoever is signed in is the author. A body never names its own author;
- *   an id that has an author baked into it must have this caller's.
- * - Knowing a room's code is what lets you see it, as it was on CloudKit.
- */
 import {
   bad,
   forbidden,
@@ -28,7 +19,6 @@ const NAME = 64;
 const TITLE = 200;
 const TEXT = 4000;
 const CAPTIONS = 32 * 1024;
-/** D1 allows 100 bound values per statement. */
 const CHUNK = 50;
 
 const chunks = (list, size = CHUNK) => {
@@ -38,7 +28,6 @@ const chunks = (list, size = CHUNK) => {
 };
 const marks = (n, from = 1) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(',');
 
-// MARK: - Row shapes
 
 export function roomJson(r) {
   return {
@@ -109,7 +98,6 @@ function commentJson(c) {
   };
 }
 
-// MARK: - Names the app derives (must match CloudKitService)
 
 export const memberId = (code, userId) => `${code}_${userId}`;
 
@@ -118,7 +106,6 @@ export function clipIdBelongs(id, code, me, day) {
   return id === first || (id.startsWith(`${first}_`) && isUUID(id.slice(first.length + 1)));
 }
 
-/** Swift writes each unicode scalar's value, joined by `-`. */
 export function reactionId(code, target, me, day, emoji) {
   const scalars = Array.from(emoji, (c) => String(c.codePointAt(0))).join('-');
   return `${code}_${target}_day${day}_${me}_${scalars}`;
@@ -133,7 +120,6 @@ function ownMedia(key, me) {
   return typeof key === 'string' && key.startsWith(mediaPrefix(me)) && key.length < 300;
 }
 
-// MARK: - Rooms
 
 async function createRoom(request, env, { me }) {
   const b = await readJson(request);
@@ -159,7 +145,6 @@ async function createRoom(request, env, { me }) {
       str(b.momentTitles, TEXT, { optional: true })
     )
     .run();
-  // The code is taken; the app picks another and tries again.
   if (!result.meta?.changes) throw new HttpError(409, 'code_taken');
   const room = await env.DB.prepare('SELECT * FROM rooms WHERE code = ?1').bind(code).first();
   return json(roomJson(room), 201);
@@ -171,8 +156,6 @@ async function getRoom(env, code) {
   return json(roomJson(room));
 }
 
-/** Only the owner's name can change, and only by the owner — account
- * deletion replaces it with "deleted member". */
 async function patchRoom(request, env, { me }, code) {
   const b = await readJson(request);
   const ownerName = str(b.ownerName, NAME);
@@ -199,7 +182,6 @@ async function myRooms(env, { me }) {
   });
 }
 
-// MARK: - Members
 
 async function listMembers(env, code) {
   const { results } = await env.DB.prepare('SELECT * FROM members WHERE room_code = ?1')
@@ -208,12 +190,6 @@ async function listMembers(env, code) {
   return json({ members: (results ?? []).map(memberJson) });
 }
 
-/**
- * Upsert my member record in a room. Every field is optional and a field left
- * out keeps what the record had — joining, the avatar and mood, and a rename
- * all write here, and none may undo another. An empty name means "not known
- * on this phone", never a new name.
- */
 async function putMember(request, env, { me }, code) {
   const b = await readJson(request);
   const displayName = str(b.displayName, NAME, { optional: true }) ?? '';
@@ -252,7 +228,6 @@ async function putMember(request, env, { me }, code) {
   return json({ ok: true });
 }
 
-// MARK: - Clips
 
 async function listClips(env, code) {
   const { results } = await env.DB.prepare(
@@ -263,8 +238,6 @@ async function listClips(env, code) {
   return json({ clips: (results ?? []).map(clipJson) });
 }
 
-/** Upload, or upload again: a retried take lands on the same row. The video
- * itself went up first (`POST /media`); this points the clip at it. */
 async function putClip(request, env, ctx, { me }, id) {
   const b = await readJson(request);
   const code = roomCode(b.roomCode);
@@ -305,8 +278,6 @@ async function putClip(request, env, ctx, { me }, id) {
   return json({ ok: true });
 }
 
-/** Just the words on a clip already in the room — no new video. A clip that
- * isn't up yet is 404, and the app lets the next upload carry the caption. */
 async function patchClip(request, env, { me }, id) {
   const b = await readJson(request);
   const clip = await env.DB.prepare('SELECT author_id FROM clips WHERE id = ?1').bind(id).first();
@@ -325,7 +296,6 @@ async function patchClip(request, env, { me }, id) {
   return json({ ok: true });
 }
 
-// MARK: - Reactions, comments, pokes
 
 async function putReaction(request, env, ctx, { me }, id) {
   const b = await readJson(request);
@@ -350,7 +320,6 @@ async function putReaction(request, env, ctx, { me }, id) {
 
 async function deleteOwn(env, table, id, me) {
   const row = await env.DB.prepare(`SELECT author_id FROM ${table} WHERE id = ?1`).bind(id).first();
-  // Already gone is what was asked for.
   if (!row) return json({ ok: true });
   if (row.author_id !== me) throw forbidden();
   await env.DB.prepare(`DELETE FROM ${table} WHERE id = ?1`).bind(id).run();
@@ -374,8 +343,6 @@ async function interactions(env, code) {
   return json({ reactions: (reactions.results ?? []).map(reactionJson), comments });
 }
 
-/** Room chat and per-clip comments. The id is the app's UUID, so sending the
- * same message twice is one message. */
 async function putComment(request, env, ctx, { me }, id) {
   if (!isUUID(id)) throw bad('bad_id');
   const b = await readJson(request);
@@ -409,8 +376,6 @@ async function putComment(request, env, ctx, { me }, id) {
   return json({ ok: true });
 }
 
-/** Which of these message ids the room has no record of. Only an id that is
- * really absent counts — the app deletes its copy on this answer. */
 async function missingComments(request, env, code) {
   const b = await readJson(request);
   if (!Array.isArray(b.ids) || b.ids.length > 1000 || !b.ids.every(isUUID)) throw bad();
@@ -423,8 +388,6 @@ async function missingComments(request, env, code) {
       .all();
     for (const row of results ?? []) present.add(row.id);
   }
-  // An id that exists in another room is not "missing" either; it just
-  // isn't this room's.
   const elsewhere = new Set();
   const rest = b.ids.filter((id) => !present.has(id));
   for (const part of chunks(rest)) {
@@ -462,9 +425,7 @@ async function putPoke(request, env, ctx, { me }, id) {
   return json({ ok: true });
 }
 
-// MARK: - Leaving a room, deleting an account
 
-/** Everything of mine in one room, by id: what leaving deletes. */
 async function myRecordNames(env, { me }, code) {
   const rows = await env.DB.batch(
     ['clips', 'reactions', 'comments', 'pokes'].map((table) =>
@@ -484,11 +445,6 @@ const OWNED = [
   ['members', 'user_id'],
 ];
 
-/**
- * Deletes by name and answers with the names now confirmed gone: mine that
- * were deleted, plus names nobody has. Someone else's record is neither
- * deleted nor confirmed — the caller's journal keeps it as not done.
- */
 async function deleteRecords(request, env, { me }) {
   const b = await readJson(request);
   if (!Array.isArray(b.names) || b.names.length > 2000) throw bad();
@@ -519,7 +475,6 @@ async function deleteRecords(request, env, { me }) {
   return json({ confirmed: names.filter((n) => !remaining.has(n)) });
 }
 
-/** A video or avatar goes once no row points at it any more. */
 export async function deleteMediaIfUnused(env, keys) {
   const unique = [...new Set(keys.filter(Boolean))];
   if (!unique.length || !env.MEDIA) return;
@@ -536,12 +491,7 @@ export async function deleteMediaIfUnused(env, keys) {
   if (gone.length) await env.MEDIA.delete(gone);
 }
 
-// MARK: - Routing
 
-/**
- * @returns a Response, or null when the path isn't one of these.
- * `who` is `{ userId, me }` from the session token.
- */
 export async function roomRoutes(request, env, ctx, who, segments) {
   const method = request.method;
   const [head, a, b, c] = segments;

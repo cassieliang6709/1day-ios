@@ -1,7 +1,5 @@
 import AVFoundation
 
-/// Clip lengths for the selection bar's 「约 8 秒」. Each file is opened once
-/// and remembered; a file that can't be read counts as nothing.
 enum ClipDurations {
     private static let cache = Cache()
 

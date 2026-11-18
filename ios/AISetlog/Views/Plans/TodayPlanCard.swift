@@ -1,10 +1,5 @@
 import SwiftUI
 
-/// 我的 → 今天的计划: today's list beside the mood, one row per item (1.5).
-///
-/// An item with footage is ticked — filming it is what ticks it, there is
-/// no box to check by hand. Tapping an item films it. No count, no bar:
-/// the list is what to film, not a score (PRD 5.6).
 struct TodayPlanCard: View {
     let challenge: Challenge
     let progress: RoomProgress
@@ -31,7 +26,6 @@ struct TodayPlanCard: View {
                     row(slot)
                 }
             }
-            // As tall as the mood card beside it.
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .accessibilityElement(children: .contain)

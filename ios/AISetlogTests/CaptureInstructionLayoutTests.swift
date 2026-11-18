@@ -5,8 +5,6 @@ import SwiftUI
 @MainActor
 final class CaptureInstructionLayoutTests: XCTestCase {
     func testIdleAndRecordingInstructionsGrowWithoutSqueezingAction() throws {
-        // Includes a narrow landscape control-column candidate, not a claim
-        // that the full camera page has adopted that layout.
         for width: CGFloat in [160, 240, 320, 640] {
             for text in ["轻点拍摄 · 3 秒", "Tap to record · 3 seconds", "Tap to stop"] {
                 func render(_ size: DynamicTypeSize) throws -> CGImage {

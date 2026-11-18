@@ -1,21 +1,8 @@
 import SwiftUI
 
-/// The grade, chosen while you watch it happen.
-///
-/// Not a sheet. A sheet would cover the one thing you're deciding about — you
-/// can't pick how bright your face should be by looking at a slider. So it sits
-/// on the bottom of the clip you're already watching, and the picture behind it
-/// changes as you drag.
-///
-/// Three dials and no presets. Presets were four names for four points somebody
-/// else picked, and the two rooms people film in most — a dim kitchen and a
-/// bright pavement — never landed on any of them. There is no "auto", and no
-/// number is shown: a figure invites you to get it right, and there is no right.
 struct LookPanel: View {
     @Binding var look: PersonalEffectParameters
     @Binding var sticky: Bool
-    /// Held down = show the clip as it was filmed. Bound rather than owned,
-    /// because the thing that has to change is the player above this panel.
     @Binding var showingOriginal: Bool
     let onDone: () -> Void
 
@@ -29,9 +16,6 @@ struct LookPanel: View {
         .padding(.horizontal, 18)
         .padding(.top, 14)
         .padding(.bottom, 18)
-        // Nearly opaque, not a tint. Glass over a bright clip let the picture
-        // read straight through the panel and put whatever the video says at
-        // that moment behind the panel's title.
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.black.opacity(0.94)))
@@ -42,7 +26,6 @@ struct LookPanel: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Header
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -52,9 +35,6 @@ struct LookPanel: View {
                     .foregroundStyle(.white)
             }
             Spacer(minLength: 8)
-            // Only offered once there is something to undo, and it resets all
-            // three at once: three dials to put back by hand is how people end
-            // up near centre but not on it, which looks like the app is broken.
             if !look.isIdentity {
                 Button(Strings.lookReset) {
                     withAnimation(OneDay.Motion.soft) { look = .none }
@@ -69,7 +49,6 @@ struct LookPanel: View {
         }
     }
 
-    // MARK: - Dials
 
     private var dials: some View {
         VStack(spacing: 4) {
@@ -100,9 +79,6 @@ struct LookPanel: View {
                 .minimumScaleFactor(0.75)
                 .frame(width: 54, alignment: .leading)
             ZStack {
-                // A tick at centre, so "off" is somewhere your thumb can find
-                // without reading anything. On a 0...1 slider off was the far
-                // left, which is a different gesture from "a bit less".
                 Rectangle()
                     .fill(.white.opacity(0.35))
                     .frame(width: 1, height: 10)
@@ -117,12 +93,7 @@ struct LookPanel: View {
         }
     }
 
-    // MARK: - Compare
 
-    /// Press and hold, don't tap-to-toggle. A toggle leaves you one tap away
-    /// from forgetting which one you're looking at; holding can only ever be
-    /// temporary, so the thing on screen when your thumb is up is always the
-    /// thing you're choosing.
     private var compare: some View {
         HStack(spacing: 6) {
             Image(systemName: showingOriginal ? "eye.fill" : "eye")
@@ -130,8 +101,6 @@ struct LookPanel: View {
             Text(Strings.lookHoldToCompare)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
         }
-        // Fixed navy on the white pressed state: `OneDay.ink` goes light in
-        // dark mode, which is light-on-white exactly while you're holding it.
         .foregroundStyle(showingOriginal ? Color(uiColor: UIColor(hex: 0x0F2E6B)) : .white)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -150,7 +119,6 @@ struct LookPanel: View {
         .disabled(look.isIdentity)
     }
 
-    // MARK: - Remember
 
     private var remember: some View {
         VStack(alignment: .leading, spacing: 4) {

@@ -1,8 +1,5 @@
 import Foundation
 
-/// Durable protocol state, not an account-deletion implementation. The integration
-/// layer must persist each transition before performing its next side effect.
-/// In particular, freeze must be shared by every writer, not just chat UI.
 struct AccountDeletionProgress: Codable, Equatable {
     enum Phase: String, Codable { case draining, discovering, deleting, localCleanup, completed }
     enum TransitionError: Error { case invalidPhase, writesInFlight, discoveryIncomplete, pendingRecords, invalidRecord }
@@ -23,8 +20,6 @@ struct AccountDeletionProgress: Codable, Equatable {
         self.inFlightWrites = inFlightWrites
     }
 
-    // Remains frozen even when completed: only a separately established identity
-    // may create a new write lease. Failure never reopens the old account.
     var allowsNewWrites: Bool { false }
 
     mutating func settleWrite(_ token: UUID, writtenRecordIDs: Set<String>) throws {
@@ -41,8 +36,6 @@ struct AccountDeletionProgress: Codable, Equatable {
         lastFailure = nil
     }
 
-    /// Call only for a successfully received page, across ALL authored record
-    /// types/rooms. The final-page signal must cover the entire inventory.
     mutating func discovered(_ records: Set<String>, isFinalPage: Bool) throws {
         guard phase == .discovering else { throw TransitionError.invalidPhase }
         guard records.allSatisfy({ !$0.isEmpty }) else { throw TransitionError.invalidRecord }
@@ -51,7 +44,6 @@ struct AccountDeletionProgress: Codable, Equatable {
         lastFailure = nil
     }
 
-    /// Partial batch successes are durable; unconfirmed records remain retryable.
     mutating func confirmedDeleted(_ records: Set<String>) throws {
         guard phase == .deleting else { throw TransitionError.invalidPhase }
         guard records.isSubset(of: pendingRecordIDs.union(deletedRecordIDs)) else {
@@ -76,7 +68,6 @@ struct AccountDeletionProgress: Codable, Equatable {
         lastFailure = nil
     }
 
-    /// Store a sanitized error code, never raw credentials or user content.
     mutating func recordFailure(code: String) {
         guard phase != .completed else { return }
         lastFailure = code

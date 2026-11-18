@@ -1,7 +1,6 @@
 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
 import Foundation
 
-/// Reuses the preview's file owner; no Documents directory or defaults access.
 final class LocalRoomDraftStorage: ClipDraftRepository, ClipDraftFileStore {
     private let files: LocalRoomDemoStorage
     private let namespace = UUID()

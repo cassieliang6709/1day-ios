@@ -1,9 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// The room page's columns (1.5): one per person, me first, every clip of
-/// theirs newest first. Pinned here because the order is the whole layout —
-/// a column that jumps sideways when somebody films is a page you can't learn.
 final class RoomFeedTests: XCTestCase {
     private let myID = "me"
 
@@ -37,8 +34,6 @@ final class RoomFeedTests: XCTestCase {
         ])
     }
 
-    /// A clip filed before the story was shared is authored "local" and is
-    /// still mine — it goes in my column, not a column of its own.
     func testLocalAuthorIsMine() {
         let columns = RoomFeed.columns(
             clips: [clip(RoomProgress.soloAuthorID, day: 1, minutesAgo: 1)],
@@ -49,8 +44,6 @@ final class RoomFeedTests: XCTestCase {
         XCTAssertTrue(columns[1].clips.isEmpty)
     }
 
-    /// Somebody whose footage arrived before their membership still gets a
-    /// column, after the members.
     func testAuthorMissingFromMembersStillGetsAColumn() {
         let columns = RoomFeed.columns(
             clips: [clip("bo", day: 1, minutesAgo: 3, name: "Bo")],
@@ -60,14 +53,12 @@ final class RoomFeedTests: XCTestCase {
         XCTAssertEqual(columns[2].name, "Bo")
     }
 
-    /// The page always has my column, even before I'm in `members`.
     func testMyColumnExistsWithNoMembers() {
         let columns = RoomFeed.columns(clips: [], members: [], myID: myID)
         XCTAssertEqual(columns.map(\.id), [myID])
         XCTAssertTrue(columns[0].clips.isEmpty)
     }
 
-    /// 2:07 used to show as "02:7": the hour was padded, the minute wasn't.
     func testRoomClockPadsTheMinute() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -81,8 +72,6 @@ final class RoomFeedTests: XCTestCase {
         }
     }
 
-    /// 20:22 used to show as "08:22" on a phone set to 12-hour time: the
-    /// format hid 上午/下午 but still counted the hour in twelves.
     func testRoomClockIsTwentyFourHourEvenOnTwelveHourLocales() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!

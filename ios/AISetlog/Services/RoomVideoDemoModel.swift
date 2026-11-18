@@ -3,7 +3,6 @@ import AVFoundation
 import Combine
 import Foundation
 
-/// Local media workspace. Never creates a Challenge or uploads a clip.
 @MainActor
 final class RoomVideoDemoModel: ObservableObject {
     @Published private(set) var clips: [DayClip] = []
@@ -58,8 +57,6 @@ final class RoomVideoDemoModel: ObservableObject {
         }
     }
 
-    /// Uses the app's actual current friendsTogether compositor, including its
-    /// current cropping behaviour. This is not a proposed replacement layout.
     static func stitch(_ clips: [DayClip], landscape: Bool? = nil) async throws -> URL {
         var options = VideoStitcher.Options()
         options.layout = .friendsTogether
@@ -69,8 +66,6 @@ final class RoomVideoDemoModel: ObservableObject {
         return try await VideoStitcher.stitch(clips: clips, options: options)
     }
 
-    /// Import a private copy, trim to the first three seconds, and never alter
-    /// or upload the selected Photos asset. The picker owns permission to read.
     func replace(index: Int, source: URL, count: Int, landscape: Bool? = nil, chinese: Bool) async {
         defer { try? FileManager.default.removeItem(at: source) }
         guard !closed, !busy, clips.indices.contains(index) else { return }

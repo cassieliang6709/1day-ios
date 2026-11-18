@@ -4,11 +4,6 @@ import PhotosUI
 import CoreTransferable
 import UniformTypeIdentifiers
 
-/// A video off the camera roll, copied somewhere this build can read it.
-///
-/// `PhotosPickerItem` hands back a file it owns and deletes out from under you,
-/// so the copy is the point. The caller deletes it once the fixture has taken
-/// what it needs.
 struct RoomDemoMovie: Transferable {
     let url: URL
 
@@ -23,7 +18,6 @@ struct RoomDemoMovie: Transferable {
     }
 }
 
-/// Fixture controls only. The room underneath remains the production UI.
 struct LocalRoomImportControls: View {
     let runtime: LocalRoomRuntime
     let chinese: Bool
@@ -35,9 +29,6 @@ struct LocalRoomImportControls: View {
     @State private var busy = false
     @State private var failed = false
 
-    /// Who, and — once the room has more than one slot — which moment. With
-    /// three moments and two members the menu is six rows, and three of them
-    /// say the same name; the moment is what tells them apart.
     private func label(for clip: DayClip, multiSlot: Bool) -> String {
         let who = clip.authorName ?? "Sample"
         guard multiSlot else { return who }

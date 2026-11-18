@@ -1,10 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// One sentence in, prompts out — and, more importantly, what happens on every
-/// path where that doesn't work. The feature is an accelerator, so every
-/// failure has to land the user back in front of the list they can fill in
-/// themselves, with nothing of theirs disturbed.
 final class PromptSuggestionServiceTests: XCTestCase {
     private var session: URLSession!
 
@@ -28,7 +24,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
             deviceID: "test-device")
     }
 
-    // MARK: - Parsing
 
     func testAWellFormedResponseParsesIntoPrompts() throws {
         let data = Data(#"{"prompts":["出门前","第一个箱子","新家的灯"]}"#.utf8)
@@ -46,8 +41,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         }
     }
 
-    /// Two is what the composer needs to make a story. One isn't a shorter
-    /// answer, it's a broken one.
     func testTooFewPromptsCountsAsMalformed() {
         let data = Data(#"{"prompts":["就一个"]}"#.utf8)
 
@@ -74,7 +67,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         XCTAssertEqual(prompts, ["一", "二", "三"])
     }
 
-    // MARK: - The round trip
 
     func testASuccessfulCallReturnsPrompts() async throws {
         StubURLProtocol.respond(status: 200, body: #"{"prompts":["出门前","第一个箱子"]}"#)
@@ -99,8 +91,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         XCTAssertEqual(sent["device"] as? String, "test-device")
     }
 
-    /// No network is the ordinary case, not an exceptional one: people make
-    /// stories on the subway.
     func testATransportFailureIsJustUnavailable() async {
         StubURLProtocol.fail(with: URLError(.notConnectedToInternet))
 
@@ -133,8 +123,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         }
     }
 
-    /// A 200 carrying nonsense is the one the app is most likely to meet, since
-    /// what's upstream is a model writing text.
     func testAGoodStatusWithABadBodyIsMalformed() async {
         StubURLProtocol.respond(status: 200, body: "<html>gateway</html>")
 
@@ -143,11 +131,7 @@ final class PromptSuggestionServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Retry and warm-up
 
-    /// A stuck connection is the usual way a call is slow; a fresh one
-    /// usually goes through, so one failure shouldn't send the user to the
-    /// blank list.
     func testATransientFailureIsRetriedOnce() async throws {
         StubURLProtocol.respond(status: 200, body: #"{"prompts":["出门前","第一个箱子"]}"#)
         StubURLProtocol.failuresBeforeSuccess = 1
@@ -168,7 +152,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         XCTAssertEqual(StubURLProtocol.requestCount, RemotePromptSuggestionService.attempts)
     }
 
-    /// Asking again would only spend more of the limit.
     func testARateLimitIsNotRetried() async {
         StubURLProtocol.respond(status: 429, body: #"{"error":"rate_limited"}"#)
 
@@ -196,7 +179,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
         XCTAssertNil(StubURLProtocol.lastBody)
     }
 
-    // MARK: - The install id
 
     func testTheInstallIDIsMintedOnceAndKept() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "install-id-tests"))
@@ -225,7 +207,6 @@ final class PromptSuggestionServiceTests: XCTestCase {
     }
 }
 
-/// Stands in for the network so the failure paths are reachable in a test.
 private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()
@@ -233,7 +214,6 @@ private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var lastBody: Data?
     nonisolated(unsafe) static var lastMethod: String?
     nonisolated(unsafe) static var requestCount = 0
-    /// Fail this many requests with a timeout before answering normally.
     nonisolated(unsafe) static var failuresBeforeSuccess = 0
 
     static func respond(status: Int, body: String) {
@@ -261,8 +241,6 @@ private final class StubURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        // `httpBody` is stripped by the loading system, so read it back out of
-        // the stream the way a real transport would.
         Self.lastBody = request.httpBody ?? request.httpBodyStream.map(Self.drain)
         Self.lastMethod = request.httpMethod
         Self.requestCount += 1

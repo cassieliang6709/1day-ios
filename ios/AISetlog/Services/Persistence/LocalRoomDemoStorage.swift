@@ -1,10 +1,6 @@
 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
 import Foundation
 
-/// Storage for a future formal-room preview session. Never reads UserDefaults,
-/// Documents/clips, production cover files, or legacy migrations.
-/// This is only the disk boundary: networking and notifications must separately
-/// be disabled before a ChallengeStore using it is exposed in the UI.
 final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore {
     let root: URL
     private(set) var isClosed = false
@@ -30,16 +26,11 @@ final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore {
         } catch { return nil }
     }
 
-    /// Every name here is already unique and nothing is ever replaced, so a
-    /// second take is just another clip.
     func storeExtraTake(from tempURL: URL, day: Int, takeID: UUID, challengeID: UUID) -> String? {
         storeClip(from: tempURL, day: day, challengeID: challengeID)
     }
 
     func clipURL(fileName: String, challengeID: UUID) -> URL {
-        // AVFoundation needs a recognizable media extension on some decoding
-        // paths. Encode the entire untrusted name, then append only a whitelisted
-        // extension; traversal input still cannot become a path component.
         let ext = (fileName as NSString).pathExtension.lowercased()
         let suffix = ["mov", "mp4", "m4v"].contains(ext) ? "." + ext : ""
         return root.appendingPathComponent(challengeID.uuidString, isDirectory: true)
@@ -60,7 +51,6 @@ final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore {
     }
 
     func migrateLegacyClips(_ fileNames: [String], into challengeID: UUID) {
-        // Deliberately never touches production legacy files.
     }
 
     func close() {
@@ -70,7 +60,6 @@ final class LocalRoomDemoStorage: ChallengeRepository, ClipFileStore {
     }
 
     private func safeComponent(_ text: String) -> String {
-        // Encode arbitrary input rather than allow ".." or absolute path parts.
         text.utf8.map { String(format: "%02x", $0) }.joined()
     }
 }

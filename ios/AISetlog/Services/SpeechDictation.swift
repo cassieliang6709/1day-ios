@@ -3,20 +3,13 @@ import Foundation
 import Observation
 import Speech
 
-/// Tap-to-start, tap-to-stop dictation for the mood note. The live transcript
-/// is published as `transcript`; the caller decides what to do with it.
-///
-/// On-device recognition when the locale supports it, so a sentence about
-/// someone's day stays on the phone where possible.
 @MainActor
 @Observable
 final class SpeechDictation {
     enum Status: Equatable {
         case idle
         case listening
-        /// Mic or speech permission was refused. The UI offers Settings.
         case denied
-        /// No recognizer for this locale, or it failed to start.
         case unavailable
     }
 
@@ -27,12 +20,10 @@ final class SpeechDictation {
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var tapInstalled = false
-    /// Bumped per start, so a late callback from an old task can't stop a new one.
     @ObservationIgnored private var generation = 0
 
     var isListening: Bool { status == .listening }
 
-    /// `zh-CN` when the app speaks Chinese, `en-US` otherwise.
     static func locale(for language: AppLanguage) -> Locale {
         Locale(identifier: language.resolved == .chinese ? "zh-CN" : "en-US")
     }
@@ -57,8 +48,6 @@ final class SpeechDictation {
         }
     }
 
-    /// Safe to call any number of times: stops the engine, removes the tap,
-    /// finishes the request and hands the audio session back to other apps.
     func stop() {
         if engine.isRunning { engine.stop() }
         if tapInstalled {

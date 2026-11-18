@@ -1,59 +1,37 @@
 import Foundation
 
-/// The complete remote boundary of RoomSyncService. Supplying a transport never
-/// falls back to CloudKit, including when an operation fails.
 struct RoomSyncTransport {
     var fetchClips: @MainActor (String, URL) async throws -> [CloudKitService.RemoteClip]
     var fetchInteractions: @MainActor (String) async throws -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
-    /// code, day, authorID, authorName, file, captions, when the take was
-    /// filmed — which is not when this runs (see `CloudKitService.uploadClip`)
-    /// — and which take (nil = take 1).
     var uploadClip: @MainActor (String, Int, String, String, URL, [Caption], Date, UUID?) async throws -> Void
-    /// Caption-only rewrite on a clip already in the room: code, day, authorID,
-    /// every caption, take (nil = take 1).
     var updateClipCaption: @MainActor (String, Int, String, [Caption], UUID?) async throws -> Void
     var setReaction: @MainActor (String, Int, String, String, String, String, Bool) async throws -> Void
     var postComment: @MainActor (String, Int, String, String, String, String, String) async throws -> Void
     var deleteComment: @MainActor (String) async throws -> Void
-    /// 拍一拍: code, authorID, authorName, targetAuthorID.
     var sendPoke: @MainActor (String, String, String, String) async throws -> Void = { _, _, _, _ in
         throw CancellationError()
     }
-    /// The room behind a join code. Defaulted to fail, like the two below: a
-    /// transport that doesn't say how to reach a room never reaches CloudKit.
     var fetchRoom: @MainActor (String) async throws -> CloudKitService.RemoteRoom = { _ in
         throw CancellationError()
     }
-    /// My `Member` record for a room I just joined: code, authorID,
-    /// displayName, joinedAt.
     var saveMember: @MainActor (String, String, String, Date) async throws -> Void = { _, _, _, _ in
         throw CancellationError()
     }
-    /// My avatar and today's mood on my `Member` record in one room.
-    /// Defaulted to fail, like `saveMember`.
     var saveMemberProfile: @MainActor (CloudKitService.MemberProfileWrite) async throws -> Void = { _ in
         throw CancellationError()
     }
-    /// The room's new name on my `Member` record: code, authorID,
-    /// displayName, title, when. Defaulted to fail, like `saveMember`.
     var saveRoomTitle: @MainActor (String, String, String, String, Date) async throws -> Void = { _, _, _, _, _ in
         throw CancellationError()
     }
-    /// Leaving a room: everything of mine in it, by record name (code,
-    /// authorID), then deleted (names → the ones confirmed gone). Defaulted
-    /// to fail, like `saveMember`.
     var myRecordNames: @MainActor (String, String) async throws -> Set<String> = { _, _ in
         throw CancellationError()
     }
     var deleteRecords: @MainActor (Set<String>) async throws -> Set<String> = { _ in
         throw CancellationError()
     }
-    /// Everyone's `Member` record in a room: code, where to cache avatars.
     var fetchMembers: @MainActor (String, URL) async throws -> [CloudKitService.RemoteMember] = { _, _ in
         throw CancellationError()
     }
-    /// The rooms a user is in, by user ID. Defaulted to fail, like
-    /// `saveMember`.
     var findMyRooms: @MainActor (String) async throws -> CloudKitService.MyRooms = { _ in
         throw CancellationError()
     }
@@ -80,9 +58,6 @@ struct RoomSyncTransport {
 }
 
 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
-/// Read-only fixture source for the formal-room runtime under construction.
-/// Unsupported writes fail closed; they must never claim an upload succeeded.
-/// Local recording belongs to the isolated store, and room chat has its own transport.
 @MainActor
 final class LocalRoomSyncSource {
     enum Failure: Error { case closed, unknownRoom, readOnly }
@@ -114,7 +89,6 @@ final class LocalRoomSyncSource {
                 throw Failure.readOnly
             },
             sendPoke: { [self] code, _, _, _ in try rejectWrite(code) },
-            // A demo room is joined from fixtures, never by code.
             fetchRoom: { [self] code in
                 try check(code)
                 throw Failure.readOnly
@@ -122,7 +96,6 @@ final class LocalRoomSyncSource {
             saveMember: { [self] code, _, _, _ in try rejectWrite(code) })
     }
 
-    /// Local fixture administration only; remote transport writes remain rejected.
     func replaceClip(authorID: String, day: Int, url: URL) throws {
         try check(code)
         guard let index = clips.firstIndex(where: { $0.authorID == authorID && $0.day == day }) else {

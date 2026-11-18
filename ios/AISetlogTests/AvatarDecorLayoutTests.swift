@@ -2,10 +2,6 @@ import CoreGraphics
 import XCTest
 @testable import AISetlog
 
-/// The avatar spec's red lines (§3.4), held by the decoration layer, which is
-/// ours whatever made the head: two or three stickers and never more, none on
-/// a cheek, two blushes where the face's cheeks are, a rainbow outline that
-/// stays inside the transparent margin.
 final class AvatarDecorLayoutTests: XCTestCase {
     private let face = CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6)
 
@@ -89,7 +85,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
         XCTAssertEqual(l.bands.map(\.color), AvatarDecorLayout.rainbow + [AvatarDecorLayout.white])
         let reaches = l.bands.map(\.reach)
         XCTAssertEqual(reaches, reaches.sorted(by: >), "painted outermost first")
-        // Every band goes all the way round.
         for band in l.bands { XCTAssertEqual(band.offsets.count, AvatarDecorLayout.samples) }
     }
 
@@ -103,7 +98,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
                 XCTAssertLessThanOrEqual(abs(r - band.reach), bandWidth * AvatarDecorLayout.wobble + 0.001)
             }
         }
-        // The white band is the even edge next to the face.
         let white = l.bands.last!.offsets.map { hypot($0.x, $0.y) }
         XCTAssertEqual(white.max()!, white.min()!, accuracy: 0.001)
     }
@@ -128,7 +122,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
         XCTAssertEqual(l.headRect.width / l.headRect.height, 600.0 / 700.0, accuracy: 0.001)
     }
 
-    // MARK: - Rendering
 
     func testTheRenderedAvatarIsSquareWithClearCornersAndAFilledMiddle() throws {
         let head = try XCTUnwrap(Self.disc(side: 400))
@@ -141,7 +134,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
         XCTAssertEqual(alpha(2, 2), 0, "the margin is transparent")
         XCTAssertEqual(alpha(253, 253), 0)
         XCTAssertEqual(alpha(128, 128), 255, "the face is opaque")
-        // Just outside the head, the outline has painted something.
         let edge = Int(l.headRect.maxX + l.bands.last!.reach / 2)
         XCTAssertGreaterThan(alpha(edge, 128), 200)
     }
@@ -165,7 +157,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
         return ctx.makeImage()
     }
 
-    /// Alpha at (x, y), top-left origin.
     private static func alpha(of image: CGImage) -> (Int, Int) -> UInt8 {
         let w = image.width, h = image.height
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
@@ -173,7 +164,6 @@ final class AvatarDecorLayoutTests: XCTestCase {
                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        // Bitmap memory is top row first.
         return { x, y in pixels[(y * w + x) * 4 + 3] }
     }
 }

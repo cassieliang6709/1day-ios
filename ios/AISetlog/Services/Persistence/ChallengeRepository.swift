@@ -1,20 +1,13 @@
 import Foundation
 
-/// Persistence boundary for challenges. The store keeps
-/// state in memory; this owns reading/writing it (UserDefaults today,
-/// SwiftData tomorrow — swap the implementation, nothing else changes).
 protocol ChallengeRepository {
     func loadChallenges() -> [Challenge]
     func saveChallenges(_ challenges: [Challenge])
 }
 
-/// UserDefaults-backed repository, including the v1 → v2 data migration
-/// (a single id-less challenge with clips loose in clips/).
 final class UserDefaultsChallengeRepository: ChallengeRepository {
     static let defaultsKey = "challenges.v2"
     private static let legacyKey = "challenge.v1"
-    /// Where custom templates were saved before 1.5 dropped templates. Only
-    /// read to clear them, along with the covers they and stories pointed at.
     static let retiredTemplateKeys = ["customTemplates.v2", "customTemplates.v1"]
 
     private let defaults: UserDefaults
@@ -26,9 +19,6 @@ final class UserDefaultsChallengeRepository: ChallengeRepository {
         removeRetiredTemplates()
     }
 
-    /// Templates, and the cover pictures picked for templates and stories,
-    /// are gone (1.5). Nothing reads them any more, so they don't stay on the
-    /// phone either.
     private func removeRetiredTemplates() {
         for key in Self.retiredTemplateKeys { defaults.removeObject(forKey: key) }
         guard defaults === UserDefaults.standard else { return }
@@ -51,7 +41,6 @@ final class UserDefaultsChallengeRepository: ChallengeRepository {
         }
     }
 
-    /// v1 stored a single challenge without an id, clips directly in clips/.
     private func migrateLegacyIfNeeded() -> [Challenge] {
         struct LegacyChallenge: Codable {
             var title: String

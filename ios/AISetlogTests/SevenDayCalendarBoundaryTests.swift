@@ -1,7 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Fixed clocks and explicit calendars: never changes the device time zone.
 final class SevenDayCalendarBoundaryTests: XCTestCase {
     private func calendar(_ zone: String) throws -> Calendar {
         var value = Calendar(identifier: .gregorian)
@@ -44,7 +43,6 @@ final class SevenDayCalendarBoundaryTests: XCTestCase {
             let value = story(start: try date(2026, 9, 1, 23, in: calendar))
             let midnight = try date(2026, 9, 8, 0, in: calendar)
             XCTAssertEqual(HomeHeroChoice(challenges: [value], now: midnight.addingTimeInterval(-1), calendar: calendar), .today(value), zone)
-            // Existing morning policy starts a new story once an old week has expired.
             XCTAssertEqual(HomeHeroChoice(challenges: [value], now: midnight, calendar: calendar), .startToday, zone)
             XCTAssertEqual(HomeHeroChoice(challenges: [value], now: try date(2026, 9, 8, 12, in: calendar), calendar: calendar), .resume(value), zone)
         }

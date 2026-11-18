@@ -1,8 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Exercises the production repository with a disposable defaults domain, not
-/// LocalRoomDemoStorage's in-memory challenge array. No live effects/transport.
 @MainActor
 final class SevenDayPersistentRepositoryTests: XCTestCase {
     func testSevenSavedDaysSurviveFreshRepositoryAndRemainIndependentFromAnotherStory() throws {
@@ -31,8 +29,6 @@ final class SevenDayPersistentRepositoryTests: XCTestCase {
         for day in 1...7 {
             try XCTUnwrap(store).saveClip(from: input, day: day, challengeID: story.id,
                 overlayText: "本人字幕 \(day) / Caption")
-            // Discard the coordinator and repository after each save. The next
-            // instance reads the serialized production payload, not its array.
             store = nil
             store = try makeStore()
             let restored = try XCTUnwrap(store?.challenge(story.id))

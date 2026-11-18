@@ -124,7 +124,6 @@ export function useKeyboardDismissDrag() {
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
-      // Capture may already be gone after pointer cancel.
     }
 
     const nextY = Math.max(0, event.clientY - drag.startY);

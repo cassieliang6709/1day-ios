@@ -2,16 +2,12 @@ import XCTest
 import AuthenticationServices
 @testable import AISetlog
 
-/// The name a room shows next to your clips. Apple hands one over exactly
-/// once, so this field is the only way most people will ever change it.
 final class AccountNameTests: XCTestCase {
     func testAName() {
         XCTAssertEqual(AccountStore.normalized("Cassie"), "Cassie")
         XCTAssertEqual(AccountStore.normalized("  Cassie  "), "Cassie")
     }
 
-    /// A cleared box is a slip, not a request to be anonymous — and a member
-    /// chip with nothing in it is worse than yesterday's name.
     func testAnEmptyFieldIsNotAName() {
         XCTAssertNil(AccountStore.normalized(""))
         XCTAssertNil(AccountStore.normalized("   \n "))
@@ -23,7 +19,6 @@ final class AccountNameTests: XCTestCase {
             AccountStore.normalized(essay)?.count, AccountStore.nameLimit)
     }
 
-    // MARK: - rename
 
     @MainActor
     private func signedIn(as name: String) -> AccountStore {
@@ -45,8 +40,6 @@ final class AccountNameTests: XCTestCase {
         store.signOut()
     }
 
-    /// A cleared field is a slip. Renaming to nothing has to leave the old name
-    /// alone rather than blank out what a room shows for you.
     @MainActor
     func testRenamingToNothingChangesNothing() {
         let store = signedIn(as: "Cassie")
@@ -57,7 +50,6 @@ final class AccountNameTests: XCTestCase {
         store.signOut()
     }
 
-    /// Nobody to rename. This has to be a quiet no-op, not a half-made account.
     @MainActor
     func testRenamingWhileSignedOutDoesNotInventAnAccount() {
         let store = AccountStore()
@@ -68,9 +60,6 @@ final class AccountNameTests: XCTestCase {
         XCTAssertFalse(store.isSignedIn)
     }
 
-    /// Only a revoked credential ends the session. 1Day Dev is its own bundle,
-    /// and Apple answered `.notFound` for an account signed in there, which
-    /// signed Cassie out after every launch and emptied her rooms of friends.
     func testOnlyARevokedCredentialSignsOut() {
         XCTAssertTrue(AccountStore.signsOut(on: .revoked))
         XCTAssertFalse(AccountStore.signsOut(on: .notFound))

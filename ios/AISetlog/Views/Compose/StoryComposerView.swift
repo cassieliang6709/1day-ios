@@ -1,50 +1,23 @@
 import SwiftUI
 
-/// Making today's plan, or a room — two pages from two doors (1.5).
-///
-/// From 我的 it's a plan: a name and today's list, then 开始拍. One plan a
-/// day — once there is one, 新建 opens it instead (`RootShellView`).
-/// From 朋友 it's a room: a name, then 创建房间 and the code. A room has no
-/// list: everyone films whenever, and the order is settled in the film.
-///
-/// 写今天的清单 opens the list editor (`GuidedMomentsView`) — typed by hand or
-/// drafted by AI from one sentence, in the same page; the page shows it folded
-/// to one 清单 · N 项 row. Templates (从模板开始, 存为我的模板, the posters)
-/// are gone (1.5).
 struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
-    /// How to leave. Nil means "I was presented, dismiss me" — the sheet path.
-    /// `RootShellView` passes a closure instead, because as the 新建 surface
-    /// this view has no presentation to dismiss and `dismiss()` is a no-op.
     var onClose: (() -> Void)? = nil
-    /// A room (the 朋友 tab's 新建) rather than a plan (我的's). Fixed: the
-    /// page doesn't switch between the two.
     var startsWithFriends = false
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
 
-    /// 写今天的清单 or 按时间拍.
     @State private var entry: ComposerEntry = .byTime
-    /// No longer asked: 一日 / 7 日 is gone from the page, every new story is one day.
     private let days: Challenge.Mode = .oneDay
-    /// No longer asked (1.5): with hold-to-record a length is only a ceiling,
-    /// and the camera you pick already decides the frame's shape.
     private let clipLength: Challenge.ClipLength = .scene
-    /// A plan films portrait. A room picks its shape here (1.5): 横拍 rooms
-    /// look like Setlog — each person a 16:9 card, stacked — and 竖拍 rooms
-    /// put people side by side. Rooms start on 横拍.
     @State private var roomOrientation: Challenge.Orientation = .landscape
     private var orientation: Challenge.Orientation { withFriends ? roomOrientation : .portrait }
-    /// No longer asked (1.5): there is one camera.
     private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
     @State private var title = ""
-    /// Set once the user edits the name, so the date name 按时间拍 gives stops
-    /// overwriting what they typed.
     @State private var titleEdited = false
-    /// The story's moments: whatever the list editor last handed back.
     @State private var moments: [String] = []
     @State private var showGuided = false
     @State private var creating = false
@@ -79,7 +52,6 @@ struct StoryComposerView: View {
         }
     }
 
-    // MARK: - Layout
 
     private var topBar: some View {
         HStack(spacing: 12) {
@@ -122,8 +94,6 @@ struct StoryComposerView: View {
 
     private var footer: some View {
         VStack(spacing: 10) {
-            // Above the button: the reason a tap did nothing has to be on
-            // screen when the tap happens.
             if let errorText {
                 footerNote(errorText, systemImage: "exclamationmark.circle.fill", color: .red)
             }
@@ -176,27 +146,21 @@ struct StoryComposerView: View {
         !trimmedTitle.isEmpty && !creating && (isTimeOnly || resolvedMoments?.isEmpty == false)
     }
 
-    // MARK: - Choices
 
     private func openList() {
         showGuided = true
     }
 
-    /// What the list editor wrote, applied to this story. The name only
-    /// follows the AI's suggestion while the user hasn't typed one.
     private func applyCustomDraft(_ draft: CustomStoryDraft) {
         entry = .writeList
         moments = draft.moments
         errorText = nil
-        // The AI's name replaces the date name, until the user types one.
         if !titleEdited, let name = draft.suggestedName {
             title = name
         }
     }
 
-    // MARK: - Actions
 
-    /// Leaving, whichever way this view got on screen. See `onClose`.
     private func leave() {
         if let onClose {
             onClose()
@@ -206,8 +170,6 @@ struct StoryComposerView: View {
     }
 
     private func start() {
-        // `dismiss()` isn't instant, so a second tap inside the closing
-        // animation used to insert a second story.
         guard canStart else { return }
         if withFriends {
             if account.isSignedIn { createSharedRoom() } else { showSignIn = true }
@@ -248,9 +210,7 @@ struct StoryComposerView: View {
         }
     }
 
-    // MARK: - Derived state
 
-    /// Named for the date until the user types a name of their own.
     private func nameForTheDay() {
         guard !titleEdited else { return }
         title = withFriends
@@ -258,7 +218,6 @@ struct StoryComposerView: View {
             : Strings.byTimeTitle(.now)
     }
 
-    /// Blank rows are dropped. Nil for 按时间拍, which has no list.
     private var resolvedMoments: [String]? {
         if isTimeOnly { return nil }
         let cleaned = moments
@@ -268,8 +227,6 @@ struct StoryComposerView: View {
     }
 }
 
-/// 横拍 or 竖拍 for a new room, as two cards that sketch the room page each
-/// one makes: stacked wide cards, or tall ones side by side.
 private struct RoomShapePicker: View {
     @Binding var selection: Challenge.Orientation
 
@@ -308,7 +265,6 @@ private struct RoomShapePicker: View {
         .accessibilityIdentifier("room-shape-\(orientation.rawValue)")
     }
 
-    /// Two people's cards, the way the room page will lay them out.
     @ViewBuilder
     private func sketch(_ orientation: Challenge.Orientation) -> some View {
         let fill = (selection == orientation ? Color.oneDayBrand : OneDay.inkFaint).opacity(0.55)

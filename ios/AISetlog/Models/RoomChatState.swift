@@ -1,7 +1,5 @@
 import Foundation
 
-/// Room scope is independent of a video's author and moment number.
-/// The account is part of the local scope so drafts/outbox never cross logins.
 struct RoomChatScope: Codable, Equatable {
     let accountID: String
     let roomCode: String
@@ -14,7 +12,6 @@ struct RoomChatMessage: Codable, Equatable, Identifiable {
     let authorName: String
     let text: String
     let createdAt: Date
-    /// Context only; never used to filter the room conversation.
     let moment: Int?
 }
 
@@ -28,9 +25,6 @@ struct RoomChatEntry: Codable, Equatable, Identifiable {
     var id: UUID { message.id }
 }
 
-/// Pure state machine. Transport errors are not empty snapshots. The caller
-/// applies a snapshot only after a successful room-wide fetch, and persists
-/// state before treating a queued message as accepted by the composer.
 struct RoomChatState: Codable, Equatable {
     enum StateError: Error { case emptyMessage, messageTooLong, wrongRoom, invalidScope, unknownMessage }
     static let maximumMessageLength = 2_000
@@ -81,7 +75,6 @@ struct RoomChatState: Codable, Equatable {
     }
 
     mutating func markFailed(_ id: UUID) {
-        // A delayed transport failure cannot demote an already echoed message.
         guard let index = entries.firstIndex(where: { $0.id == id }),
               entries[index].delivery == .sending else { return }
         entries[index].delivery = .failed
@@ -106,26 +99,18 @@ struct RoomChatState: Codable, Equatable {
     }
 
     mutating func mergeSuccessfulFetch(_ messages: [RoomChatMessage]) throws {
-        // Validate the whole batch first; a bad response cannot partially mutate state.
         guard messages.allSatisfy({ $0.roomCode == scope.roomCode }) else {
             throw StateError.wrongRoom
         }
         for message in messages { try acknowledge(message) }
-        // Keep local entries absent from this fetch. An eventually consistent
-        // query may not echo a confirmed write yet. Deletions need explicit
-        // tombstones/confirmation, not inference from a missing record.
     }
 
-    /// Only an explicit server deletion/unknownItem confirmation may call this.
-    /// Failed or in-flight local sends are never removed by a missing remote record.
     mutating func confirmDeleted(_ ids: Set<UUID>) {
         let confirmed = Set(entries.filter { ids.contains($0.id) && $0.delivery == .sent }.map(\.id))
         deletedIDs.formUnion(confirmed)
         entries.removeAll { confirmed.contains($0.id) }
     }
 
-    /// Replan against current state rather than applying a potentially stale plan.
-    /// This never sends messages or removes the source legacy comments.
     @discardableResult
     mutating func recoverLegacyComments(_ candidates: [LegacyRoomChatMigration.Candidate]) -> LegacyRoomChatMigration.Plan {
         let plan = LegacyRoomChatMigration.plan(candidates: candidates, archive: self)
@@ -143,8 +128,6 @@ struct RoomChatState: Codable, Equatable {
     }
 }
 
-/// One scoped envelope per file, stored under app-private Application Support
-/// by the integration layer. A wrong account/room refuses to load the file.
 struct RoomChatArchive {
     enum ArchiveError: Error { case unsupportedVersion, scopeMismatch }
     private struct Envelope: Codable {

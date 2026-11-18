@@ -1,13 +1,8 @@
 import Foundation
 
-/// Copy for the 朋友 tab's invite flow. Kept apart from `Localization.swift`
-/// so the invite sheet's words live next to each other.
 extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
-    // Signed out: said where something is missing because of it, each with
-    // a way to sign in. A room that quietly showed only my own clips read as
-    // friends' clips being lost.
     static var signedOutTitle: String { zh ? "还没登录" : "Not signed in" }
     static var signedOutSettingsBody: String {
         zh ? "登录后才能和朋友一起拍、看到他们的片段" : "Sign in to film with friends and see their clips"
@@ -50,10 +45,6 @@ extension Strings {
     static func memberCount(_ n: Int) -> String { zh ? "\(n) 人" : (n == 1 ? "1 person" : "\(n) people") }
     static func inviteCodeLine(_ code: String) -> String { zh ? "邀请码 \(code)" : "Code \(code)" }
 
-    // The invite card — the image "发给朋友" sends. An image because WeChat's
-    // share extension refuses plain text ("暂不支持的文件类型"); see
-    // `RoomInviteCard.swift`. The card has to stand on its own in a chat with
-    // no link to tap, so it spells out where the code goes.
     static func inviteCardHeadline(inviter: String?) -> String {
         guard let inviter else { return zh ? "来 1Day 一起拍" : "Come film with me on 1Day" }
         return zh ? "\(inviter) 邀请你一起拍" : "\(inviter) invited you to film together"

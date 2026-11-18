@@ -1,11 +1,3 @@
-/**
- * Exercises the Worker's own logic against a stubbed upstream, then — only
- * when a key is present — makes one real call to check the prompt actually
- * produces filmable prompts in the right order.
- *
- *   npm test
- *   node --env-file=.dev.vars --test test/*.test.mjs   # + the live one
- */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
@@ -182,7 +174,6 @@ test('a different device is unaffected by that limit', async (t) => {
   assert.equal(res.status, 200);
 });
 
-// Live, and skipped without a key so CI doesn't depend on a vendor being up.
 test(
   'a real call turns 今天要搬家 into prompts about moving house',
   { skip: !process.env.DEEPSEEK_API_KEY && 'no DEEPSEEK_API_KEY' },

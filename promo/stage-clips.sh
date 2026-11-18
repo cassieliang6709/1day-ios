@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# stage-clips.sh — push out/demo/demo-clip-N.mp4 into the booted simulator's
-# 1Day container as Documents/demo-clips/N.mp4, so the room demo can prefill
-# itself with -demoRoomClips demo-clips instead of six manual imports.
 set -euo pipefail
 BUNDLE="com.cassie.AISetlog"
 HERE="$(cd "$(dirname "$0")" && pwd)"

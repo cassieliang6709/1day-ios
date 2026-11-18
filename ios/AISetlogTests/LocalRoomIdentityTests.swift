@@ -17,7 +17,6 @@ final class LocalRoomIdentityTests: XCTestCase {
     }
 
     func testLivePersistencePathSurvivesReloadAndKeepsEpochSemantics() throws {
-        // Same initializer/path as the app, redirected to a disposable suite.
         let suite = "1day.identity-tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }

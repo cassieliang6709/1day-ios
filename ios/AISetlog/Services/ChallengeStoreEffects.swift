@@ -1,7 +1,5 @@
 import Foundation
 
-/// Non-storage side effects triggered by changes to a store. Local previews must
-/// explicitly supply .isolated as well as isolated storage and room transport.
 struct ChallengeStoreEffects {
     let allowsCloudRoomManagement: Bool
     var reconcileReminders: ([Challenge]) -> Void

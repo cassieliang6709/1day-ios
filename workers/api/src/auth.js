@@ -1,18 +1,3 @@
-/**
- * Who is calling. Two halves:
- *
- * 1. `verifyIdentityToken` checks a token Apple or Google handed the app: the
- *    signature against the provider's published keys, then issuer, audience
- *    and expiry. A token that fails any of these is somebody else's, or
- *    nobody's.
- * 2. `issueSessionToken` / `verifySessionToken` are 1Day's own token, which
- *    every later endpoint (rooms, clips, uploads) checks instead of going back
- *    to Apple or Google on each request.
- *
- * WebCrypto only, no JWT library: the surface needed here is one algorithm
- * each way, and a library's job of accepting many algorithms is exactly the
- * thing that goes wrong (`alg: none`, RS256/HS256 confusion).
- */
 
 export const PROVIDERS = {
   apple: {
@@ -21,36 +6,26 @@ export const PROVIDERS = {
   },
   google: {
     jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
-    // Google signs with either form, documented as interchangeable.
     issuers: ['https://accounts.google.com', 'accounts.google.com'],
   },
 };
 
-/** Clock difference tolerated between the phone, Apple/Google and Cloudflare. */
 const CLOCK_SKEW_S = 60;
 
-/** Providers rotate keys rarely and publish the new one well ahead. */
 const JWKS_TTL_MS = 60 * 60 * 1000;
 
-/**
- * An unknown `kid` refetches the key set once, in case a rotation just
- * happened — but not more often than this, or a stream of made-up `kid`s
- * becomes a stream of requests to Apple.
- */
 const JWKS_REFETCH_GAP_MS = 60 * 1000;
 
 const SESSION_ISSUER = 'oneday-api';
 export const SESSION_TTL_S = 90 * 24 * 60 * 60;
 
 export class AuthError extends Error {
-  /** `reason` is for tests and logs; callers only ever see "invalid_token". */
   constructor(reason) {
     super(reason);
     this.reason = reason;
   }
 }
 
-// MARK: - Encoding
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -90,12 +65,7 @@ function splitToken(token) {
   return parts;
 }
 
-// MARK: - Provider keys
 
-/**
- * Fetches and caches one provider's key set. `fetchImpl` is looked up at call
- * time rather than captured, so tests can stub the global `fetch`.
- */
 export function createKeySource(jwksUrl, { fetchImpl } = {}) {
   let keys = null;
   let fetchedAt = -Infinity;
@@ -131,17 +101,7 @@ function defaultKeySource(provider) {
   return defaultKeySources[provider];
 }
 
-// MARK: - Identity tokens (Apple, Google)
 
-/**
- * @param {'apple' | 'google'} provider
- * @param {string} token the raw identity token from the app
- * @param {object} options
- * @param {string[]} options.audiences bundle IDs (Apple) or OAuth client IDs (Google)
- * @param {number} [options.now] seconds since epoch
- * @param {(kid: string) => Promise<object | null>} [options.keyFor]
- * @returns the verified claims
- */
 export async function verifyIdentityToken(provider, token, options) {
   const config = PROVIDERS[provider];
   if (!config) throw new AuthError('unknown_provider');
@@ -153,8 +113,6 @@ export async function verifyIdentityToken(provider, token, options) {
 
   const [headerPart, payloadPart, signaturePart] = splitToken(token);
   const header = decodeJson(headerPart);
-  // Apple and Google both sign with RS256 and nothing else. Anything else in
-  // the header is a token trying to choose how it gets checked.
   if (header.alg !== 'RS256') throw new AuthError('bad_alg');
   if (typeof header.kid !== 'string' || !header.kid) throw new AuthError('no_kid');
 
@@ -178,9 +136,6 @@ export async function verifyIdentityToken(provider, token, options) {
 
   const claims = decodeJson(payloadPart);
   if (!config.issuers.includes(claims.iss)) throw new AuthError('bad_issuer');
-  // Both providers send `aud` as a string; an array is allowed by the JWT
-  // spec, and then every entry has to be ours — a token issued to us and to
-  // somebody else is still somebody else's.
   const tokenAudiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (tokenAudiences.length === 0 || !tokenAudiences.every((aud) => audiences.includes(aud))) {
     throw new AuthError('bad_audience');
@@ -195,12 +150,10 @@ export async function verifyIdentityToken(provider, token, options) {
   return claims;
 }
 
-/** One person, one id, whichever way they came in. `apple:001234.abcd…` */
 export function userIdFor(provider, claims) {
   return `${provider}:${claims.sub}`;
 }
 
-// MARK: - 1Day session tokens
 
 async function hmacKey(secret) {
   if (typeof secret !== 'string' || secret.length < 32) {
@@ -229,14 +182,11 @@ export async function issueSessionToken(userId, secret, now = Math.floor(Date.no
   return { token: `${header}.${payload}.${base64UrlEncode(signature)}`, expiresAt: exp };
 }
 
-/** @returns the user id the token was issued to */
 export async function verifySessionToken(token, secret, now = Math.floor(Date.now() / 1000)) {
   const [headerPart, payloadPart, signaturePart] = splitToken(token);
   const header = decodeJson(headerPart);
   if (header.alg !== 'HS256') throw new AuthError('bad_alg');
 
-  // `verify` rather than sign-and-compare: WebCrypto's comparison is constant
-  // time, a string `===` is not.
   const valid = await crypto.subtle.verify(
     'HMAC',
     await hmacKey(secret),

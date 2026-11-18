@@ -1,8 +1,6 @@
 import Foundation
 import SwiftUI
 
-/// Explicit routing for the production room/clip chat UI. A local route never
-/// falls back to live services, including for a mismatched scope or closed owner.
 enum RoomChatSessionSource {
     case live
     case local(RoomChatDemoTransport)
@@ -21,8 +19,6 @@ enum RoomChatSessionSource {
         return nil
     }
 
-    /// Lazy dependencies keep local routing from even reading live persistence
-    /// or identity. Tests exercise the default-live branch with isolated inputs.
     struct LiveDependencies {
         var directory: () -> URL
         var transport: () -> any RoomChatTransport

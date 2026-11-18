@@ -3,11 +3,8 @@ import XCTest
 
 @testable import AISetlog
 
-/// The four backings and the twelve colours — the part that has to look the
-/// same on the review screen and in the exported film.
 final class CaptionPlateTests: XCTestCase {
 
-    // MARK: - What the picker offers
 
     func testThePickerOffersFourBackingsAndNotTheRetiredOne() {
         XCTAssertEqual(
@@ -15,8 +12,6 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertFalse(CaptionSticker.Style.picker.contains(.headline))
     }
 
-    /// A card saved when 大 was a style still draws big, and the picker shows
-    /// it as 不加底 rather than showing nothing selected.
     func testHeadlineStillDecodesAndLightsUpTheNoBackingSquare() throws {
         let json = #"{"x":0.5,"y":0.43,"style":"headline","scale":1,"angle":0,"tint":"white"}"#
         let sticker = try JSONDecoder().decode(
@@ -26,7 +21,6 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertNil(sticker.style.plate)
     }
 
-    // MARK: - The backings themselves
 
     func testOnlyTwoStylesHaveNoBacking() {
         XCTAssertNil(CaptionSticker.Style.outline.plate)
@@ -36,8 +30,6 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertNotNil(CaptionSticker.Style.light.plate)
     }
 
-    /// The dimmed band is the round one; the two bars are square-ish. That
-    /// difference is the only thing telling them apart at a glance.
     func testTheBandIsRounderThanTheBars() throws {
         let band = try XCTUnwrap(CaptionSticker.Style.band.plate)
         let solid = try XCTUnwrap(CaptionSticker.Style.solid.plate)
@@ -57,7 +49,6 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(CaptionSticker.Style.light.plate).isWhite)
     }
 
-    // MARK: - The bar is the colour it says it is
 
     private func isLight(_ color: UIColor) -> Bool {
         var white: CGFloat = 0
@@ -66,9 +57,6 @@ final class CaptionPlateTests: XCTestCase {
         return white > 0.5
     }
 
-    /// The bar never second-guesses the square that was tapped. 白底 draws
-    /// white whatever colour the words are — the correction happens to the
-    /// words, where it can be seen.
     func testTheBarIsWhateverTheStyleSaid() throws {
         for tint in CaptionSticker.Tint.allCases {
             let light = CaptionSticker(x: 0.5, y: 0.5, style: .light, tint: tint)
@@ -85,7 +73,6 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertNil(CaptionSticker(x: 0.5, y: 0.5, style: .headline, tint: .blue).plateUIColor)
     }
 
-    // MARK: - Picking one moves the other, rather than drawing a lie
 
     func testPickingTheWhiteBarUnderWhiteWordsTurnsTheWordsBlack() {
         XCTAssertEqual(
@@ -107,14 +94,10 @@ final class CaptionPlateTests: XCTestCase {
             CaptionSticker.legibleTint(picking: .solid, keeping: .butter), .butter)
         XCTAssertEqual(
             CaptionSticker.legibleTint(picking: .light, keeping: .blue), .blue)
-        // No bar, nothing to clash with: black words with no backing are the
-        // point of having black at all.
         XCTAssertEqual(
             CaptionSticker.legibleTint(picking: .outline, keeping: .black), .black)
     }
 
-    /// The mirror: tapping a colour swaps the bar, and swaps it for the other
-    /// bar rather than for no bar — somebody who chose a bar wants a bar.
     func testPickingWhiteWordsOnTheWhiteBarSwapsToTheBlackBar() {
         XCTAssertEqual(
             CaptionSticker.legibleStyle(picking: .white, keeping: .light), .solid)
@@ -134,8 +117,6 @@ final class CaptionPlateTests: XCTestCase {
             CaptionSticker.legibleStyle(picking: .black, keeping: .headline), .headline)
     }
 
-    /// Whatever route it took, what gets saved has to be readable — this is the
-    /// property the two functions exist for.
     func testEveryPickEndsUpReadable() {
         for style in CaptionSticker.Style.picker {
             for tint in CaptionSticker.Tint.allCases {
@@ -159,13 +140,10 @@ final class CaptionPlateTests: XCTestCase {
         }
     }
 
-    // MARK: - Twelve colours
 
     func testTwelveColoursInTwoRowsOfSix() {
         XCTAssertEqual(CaptionSticker.Tint.allCases.count, 12)
         XCTAssertEqual(CaptionSticker.Tint.allCases.first, .white)
-        // The picker draws `allCases` six at a time, so the declaration order
-        // *is* the layout: white and black lead the first row.
         XCTAssertEqual(CaptionSticker.Tint.allCases[1], .black)
     }
 
@@ -174,16 +152,12 @@ final class CaptionPlateTests: XCTestCase {
         XCTAssertEqual(values.count, CaptionSticker.Tint.allCases.count)
     }
 
-    /// The six that shipped keep their names, so a card written before this
-    /// change still comes back the colour it was.
     func testTheOriginalSixStillDecodeByName() {
         for raw in ["white", "blue", "cyan", "lavender", "mint", "ink"] {
             XCTAssertNotNil(CaptionSticker.Tint(rawValue: raw), raw)
         }
     }
 
-    /// A colour from a newer phone, read by this one, falls back to white
-    /// rather than dropping the whole caption.
     func testAnUnknownColourFallsBackToWhite() throws {
         let sticker = try XCTUnwrap(
             CaptionSticker(cloudValue: "0.4,0.6,solid,1.2,10,tangerine"))

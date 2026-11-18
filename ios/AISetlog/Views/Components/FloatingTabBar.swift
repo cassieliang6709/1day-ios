@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Camera and rooms share one compact navigation control.
 struct FloatingTabBar<Tab: Hashable>: View {
     struct Item: Identifiable {
         let tab: Tab

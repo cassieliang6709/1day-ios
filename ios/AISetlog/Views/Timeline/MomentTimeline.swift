@@ -1,32 +1,12 @@
 import SwiftUI
 
-/// The day as one vertical timeline: every moment in order, on one rail,
-/// whether it has been filmed or not.
-///
-/// This replaces two lists and their two headings. The page used to be
-/// 「还没拍的」 — a glass card of rows — then 「拍过的」 — a three-column contact
-/// sheet — which meant the order of your day was cut in half and re-sorted by
-/// state, twice. A moment that was second in the plan and filmed appeared below
-/// a moment that was fifth and empty, and the only way to know either one's
-/// position was the words 第一个瞬间 / 第二个瞬间 that 1.3 deletes.
-///
-/// So: one rail, day order, and the state is carried by the node instead of by
-/// a section. Filled dot and a still = filmed. Hollow dot and 开拍 = yours to
-/// take. A ring = the one worth starting with. Nothing here is numbered, and
-/// nothing needs to be: the rail *is* the ordinal.
-///
-/// It is deliberately not a `LazyVStack`. The rail's drawn progress has to know
-/// where the last filmed node is, which means measuring all of them, and a
-/// day is three to seven rows.
 struct MomentTimeline: View {
     let challenge: Challenge
     let clips: [DayClip]
     let members: [(id: String, name: String)]
     let myID: String
     let agenda: StoryAgenda
-    /// A filmed moment was tapped — play it.
     let onPlay: (Int) -> Void
-    /// An open moment was tapped — film it.
     let onFilm: (Int) -> Void
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -34,18 +14,10 @@ struct MomentTimeline: View {
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
 
-    /// Every slot in the plan, in order. The agenda's two lists are about state;
-    /// this is about the day.
     private var slots: [Int] {
         agenda.total > 0 ? Array(1...agenda.total) : []
     }
 
-    /// How far down the rail to paint brand colour: to the last filmed node.
-    ///
-    /// Counted from the *last* one rather than from the count, because a day
-    /// filmed out of order — which 1.2 made possible on purpose — has holes in
-    /// it, and a rail that stopped at "three filmed" would stop above a still
-    /// that is plainly there.
     private var filledThrough: Int {
         agenda.filmed.last ?? 0
     }
@@ -58,52 +30,29 @@ struct MomentTimeline: View {
         }
     }
 
-    // MARK: - The rail
 
-    /// One node's slice of the rail: a full-height line with the dot on it.
-    ///
-    /// Full height, one colour per node, is the whole trick. Drawn behind the
-    /// stack instead, the painted length could only ever be a fraction of the
-    /// total — and the nodes are not the same height, because a filmed one
-    /// carries a still — so at 1 filmed of 3 the progress line ended in the
-    /// middle of the first thumbnail. Per node, the colour change lands exactly
-    /// on a node boundary, which is the only place it means anything.
-    ///
-    /// Brand runs through the last filmed node. `filledThrough` is the last
-    /// filmed *slot* rather than the count, because a day filmed out of order
-    /// has holes in it and a line that stopped after "three filmed" would stop
-    /// above a still that is plainly there.
     private func railColumn(_ slot: Int, filmed: Bool, suggested: Bool) -> some View {
         let reached = slot <= filledThrough
         return ZStack(alignment: .top) {
             Rectangle()
                 .fill(reached
                     ? AnyShapeStyle(Color.oneDayBrand)
-                    // Not `surfaceSoft`: #DCEBFF on the #F5F8FF canvas is a
-                    // line you cannot see, and an invisible rail leaves three
-                    // dots floating in space.
                     : AnyShapeStyle(OneDay.inkFaint.opacity(0.38)))
                 .frame(width: 2)
                 .frame(maxHeight: .infinity)
-                // Starts at the first dot and stops at the last: a rail running
-                // past either end reads as a day with moments off-screen.
                 .padding(.top, slot == slots.first ? 11 : 0)
                 .padding(.bottom, slot == slots.last ? 0 : 0)
 
             dot(filmed: filmed, suggested: suggested)
-                // Level with the first line of text beside it, not with the top
-                // of the node: a filmed node's still would drag it up.
                 .padding(.top, 6)
         }
         .padding(.leading, Self.dotColumn)
         .allowsHitTesting(false)
     }
 
-    /// Where the dots sit, and therefore how far the content is indented.
     private static let dotColumn: CGFloat = 5
     private static let contentInset: CGFloat = 26
 
-    // MARK: - One moment
 
     @ViewBuilder
     private func node(_ slot: Int) -> some View {
@@ -133,8 +82,6 @@ struct MomentTimeline: View {
                     filmed || suggested ? Color.oneDayBrand : OneDay.surfaceSoft,
                     lineWidth: 2)
             }
-            // Only the suggestion gets a halo, and only while it is still a
-            // suggestion — `StoryAgenda.suggested` is nil once the day is full.
             .background {
                 if suggested {
                     Circle()
@@ -142,22 +89,10 @@ struct MomentTimeline: View {
                         .frame(width: 21, height: 21)
                 }
             }
-            // Centred on the rail: the line is 2pt at `dotColumn`, the dot is
-            // 11pt, so it sits 4.5pt to the left of where the line starts.
             .padding(.leading, -4.5)
             .accessibilityHidden(true)
     }
 
-    /// A moment that happened. The title reads back in `inkSoft`, because the
-    /// still under it is the content and the row is a record rather than an
-    /// invitation.
-    ///
-    /// In a room, a moment a friend filmed and I haven't also carries a small
-    /// 「加上你的」. Before it did, the only row that could say "add yours" was
-    /// `OpenSlotRow`, which is drawn only for moments *nobody* has filmed — so
-    /// the moment a friend got there first, the slot quietly stopped being
-    /// mine to film. That is backwards for a room: a moment with someone in
-    /// it is the one most worth joining.
     private func filmedNode(_ slot: Int, slotClips: [DayClip]) -> some View {
         let mine = StoryGridView.mineAmong(slotClips, myID: myID)
         let lanes = StoryGridView.lanes(slotClips: slotClips, members: members, myID: myID)
@@ -189,23 +124,13 @@ struct MomentTimeline: View {
             ClipThumb(
                 momentTitle: title(for: slot),
                 lanes: lanes,
-                // The time is on the line above, where it lines up with every
-                // other node's. Repeating it on the still puts the same number
-                // twice in one row.
                 timeStamp: nil,
                 authorNames: challenge.isShared ? lanes.compactMap(\.authorName) : [],
                 reaction: shown?.emoji.first,
                 awaitingMine: mine == nil,
-                // Wide and short. This is a row in a list, not a cell in a
-                // contact sheet: it has the full width and no neighbour to
-                // match, so a portrait tile here would push the next moment
-                // most of a screen away. Past seven moments it gets shorter
-                // still, so a long day stays a list you can scroll rather
-                // than a wall of stills.
                 aspectRatio: agenda.total > 7 ? 3.2 : 2.1,
                 sourceAspect: challenge.resolvedOrientation == .landscape
                     ? 16.0 / 9 : 9.0 / 16,
-                // The title is on the line above.
                 showsCaption: false
             ) {
                 onPlay(slot)
@@ -213,12 +138,6 @@ struct MomentTimeline: View {
         }
     }
 
-    /// My way into a moment somebody else filmed. The same action as an open
-    /// row — it opens the camera on this slot — at the size of a tag, because
-    /// the still below is still what the row is about.
-    ///
-    /// The capsule is ~28pt; the padding pulled back out after `contentShape`
-    /// keeps a 44pt target without making the title line 44pt tall.
     private func addYoursButton(_ slot: Int) -> some View {
         Button { onFilm(slot) } label: {
             Label(Strings.addYourTake, systemImage: "plus")
@@ -237,8 +156,6 @@ struct MomentTimeline: View {
         .accessibilityIdentifier("timeline-add-yours-\(slot)")
     }
 
-    /// A moment still to take. Reuses the row the 「还没拍的」 card was built
-    /// from, minus its own card: the rail is the container now.
     private func openNode(_ slot: Int, isSuggested: Bool) -> some View {
         OpenSlotRow(
             momentTitle: title(for: slot),
@@ -251,12 +168,7 @@ struct MomentTimeline: View {
         .glassSurface(radius: OneDay.Radius.card)
     }
 
-    // MARK: - Copy
 
-    /// A time-only story has no prompt to show, so the slot's own label stands
-    /// in. That label is 「第 N 个瞬间」 — the one place in the app where a
-    /// numbered moment is still the honest answer, because the story genuinely
-    /// has nothing else to call it.
     private func title(for slot: Int) -> String {
         challenge.isTimeOnly
             ? Strings.lockedSlot(oneDay: challenge.isOneDay, day: slot)

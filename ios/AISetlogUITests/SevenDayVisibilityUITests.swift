@@ -1,9 +1,6 @@
 import XCTest
 
 final class SevenDayVisibilityUITests: XCTestCase {
-    /// 1.5 (08f539d): the composer has no 拍几天 step any more — every new
-    /// story is one day — so the 一日 / 7 日 rows must be gone, and 按时间拍
-    /// names the story on the same page.
     func testByTimeNamesTheStoryWithoutADaysStep() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -22,7 +19,6 @@ final class SevenDayVisibilityUITests: XCTestCase {
         XCTAssertFalse(app.buttons["plan-seven-day"].exists)
         let name = app.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 15))
-        // 按时间拍 names the story for the date.
         XCTAssertFalse((name.value as? String ?? "").isEmpty)
         XCTAssertFalse(app.buttons["company-solo"].exists)
         XCTAssertTrue(app.buttons["composer-start"].exists)
@@ -33,12 +29,6 @@ final class SevenDayVisibilityUITests: XCTestCase {
         app.launchArguments = [
             "-onboarding.completed.v1", "YES",
             "-appLanguage", "chinese",
-            // The demo entries this suite navigates through are opt-in as of
-            // 1.3 — see `DemoEntries` in the app target. A UI test runs in its
-            // own process, so the flag is spelled out rather than referenced.
-            // Without it the home screen has no 房间演示 button and the camera
-            // has no 示例片段, and on a runner with no camera there is then no
-            // way to get footage anywhere.
             "-demoEntries", "YES",
         ]
         app.launch()

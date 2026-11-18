@@ -1,11 +1,6 @@
 import XCTest
 @testable import AISetlog
 
-/// Which room videos a sync downloads again, and how the room syncs overlap.
-///
-/// The CloudKit half of `fetchClips` needs a signed-in simulator; the rule that
-/// decides what it fetches doesn't, and that rule is where "every sync pulls
-/// every video" either stays fixed or comes back.
 final class RoomClipCacheTests: XCTestCase {
     private var dir: URL!
 
@@ -34,7 +29,6 @@ final class RoomClipCacheTests: XCTestCase {
         return String(decoding: try Data(contentsOf: url), as: UTF8.self)
     }
 
-    // MARK: - Plan
 
     func testPlanDownloadsOnlyNewAndChangedRecordsAndDropsDeparted() {
         let manifest = RoomClipCache.Manifest(versions: [
@@ -70,7 +64,6 @@ final class RoomClipCacheTests: XCTestCase {
         XCTAssertEqual(second.reuse, ["a", "b"])
     }
 
-    // MARK: - Manifest after a sync
 
     func testFailedDownloadKeepsOldEntrySoTheNextSyncRetries() {
         let previous = RoomClipCache.Manifest(versions: ["kept": "v1", "retry": "v1", "gone": "v1"])
@@ -87,7 +80,6 @@ final class RoomClipCacheTests: XCTestCase {
         XCTAssertEqual(again.reuse, ["kept", "fresh"])
     }
 
-    // MARK: - Video version
 
     func testCaptionEditDoesNotChangeTheVideoVersion() {
         let take = Date(timeIntervalSince1970: 1_700_000_123.456)
@@ -104,7 +96,6 @@ final class RoomClipCacheTests: XCTestCase {
         XCTAssertNil(RoomClipCache.videoVersion(recordedAt: nil, changeTag: nil))
     }
 
-    // MARK: - Disk
 
     func testManifestRoundTripsAndUnreadableManifestReadsEmpty() throws {
         XCTAssertEqual(RoomClipCache.loadManifest(in: dir), .init())
@@ -145,11 +136,8 @@ final class RoomClipCacheTests: XCTestCase {
     }
 }
 
-/// How room syncs overlap: different rooms side by side up to a cap, the same
-/// room never twice at once.
 @MainActor
 final class RoomSyncConcurrencyTests: XCTestCase {
-    /// Counts how many fetches are running at once, per room and overall.
     private final class FetchMeter {
         var active = 0
         var peak = 0

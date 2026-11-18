@@ -2,8 +2,6 @@ import AVFoundation
 import XCTest
 @testable import AISetlog
 
-/// Exercises the same owner/media lease used by StoryTimelineView and FilmView.
-/// Decoded file frames are not assertions about on-screen playback.
 @MainActor
 final class LocalFormalMediaLifecycleTests: XCTestCase {
     func testMemberSwitchRetiresOldRenderedCacheWithoutTouchingNewRoom() async throws {
@@ -59,7 +57,6 @@ final class LocalFormalMediaLifecycleTests: XCTestCase {
         options.showDayCaptions = false
         let output = try await VideoStitcher.stitch(
             clips: runtime.store.recordedClips(for: runtime.challengeID), options: options)
-        // Deterministically model dismissal between export completion and its UI delivery.
         owner.close()
         XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
         XCTAssertFalse(scope.accept(output, key: "late"))

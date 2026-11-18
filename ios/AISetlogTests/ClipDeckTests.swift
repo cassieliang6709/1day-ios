@@ -20,7 +20,6 @@ final class ClipDeckTests: XCTestCase {
         ClipDeck(clips: clips, momentCount: momentCount, myID: me)
     }
 
-    // MARK: Order
 
     func testMomentsComeInOrderWhateverOrderTheyArriveIn() {
         let d = deck([
@@ -31,10 +30,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertEqual(d.clips.map(\.day), [1, 3, 4])
     }
 
-    /// The bug this whole type exists to fix. The store hands clips over sorted
-    /// by `(day, authorName)`, so in a room with Ava in it my own take on a
-    /// moment came second — my tile sat to the right of hers and my page opened
-    /// after hers. Whose day this is shouldn't depend on the alphabet.
     func testMyTakeComesFirstEvenWhenMyNameSortsLast() {
         let d = deck([
             clip(day: 1, author: "friend-ava", name: "Ava"),
@@ -54,9 +49,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertEqual(d.clips.map(\.authorName), ["Ann", "Bo", "Cara"])
     }
 
-    /// Two people can pick the same display name. Without a final tiebreak the
-    /// sort is unstable, and a deck that reorders between two reads hands the
-    /// pager a different page for the same tile.
     func testTwoFriendsWithOneNameStillGetAFixedOrder() {
         let first = deck([
             clip(day: 1, author: "f-2", name: "Sam", key: "k2"),
@@ -80,15 +72,12 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertEqual(d.clips.map(\.id), ["m1", "a1", "m2", "a2"])
     }
 
-    // MARK: Whose is it
 
     func testAStoryThatWasNeverSharedIsAllMine() {
         let d = deck([clip(day: 1, author: RoomProgress.soloAuthorID)])
         XCTAssertTrue(d.isMine(at: 0))
     }
 
-    /// Clips saved before authorship existed carry no author. Reading those as
-    /// somebody else's would hide the re-record button on my own clip.
     func testAClipWithNoAuthorAtAllIsMine() {
         let d = deck([clip(day: 1, author: nil)])
         XCTAssertTrue(d.isMine(at: 0))
@@ -99,7 +88,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertFalse(d.isMine(at: 0))
     }
 
-    // MARK: Finding a tap
 
     func testTappingATileOpensThatTile() {
         let d = deck([
@@ -112,7 +100,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertEqual(d.index(ofDay: 3, authorID: "f-a"), 2)
     }
 
-    /// nil, "local" and my own id all mean the same tile.
     func testTheThreeWaysOfSayingMineAllFindMine() {
         let d = deck([
             clip(day: 1, author: "f-a", name: "Ann"),
@@ -129,7 +116,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertNil(d.index(ofDay: 1, authorID: "someone-who-didnt"))
     }
 
-    // MARK: The chip over the video
 
     func testTheChipNamesTheMomentAndDoesNotNameMe() {
         let d = deck([clip(day: 2, author: me, name: "Me", label: "Golden hour")])
@@ -143,9 +129,6 @@ final class ClipDeckTests: XCTestCase {
         XCTAssertEqual(d.position(at: 0)?.authorName, "Ann")
     }
 
-    /// A clip can outlive the story it was filmed for — trimming the prompt list
-    /// leaves day 6 sitting in a 5-slot story. It should still be watchable, and
-    /// the chip should not read "6 / 5".
     func testAClipPastTheEndOfTheStoryStillCounts() {
         let d = deck([clip(day: 6, author: me)], momentCount: 5)
         XCTAssertEqual(d.position(at: 0)?.momentCount, 6)

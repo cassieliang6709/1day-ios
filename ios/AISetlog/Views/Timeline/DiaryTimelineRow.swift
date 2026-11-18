@@ -1,21 +1,11 @@
 import SwiftUI
 
-/// One line of the story page's diary: a big time on the left, a dot on a thin
-/// rail, and whatever the row holds on the right.
-///
-/// The rail is drawn as the content's background, so it is always exactly as
-/// tall as the row — a tall filmed row and a short empty one both join up with
-/// their neighbours without measuring anything.
 struct DiaryTimelineRow<Content: View>: View {
-    /// HH:mm, or nil for a moment not filmed yet.
     let time: String?
     let isFirst: Bool
     let isLast: Bool
-    /// Filled dot; otherwise a hollow one.
     let filmed: Bool
-    /// Rings the dot: the moment the big button will open.
     var highlighted = false
-    /// Paints the rail below this dot in brand colour — the next row is filmed too.
     var railReached = false
     @ViewBuilder let content: Content
 
