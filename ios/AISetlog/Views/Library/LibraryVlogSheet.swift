@@ -1,23 +1,16 @@
 import Photos
 import SwiftUI
 
-/// A vlog from clips picked in 我的: any stories, any people. Opens on an
-/// arrange step — the clips in the order they were picked, draggable, each
-/// one previewable — and renders once 生成 vlog is tapped, in that order.
-/// No shape picker: the cameras decide the shape, so the stitcher builds the
-/// canvas from the takes themselves (`Options.aspect = nil`).
 struct LibraryVlogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var order: [LibraryClip]
     @State private var stage: Stage = .arrange
-    /// What the player lays out before the film is read; the film's own
-    /// shape wins once it is.
     private let layoutRatio: CGFloat
     @State private var phase: Phase = .rendering
     @State private var saveMessage: String?
     @State private var isSaving = false
-    /// The film remixed with music or voiceover; nil while it's the original.
     @State private var mixedURL: URL?
+    @State private var showsSound = false
     @Environment(MoodStore.self) private var moodStore: MoodStore?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -50,36 +43,47 @@ struct LibraryVlogSheet: View {
         }
     }
 
+    // Same shape as the room film page (FinalFilmTimeline): title and meta, big player, folded sound, Save / Share pinned at the bottom.
     private var film: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: OneDay.Space.l) {
             HStack {
                 IconBubble(systemName: "chevron.left") { stage = .arrange }
                     .accessibilityLabel(Strings.vlogArrangeTitle)
                 Spacer()
-                Text(Strings.vlogTitle)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                Spacer()
                 IconBubble(systemName: "xmark") { dismiss() }
             }
+
+            VStack(alignment: .leading, spacing: OneDay.Space.xs) {
+                Text(Strings.filmReadyTitle)
+                    .font(OneDay.Font.caption)
+                    .foregroundStyle(OneDay.brandText)
+                Text(Strings.vlogTitle)
+                    .font(OneDay.Font.title)
+                    .foregroundStyle(OneDay.ink)
+                Text(Strings.libraryClipCount(order.count))
+                    .font(OneDay.Font.subhead)
+                    .foregroundStyle(OneDay.inkSoft)
+            }
+            .accessibilityElement(children: .combine)
 
             Group {
                 switch phase {
                 case .rendering:
-                    VStack(spacing: 12) {
+                    VStack(spacing: OneDay.Space.m) {
                         ProgressView().controlSize(.large)
                         Text(Strings.vlogMaking)
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(OneDay.Font.subhead)
                             .foregroundStyle(OneDay.inkSoft)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .done(let url):
                     VlogPlayer(url: mixedURL ?? url, aspectRatio: layoutRatio)
                         .id(mixedURL ?? url)
+                        .frame(maxWidth: .infinity)
                 case .failed:
-                    VStack(spacing: 12) {
+                    VStack(spacing: OneDay.Space.m) {
                         Text(Strings.vlogFailed)
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(OneDay.Font.subhead)
                             .foregroundStyle(OneDay.inkSoft)
                         Button(Strings.vlogRetry) { Task { await render() } }
                             .buttonStyle(.primaryAction)
@@ -90,26 +94,52 @@ struct LibraryVlogSheet: View {
             .frame(maxHeight: .infinity)
 
             if case .done(let url) = phase {
-                FilmSoundtrackPanel(
-                    baseURL: url,
-                    mood: order.first.flatMap { moodStore?.mood(on: $0.recordedAt)?.mood },
-                    mixedURL: $mixedURL)
-                Button {
-                    Task { await save(mixedURL ?? url) }
-                } label: {
-                    if isSaving { ProgressView().tint(.white) } else { Text(Strings.saveVlogToPhotos) }
+                if showsSound {
+                    FilmSoundtrackPanel(
+                        baseURL: url,
+                        mood: order.first.flatMap { moodStore?.mood(on: $0.recordedAt)?.mood },
+                        mixedURL: $mixedURL)
+                } else {
+                    Button { showsSound = true } label: {
+                        Label(Strings.filmAdjustTitle, systemImage: "slider.horizontal.3")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.softAction)
+                    .accessibilityIdentifier("library-vlog-adjust")
                 }
-                .buttonStyle(.primaryAction)
-                .disabled(isSaving)
+
+                HStack(spacing: OneDay.Space.m) {
+                    Button {
+                        Task { await save(mixedURL ?? url) }
+                    } label: {
+                        HStack(spacing: OneDay.Space.s) {
+                            if isSaving { ProgressView().tint(OneDay.onBrand) } else { Image(systemName: "square.and.arrow.down") }
+                            Text(Strings.saveAction)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.primaryAction)
+                    .disabled(isSaving)
+                    .accessibilityIdentifier("library-vlog-save")
+
+                    ShareLink(item: mixedURL ?? url) {
+                        Label(Strings.shareAction, systemImage: "paperplane.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.softAction)
+                    .accessibilityIdentifier("library-vlog-share")
+                }
 
                 if let saveMessage {
                     Text(saveMessage)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(OneDay.Font.caption)
                         .foregroundStyle(OneDay.inkSoft)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
-        .padding(20)
+        .padding(OneDay.Space.xl)
+        .animation(OneDay.Motion.soft, value: showsSound)
     }
 
     private func render() async {
@@ -120,7 +150,7 @@ struct LibraryVlogSheet: View {
         options.layout = .sequential
         options.aspect = nil
         do {
-            let url = try await VideoStitcher.stitch(
+            let url = try await BackgroundFilmExport.shared.render(
                 clips: ClipLibrary.stitchable(order), options: options)
             guard !Task.isCancelled else { return }
             phase = .done(url)

@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// The week across the top of 我的. Tap a day to see its plan; swipe for
-/// the week before or after. A dot marks a day with a plan or a clip.
 struct DayStrip: View {
     @Binding var selected: Date
     let hasSomething: (Date) -> Bool
+    var mood: (Date) -> Mood? = { _ in nil }
 
     @State private var weekOffset = 0
     private let calendar = Calendar.current
@@ -46,10 +45,22 @@ struct DayStrip: View {
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(isSelected ? OneDay.onBrand : (isToday ? OneDay.brandText : OneDay.ink))
-                Circle()
-                    .fill(isSelected ? OneDay.onBrand : Color.oneDayBrand)
-                    .frame(width: 5, height: 5)
-                    .opacity(hasSomething(day) ? 1 : 0)
+                // The day's mood face, or a dot when something was filmed but no mood was logged.
+                ZStack {
+                    if let mood = mood(day) {
+                        Image(mood.imageName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30)
+                            .accessibilityLabel(mood.label)
+                    } else {
+                        Circle()
+                            .fill(isSelected ? OneDay.onBrand : Color.oneDayBrand)
+                            .frame(width: 5, height: 5)
+                            .opacity(hasSomething(day) ? 1 : 0)
+                    }
+                }
+                .frame(height: 30)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -64,9 +75,6 @@ struct DayStrip: View {
     }
 }
 
-/// A past day's mood, to look at: the face and the line written that day.
-/// Not editable — a mood is filled in on the day or not at all. `wide`
-/// when it has the row to itself: face on the left, a sentence beside it.
 struct MoodDayCard: View {
     let entry: MoodEntry
     var wide = false
@@ -113,8 +121,6 @@ struct MoodDayCard: View {
     }
 }
 
-/// A past day's clips, one tap from a recap film. Same size as the mood
-/// card beside it.
 struct DayRecapCard: View {
     let count: Int
     let onMake: () -> Void

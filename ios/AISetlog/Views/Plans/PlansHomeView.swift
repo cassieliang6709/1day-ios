@@ -1,44 +1,23 @@
 import SwiftUI
 
-/// Screen 1 — today's story.
-///
-/// Not a list of plans. The screen answers one question ("what am I filming
-/// today, and with whom?") with one object: the hero `StoryCard`. Everything
-/// else — other stories, finished films — is secondary and sits below the
-/// fold, deliberately quieter.
 struct PlansHomeView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
-    /// Only for the standing count in `draftsRow`. The camera keeps its own
-    /// entry (`DraftsEntryButton`) and the shell keeps the four-second
-    /// confirmation; this is the third and quietest way back to the same list.
     @Environment(ClipDraftStore.self) private var drafts
     @Environment(MoodStore.self) private var moods: MoodStore?
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
-    /// What to lead with and what to list under it, as one decision. See
-    /// `HomeStories`.
     let stories: HomeStories
-    /// 故事 shows everything; 朋友 shows only shared stories, with invite and
-    /// join up front. Same screen so the join sheet, sign-in and the story push
-    /// exist once.
     var scope: Scope = .stories
     enum Scope { case stories, friends }
-    /// Bumped by the shell when the camera's drafts button is tapped: scroll
-    /// to 所有片段 with 待归档 picked. See `LibrarySection.draftsRequest`.
     var draftsRequest = 0
     var isActive = true
     var onActivate: (() -> Bool)? = nil
     var onBackToRooms: (() -> Void)? = nil
     var onOpenPersonal: (() -> Void)? = nil
-    /// Open the composer. The composer used to be a
-    /// `fullScreenCover` owned by this screen; it is a sibling surface now, so
-    /// every in-page CTA that used to raise the cover asks the shell instead.
-    /// One composer, one place it can be.
     let onCompose: () -> Void
 
     @State private var path: [UUID] = []
-    /// When I last had each room open, by room id (seconds since 1970).
     @State private var roomSeenAt: [String: Double] =
         UserDefaults.standard.dictionary(forKey: PlansHomeView.roomSeenKey) as? [String: Double] ?? [:]
     @State private var showJoin = false
@@ -47,37 +26,24 @@ struct PlansHomeView: View {
     @State private var showDrafts = false
     @State private var joinCode = ""
     @State private var joining = false
-    /// Bumped to abandon the current join — by the cancel button or the
-    /// timeout. The in-flight call checks it before doing anything with its
-    /// result, so a late success can't navigate somewhere the person left.
     @State private var joinAttempt = 0
     @State private var joinTask: Task<Void, Never>?
     @State private var errorText: String?
     @State private var recordChallenge: Challenge?
-    /// One item of 今天的计划, tapped: film that one.
     @State private var recordPlanSlot: PlanSlot?
-    /// The story a long press is proposing to delete, held until it's confirmed.
     @State private var pendingDeletion: Challenge?
     @State private var notificationRecordRoute: NotificationRecordRoute?
-    /// When set, present sign-in and run this once the user finishes.
     @State private var afterSignIn: (() -> Void)?
-    /// 我的's select mode and what's been picked; the bar and the vlog sheet
-    /// sit on this page so they float over the scroll view.
     @State private var isSelectingClips = false
     @State private var pickedClips: [LibraryClip] = []
     @State private var vlogRequest: VlogRequest?
-    /// The day the strip at the top has picked. Today unless tapped.
     @State private var selectedDay = Calendar.current.startOfDay(for: .now)
     @State private var planningAhead = false
-    /// 邀请朋友一起拍 with at least one room to invite to. See `inviteFriends`.
     @State private var inviteRequest: InviteRequest?
-    /// The debug test room's own alert, so its failures aren't titled 无法加入.
     @State private var debugAlert: DebugAlert?
 
-    /// Bound only so a language change re-renders the screen.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// Everything except the hero, by the day it was for. See `StoryTimeline`.
     private var timeline: StoryTimeline { stories.timeline }
 
     var body: some View {
@@ -89,7 +55,6 @@ struct PlansHomeView: View {
             .accessibilityHidden(!isActive)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: UUID.self) { id in
-                // Both ends: clips that arrive while I'm inside are seen too.
                 StoryTimelineView(challengeID: id)
                     .onAppear { markSeen(id) }
                     .onDisappear { markSeen(id) }
@@ -153,8 +118,6 @@ struct PlansHomeView: View {
                     startJoin(joinCode)
                 }
             )
-            // Not a fixed height: with the keyboard up on an SE, 430pt pushed
-            // the join button off screen. The sheet scrolls and pins its button.
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
@@ -164,11 +127,6 @@ struct PlansHomeView: View {
         )) {
             SignInView { afterSignIn?() }
                 .presentationDetents([.medium])
-                // Cancelling sign-in used to drop the six digits with the
-                // pending action: the sheet closed, `afterSignIn` was cleared,
-                // and reopening 加入 started from an empty field. The code the
-                // friend sent is the one thing here the app can't reproduce,
-                // so cancelling puts the sheet back with it still typed.
                 .onDisappear {
                     guard afterSignIn == nil, !joinCode.isEmpty,
                           !account.isSignedIn
@@ -183,9 +141,6 @@ struct PlansHomeView: View {
         } message: {
             Text(errorText ?? "")
         }
-        // Launch routing belongs to the 故事 instance alone. The 朋友 one is
-        // mounted beside it and would otherwise open every notification's
-        // camera a second time.
         .onAppear {
             consumePendingJoinCode()
             consumeLaunchAction()
@@ -223,7 +178,6 @@ struct PlansHomeView: View {
         }
     }
 
-    // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
@@ -292,9 +246,6 @@ struct PlansHomeView: View {
                 }
                 header
 
-                // Off unless something asked for it — see `DemoEntries`. It
-                // was an always-on button on the first screen of every Debug
-                // build, which is where 1.3's 冗余内容清理 found it.
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
                 if DemoEntries.areEnabled {
                     Button {
@@ -309,40 +260,36 @@ struct PlansHomeView: View {
                 }
                 #endif
 
-                // 我的, top to bottom: the week, the picked day's mood and
-                // plan, then every clip. No plan today: the mood has the row.
-                DayStrip(selected: $selectedDay) { day in
-                    store.plan(on: day) != nil || !clips(on: day).isEmpty
-                }
+                DayStrip(
+                    selected: $selectedDay,
+                    hasSomething: { day in store.plan(on: day) != nil || !clips(on: day).isEmpty },
+                    mood: { day in day > .now ? nil : moods?.mood(on: day)?.mood })
                 todayCards
+                todayStrip
 
-                // A first run — no stories, no clips — gets the three-line
-                // guide.
                 if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
 
-                // Replaces the date-grouped story list (`timelineSection`):
-                // every clip, filterable by room, with a calendar.
                 LibrarySection(
                     library: library,
                     rooms: store.challenges.filter(\.isShared),
                     onOpenStory: { path.append($0) },
                     draftsRequest: draftsRequest,
                     isSelecting: $isSelectingClips,
-                    picked: $pickedClips)
+                    picked: $pickedClips,
+                    onMakeVlog: { dayClips in
+                        vlogRequest = VlogRequest(clips: dayClips.sorted { $0.recordedAt < $1.recordedAt })
+                    },
+                    hiddenDay: showsTodayStrip ? .now : nil)
                     .id(Self.libraryAnchor)
             }
             .padding(.top, 8)
             .padding(.bottom, OneDay.tabBarClearance + 20)
-            // Belt and braces: the page can never be wider than the scroll
-            // viewport. Without this a single over-eager child silently drags
-            // every section off both edges of the display.
             .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
         .overlay { joiningOverlay }
     }
 
-    /// Every clip on this device, as 我的 lists it.
     private var library: ClipLibrary {
         let mine = [account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 }
         return ClipLibrary(
@@ -357,12 +304,6 @@ struct PlansHomeView: View {
             VStack(spacing: 14) {
                 ProgressView(Strings.joining)
                     .controlSize(.large)
-                // A full-screen spinner with no way out and no ceiling is
-                // indistinguishable from a frozen app: a bad code or no
-                // signal left the person holding a phone that spun until
-                // they force-quit it. Cancelling does not stop the network
-                // call — it stops *waiting* for it, which is the part they
-                // are stuck in.
                 Button(Strings.cancel) {
                     joinAttempt += 1
                     joinTask?.cancel()
@@ -377,10 +318,7 @@ struct PlansHomeView: View {
         }
     }
 
-    // MARK: - 朋友
 
-    /// Shared stories, the one with the newest clip first; a room nobody has
-    /// filmed in yet goes by when it was made.
     private var sharedStories: [Challenge] {
         store.challenges.filter(\.isShared)
             .map { ($0, Self.latestClip(store.recordedClips(for: $0.id))?.recordedAt ?? $0.startDate) }
@@ -391,25 +329,28 @@ struct PlansHomeView: View {
     private var friendsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if let onOpenPersonal {
-                    personalEntry(onOpen: onOpenPersonal)
-                }
+                greetingRow
+                    .padding(.horizontal, 20)
+                MoodTodayCard()
+                    .padding(.horizontal, 20)
                 friendsHeader
+                if !account.isSignedIn, !sharedStories.isEmpty {
+                    signedOutBanner
+                }
 
-                if sharedStories.isEmpty {
-                    friendsEmptyState
-                } else {
-                    // No 邀请朋友一起拍 above the list any more (1.5): each
-                    // room sends its own code from 邀请 on its page. The
-                    // empty state keeps it — there it's how the first room
-                    // gets made.
-                    // Rows without cards (`StoryRowCard`), so the gap does the
-                    // separating.
-                    LazyVStack(alignment: .leading, spacing: 14) {
+                if onOpenPersonal != nil || !sharedStories.isEmpty {
+                    LazyVGrid(columns: Self.tileColumns, alignment: .leading, spacing: 14) {
+                        if let onOpenPersonal {
+                            personalTile(onOpen: onOpenPersonal)
+                        }
                         ForEach(sharedStories) { challenge in
                             storyRow(challenge, membersAsCover: true)
                         }
                     }
+                    .padding(.horizontal, 20)
+                }
+                if sharedStories.isEmpty {
+                    friendsEmptyState
                 }
             }
             .padding(.top, 8)
@@ -420,25 +361,49 @@ struct PlansHomeView: View {
         .overlay { joiningOverlay }
     }
 
-    private func personalEntry(onOpen: @escaping () -> Void) -> some View {
-        Button(action: onOpen) {
-            HStack(spacing: 14) {
-                AvatarDot(name: account.account?.displayName, size: 38, image: AvatarStore.shared.image)
-                Text(Strings.surfacePlans)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+    private var signedOutBanner: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Strings.signedOutRoomsTitle)
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
                     .foregroundStyle(OneDay.ink)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(OneDay.inkFaint)
+                Text(Strings.signedOutRoomsBody)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
             }
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
+            Spacer(minLength: 6)
+            Button(Strings.signIn) {
+                joinCode = ""
+                afterSignIn = {}
+            }
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.black, in: Capsule())
+            .accessibilityIdentifier("rooms-sign-in")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+        .glassSurface(radius: 18)
+        .padding(.horizontal, 20)
+    }
+
+    static let tileColumns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
+
+    private func personalTile(onOpen: @escaping () -> Void) -> some View {
+        let latest = library.clips.filter(\.isMine).max { $0.recordedAt < $1.recordedAt }
+        return Button(action: onOpen) {
+            PortraitTile(
+                coverURL: latest?.url, refreshToken: latest?.recordedAt,
+                title: Strings.surfacePlans,
+                subtitle: latest.flatMap { latestLine($0.clip) } ?? Strings.roomNobodyFilmed
+            ) {
+                AvatarDot(name: account.account?.displayName, size: 30, image: AvatarStore.shared.image)
+            }
         }
         .buttonStyle(.plain)
-        .padding(.bottom, 10)
-        .overlay(alignment: .bottom) { Rectangle().fill(OneDay.hairline).frame(height: 1) }
-        .padding(.horizontal, 20)
         .accessibilityIdentifier("rooms-personal")
     }
 
@@ -449,14 +414,9 @@ struct PlansHomeView: View {
 
     struct InviteRequest: Identifiable {
         let id = UUID()
-        /// The room whose code to show straight away; nil shows the picker.
         let roomID: UUID?
     }
 
-    /// 邀请朋友一起拍, by how many rooms there already are.
-    /// - none: the composer, opened by the shell with 和朋友一起 on.
-    /// - one: into that room, with its code up.
-    /// - more: a list to pick the room from, ending in 新建房间.
     private func inviteFriends() {
         let rooms = sharedStories
         switch rooms.count {
@@ -474,8 +434,6 @@ struct PlansHomeView: View {
         inviteRequest = InviteRequest(roomID: room.id)
     }
 
-    /// The room page offers its code once on its own (`RoomShareNudge`);
-    /// marked here so it doesn't ask a second time under this sheet.
     private func openRoomForInvite(_ room: Challenge) {
         if let code = room.roomCode { RoomShareNudge.markOffered(code: code) }
         path = [room.id]
@@ -494,8 +452,6 @@ struct PlansHomeView: View {
     }
 
     #if DEBUG
-    /// `-debugCreateTestRoom YES`: make the test room once at launch, then
-    /// show its code the way 邀请朋友一起拍 would.
     private func createDebugTestRoomIfAsked() {
         guard DebugTestRoom.consumeLaunchRequest() else { return }
         guard account.isSignedIn else {
@@ -527,7 +483,6 @@ struct PlansHomeView: View {
         .padding(.horizontal, 20)
     }
 
-    /// 新建房间, beside 加入: this instance's `onCompose` opens the room form.
     private var newRoomButton: some View {
         Button { onCompose() } label: {
             HStack(spacing: 5) {
@@ -587,16 +542,7 @@ struct PlansHomeView: View {
         .padding(.horizontal, 20)
     }
 
-    /// Who you are, what day it is, how far today has got — then the two
-    /// actions. The wordmark used to sit here; it's the one fact a person
-    /// opening 1day already has, and it was crowding out the two they didn't.
-    ///
-    /// Nothing up here is allowed to outshine "continue today's story" in the
-    /// card below.
-    ///
-    /// One action on the right: 新建. See the comment on the button for its
-    /// history; 加入 lives in the 朋友 header (`joinButton`).
-    private var header: some View {
+    private var greetingRow: some View {
         HStack(spacing: 11) {
             Button { showSettings = true } label: {
                 AvatarDot(name: account.account?.displayName, size: 42, image: AvatarStore.shared.image)
@@ -615,32 +561,121 @@ struct PlansHomeView: View {
 
                 dateline
             }
+            Spacer(minLength: 0)
+        }
+    }
 
-            Spacer(minLength: 6)
-
-            // 新建 is back up here as of 1.5, when the bar's middle slot went
-            // to the camera — labelled and filled, not the wordless 36pt plus
-            // it was before 1.3. 加入 moved to 朋友, where rooms live.
-            Button { onCompose() } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .heavy))
-                    Text(Strings.surfaceCompose)
-                        .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                        .lineLimit(1)
-                }
-                .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(OneDay.onBrand)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(OneDay.brandHorizontal, in: Capsule())
-                .oneDayGlow(strength: 0.5)
-                .contentShape(Capsule())
+    private var header: some View {
+        HStack(spacing: 11) {
+            if onBackToRooms != nil {
+                mineHeader
+            } else {
+                greetingAndCompose
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("home-compose")
         }
         .padding(.horizontal, 20)
+    }
+
+    private var mineHeader: some View {
+        HStack(spacing: OneDay.Space.m) {
+            Button { showSettings = true } label: {
+                AvatarDot(name: account.account?.displayName, size: 48, image: AvatarStore.shared.image)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.settings)
+
+            VStack(alignment: .leading, spacing: OneDay.Space.xs) {
+                Text(Strings.surfacePlans)
+                    .font(OneDay.Font.title)
+                    .foregroundStyle(OneDay.ink)
+                Text(mineStatsLine)
+                    .font(OneDay.Font.subhead)
+                    .foregroundStyle(OneDay.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: OneDay.Space.s)
+            composeButton
+        }
+        .accessibilityIdentifier("mine-header")
+    }
+
+    private var mineStatsLine: String {
+        let mine = library.scoped(includingFriends: false).clips
+        let calendar = Calendar.current
+        let week = calendar.dateInterval(of: .weekOfYear, for: .now)
+        let days = Set(mine.filter { week?.contains($0.recordedAt) ?? false }
+            .map { calendar.startOfDay(for: $0.recordedAt) }).count
+        return Strings.mineStats(days: days, clips: mine.count)
+    }
+
+    private var showsTodayStrip: Bool {
+        onBackToRooms != nil && Calendar.current.isDateInToday(selectedDay) && !clips(on: .now).isEmpty
+    }
+
+    @ViewBuilder
+    private var todayStrip: some View {
+        let today = clips(on: .now).sorted { $0.recordedAt < $1.recordedAt }
+        if showsTodayStrip {
+            VStack(alignment: .leading, spacing: OneDay.Space.m) {
+                HStack {
+                    SectionLabel(text: Strings.mineTodayHeader)
+                    Spacer(minLength: 0)
+                    Text(Strings.libraryClipCount(today.count))
+                        .font(OneDay.Font.caption)
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+                .padding(.horizontal, OneDay.Space.xl)
+                ScrollView(.horizontal) {
+                    HStack(spacing: OneDay.Space.s) {
+                        ForEach(today) { clip in
+                            ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
+                                // Fixed tile size: a row of 9:16 previews, like the camera's dated look.
+                                .frame(width: 112, height: 199)
+                                .overlay(alignment: .bottomTrailing) {
+                                    ClipTileLabel(text: clip.recordedAt.formatted(date: .omitted, time: .shortened))
+                                }
+                        }
+                    }
+                    .padding(.horizontal, OneDay.Space.xl)
+                }
+                .scrollIndicators(.hidden)
+                Button(Strings.mineMakeTodayVlog, systemImage: "film.stack.fill") {
+                    vlogRequest = VlogRequest(clips: today)
+                }
+                .buttonStyle(.primaryAction)
+                .padding(.horizontal, OneDay.Space.xl)
+                .accessibilityIdentifier("mine-make-today-vlog")
+            }
+        }
+    }
+
+    private var greetingAndCompose: some View {
+        HStack(spacing: 6) {
+            greetingRow
+            composeButton
+        }
+    }
+
+    private var composeButton: some View {
+        Button { onCompose() } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .heavy))
+                Text(Strings.surfaceCompose)
+                    .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .foregroundStyle(OneDay.onBrand)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(OneDay.brandHorizontal, in: Capsule())
+            .oneDayGlow(strength: 0.5)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home-compose")
     }
 
     private var joinButton: some View {
@@ -655,11 +690,6 @@ struct PlansHomeView: View {
                     .font(.system(size: 12.5, weight: .heavy, design: .rounded))
                     .lineLimit(1)
             }
-            // 加入 is two glyphs and Join is four, so the capsule that fits
-            // in Chinese is narrower than the English word and the label
-            // wrapped to "Joi / n". Fixing the label's width makes the
-            // greeting column absorb the squeeze instead — it already
-            // shrinks by design, and the dateline drops its pips first.
             .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(OneDay.ink)
             .padding(.horizontal, 11)
@@ -673,8 +703,6 @@ struct PlansHomeView: View {
         .accessibilityIdentifier("home-join-room")
     }
 
-    /// The date. It used to add 「今天 1/7」 and pips for the story in
-    /// progress; gone in 1.5 — a day isn't a quota.
     private var dateline: some View {
         let summary = HomeHeaderSummary()
         return HStack(spacing: 6) {
@@ -687,29 +715,11 @@ struct PlansHomeView: View {
         }
     }
 
-    /// `label` varies because the card isn't always today's story — calling an
-    /// unfinished story from yesterday "today's story" is the kind of small lie
-    /// that makes the whole screen untrustworthy.
-    /// Clips that were kept on the way out of the camera and have not been
-    /// filed into a story yet.
-    ///
-    /// A row rather than the floating capsule it used to be — see
-    /// `RootShellView.draftsBanner` for why. Last in the list on purpose: it is
-    /// a loose end, not a thing to do today, and putting it under the stories
-    /// means it is somewhere you arrive rather than somewhere you are sent.
-    ///
-    /// Dashed border and no cover: everything above it is a story, and this
-    /// has to be reachable without being mistaken for one.
     @ViewBuilder
     private var draftsRow: some View {
         if !drafts.isEmpty {
             Button { showDrafts = true } label: {
                 HStack(spacing: 12) {
-                    // A brand tint rather than `oneDayMist`, which is a fixed
-                    // light hex: on a dark card it lit up as the brightest
-                    // thing in the row, and on a light one it matched the card
-                    // exactly and vanished. An alpha of the accent lands right
-                    // against both.
                     Image(systemName: "tray.full.fill")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(OneDay.brandText)
@@ -727,10 +737,6 @@ struct PlansHomeView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                // `OneDay.surface`, the card background the story rows use, so
-                // this sits at the same depth as them. `oneDaySurface` — the
-                // soft chip fill — collapses onto the card in dark mode and
-                // onto the page in light.
                 .background(
                     OneDay.surface,
                     in: RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
@@ -746,16 +752,16 @@ struct PlansHomeView: View {
         }
     }
 
-    /// The mood card, and today's plan beside it when there is one: two
-    /// cards of one size, side by side (PRD 5.6).
     @ViewBuilder
     private var todayCards: some View {
         if !Calendar.current.isDateInToday(selectedDay) {
             otherDayCards
         } else if let plan = store.todaysPlan() {
             HStack(alignment: .top, spacing: 12) {
-                MoodTodayCard(compact: true)
-                    .frame(maxHeight: .infinity, alignment: .top)
+                if onBackToRooms == nil {
+                    MoodTodayCard(compact: true)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
                 TodayPlanCard(
                     challenge: plan,
                     progress: cardState(for: plan).progress,
@@ -765,15 +771,12 @@ struct PlansHomeView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 20)
-        } else {
+        } else if onBackToRooms == nil {
             MoodTodayCard()
                 .padding(.horizontal, 20)
         }
     }
 
-    /// A day that isn't today: its plan if it had one; otherwise a recap of
-    /// what was filmed (past) or a way to plan it (future). A past day with
-    /// nothing in it shows nothing.
     @ViewBuilder
     private var otherDayCards: some View {
         let isFuture = selectedDay > .now
@@ -801,8 +804,6 @@ struct PlansHomeView: View {
             let dayClips = clips(on: selectedDay).sorted { $0.recordedAt < $1.recordedAt }
             let recap = DayRecapCard(count: dayClips.count) { vlogRequest = VlogRequest(clips: dayClips) }
             Group {
-                // Mood and recap side by side, like mood and plan. A mood
-                // alone gets the whole row and says it in a sentence.
                 if let mood, !dayClips.isEmpty {
                     HStack(alignment: .top, spacing: 12) {
                         MoodDayCard(entry: mood).frame(maxHeight: .infinity, alignment: .top)
@@ -819,14 +820,11 @@ struct PlansHomeView: View {
         }
     }
 
-    /// My clips filmed on `day`.
     private func clips(on day: Date) -> [LibraryClip] {
         library.scoped(includingFriends: false).clips
             .filter { Calendar.current.isDate($0.recordedAt, inSameDayAs: day) }
     }
 
-    /// 今天的故事 as rows, one per story today is for, stacked. `leading` is
-    /// the one `HomeHeroChoice` picked and goes first.
     private func todaySection(_ challenges: [Challenge], label: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: label)
@@ -849,12 +847,9 @@ struct PlansHomeView: View {
             .padding(.horizontal, 20)
     }
 
-    /// The leading story, then every other unfinished one today is for —
-    /// a one-day story started today, or a multi-day one whose week this is.
     private func todayStories(leading: Challenge) -> [Challenge] {
         let calendar = Calendar.current
         let others = store.challenges.filter { challenge in
-            // Rooms are on 朋友, not here.
             guard !challenge.isShared, challenge.id != leading.id, !challenge.isComplete, !challenge.cards.isEmpty
             else { return false }
             if challenge.isOneDay { return calendar.isDateInToday(challenge.startDate) }
@@ -881,9 +876,6 @@ struct PlansHomeView: View {
         }
     }
 
-    /// Nothing to lead with, but this isn't a first run — there are films
-    /// behind this screen, just nothing going on today. Compact on purpose:
-    /// the timeline below it is the interesting part.
     private var startTodayCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: Strings.startTodayLabel)
@@ -904,47 +896,31 @@ struct PlansHomeView: View {
         }
     }
 
-    /// No active story: the mascot, one line of why, one button.
-    /// A first run: nothing filmed, no story. Plain text on how the app
-    /// works (1.5) — the old card with the mascot, 今天想拍什么 and 我有邀请码
-    /// was a second way to do what the camera and 朋友 already do.
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: Strings.guideTitle)
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(Strings.guideSteps.enumerated()), id: \.offset) { index, step in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(.system(size: 14, weight: .heavy, design: .rounded))
-                            .foregroundStyle(OneDay.brandText)
-                            .monospacedDigit()
-                        Text(step)
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+        EmptyFrame(radius: OneDay.Radius.card) {
+            VStack(spacing: OneDay.Space.m) {
+                Image(systemName: "video.badge.plus")
+                    .font(OneDay.Font.title)
+                    .foregroundStyle(OneDay.brandText)
+                Text(Strings.mineEmptyTitle)
+                    .font(OneDay.Font.headline)
+                    .foregroundStyle(OneDay.ink)
+                Text(Strings.mineEmptyHint)
+                    .font(OneDay.Font.subhead)
+                    .foregroundStyle(OneDay.inkSoft)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(OneDay.Space.l)
+            .padding(.vertical, OneDay.Space.s)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // The page's 20 plus the mood card's own 18 (`MoodTodayCard`), so the
-        // guide starts where 今天的心情 does rather than at the card's
-        // rounded edge, which reads as the text sticking out.
-        .padding(.horizontal, 38)
+        .padding(.horizontal, OneDay.Space.xl)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("home-guide")
     }
 
-    /// Everything that isn't today, newest day first. One label per day, then
-    /// that day's stories — finished or not, they sit together, because "when"
-    /// is the axis people actually remember by.
-    /// Lazy because each row costs a pass over its story's clips: an eager
-    /// stack rebuilt every off-screen row on every render, and this list only
-    /// grows.
     private var timelineSection: some View {
         LazyVStack(alignment: .leading, spacing: 18) {
-            // Nil when nothing in the list has been filmed — the rows still
-            // show, the heading doesn't. See `HomeStories.sectionTitle`.
             if let title = stories.sectionTitle {
                 SectionLabel(text: title)
                     .padding(.horizontal, 20)
@@ -965,8 +941,6 @@ struct PlansHomeView: View {
         }
     }
 
-    /// `membersAsCover`: 朋友's room list shows the room's faces instead of
-    /// a cover picture (1.5).
     private func storyRow(_ challenge: Challenge, membersAsCover: Bool = false) -> some View {
         let state = cardState(for: challenge)
         let members = store.members(for: challenge.id)
@@ -993,28 +967,17 @@ struct PlansHomeView: View {
                 challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
                 role: .destructive
             ) {
-                // Ask, don't do. A long press is the easiest gesture in the app
-                // to trigger by accident, and this menu item used to delete
-                // every clip in a story outright — the app's most destructive
-                // frequent action was the one without a confirmation, while
-                // "delete account" had a full dialog.
                 pendingDeletion = challenge
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, membersAsCover ? 0 : 20)
     }
 
 
-    // MARK: - Recorder
 
-    /// Opens the camera on an unfilmed slot (or a specific one, when a
-    /// notification asked for it).
     @ViewBuilder
     private func recorder(for challenge: Challenge, preferredDay: Int? = nil) -> some View {
         let slot = slotToRecord(in: challenge, preferred: preferredDay)
-        // A room's camera never says which day it is (1.5): its slot's name
-        // when it has one, and otherwise no name and no 3/7 bars — the same
-        // rule `StoryTimelineView.sheetContent` opens the camera by.
         let label = ChallengePresenter(challenge: challenge).slotLabel(forSlot: slot)
         RecordClipView(
             day: slot,
@@ -1027,41 +990,27 @@ struct PlansHomeView: View {
         ) { url, overlayText in
             store.saveClip(
                 from: url, day: slot, challengeID: challenge.id, overlayText: overlayText)
-            // Finishing the last moment from the home card should land on the
-            // timeline, so the film is one glance away.
             if store.challenge(challenge.id)?.isComplete == true {
                 path.append(challenge.id)
             }
         }
     }
 
-    /// A default, not a decision. This shortcut skips the story page entirely,
-    /// so it has to open the camera on *something* — a home card has no room
-    /// to lay seven moments out and ask. Picking any moment yourself is one
-    /// tap further in, where `StoryAgenda` offers all of them at once and this
-    /// same slot is only the row wearing a question mark.
     private func slotToRecord(in challenge: Challenge, preferred: Int?) -> Int {
         if let preferred,
            let card = challenge.cards.first(where: { $0.day == preferred }),
            card.clipFileName == nil {
             return card.day
         }
-        // Today's, when today is still empty — see `RoomProgress.slotToOffer`.
-        // Otherwise the first moment *nobody* has filmed: defaulting to one a
-        // friend already covered, while an untouched one waits further down, is
-        // how a room ends up with three takes of breakfast and no evening.
         return cardState(for: challenge).progress.slotToOffer(
             today: challenge.isOneDay ? nil : challenge.currentDay)
     }
 
-    // MARK: - Routing
 
     private func consumePendingJoinCode() {
         guard let code = pendingJoinCode else { return }
         guard onActivate?() != false else { return }
         pendingJoinCode = nil
-        // Kept in the join field too: if sign-in is cancelled, startJoin's
-        // deferred run never fires, and the link's code would be gone.
         joinCode = code
         startJoin(code)
     }
@@ -1082,8 +1031,6 @@ struct PlansHomeView: View {
         case .record(let id):
             recordChallenge = store.challenge(id)
         case .openStory(let id):
-            // Replaces rather than appends: the composer is not a screen you
-            // go "back" to, and it is no longer on this stack to go back to.
             guard store.challenge(id) != nil else { return }
             path = [id]
         }
@@ -1118,9 +1065,6 @@ struct PlansHomeView: View {
                 }
                 do {
                     let challenge = try await store.joinRoom(code: code)
-                    // Abandoned while it was in flight — cancelled, or timed
-                    // out. Navigating now would drop somebody into a room they
-                    // had already walked away from.
                     guard attempt == joinAttempt else { return }
                     path = [challenge.id]
                 } catch is CancellationError {
@@ -1130,9 +1074,6 @@ struct PlansHomeView: View {
                     errorText = error.localizedDescription
                 }
             }
-            // The ceiling. 20s is well past a healthy join on a slow
-            // connection and well short of the minute it takes to decide an
-            // app is broken.
             Task {
                 try? await Task.sleep(for: .seconds(20))
                 guard attempt == joinAttempt, joining else { return }
@@ -1146,33 +1087,16 @@ struct PlansHomeView: View {
         if account.isSignedIn { run() } else { afterSignIn = run }
     }
 
-    // MARK: - Progress and cover art
 
-    /// Everything a card needs about a story, from one pass over its clips.
-    ///
-    /// `recordedClips` is not cheap — it localises every moment title and
-    /// rebuilds a documents-directory URL per card, and in a room it filters
-    /// the whole reaction and comment list per clip. Asking for it three times
-    /// per row (progress, cover, refresh token) tripled that for nothing.
     private struct CardState {
         let progress: RoomProgress
-        /// What the card shows: the cover this story was given, and failing
-        /// that the most recent clip in it, from anyone. A room where only my
-        /// friends have filmed used to fall back to the template art, so the
-        /// card looked untouched while it was three moments in.
         let coverURL: URL?
-        /// Re-records reuse the same file name, so a cached frame needs the
-        /// clip's `recordedAt` to notice the change.
         let refreshToken: Date?
-        /// The room's newest clip, from anyone.
         let latest: DayClip?
     }
 
     private func cardState(for challenge: Challenge) -> CardState {
         let clips = store.recordedClips(for: challenge.id)
-        // The cover is the day's first clip (1.5; there are no posters to pick
-        // any more). Day breaks the tie, so a clip with no timestamp still
-        // sorts sanely.
         let first = clips.min {
             ($0.recordedAt ?? .distantFuture, $0.day) < ($1.recordedAt ?? .distantFuture, $1.day)
         }
@@ -1190,7 +1114,6 @@ struct PlansHomeView: View {
         clips.filter { $0.recordedAt != nil }.max { $0.recordedAt! < $1.recordedAt! }
     }
 
-    /// 「尼尼 · 10月25日」, or the time when it was today.
     private func latestLine(_ clip: DayClip?) -> String? {
         guard let clip, let date = clip.recordedAt else { return nil }
         let name = isMine(clip) ? Strings.youLabel : (clip.authorName ?? "")
@@ -1205,7 +1128,6 @@ struct PlansHomeView: View {
             || clip.authorID == account.account?.id
     }
 
-    /// Someone else filmed since I last had this room open.
     private func hasNew(_ challenge: Challenge, latest: DayClip?) -> Bool {
         guard let latest, let date = latest.recordedAt, !isMine(latest) else { return false }
         guard let seen = roomSeenAt[challenge.id.uuidString] else { return true }
@@ -1221,7 +1143,6 @@ struct PlansHomeView: View {
 
 }
 
-/// An item of 今天的计划 to film.
 struct PlanSlot: Identifiable, Equatable {
     let challengeID: UUID
     let slot: Int
