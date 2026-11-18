@@ -1,58 +1,34 @@
 import SwiftUI
 
-/// Requests from onboarding, links, and story creation.
 enum HomeLaunchAction: Equatable {
-    /// First-run path: make the three-moment personal story immediately.
     case quickStart
     case newStory
     case join
     case record(UUID)
-    /// Push a story's timeline onto the plans stack. What the composer asks for
-    /// once it has made something: the composer lives in the shell now, and the
-    /// navigation stack it needs to push onto belongs to `PlansHomeView`.
     case openStory(UUID)
 }
 
-/// Camera and rooms are the two tabs; the personal library opens from rooms.
 struct RootShellView: View {
     @Environment(ChallengeStore.self) private var store
-    /// Read here as well as in the camera: a kept clip has to be findable from
-    /// the screen you land on, not only from the one you left.
     @Environment(ClipDraftStore.self) private var drafts
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
     enum Surface: Hashable { case plans, friends, compose, camera }
     @State private var surface: Surface = .friends
-    /// The tab compose or the camera was opened from, and goes back to.
     @State private var returnTab: Surface = .friends
-    /// Whether the composer opens with 和朋友一起 already on — set by 朋友's
-    /// invite button, which is otherwise the same composer.
     @State private var composeTogether = false
     @State private var roomLaunchAction: HomeLaunchAction?
-    /// Bumped by the camera's drafts button: 我的 scrolls to 所有片段 with
-    /// 待归档 picked. See `PlansHomeView.draftsRequest`.
     @State private var draftsRequests = 0
 
-    /// The camera surface reports through this whether it's still holding a
-    /// clip nobody has filed, and hands back the two ways out.
     @State private var unfiledGuard = UnfiledClipGuard()
     @State private var askBeforeLeavingCamera = false
     @State private var pendingSurface: Surface?
     @State private var showDrafts = false
-    /// Raised by "保留" and cleared a few seconds later. Lives up here rather
-    /// than in the camera because the tab switch that triggers it unmounts the
-    /// camera, and a confirmation that dies with the screen that caused it is
-    /// the same as no confirmation at all.
     @State private var justKeptADraft = false
 
-    /// Bound only so a language change re-renders the tab labels.
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    /// What the home screen leads with and what it lists underneath. See
-    /// `HomeStories`; `HomeHeroChoice` covers why the lead isn't just "the
-    /// story with the fewest moments filmed". Solo stories only (1.5): a room
-    /// lives on 朋友, and 我的 doesn't list it again.
     private var stories: HomeStories {
         HomeStories(challenges: store.challenges.filter { !$0.isShared })
     }
@@ -72,9 +48,6 @@ struct RootShellView: View {
                 .allowsHitTesting(surface == .plans)
                 .accessibilityHidden(surface != .plans)
 
-            // A second instance rather than a new screen: every row, the join
-            // sheet, sign-in and the story push already live in PlansHomeView.
-            // `.friends` filters it to shared stories.
             PlansHomeView(
                 pendingJoinCode: $pendingJoinCode,
                 launchAction: $roomLaunchAction,
@@ -88,14 +61,9 @@ struct RootShellView: View {
                 .allowsHitTesting(surface == .friends)
                 .accessibilityHidden(surface != .friends)
 
-            // Not kept mounted behind the others the way plans is: it holds a
-            // half-filled form, and coming back to 新建 after wandering off
-            // should offer a fresh one rather than the poster rack scrolled to
-            // wherever it was left. There is no navigation stack to lose here.
             if surface == .compose {
                 StoryComposerView(
                     onCreate: { id in
-                        // Open the result on the stack it belongs to.
                         if composeTogether {
                             surface = .friends
                             roomLaunchAction = .openStory(id)
@@ -108,9 +76,6 @@ struct RootShellView: View {
                     startsWithFriends: composeTogether)
             }
 
-            // Mounted only while active so the capture session stops on leave.
-            // That unmount is also what used to destroy unfiled clips, so the
-            // guard below gets a say before it happens.
             if surface == .camera {
                 CameraTabView(
                     unfiledGuard: unfiledGuard,
@@ -162,14 +127,31 @@ struct RootShellView: View {
             }
             Button(Strings.cancel, role: .cancel) { pendingSurface = nil }
         } message: {
-            // The camera's own ✕ has said this since drafts shipped
-            // (`RecordClipView`); this dialog — the one you get by tapping
-            // another tab, which is how most people leave — never did. So
-            // "保留" was a button with no stated destination, and a clip it
-            // saved correctly still read as one that vanished.
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+        .onAppear { consumeCaptureLaunch() }
+        .onReceive(NotificationCenter.default.publisher(for: .oneDayCaptureRequested)) { _ in
+            consumeCaptureLaunch()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .oneDayCapturedDraftsRequested)) { _ in
+            consumeCaptureLaunch()
+        }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: .debugDeepLink)) { note in
+            guard let link = note.userInfo?["link"] as? DebugDeepLink else { return }
+            switch link {
+            case .surface("plans"): _ = activate(.plans)
+            case .surface("friends"): _ = activate(.friends)
+            case .surface("compose"): openCompose(together: false)
+            case .surface("camera"): openCamera()
+            case .story(let id):
+                _ = activate(.plans)
+                launchAction = .openStory(id)
+            default: break
+            }
+        }
+        #endif
         .onChange(of: unfiledGuard.isRecording) { _, recording in
             if !recording, let next = pendingSurface {
                 pendingSurface = nil
@@ -178,23 +160,18 @@ struct RootShellView: View {
         }
     }
 
-    /// The four seconds after you keep a clip: what just happened, and the way
-    /// in if that is not where you meant it to go.
-    ///
-    /// It used to hold a second job — a standing "N 段待归档" count that stayed
-    /// on the plans surface indefinitely. Two problems with that, and they
-    /// compound. The tab bar is itself a floating capsule, so a permanent
-    /// second capsule directly above it made the bottom of the screen two
-    /// hovering pills with no hierarchy between them; and an overlay cannot be
-    /// scrolled out of the way, so the count sat on top of whichever story card
-    /// happened to be behind it, forever.
-    ///
-    /// Underneath that was the real mistake: a confirmation and a count are
-    /// different kinds of thing. A confirmation earns the middle of the screen
-    /// because you just did something; a count does not, and inheriting the
-    /// confirmation's placement and weight is how it ended up shouting. The
-    /// count now lives in the plans list as `PlansHomeView.draftsRow`, where it
-    /// scrolls with everything else and covers nothing.
+    private func consumeCaptureLaunch() {
+        if UserDefaults.standard.bool(forKey: "capture.openDraftsRequested") {
+            UserDefaults.standard.removeObject(forKey: "capture.openDraftsRequested")
+            UserDefaults.standard.removeObject(forKey: "capture.launchRequested")
+            showDrafts = true
+            return
+        }
+        guard UserDefaults.standard.bool(forKey: "capture.launchRequested") else { return }
+        UserDefaults.standard.removeObject(forKey: "capture.launchRequested")
+        openCamera()
+    }
+
     @ViewBuilder
     private var draftsBanner: some View {
         if justKeptADraft, !drafts.isEmpty, surface != .camera {
@@ -213,7 +190,6 @@ struct RootShellView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("drafts-entry")
-            // Above the capsule, clear of it.
             .padding(.bottom, OneDay.tabBarClearance + 8)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(OneDay.Motion.soft, value: justKeptADraft)
@@ -225,9 +201,6 @@ struct RootShellView: View {
         }
     }
 
-    /// Leaving the camera with a clip still in review used to throw it away
-    /// silently. Now the switch has to go through here first, so discarding is
-    /// something a person chose rather than something that just happened.
     private var guardedSurface: Binding<Surface> {
         Binding(
             get: { surface },
@@ -237,8 +210,6 @@ struct RootShellView: View {
                     surface = next
                     return
                 }
-                // A free take is kept in 我的 (only you see it) rather than
-                // asked about: it can be sent to a room from there later.
                 pendingSurface = next
                 guard unfiledGuard.keepForNavigation() else {
                     pendingSurface = nil
@@ -254,7 +225,6 @@ struct RootShellView: View {
         pendingSurface = nil
     }
 
-    /// External links wait for a recording, then keep its take before routing.
     private func activate(_ next: Surface) -> Bool {
         if unfiledGuard.isRecording {
             pendingSurface = next
@@ -282,7 +252,6 @@ struct RootShellView: View {
     }
 
     private func openCompose(together: Bool) {
-        // One plan a day: once today has one, 新建 on 我的 opens it.
         if !together, let plan = store.todaysPlan() {
             returnTab = .plans
             guardedSurface.wrappedValue = .plans
@@ -291,16 +260,10 @@ struct RootShellView: View {
         }
         if surface == .plans || surface == .friends { returnTab = surface }
         composeTogether = together
-        // Leaving the camera for the composer still goes through the guard: a
-        // clip in review would otherwise vanish with the camera.
         guardedSurface.wrappedValue = .compose
     }
 }
 
-/// Shared between the shell and the camera surface so the shell can ask "you
-/// still have a clip — keep it?" while the temp file is still there to keep.
-/// The camera owns the recorder, so it supplies the actions; the shell owns the
-/// navigation, so it decides when to ask.
 @Observable
 final class UnfiledClipGuard {
     var isRecording = false
@@ -316,15 +279,10 @@ final class UnfiledClipGuard {
     }
 }
 
-/// The free-form camera surface: the same recorder as the per-moment one, in
-/// free-form mode — roll a clip any time, then file it into a story.
 struct CameraTabView: View {
     var unfiledGuard: UnfiledClipGuard?
     var onStartStory: (() -> Void)?
-    /// Back to the browsing surface the camera was opened from.
     var onClose: (() -> Void)?
-    /// The drafts button: 我的 with 待归档 picked. Nil opens the drafts list
-    /// over the camera instead.
     var onOpenDrafts: (() -> Void)?
 
     @Environment(ClipDraftStore.self) private var drafts
@@ -332,11 +290,6 @@ struct CameraTabView: View {
 
     var body: some View {
         RecordClipView(
-            // A loose take belongs to no story yet, so there is no moment
-            // number to be on and no count to be out of. `momentCount` stays 0,
-            // which is what stops the camera drawing a position it doesn't
-            // know; `day` is only a placeholder for the recorder's plumbing and
-            // is never shown here.
             day: 1,
             slotTitle: Strings.freeformSlot,
             isFreeform: true,
@@ -344,14 +297,5 @@ struct CameraTabView: View {
             onStartStory: onStartStory,
             onCloseFreeform: onClose
         ) { _, _ in }
-            // Over the camera rather than on the home screen: this is where the
-            // clips came from, and home doesn't need another section. Clear of
-            // the wordmark, and gone while a take is in review — the clip in
-            // front of you is the one that needs deciding about.
-            // In the top bar's empty trailing slot, beside the wordmark, rather
-            // than 88pt down: that put it inside the frame, and on a small
-            // phone on top of the timer chip. Compact so it fits the slot.
-            // No 待归档 count up here any more (1.5): a take is in 我的 the
-            // moment it's filmed, with nothing left to sort.
     }
 }

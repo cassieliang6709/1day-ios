@@ -1,20 +1,10 @@
 import SwiftUI
 import AVFoundation
 
-/// Endlessly looping muted-free playback of one clip. Fills its frame like
-/// the live camera preview does (`.resizeAspectFill`) — SwiftUI's `VideoPlayer`
-/// aspect-*fits* by default, which is what was letterboxing recorded clips
-/// with black bars whenever the footage didn't exactly match the frame.
 struct LoopingClipPlayer: View {
     let url: URL
-    /// Bump this (e.g. the card's `recordedAt`) when the file at `url` gets
-    /// overwritten in place — a re-record reuses the same file name, which
-    /// AVPlayer can't notice on its own.
     var refreshToken: Date? = nil
-    /// Applied as the frames come off the file. Nothing is written anywhere, so
-    /// turning it off gives back exactly what the camera saw.
     var look: PersonalEffectParameters = .none
-    /// For a wall of tiles playing at once, where sound from all of them is noise.
     var muted = false
 
     var body: some View {
@@ -34,8 +24,6 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     final class Coordinator {
-        /// What's on screen. The look is in here with the URL because changing
-        /// either one means building a new player.
         struct Request: Equatable {
             let url: URL
             let look: PersonalEffectParameters
@@ -58,8 +46,6 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
-        // SwiftUI reuses the UIView when only the URL changed (same view
-        // identity) — rebuild the player or the old clip keeps looping.
         guard context.coordinator.loaded != Coordinator.Request(url: url, look: look) else { return }
         start(in: uiView, coordinator: context.coordinator)
     }
@@ -70,16 +56,11 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         coordinator.building?.cancel()
         coordinator.building = nil
 
-        // Off is the path this view has always taken: file straight to layer.
         guard !look.isIdentity else {
             play(request, composition: nil, in: view, coordinator: coordinator)
             return
         }
 
-        // A look has to be ready *before* the first frame, because
-        // `AVPlayerLooper` copies the template item for every pass — hand it an
-        // unfiltered item now and every loop after this one is unfiltered too.
-        // So the layer stays black for the moment it takes to read the tracks.
         coordinator.building = Task { @MainActor in
             let composition = await PersonalEffectFilter.playbackComposition(
                 request.look, for: AVURLAsset(url: request.url))
@@ -107,13 +88,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 }
 
-/// The shape of a video file, as it will be seen.
 enum ClipGeometry {
-    /// width / height after the file's own rotation, or nil if it can't be read.
-    ///
-    /// Worth measuring rather than assuming: a story knows which way its takes
-    /// were filmed, but a stitched moment is a different shape from the takes
-    /// inside it — two portrait takes side by side come out 9:8.
     static func aspect(of url: URL) async -> CGFloat? {
         guard let track = try? await AVURLAsset(url: url)
             .loadTracks(withMediaType: .video).first,
@@ -126,35 +101,24 @@ enum ClipGeometry {
     }
 }
 
-/// First-frame thumbnail of a clip, loaded off the main thread.
 struct ClipThumbnail: View {
     let url: URL
-    /// Changing this value (e.g. recordedAt) forces a reload after re-recording.
     var refreshToken: Date?
-    /// Fit the whole frame inside the tile, bedded on a blurred copy of itself,
-    /// instead of cropping it to fill.
-    ///
-    /// A contact sheet wants every tile the same shape, and the clips are a
-    /// different shape — a 9:16 take in a 0.72 tile. Closing that gap by
-    /// cropping takes 22% off the height and scales the remainder up 28%, and
-    /// what sits in the middle of a 1Day clip is a face. The bed keeps the
-    /// tile's shape without ever cutting the picture.
     var bedsInsteadOfCrops = false
 
     @State private var image: UIImage?
+
+    private struct Request: Equatable {
+        let url: URL
+        let refreshToken: Date?
+    }
 
     var body: some View {
         Group {
             if let image {
                 if bedsInsteadOfCrops {
-                    // `Color.clear` takes the offered size and overlays don't
-                    // feed back into it, so the filling bed can overflow
-                    // without dragging the tile's own dimensions with it.
                     Color.clear
                         .overlay {
-                            // `opaque: true`: a transparent-edged blur fades
-                            // into nothing at the tile's border and leaves a
-                            // pale halo inside the corner radius.
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
@@ -176,14 +140,11 @@ struct ClipThumbnail: View {
                 Color(.systemGray5)
             }
         }
-        .task(id: refreshToken) {
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 600, height: 600)
-            let time = CMTime(seconds: 0.1, preferredTimescale: 600)
-            if let cgImage = try? await generator.image(at: time).image {
-                image = UIImage(cgImage: cgImage)
-            }
+        .task(id: Request(url: url, refreshToken: refreshToken)) {
+            image = nil
+            let loaded = await ClipThumbnailCache.shared.image(for: url, refreshToken: refreshToken)
+            guard !Task.isCancelled else { return }
+            image = loaded
         }
     }
 }

@@ -1,9 +1,6 @@
 import Foundation
 import Observation
 
-/// Holds challenge state in memory and orchestrates the services around it:
-/// persistence (ChallengeRepository), clip files (ClipFileStore), and room
-/// sync (RoomSyncService). Contains no I/O of its own beyond delegating.
 @Observable
 final class ChallengeStore {
     var challenges: [Challenge] = [] {
@@ -12,23 +9,20 @@ final class ChallengeStore {
             effects.reconcileReminders(challenges)
             let oldRooms = Set(oldValue.compactMap(\.roomCode))
             let newRooms = Set(challenges.compactMap(\.roomCode))
+            for code in newRooms.subtracting(oldRooms) {
+                roomSync.restoreCachedContent(code: code)
+            }
             if oldRooms != newRooms {
                 effects.reconcileSubscriptions(challenges)
             }
         }
     }
 
-    /// Set once at app launch so shared rooms can attribute + upload clips.
     var account: AccountStore?
-    /// My avatar and today's mood, as rooms should show them. Set at launch;
-    /// read whenever a room needs my `Member` record brought up to date.
     var myRoomProfile: @MainActor () -> MyRoomProfile? = { nil }
-    /// This phone's own avatar: put one back from the cloud, or wipe it when
-    /// someone else signs in. Set at launch; no-ops in tests and previews.
     var adoptAvatar: @MainActor (URL) -> Void = { _ in }
     var forgetAvatar: @MainActor () -> Void = {}
 
-    /// CloudKit room sync (remote clip cache + syncing spinners live there).
     let roomSync: RoomSyncService
 
     private let repository: ChallengeRepository
@@ -44,9 +38,11 @@ final class ChallengeStore {
         self.repository = repository ?? UserDefaultsChallengeRepository(fileStore: fileStore)
         self.roomSync = roomSync ?? RoomSyncService(fileStore: fileStore)
         challenges = self.repository.loadChallenges()
+        for code in Set(challenges.compactMap(\.roomCode)) {
+            self.roomSync.restoreCachedContent(code: code)
+        }
     }
 
-    /// Room codes currently being synced (drives a spinner in the board).
     var syncing: Set<String> { roomSync.syncing }
 
     func syncError(for challengeID: UUID) -> String? {
@@ -66,10 +62,6 @@ final class ChallengeStore {
         challenges[index] = updated
     }
 
-    /// 编辑计划 (1.5): the list rewritten — reordered, added to, trimmed. Each
-    /// item names the slot it came from, so its footage moves with it; a new
-    /// item gets an empty slot. A slot left out loses its card, which is why
-    /// the editor never lets an item with footage be removed.
     func replacePlan(_ id: UUID, items: [(title: String, fromSlot: Int?)]) {
         guard let index = challenges.firstIndex(where: { $0.id == id }), !items.isEmpty else { return }
         var updated = challenges[index]
@@ -110,12 +102,6 @@ final class ChallengeStore {
         return challenge
     }
 
-    /// The first-run story: an immediately filmable personal day. Keeping this
-    /// alongside `create` means it has the exact same persistence and reminder
-    /// behavior as a story made in the composer.
-    ///
-    /// 按时间 as of 1.5 — no prompts to read before the first take, which is
-    /// what 晨光 / 在路上 / 傍晚的光 asked of someone who had just opened the app.
     @discardableResult
     func createQuickStart() -> Challenge {
         create(
@@ -127,17 +113,14 @@ final class ChallengeStore {
             momentTitles: nil)
     }
 
-    // MARK: - Shared rooms (CloudKit)
 
     enum RoomError: LocalizedError {
         case notSignedIn
         var errorDescription: String? { Strings.errorSignInFirst }
     }
 
-    /// A preview cannot manage real rooms or erase a real account.
     enum IsolationError: Error { case cloudRoomManagementDisabled }
 
-    /// Create a CloudKit-backed room and mirror it locally.
     @MainActor
     @discardableResult
     func createSharedRoom(
@@ -166,38 +149,28 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
-        // My `Member` record, as joining writes one: it is how this room
-        // finds its way back to me on another phone (`restoreMyRooms`).
         await roomSync.recordMembership(
             code: room.code, authorID: me.id, displayName: me.displayName)
         await publishMyProfile(toRoom: room.code)
         return challenge
     }
 
-    /// Rooms made before every owner got a `Member` record (1.5 (36)). Only
-    /// these come back through `Room.ownerID`: a later room I made and then
-    /// left has no `Member` record either, and must stay left.
     static let ownerMemberRecordsSince = DateComponents(
         calendar: .init(identifier: .gregorian), timeZone: .init(identifier: "Asia/Shanghai"),
         year: 2026, month: 10, day: 28).date!
 
     @ObservationIgnored private var roomRestoration: (userID: String, revision: UInt64, request: UUID)?
 
-    /// Whose the shared rooms on this phone are. Signing out keeps them (and
-    /// any take whose upload hasn't landed yet) for the same person coming
-    /// back; it can't keep them for someone else.
     static let roomsAccountKey = "rooms.accountID.v1"
 
-    /// Run on sign-in and on every foreground. Someone other than the last
-    /// person signed in here: their shared rooms, takes and avatar leave this
-    /// phone first — left in place, the next sync uploaded every one of their
-    /// takes under the new account and joined it to their rooms. Only this
-    /// phone's copy goes; the rooms and takes stay in the cloud, and come back
-    /// when that person signs in again (`restoreMyRooms`). Personal stories
-    /// stay: they never leave the phone. Then the new person's rooms come back.
     @MainActor
     func reconcileAccountRooms(defaults: UserDefaults = .standard) async {
-        guard let me = account?.account else { return }
+        roomSync.reconcileCacheAccount()
+        guard let me = account?.account else {
+            Log.sync.notice("reconcileAccountRooms skipped: no account")
+            return
+        }
+        Log.sync.info("reconcileAccountRooms start")
         if let previous = defaults.string(forKey: Self.roomsAccountKey), previous != me.id {
             for challenge in challenges where challenge.isShared {
                 fileStore.deleteClips(challengeID: challenge.id)
@@ -211,12 +184,6 @@ final class ChallengeStore {
         await restoreMyRooms()
     }
 
-    /// Puts back every room the cloud says I'm in that this phone doesn't
-    /// have — a new phone, a reinstall, or the Dev build next to the App
-    /// Store one. The room list lives on the phone; the cloud only knows it
-    /// through my `Member` records and the rooms I own. Rooms I left have
-    /// neither, so they stay gone. Nothing is removed here: a room the
-    /// cloud can't vouch for may just be one the query missed.
     @MainActor
     func restoreMyRooms() async {
         guard effects.allowsCloudRoomManagement, let me = account?.account
@@ -231,9 +198,6 @@ final class ChallengeStore {
         guard let mine = await roomSync.findMyRooms(userID: me.id) else { return }
         guard isCurrentAccount(me.id, revision: revision), roomRestoration?.request == request,
               !Task.isCancelled else { return }
-        // Apple hands the name over only on the very first sign-in, and the
-        // avatar lives in a file on the old phone: a new phone has neither.
-        // My own `Member` records still do.
         if me.name == nil, let name = mine.displayName { account?.rename(to: name) }
         if myRoomProfile()?.avatarURL == nil, let avatar = mine.avatarFile { adoptAvatar(avatar) }
 
@@ -244,15 +208,11 @@ final class ChallengeStore {
         }
         let ownedCodes = Set(rooms.map(\.code))
         for code in Set(mine.memberCodes) where !have.contains(code) && !ownedCodes.contains(code) {
-            // A room deleted since, or unreadable right now: skip it, the
-            // next launch tries again.
             if let room = try? await roomSync.fetchRoom(code: code) { rooms.append(room) }
             guard isCurrentAccount(me.id, revision: revision), roomRestoration?.request == request,
                   !Task.isCancelled else { return }
         }
         guard !rooms.isEmpty else { return }
-        // Newest first, as the list keeps them. Re-checked: a join may have
-        // landed while the queries ran.
         for room in rooms.sorted(by: { $0.startDate > $1.startDate })
         where !challenges.contains(where: { $0.roomCode == room.code }) {
             challenges.append(challenge(mirroring: room))
@@ -272,11 +232,6 @@ final class ChallengeStore {
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
     }
 
-    /// My own takes that are in the room but not on this phone — a new phone,
-    /// a reinstall, a room put back by `restoreMyRooms` — become this phone's
-    /// take 1 again. Left as empty cards, the camera filed the next take into
-    /// the first "empty" moment and uploaded it over the one already there,
-    /// for everyone. Only take 1: extra takes stay in the room as they are.
     @MainActor
     private func adoptMyTakes(_ remote: [CloudKitService.RemoteClip], code: String, into id: UUID) {
         guard let me = account?.account,
@@ -293,7 +248,6 @@ final class ChallengeStore {
         }
     }
 
-    /// Join an existing room by its code, mirroring it locally.
     @MainActor
     @discardableResult
     func joinRoom(code: String) async throws -> Challenge {
@@ -302,28 +256,18 @@ final class ChallengeStore {
         let revision = AccountStore.identityRevision
         try Task.checkCancellation()
         let normalized = InviteCode.normalize(code)
-        // Already joined? Jump to it.
         if let existing = challenges.first(where: { $0.roomCode == normalized }) {
             return existing
         }
-        // A code with an O in it, or five characters, isn't a room that exists
-        // somewhere — it's a room that cannot exist. Say so here rather than
-        // spending a round trip to be told the same thing, or worse, telling
-        // someone to sign into iCloud because that's the error the trip hit
-        // first.
         guard InviteCode.isValid(normalized) else {
             throw CloudKitService.CKServiceError.roomNotFound
         }
         let room = try await roomSync.fetchRoom(code: normalized)
         try Task.checkCancellation()
         guard isCurrentAccount(me.id, revision: revision) else { throw CancellationError() }
-        // Six people at most (PRD 5.5). Counted from the `Member` records;
-        // when those can't be read the join goes ahead rather than turning
-        // somebody away on a guess.
         let people = await roomSync.peopleInRoom(code: normalized, ownerID: room.ownerID)
         try Task.checkCancellation()
         guard isCurrentAccount(me.id, revision: revision) else { throw CancellationError() }
-        // Another join or restoration may have finished while the requests ran.
         if let existing = challenges.first(where: { $0.roomCode == normalized }) { return existing }
         if let people, !people.contains(me.id), people.count >= Self.roomCapacity {
             throw CloudKitService.CKServiceError.roomFull
@@ -338,16 +282,11 @@ final class ChallengeStore {
             momentTitles: room.momentTitles,
             roomCode: room.code, ownerName: room.ownerName, ownerID: room.ownerID)
         challenges.insert(challenge, at: 0)
-        // Only once the room is really here: a code that found nothing never
-        // reaches this line, so it leaves no record behind.
         await roomSync.recordMembership(
             code: room.code, authorID: me.id, displayName: me.displayName)
         try Task.checkCancellation()
         guard isCurrentAccount(me.id, revision: revision), self.challenge(challenge.id) != nil
         else { throw CancellationError() }
-        // The room is joined; open it now. Putting my avatar and mood back
-        // and pulling every clip (a busy room is dozens of videos) happen
-        // behind it, so joining doesn't wait on downloads.
         Task { @MainActor [weak self] in
             guard let self, self.isCurrentAccount(me.id, revision: revision) else { return }
             self.roomSync.forgetPublishedProfile(code: room.code)
@@ -358,22 +297,26 @@ final class ChallengeStore {
         return challenge
     }
 
-    /// Pull every member's clips for a room into the local cache, send up any
-    /// of mine the room is missing, then fold remote reactions/comments into
-    /// the local cards.
     @MainActor
     func syncRoom(_ id: UUID) async {
         guard let challenge = challenge(id), let code = challenge.roomCode else { return }
-        guard !effects.allowsCloudRoomManagement || account?.isSignedIn == true else { return }
+        guard !effects.allowsCloudRoomManagement || account?.isSignedIn == true else {
+            Log.sync.notice("syncRoom \(code, privacy: .public) skipped: not signed in")
+            return
+        }
+        let started = Date()
+        Log.sync.info("syncRoom \(code, privacy: .public) start")
+        defer {
+            let ms = Int(Date().timeIntervalSince(started) * 1000)
+            Log.sync.info("syncRoom \(code, privacy: .public) done \(ms)ms")
+        }
         let userID = account?.account?.id
         let revision = AccountStore.identityRevision
         let isCurrent = {
             self.isCurrentAccount(userID, revision: revision)
                 && self.challenge(id)?.roomCode == code && !Task.isCancelled
         }
-        // Who is in the room first: last launch's roster at once, then a fresh
-        // one, before the clip downloads that can take a while.
-        roomSync.restoreCachedMembers(code: code)
+        roomSync.restoreCachedContent(code: code)
         await roomSync.syncMembers(code: code)
         guard isCurrent() else { return }
         if let remote = await roomSync.syncClips(code: code) {
@@ -402,14 +345,8 @@ final class ChallengeStore {
         account?.account?.id == userID && AccountStore.identityRevision == revision
     }
 
-    /// How long a reaction or comment I just added on a friend's take is kept
-    /// on screen while the room's answer doesn't have it yet: the save may
-    /// still be in flight, or saved but not yet in query results.
-    static let myInteractionGrace: TimeInterval = 120
+    static let myInteractionGrace = RoomContentCache.confirmationGrace
 
-    /// The fetched interactions plus my own recent ones the fetch didn't
-    /// return. Replacing them outright made a comment I had just typed vanish
-    /// on the next poll and flicker back later — or never, if it failed.
     @MainActor
     private func keepingMyRecentInteractions(
         _ fetched: (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment]),
@@ -435,7 +372,6 @@ final class ChallengeStore {
         return (reactions, comments)
     }
 
-    /// Renames a room on this phone at once, then for everyone in it.
     @MainActor
     func renameRoom(_ id: UUID, to title: String) async {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -447,8 +383,6 @@ final class ChallengeStore {
         await roomSync.publishRoomTitle(code: code, authorID: me.id, displayName: me.displayName, title: title)
     }
 
-    /// Sends a rename that didn't get through, then takes the room's newest
-    /// name from its members' records.
     @MainActor
     private func syncRoomTitle(_ id: UUID, code: String) async {
         if effects.allowsCloudRoomManagement, let me = account?.account {
@@ -461,23 +395,12 @@ final class ChallengeStore {
         challenges[index].title = latest
     }
 
-    /// Re-sends my takes the room doesn't have.
-    ///
-    /// `saveClip` uploads once, at record time. A take whose upload failed — no
-    /// network, iCloud refusing the app — used to stay on this phone for good:
-    /// shown to me as pending, to nobody else, and "retry sync" only pulled.
-    /// Runs only after a fetch succeeded, so "missing" means missing rather
-    /// than unreachable.
-    ///
-    /// - Returns: whether anything went up, so the caller can pull it back.
     @MainActor
     private func uploadMissingClips(
         in challenge: Challenge, code: String, remote: [CloudKitService.RemoteClip]
     ) async -> Bool {
         guard effects.allowsCloudRoomManagement, let me = account?.account else { return false }
         let revision = AccountStore.identityRevision
-        // Keyed by take, not by day: a moment can hold several of my takes, and
-        // the room having take 1 says nothing about take 2.
         let roomCopies = Dictionary(
             remote.filter { $0.authorID == me.id }
                 .map { (Self.takeKey(day: $0.day, takeID: takeID(of: $0, code: code)), $0.recordedAt) },
@@ -487,9 +410,6 @@ final class ChallengeStore {
             guard isCurrentAccount(me.id, revision: revision),
                   self.challenge(challenge.id)?.roomCode == code, !Task.isCancelled else { return uploadedAny }
             guard let fileName = card.clipFileName else { continue }
-            // Extra takes first in code, independent of take 1's fate below:
-            // each is its own record, and a take never re-recorded in place, so
-            // "the room has a record by this name" is the whole question.
             for take in card.moreTakes
             where roomCopies[Self.takeKey(day: card.day, takeID: take.id)] == nil {
                 guard isCurrentAccount(me.id, revision: revision),
@@ -508,12 +428,6 @@ final class ChallengeStore {
             }
             guard isCurrentAccount(me.id, revision: revision),
                   self.challenge(challenge.id)?.roomCode == code, !Task.isCancelled else { return uploadedAny }
-            // The room's copy carries the time its take was filmed (it used to
-            // carry the time it went up). Same take: equal stamps, nothing to
-            // do. A re-record whose upload failed: the card's take is later
-            // than the one the room still holds, so it goes up. A copy written
-            // by an older client is stamped at upload, which is after the take
-            // it holds, so it still reads as "already there".
             if let roomCopy = roomCopies[Self.takeKey(day: card.day, takeID: nil)], roomCopy >= (card.recordedAt ?? .distantPast) {
                 continue
             }
@@ -523,8 +437,6 @@ final class ChallengeStore {
                 code: code, day: card.day, authorID: me.id,
                 authorName: me.displayName, fileURL: file,
                 captions: card.captions,
-                // A card from before `recordedAt` existed has no better answer
-                // than now; every card saved since has one.
                 recordedAt: card.recordedAt ?? .now
             ) {
                 uploadedAny = true
@@ -533,19 +445,6 @@ final class ChallengeStore {
         return uploadedAny
     }
 
-    /// Sends my captions again wherever the room's copy of my take says
-    /// something else.
-    ///
-    /// A caption edited after the take goes up once, from
-    /// `pushCaptionsToRoom`, and a failure there only logs. The take is
-    /// already in the room, so no later upload carries the new words either:
-    /// friends kept seeing the old caption for good. Comparing on every sync
-    /// retries it until the room agrees.
-    ///
-    /// Words and placement only — the ids of captions rebuilt from
-    /// `overlayText` are new every time. Without `captionsJSON` on the record
-    /// (not deployed, or an older client wrote it) only the first caption's
-    /// words can be compared, so only those count.
     @MainActor
     private func pushStaleCaptions(
         in id: UUID, code: String, remote: [CloudKitService.RemoteClip]
@@ -580,18 +479,10 @@ final class ChallengeStore {
             || zip(local, theirs).contains { $0.trimmedText != $1.trimmedText || $0.sticker != $1.sticker }
     }
 
-    /// Refreshes every locally joined room when the app becomes active.
-    /// Board views also poll while visible so two friends recording at the
-    /// same time see each other's clips without manual pull-to-refresh.
-    ///
-    /// A few rooms at a time rather than one after another: each room's sync is
-    /// mostly waiting on CloudKit, and someone in five rooms used to wait for
-    /// all five in a row. Each room still syncs in its own order inside
-    /// `syncRoom`; the cap keeps a long room list from opening every request at
-    /// once.
     @MainActor
     func syncSharedRooms() async {
         let ids = challenges.filter(\.isShared).map(\.id)
+        Log.sync.info("syncSharedRooms \(ids.count) rooms")
         var pending = ids.makeIterator()
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<Self.sharedRoomSyncWidth {
@@ -605,12 +496,8 @@ final class ChallengeStore {
         }
     }
 
-    /// How many rooms `syncSharedRooms` syncs at once.
     static let sharedRoomSyncWidth = 3
 
-    /// Fold remote reactions/comments into local cards by day. Remote is the
-    /// source of truth, unioned with my own optimistic writes not yet echoed
-    /// back — so a reaction I just tapped stays visible before the next fetch.
     @MainActor
     private func mergeInteractions(
         _ remote: (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment]),
@@ -642,9 +529,6 @@ final class ChallengeStore {
         }
     }
 
-    /// Members seen in a room: owner + everyone who has uploaded a clip + me.
-    /// Puts a clip into a room. A room is filmed whenever, so it is never
-    /// full: the first empty slot, else one more take on the last one.
     @discardableResult
     func sendToRoom(
         from url: URL, roomID: UUID, overlayText: String? = nil,
@@ -661,13 +545,10 @@ final class ChallengeStore {
         return true
     }
 
-    /// Today's plan — my own one-day story with a list, made today. There
-    /// is at most one a day; this is it.
     func todaysPlan(now: Date = .now, calendar: Calendar = .current) -> Challenge? {
         plan(on: now, calendar: calendar)
     }
 
-    /// The plan written for `day`, if there is one.
     func plan(on day: Date, calendar: Calendar = .current) -> Challenge? {
         let now = day
         return challenges.first {
@@ -676,31 +557,22 @@ final class ChallengeStore {
         }
     }
 
-    /// The most people a room takes.
     static let roomCapacity = 6
 
     func members(for challengeID: UUID) -> [(id: String, name: String)] {
         guard let challenge = challenge(challengeID), let code = challenge.roomCode else { return [] }
         var seen: [String: String] = [:]
-        // The owner belongs in the roster before they've filmed anything —
-        // otherwise someone who just joined sees a room with only themselves
-        // in it and can't tell whether the code worked.
         if let ownerName = challenge.ownerName {
             seen[challenge.ownerID ?? ownerName] = ownerName
         }
-        // Everyone with a `Member` record: joined, maybe not filmed yet.
         for member in (roomSync.remoteMembers[code] ?? [:]).values
         where !member.displayName.isEmpty || seen[member.userID] == nil {
             seen[member.userID] = member.displayName
         }
-        // A take uploaded while its author's name was unknown carries none;
-        // it mustn't blank the name their `Member` record has.
         for clip in roomSync.remoteClips[code] ?? [] where !clip.authorName.isEmpty || seen[clip.authorID] == nil {
             seen[clip.authorID] = clip.authorName
         }
         if let me = account?.account { seen[me.id] = me.displayName }
-        // Rooms saved before `ownerID` existed key the owner by name; drop that
-        // placeholder once the same person turns up under a real author id.
         if challenge.ownerID == nil, let ownerName = challenge.ownerName,
            seen.contains(where: { $0.key != ownerName && $0.value == ownerName }) {
             seen.removeValue(forKey: ownerName)
@@ -710,13 +582,6 @@ final class ChallengeStore {
         }
     }
 
-    /// Signs out and forgets what the rooms had downloaded.
-    ///
-    /// The cache is keyed by author id, and signing out changes who I am. Left
-    /// in place, my own uploaded clips became somebody else's: the roster still
-    /// listed me, every empty slot read "waiting for <my own name>", and the
-    /// header credited my takes to a stranger. The stories stay; only the
-    /// borrowed copy of other people's work goes.
     func signOut() {
         for challenge in challenges {
             if let code = challenge.roomCode { roomSync.clearRoom(code) }
@@ -724,21 +589,11 @@ final class ChallengeStore {
         account?.signOut()
     }
 
-    // MARK: - Account deletion
 
-    /// Removes the person from the app entirely: their clips and interactions
-    /// in every shared room they're part of, then every local story, clip file
-    /// and preference on this device.
-    ///
-    /// Required by App Store guideline 5.1.1(v) — an app that creates accounts
-    /// has to let you delete one. Signing out is not the same thing.
     @MainActor
     func deleteAccountAndAllData() async {
-        // Preview teardown is owned by its runtime, never by account deletion.
         guard effects.allowsCloudRoomManagement else { return }
         if let me = account?.account {
-            // Everything this person authored, addressed by reconstructable
-            // record IDs rather than a query. See `deleteMyRoomData`.
             var clips: [(code: String, day: Int)] = []
             var reactions: [(code: String, targetAuthorID: String, day: Int, emoji: String)] = []
             var commentIDs: [String] = []
@@ -760,7 +615,6 @@ final class ChallengeStore {
                 where comment.authorID == me.id {
                     commentIDs.append(comment.id)
                 }
-                // My own comments on my own clips live only on the card.
                 for card in challenge.cards {
                     for comment in card.comments where comment.authorID == me.id {
                         commentIDs.append(comment.id.uuidString)
@@ -780,13 +634,6 @@ final class ChallengeStore {
         await wipeLocalAccountData()
     }
 
-    /// Record names of every extra take of mine in a room — names
-    /// `deleteMyRoomData` and `AccountDeletionService.inventory` can't rebuild
-    /// from a day alone, the way they rebuild take 1's.
-    ///
-    /// The ones this phone filmed, from the cards, and any the room is known to
-    /// hold that this phone doesn't — filmed on another device signed in as me.
-    /// Sorted and unique, so a resumed deletion pages the same list.
     func extraTakeRecordNames(in challenge: Challenge, authorID: String) -> [String] {
         guard let code = challenge.roomCode else { return [] }
         var names: Set<String> = []
@@ -804,17 +651,6 @@ final class ChallengeStore {
         return names.sorted()
     }
 
-    /// The device half of account deletion: every stored clip, story, cover and
-    /// preference, then the sign-out.
-    ///
-    /// Separated from the cloud half so `AccountDeletionService` can hold it
-    /// back until the remote records are confirmed gone. Running it first, as
-    /// the older path did, destroys the only copy of the inventory a retry
-    /// would need — and leaves someone signed out, with their clips still on
-    /// CloudKit, told they were deleted.
-    ///
-    /// Idempotent: the coordinator can replay this step after a crash between
-    /// the wipe and the journal write.
     @MainActor
     func wipeLocalAccountData() async {
         for challenge in challenges {
@@ -829,9 +665,6 @@ final class ChallengeStore {
     func delete(_ id: UUID) {
         fileStore.deleteClips(challengeID: id)
         if let code = challenge(id)?.roomCode {
-            // Leaving takes me out for everyone (1.5): my takes and my
-            // `Member` record go too, so friends stop seeing my frame. The
-            // room itself stays for them.
             if effects.allowsCloudRoomManagement, let me = account?.account {
                 let sync = roomSync
                 Task { @MainActor in await sync.leaveRemotely(code: code, authorID: me.id) }
@@ -841,16 +674,6 @@ final class ChallengeStore {
         challenges.removeAll { $0.id == id }
     }
 
-    /// Moves a freshly recorded clip into permanent storage and marks the card done.
-    ///
-    /// `recordedAt` is when the take was filmed. Straight from the camera that
-    /// is now; a draft filed later has its own time and passes it, otherwise
-    /// the card — and every friend's copy of it — says the moment happened
-    /// when somebody tidied their drafts.
-    ///
-    /// `take` only matters when the moment already has a clip. The default,
-    /// `.replace(nil)`, is 重拍 on take 1 and what every caller did before a
-    /// moment could hold more than one take; only 再拍一段 passes `.append`.
     func saveClip(
         from tempURL: URL,
         day: Int,
@@ -860,16 +683,10 @@ final class ChallengeStore {
         recordedAt: Date = .now,
         take: TakeTarget = .replace(nil)
     ) {
-        // A draft filed into a story brings every caption it had; the camera
-        // hands over the one line typed while filming.
         let captions = (captions ?? .single(overlayText)).drawable
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }) else { return }
         guard let idx = challenges[ci].cards.firstIndex(where: { $0.day == day }) else { return }
 
-        // 重拍 replaces the take you were looking at, file and room record
-        // both, so friends see the new one in its place. 再拍一段 keeps every
-        // take and adds the new one under its own file and its own record;
-        // take 1 stays exactly where every version of the app expects it.
         let card = challenges[ci].cards[idx]
         let extraIndex: Int? = switch take {
         case .replace(let id?): card.moreTakes.firstIndex { $0.id == id }
@@ -887,7 +704,6 @@ final class ChallengeStore {
             challenges[ci].cards[idx].recordedAt = recordedAt
             challenges[ci].cards[idx].captions = captions
         } else if let t = extraIndex {
-            // Same take id, so the same file name and the same room record.
             let id = card.moreTakes[t].id
             guard let stored = fileStore.storeExtraTake(
                 from: tempURL, day: day, takeID: id, challengeID: challengeID) else { return }
@@ -897,12 +713,7 @@ final class ChallengeStore {
             challenges[ci].cards[idx].moreTakes[t].recordedAt = recordedAt
             challenges[ci].cards[idx].moreTakes[t].captions = captions
         } else {
-            // 再拍一段 — or 重拍 on a take that was gone by the time the camera
-            // handed back, where keeping the footage beats dropping it.
             let id = UUID()
-            // `storeExtraTake` never deletes; nil means nothing was kept, and
-            // nothing is touched — never "fall back" to `storeClip`, which
-            // clears `dayN.*` first.
             guard let stored = fileStore.storeExtraTake(
                 from: tempURL, day: day, takeID: id, challengeID: challengeID) else { return }
             fileName = stored
@@ -912,7 +723,6 @@ final class ChallengeStore {
                 captions: captions))
         }
 
-        // Shared room: also push this clip to CloudKit for friends to see.
         if let code = challenges[ci].roomCode, let me = account?.account {
             let dest = fileStore.clipURL(fileName: fileName, challengeID: challengeID)
             Task { @MainActor in
@@ -933,17 +743,6 @@ final class ChallengeStore {
         return fileStore.clipURL(fileName: name, challengeID: challengeID)
     }
 
-    /// Edit a clip's center caption after the fact (from the preview).
-    ///
-    /// Pushed to the room as well, not just saved locally. It used to say
-    /// "room sync of caption edits rides the next clip upload", which in
-    /// practice meant never: most captions are written *after* the take, so a
-    /// friend saw the words you typed at record time and nothing you changed
-    /// afterwards — including a caption you deleted.
-    ///
-    /// `takeID` nil is take 1 (the card's own fields); otherwise the extra take
-    /// with that id. A take id the card doesn't have changes nothing — it must
-    /// not land on take 1, whose words are somebody else's take.
     func updateOverlayText(_ text: String?, day: Int, challengeID: UUID, takeID: UUID? = nil) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
@@ -957,18 +756,11 @@ final class ChallengeStore {
             if words == nil { challenges[ci].cards[idx].moreTakes[t].captionSticker = nil }
         } else {
             challenges[ci].cards[idx].overlayText = words
-            // Clearing the words clears where they were. Otherwise a caption
-            // deleted and typed again would reappear wherever the last one was
-            // dragged to, which reads as the app remembering something you
-            // threw away.
             if words == nil { challenges[ci].cards[idx].captionSticker = nil }
         }
         pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
     }
 
-    /// Every caption on one take at once — what the full-screen editor saves
-    /// after each change. Blank ones are dropped. `takeID` as in
-    /// `updateOverlayText`; pushed to the room the same way.
     func updateCaptions(_ captions: [Caption], day: Int, challengeID: UUID, takeID: UUID? = nil) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
@@ -986,11 +778,6 @@ final class ChallengeStore {
         pushCaptionsToRoom(day: day, takeID: takeID, challengeIndex: ci)
     }
 
-    /// Where the caption sits on the clip, and how it's drawn.
-    ///
-    /// Written on every drag, so it takes the finished sticker rather than a
-    /// delta — the gesture owns the arithmetic, the card owns the result.
-    /// `takeID` as in `updateOverlayText`.
     func updateCaptionSticker(_ sticker: CaptionSticker?, day: Int, challengeID: UUID, takeID: UUID? = nil) {
         guard let ci = challenges.firstIndex(where: { $0.id == challengeID }),
               let idx = challenges[ci].cards.firstIndex(where: { $0.day == day })
@@ -1004,11 +791,6 @@ final class ChallengeStore {
         }
     }
 
-    /// Sends a take's captions to the room, when there is one to send to.
-    ///
-    /// Every caption, position and look included — `captionsJSON` carries
-    /// them, `overlayText` carries the first one's words for 1.5 (31). Read
-    /// off the card when the push is made, so it sends what is saved now.
     private func pushCaptionsToRoom(day: Int, takeID: UUID?, challengeIndex ci: Int) {
         guard let code = challenges[ci].roomCode, let me = account?.account,
               let card = challenges[ci].cards.first(where: { $0.day == day })
@@ -1022,17 +804,12 @@ final class ChallengeStore {
         }
     }
 
-    // MARK: - Reactions & comments (local-first)
 
-    /// The identity a reaction/comment is attributed to. Falls back to a local
-    /// stand-in so solo ("just me") challenges work without Sign in with Apple.
     var currentAuthor: (id: String, name: String) {
         if let me = account?.account { return (me.id, me.displayName) }
         return ("local", "You")
     }
 
-    /// Toggle one emoji on a day's clip for the current author. Optimistic
-    /// local write; a shared room also mirrors it to CloudKit (best-effort).
     func toggleReaction(_ emoji: String, day: Int, challengeID: UUID, targetAuthorID: String) {
         let me = currentAuthor
         let isMe = targetAuthorID == me.id || targetAuthorID == "local"
@@ -1073,16 +850,12 @@ final class ChallengeStore {
         }
     }
 
-    // MARK: - 拍一拍
 
-    /// Whether I already poked this friend in this room today.
     func hasPokedToday(challengeID: UUID, targetAuthorID: String) -> Bool {
         guard let code = challenge(challengeID)?.roomCode else { return false }
         return PokeLimiter().hasPoked(code: code, targetAuthorID: targetAuthorID)
     }
 
-    /// Nudge a friend who hasn't filmed today. Once per friend per day; the
-    /// CloudKit write is best-effort like a reaction's.
     @discardableResult
     func poke(challengeID: UUID, targetAuthorID: String) -> Bool {
         guard let code = challenge(challengeID)?.roomCode,
@@ -1090,8 +863,6 @@ final class ChallengeStore {
               PokeLimiter().claim(code: code, targetAuthorID: targetAuthorID)
         else { return false }
         Task { @MainActor in
-            // Not sent, not used: the button turns back so it can be tried
-            // again, instead of saying "poked" until tomorrow over nothing.
             if await !roomSync.sendPoke(
                 code: code, authorID: acct.id, authorName: acct.displayName,
                 targetAuthorID: targetAuthorID) {
@@ -1101,7 +872,6 @@ final class ChallengeStore {
         return true
     }
 
-    /// Append a comment to a day's clip. Empty/whitespace-only text is ignored.
     func addComment(_ text: String, day: Int, challengeID: UUID, targetAuthorID: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -1130,7 +900,6 @@ final class ChallengeStore {
         }
     }
 
-    /// Remove one of the current author's own comments.
     func deleteComment(_ commentID: UUID, day: Int, challengeID: UUID, targetAuthorID: String) {
         let me = currentAuthor
         let isMe = targetAuthorID == me.id || targetAuthorID == "local"
@@ -1146,20 +915,13 @@ final class ChallengeStore {
             roomSync.remoteComments[code] = remoteC
         }
 
-        if challenge(challengeID)?.roomCode != nil, account?.account != nil {
+        if let code = challenge(challengeID)?.roomCode, account?.account != nil {
             Task { @MainActor in
-                await roomSync.deleteComment(id: commentID.uuidString)
+                await roomSync.deleteComment(id: commentID.uuidString, code: code)
             }
         }
     }
 
-    /// All recorded clips in day order — the stitcher's input. For a shared
-    /// room this merges every member's clips with my own local ones.
-    ///
-    /// The local half is not a fallback for an unsynced room: it is the only
-    /// record of a clip whose upload hasn't landed yet. Returning the remote
-    /// list alone made a moment I had just filmed offline disappear from the
-    /// room, the home card and the count, and come back only after a relaunch.
     func recordedClips(for challengeID: UUID) -> [DayClip] {
         guard let challenge = challenge(challengeID) else { return [] }
         let presenter = ChallengePresenter(challenge: challenge)
@@ -1168,10 +930,6 @@ final class ChallengeStore {
             let remoteReactions = roomSync.remoteReactions[code] ?? []
             let remoteComments = roomSync.remoteComments[code] ?? []
             let myID = account?.account?.id
-            // Takes of mine the room already has, by record name — a day is no
-            // longer enough, since one moment can hold several of my takes and
-            // the room can have take 1 while take 2 is still only here.
-            // Anything else I've filmed belongs in the list once.
             let uploaded = Set(remote.filter { $0.authorID == myID }
                 .map { Self.takeKey(day: $0.day, takeID: takeID(of: $0, code: code)) })
             let pending = localClips(in: challenge, presenter: presenter)
@@ -1181,13 +939,7 @@ final class ChallengeStore {
                     let isMe = clip.authorID == (account?.account?.id ?? "")
                     let card = isMe ? challenge.cards.first { c in c.day == clip.day } : nil
                     let take = takeID(of: clip, code: code)
-                    // Reactions and comments are addressed to a person's
-                    // moment, not to one take of it, so they ride take 1 only —
-                    // on every take, the film would float the same 🔥 twice.
                     let carriesInteractions = take == nil
-                    // My own words come off this phone's card: it is where
-                    // they were edited, and until `captionsJSON` is deployed
-                    // the room's copy only knows the first one.
                     let localCaptions: [Caption]?
                     if !isMe {
                         localCaptions = nil
@@ -1219,8 +971,6 @@ final class ChallengeStore {
                         key: clip.id,
                         takeID: take)
                 } + pending)
-                // Stable within a person's moment too: take 1, then the
-                // others in the order they were filmed.
                 .sorted {
                     ($0.day, $0.authorName ?? "", $0.takeID == nil ? 0 : 1, $0.recordedAt ?? .distantPast)
                         < ($1.day, $1.authorName ?? "", $1.takeID == nil ? 0 : 1, $1.recordedAt ?? .distantPast)
@@ -1229,27 +979,19 @@ final class ChallengeStore {
         return localClips(in: challenge, presenter: presenter)
     }
 
-    /// Which take a room clip is, read off its record name. Nil for take 1 —
-    /// and for any name this app didn't write, which is how every clip from
-    /// before takes existed reads.
     private func takeID(of clip: CloudKitService.RemoteClip, code: String) -> UUID? {
         CloudKitService.takeID(
             fromClipRecordName: clip.id, code: code, authorID: clip.authorID, day: clip.day)
     }
 
-    /// One string per take of one moment: the room copy and the local copy of
-    /// the same take derive the same one.
     private static func takeKey(day: Int, takeID: UUID?) -> String {
         "\(day)#\(takeID?.uuidString ?? "1")"
     }
 
-    /// My own clips, from the cards on this device: one per take, take 1 first.
     private func localClips(
         in challenge: Challenge, presenter: ChallengePresenter
     ) -> [DayClip] {
         challenge.cards.flatMap { card -> [DayClip] in
-            // Extra takes only ever exist beside a take 1; a card whose take 1
-            // file name is gone has nothing to show.
             guard let first = clipURL(for: card, in: challenge.id) else { return [] }
             let authorName = account?.account?.displayName
             let authorID = account?.account?.id ?? RoomProgress.soloAuthorID
@@ -1264,9 +1006,6 @@ final class ChallengeStore {
                 recordedAt: card.recordedAt,
                 emoji: card.reactions.map(\.emoji),
                 comments: Self.commentLines(for: card))
-            // Keyed apart from take 1's "dayN" — `DayClip.id` feeds SwiftUI
-            // `ForEach`, and two clips with one id is one clip on screen.
-            // Interactions stay on take 1 (see `recordedClips`).
             let others = card.moreTakes.map { take in
                 DayClip(
                     day: card.day,
@@ -1307,16 +1046,12 @@ final class ChallengeStore {
         }
     }
 
-    /// "Mia: this is great" lines, oldest first — the stitcher caps how many
-    /// make it onto the frame.
     private static func commentLines(for card: DayCard) -> [String] {
         card.comments
             .sorted { $0.createdAt < $1.createdAt }
             .map { "\($0.authorName): \($0.text)" }
     }
 
-    /// Card count for a new challenge: matches a custom moment list's length,
-    /// falling back to the original 7-day/7-moment shape.
     private func cardCount(for momentTitles: [String]?) -> Int {
         guard let count = momentTitles?.count, count > 0 else { return 7 }
         return count

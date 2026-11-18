@@ -1,4 +1,5 @@
 import SwiftUI
+import LockedCameraCapture
 import GoogleSignIn
 
 @main
@@ -11,15 +12,7 @@ struct AISetlogApp: App {
     @State private var promptMetrics = PromptSuggestionMetrics()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppAppearance.storageKey) private var appAppearance: AppAppearance = .system
-    /// The accent the whole app wears, which is whichever colour you picked for
-    /// your avatar. Bound so `.tint` below is handed the new one the moment it
-    /// changes.
     @AppStorage(Identity.myTintKey) private var myTintIndex = -1
-    /// Picking a skin rebuilds the tree (`.id` below). A new `.tint` alone
-    /// only reached views that read the tint; the canvas and the plain-text
-    /// labels kept the old skin. The rebuild closes the Settings sheet it was
-    /// picked in, so Settings sets `AppSkin.reopenSettingsKey` and the home
-    /// screen opens it again.
     @AppStorage(AppSkin.storageKey) private var appSkin: AppSkin = .cream
 
     init() {
@@ -27,7 +20,6 @@ struct AISetlogApp: App {
         let store = ChallengeStore()
         store.account = account
         let moods = MoodStore()
-        // Rooms show my avatar and today's mood face — never the note.
         store.myRoomProfile = { [weak moods] in
             MyRoomProfile.make(avatar: .shared, today: moods?.today)
         }
@@ -43,10 +35,6 @@ struct AISetlogApp: App {
         Self.settlePersonalEffect()
     }
 
-    /// Put the grade back to "as shot" unless you asked it to stick.
-    ///
-    /// Done here, before any view reads the key, so nothing gets one frame of
-    /// yesterday's setting on the way to the right one.
     private static func settlePersonalEffect() {
         let defaults = UserDefaults.standard
         let stored = defaults.string(forKey: PersonalEffectParameters.storageKey)
@@ -66,20 +54,12 @@ struct AISetlogApp: App {
                 .environment(drafts)
                 .environment(moods)
                 .environment(promptMetrics)
-                // `.tint` is enough on its own: it is an environment value, so
-                // changing it invalidates the whole subtree and every screen
-                // re-reads `Color.oneDayBrand`. An `.id(myTintIndex)` here also
-                // worked, and rebuilt the tree so hard that it closed the
-                // Settings sheet you were picking the colour in.
-                // `brandText`, not the fill colour: the system draws plain
-                // buttons and links in the tint, and 奶油黄 can't be text.
                 .tint(OneDay.brandText)
                 .preferredColorScheme(appAppearance.colorScheme)
-                // Runs on launch and on every skin change; outside `.id` so
-                // the rebuild doesn't re-trigger it.
                 .task(id: appSkin) { AppSkin.syncAppIcon(to: appSkin) }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
+                    Log.app.info("scene active, \(store.challenges.count) stories")
                     ReminderService.reconcile(for: store.challenges)
                     SharedActivityNotificationService.reconcileSubscriptions(
                         for: store.challenges)
@@ -90,24 +70,21 @@ struct AISetlogApp: App {
                         await store.publishMyProfileToAllRooms()
                     }
                 }
-                // Signing in on a phone that has never seen this account:
-                // bring its rooms back now, not on the next foreground.
-                .onChange(of: account.account?.id) { _, id in
+                .onChange(of: account.account?.id, initial: true) { previousID, id in
+                    if previousID != id { BackgroundFilmExport.shared.resetForAccountChange() }
+                    store.roomSync.reconcileCacheAccount()
                     guard id != nil else { return }
                     Task {
                         await store.reconcileAccountRooms()
                         await store.syncSharedRooms()
                     }
                 }
-                // A friend did something in a room while the app is open:
-                // fetch that room now instead of at the next foreground.
                 .onReceive(NotificationCenter.default.publisher(for: .roomActivityArrived)) { note in
                     guard let code = note.userInfo?["roomCode"] as? String,
                           let id = store.challenges.first(where: { $0.roomCode == code })?.id
                     else { return }
                     Task { await store.syncRoom(id) }
                 }
-                // A new mood or a new avatar goes to every room I'm in.
                 .onChange(of: moods.today) { _, _ in
                     Task { await store.publishMyProfileToAllRooms() }
                 }
@@ -119,14 +96,19 @@ struct AISetlogApp: App {
 }
 
 struct RootView: View {
+    @State private var captureImportFailed = false
+    private static var lockedCaptureActivityType: String {
+        if #available(iOS 18.0, *) { return NSUserActivityTypeLockedCameraCapture }
+        return "oneday.unavailable.lockedCapture"
+    }
     @Environment(ChallengeStore.self) private var store
-    /// Join code parsed from an `oneday://join?code=XXXXXX` deep link.
+    @Environment(AccountStore.self) private var account
+    @Environment(ClipDraftStore.self) private var drafts
+    @Environment(MoodStore.self) private var moods
     @State private var pendingJoinCode: String?
     @State private var homeLaunchAction: HomeLaunchAction?
     @AppStorage("onboarding.completed.v1") private var hasCompletedOnboarding = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-    /// `-debugAvatarFlow YES` opens the avatar flow over whatever is on screen,
-    /// for screenshots.
     @State private var showsDebugAvatarFlow = RootView.debugAvatarFlowRequested
 
     private static var debugAvatarFlowRequested: Bool {
@@ -156,22 +138,116 @@ struct RootView: View {
             }
         }
         .environment(\.locale, appLanguage.resolved.locale)
+        .task {
+            if #available(iOS 18.0, *) {
+                for await update in LockedCameraCaptureManager.shared.sessionContentUpdates {
+                    if Task.isCancelled { return }
+                    let directories: [URL]
+                    switch update {
+                    case .initial(let urls): directories = urls
+                    case .added(let url): directories = [url]
+                    case .removed: continue
+                    @unknown default: continue
+                    }
+                    for directory in directories {
+                        do { try await LockedCaptureImporter.receive(directory, into: drafts) }
+                        catch { captureImportFailed = true }
+                    }
+                }
+            }
+        }
+        .onContinueUserActivity(Self.lockedCaptureActivityType) { _ in
+            hasCompletedOnboarding = true
+            UserDefaults.standard.set(true, forKey: "capture.openDraftsRequested")
+            NotificationCenter.default.post(name: .oneDayCapturedDraftsRequested, object: nil)
+        }
+        .alert(Strings.captureImportFailed, isPresented: $captureImportFailed) {
+            Button(Strings.retry) {
+                Task {
+                    if #available(iOS 18.0, *) {
+                        for directory in LockedCameraCaptureManager.shared.sessionContentURLs {
+                            do { try await LockedCaptureImporter.receive(directory, into: drafts) }
+                            catch { captureImportFailed = true }
+                        }
+                    }
+                }
+            }
+            Button(Strings.cancel, role: .cancel) {}
+        }
         .fullScreenCover(isPresented: $showsDebugAvatarFlow) {
             AvatarSetupFlow { _ in showsDebugAvatarFlow = false }
         }
         .onAppear {
-            // Existing installs should never be sent through first-run screens
-            // merely because this version introduced onboarding.
             if !store.challenges.isEmpty {
                 hasCompletedOnboarding = true
             }
+            #if DEBUG
+            DebugLinkInbox.start()
+            if let path = UserDefaults.standard.string(forKey: "debugLink") {
+                if let link = DebugDeepLink(path: path) {
+                    DispatchQueue.main.async { handle(link) }
+                } else {
+                    Log.debug.error("-debugLink: unknown \(path, privacy: .public)")
+                }
+            }
+            #endif
         }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: .debugLinkInbox)) { note in
+            if let link = note.userInfo?["link"] as? DebugDeepLink { handle(link) }
+        }
+        #endif
         .onOpenURL { url in
-            // Google's sign-in coming back from the browser.
+            #if DEBUG
+            if url.host == "debug" {
+                if let link = DebugDeepLink(url) { handle(link) }
+                else { Log.debug.error("unknown link \(url.absoluteString, privacy: .public)") }
+                return
+            }
+            #endif
             if GIDSignIn.sharedInstance.handle(url) { return }
-            guard let code = InviteCode.fromDeepLink(url) else { return }
+            guard let code = InviteCode.fromDeepLink(url) else {
+                Log.app.notice("unhandled url scheme=\(url.scheme ?? "", privacy: .public) host=\(url.host ?? "", privacy: .public)")
+                return
+            }
+            Log.app.info("join link")
             hasCompletedOnboarding = true
             pendingJoinCode = code
         }
     }
 }
+
+#if DEBUG
+extension RootView {
+    fileprivate func handle(_ link: DebugDeepLink) {
+        Log.debug.info("link \(String(describing: link), privacy: .public)")
+        switch link {
+        case .surface, .story:
+            hasCompletedOnboarding = true
+            NotificationCenter.default.post(name: .debugDeepLink, object: nil, userInfo: ["link": link])
+        case .avatar:
+            showsDebugAvatarFlow = true
+        case .resetOnboarding:
+            hasCompletedOnboarding = false
+        case .seedLibrary:
+            UserDefaults.standard.set(true, forKey: "debugSeedLibrary")
+            UserDefaults.standard.removeObject(forKey: "debugSeedLibrary.done")
+            LibraryDebugSeed.runIfAsked(store: store, drafts: drafts, moods: moods)
+            Log.debug.info("seed-library done, \(store.challenges.count) stories")
+        case .sync:
+            Task {
+                await store.reconcileAccountRooms()
+                await store.syncSharedRooms()
+                Log.debug.info("sync done")
+            }
+        case .dumpState:
+            let shared = store.challenges.filter(\.isShared).count
+            Log.debug.info("""
+                state stories=\(store.challenges.count) rooms=\(shared) \
+                drafts=\(drafts.drafts.count) signedIn=\(account.isSignedIn) \
+                onboardingDone=\(hasCompletedOnboarding)
+                """)
+        }
+    }
+}
+#endif

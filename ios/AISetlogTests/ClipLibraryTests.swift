@@ -30,7 +30,6 @@ final class ClipLibraryTests: XCTestCase {
         XCTAssertEqual(library.filtered(.all).count, 3)
         XCTAssertEqual(library.filtered(.mine).count, 2)
         XCTAssertEqual(library.filtered(.friends).count, 1)
-        // Newest first.
         XCTAssertEqual(library.clips.map(\.recordedAt.timeIntervalSince1970), [300, 200, 100])
     }
 
@@ -50,7 +49,7 @@ final class ClipLibraryTests: XCTestCase {
             case 1, 3: cameras[item.cameraKey] = .film
             case 2: cameras[item.cameraKey] = .instant
             case 4: cameras[item.cameraKey] = .standard
-            default: break // 5: metadata not read yet
+            default: break
             }
         }
         return (library, cameras)
@@ -62,7 +61,6 @@ final class ClipLibraryTests: XCTestCase {
         XCTAssertEqual(library.filtered(.camera(.film), cameras: cameras).count, 2)
         XCTAssertEqual(library.filtered(.camera(.instant), cameras: cameras).count, 1)
         XCTAssertEqual(library.filtered(.camera(.camcorder), cameras: cameras).count, 0)
-        // A clip whose camera hasn't been read matches no camera.
         XCTAssertEqual(library.filtered(.camera(.film)).count, 0)
     }
 
@@ -99,11 +97,9 @@ final class ClipLibraryTests: XCTestCase {
         let library = ClipLibrary(
             stories: [(a, [clip(day: 1, author: me, at: 300)]), (b, [clip(day: 1, author: me, at: 100)])],
             drafts: [], myIDs: [me])
-        // Newest first as picked; the vlog plays them in that order.
         let stitched = ClipLibrary.stitchable(library.clips)
         XCTAssertEqual(stitched.map(\.day), [1, 2])
         XCTAssertEqual(stitched.map { $0.recordedAt?.timeIntervalSince1970 }, [300, 100])
-        // Dragged into the other order in the arrange sheet.
         let reordered = ClipLibrary.stitchable(library.clips.reversed())
         XCTAssertEqual(reordered.map(\.day), [1, 2])
         XCTAssertEqual(reordered.map { $0.recordedAt?.timeIntervalSince1970 }, [100, 300])
@@ -128,14 +124,11 @@ final class ClipLibraryTests: XCTestCase {
         let drafts = library.filtered(.drafts)
         XCTAssertEqual(drafts.map(\.recordedAt.timeIntervalSince1970), [150, 50])
         XCTAssertTrue(drafts.allSatisfy { $0.storyID == nil })
-        // Drafts are mine, so 朋友拍的 + 待归档 is empty.
         XCTAssertEqual(library.filtered(LibraryFilter(people: .friends, draftsOnly: true)).count, 0)
         XCTAssertEqual(library.filtered(LibraryFilter(people: .mine, draftsOnly: true)).count, 2)
     }
 
-    // MARK: - 含朋友的
 
-    /// Two of mine in a room, one friend's, one draft.
     private func mixedLibrary() -> ClipLibrary {
         let room = story("Trip", shared: true)
         return ClipLibrary(
@@ -145,22 +138,17 @@ final class ClipLibraryTests: XCTestCase {
             myIDs: [me])
     }
 
-    /// 我的 shows my story clips and my draft, never a friend's.
     func testMyArchiveShowsOnlyMine() {
         let library = mixedLibrary()
         let mine = library.scoped(includingFriends: false)
         XCTAssertEqual(mine.clips.count, 3)
         XCTAssertTrue(mine.filtered(.mine).allSatisfy(\.isMine))
         XCTAssertEqual(mine.filtered(.mine).count, 3)
-        // Drafts are mine, so they stay.
         XCTAssertEqual(mine.draftCount, 1)
-        // Covers come from what is shown, so no day's picture is a friend's clip.
         XCTAssertTrue(mine.coverByDay(mine.filtered(.mine)).values.allSatisfy(\.isMine))
-        // A bare filter (what a room's feed uses) still means everyone's.
         XCTAssertEqual(library.filtered(.all).count, 4)
     }
 
-    /// One take sent to four rooms is one clip in 我的, not four.
     func testOneTakeSentToSeveralRoomsShowsOnce() {
         let rooms = (1...4).map { story("Room \($0)", shared: true) }
         let library = ClipLibrary(
@@ -169,7 +157,6 @@ final class ClipLibraryTests: XCTestCase {
             drafts: [],
             myIDs: [me])
         XCTAssertEqual(library.scoped(includingFriends: false).clips.count, 2)
-        // A room's feed still has each room's own copy.
         XCTAssertEqual(library.clips.count, 5)
     }
 
