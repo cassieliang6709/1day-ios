@@ -1,47 +1,55 @@
 import Foundation
 import Observation
 
-/// Owns CloudKit room sync for shared challenges: pulling members' clips and
-/// interactions, pushing my clips/reactions/comments. The store keeps the
-/// local mirror; this service is the only one that talks to CloudKitService.
 @Observable
 final class RoomSyncService {
-    /// Clips fetched per room code (all members). Transient cache.
-    ///
-    /// Settable, like the two caches below it: the merge rules that read this
-    /// live in `ChallengeStore`, and standing a room's contents up is the only
-    /// way to check them without CloudKit on the line.
     var remoteClips: [String: [CloudKitService.RemoteClip]] = [:]
-    /// Reactions fetched per room code.
     var remoteReactions: [String: [CloudKitService.RemoteReaction]] = [:]
-    /// Comments fetched per room code.
     var remoteComments: [String: [CloudKitService.RemoteComment]] = [:]
-    /// Everyone's `Member` record per room code, keyed by user ID: their
-    /// avatar and today's mood. Settable for the same reason as the caches
-    /// above.
     var remoteMembers: [String: [String: CloudKitService.RemoteMember]] = [:]
-    /// Room codes currently being synced (drives a spinner in the board).
     private(set) var syncing: Set<String> = []
-    /// Clips on their way up, as "code#authorID#day". Recording, the board's
-    /// poll and coming back to the app can all reach `uploadClip` for the same
-    /// take at once; one upload is enough.
     @ObservationIgnored private var uploading: Set<String> = []
-    /// Clearing a room invalidates every response started before that clear.
     @ObservationIgnored private var roomGenerations: [String: UUID] = [:]
-    /// Last CloudKit failure per room. Kept visible instead of silently
-    /// presenting an empty room when the production schema is unavailable.
     private(set) var lastError: [String: String] = [:]
 
     private let fileStore: ClipFileStore
     private let transport: RoomSyncTransport
+    private let cacheAccountID: () -> String?
+    @ObservationIgnored private var loadedAccountID: String?
 
-    init(fileStore: ClipFileStore = DiskClipFileStore(), transport: RoomSyncTransport = .live) {
+    init(fileStore: ClipFileStore = DiskClipFileStore(), transport: RoomSyncTransport = .live,
+         cacheAccountID: @escaping () -> String? = { AccountStore.persistedUserID }) {
         self.fileStore = fileStore
         self.transport = transport
+        self.cacheAccountID = cacheAccountID
+        self.loadedAccountID = cacheAccountID()
     }
 
     func remoteCacheDir(for code: String) -> URL {
         fileStore.remoteCacheDir(roomCode: code)
+    }
+
+    func reconcileCacheAccount() {
+        let current = cacheAccountID()
+        guard current != loadedAccountID else { return }
+        let codes = Set(remoteClips.keys).union(remoteReactions.keys).union(remoteComments.keys)
+            .union(remoteMembers.keys).union(clipPulls.keys).union(memberPulls.keys)
+        for code in codes { clearRoom(code) }
+        loadedAccountID = current
+    }
+
+    func restoreCachedContent(code: String) {
+        reconcileCacheAccount()
+        restoreCachedMembers(code: code)
+        let directory = remoteCacheDir(for: code)
+        let accountID = cacheAccountID()
+        if remoteClips[code] == nil {
+            remoteClips[code] = RoomContentCache.loadClips(in: directory, accountID: accountID)
+        }
+        if let saved = RoomContentCache.loadInteractions(in: directory, accountID: accountID) {
+            if remoteReactions[code] == nil { remoteReactions[code] = saved.reactions }
+            if remoteComments[code] == nil { remoteComments[code] = saved.comments }
+        }
     }
 
     func clearRoom(_ code: String) {
@@ -49,7 +57,9 @@ final class RoomSyncService {
         clipPulls[code]?.cancel()
         memberPulls[code]?.cancel()
         syncing.remove(code)
+        let directory = remoteCacheDir(for: code)
         fileStore.deleteRemoteCache(roomCode: code)
+        ClipThumbnailCache.shared.removeImages(in: directory)
         remoteClips[code] = nil
         remoteReactions[code] = nil
         remoteComments[code] = nil
@@ -59,25 +69,15 @@ final class RoomSyncService {
         if pendingRoomTitles[code] != nil { setPendingRoomTitle(nil, code: code) }
     }
 
-    /// Pull every member's clips for a room into the local cache. Interaction
-    /// sync is handed back to the caller to merge into local state.
-    ///
-    /// Two pulls of the same room never overlap: the open room page polls while
-    /// the foreground refresh may be syncing that room too, and both write the
-    /// same cache directory and its manifest. A second caller waits for the
-    /// running pull and then makes its own, so it never gets a result older
-    /// than its call. Different rooms still run side by side.
     @MainActor
     func syncClips(code: String) async -> [CloudKitService.RemoteClip]? {
+        restoreCachedContent(code: code)
         let generation = roomGenerations[code]
         while let running = clipPulls[code] {
             _ = await running.value
             guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
         }
         guard !Task.isCancelled else { return nil }
-        // The pull clears its own slot before it finishes, so a waiter woken
-        // by it never finds the finished task still parked there. Nothing else
-        // can have taken the slot meanwhile: it is only filled while empty.
         let pull = Task { @MainActor in
             let clips = await self.pullClips(code: code, generation: generation)
             self.clipPulls[code] = nil
@@ -87,11 +87,11 @@ final class RoomSyncService {
         return await pull.value
     }
 
-    /// Room code → the clip pull running for it.
     @ObservationIgnored private var clipPulls: [String: Task<[CloudKitService.RemoteClip]?, Never>] = [:]
 
     @MainActor
     private func pullClips(code: String, generation: UUID?) async -> [CloudKitService.RemoteClip]? {
+        let accountID = cacheAccountID()
         syncing.insert(code)
         defer { syncing.remove(code) }
         do {
@@ -100,12 +100,15 @@ final class RoomSyncService {
             #if DEBUG
             clips += await DebugFakeFriends.clips(for: code)
             #endif
-            guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
+            guard roomGenerations[code] == generation, cacheAccountID() == accountID,
+                  !Task.isCancelled else { return nil }
+            try? RoomContentCache.saveClips(clips, in: remoteCacheDir(for: code), accountID: accountID)
             remoteClips[code] = clips
             lastError[code] = nil
             return clips
         } catch {
-            guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
+            guard roomGenerations[code] == generation, cacheAccountID() == accountID,
+                  !Task.isCancelled else { return nil }
             print("[room] sync failed: \(error)")
             lastError[code] = error.localizedDescription
             #if DEBUG
@@ -116,18 +119,22 @@ final class RoomSyncService {
         }
     }
 
-    /// Fetch remote reactions/comments. Degrades to nil (caller keeps local
-    /// state) if the CloudKit index isn't deployed — never fails a clip sync.
     @MainActor
     func fetchInteractions(code: String) async -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])? {
+        restoreCachedContent(code: code)
         let generation = roomGenerations[code]
+        let accountID = cacheAccountID()
         let fetched = try? await transport.fetchInteractions(code)
-        guard roomGenerations[code] == generation, !Task.isCancelled else { return nil }
-        return fetched
+        guard roomGenerations[code] == generation, cacheAccountID() == accountID,
+              !Task.isCancelled else { return nil }
+        guard let fetched else { return nil }
+        let directory = remoteCacheDir(for: code)
+        let saved = RoomContentCache.loadInteractions(in: directory, accountID: accountID) ?? .init()
+        let merged = saved.refreshing(with: .init(reactions: fetched.reactions, comments: fetched.comments))
+        try? RoomContentCache.saveInteractions(merged, in: directory, accountID: accountID)
+        return (merged.reactions, merged.comments)
     }
 
-    /// Push one of my clips to the room. The caller refreshes the complete room
-    /// state after a successful upload so clips and interactions stay in sync.
     @MainActor
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
                     fileURL: URL, overlayText: String?, recordedAt: Date,
@@ -138,14 +145,10 @@ final class RoomSyncService {
             takeID: takeID)
     }
 
-    /// Same, with every caption on the take.
     @MainActor
     func uploadClip(code: String, day: Int, authorID: String, authorName: String,
                     fileURL: URL, captions: [Caption], recordedAt: Date,
                     takeID: UUID? = nil) async -> Bool {
-        // A skipped duplicate reports false: it put nothing up itself, and a
-        // take it shadowed is picked up by the next sync's retry. Keyed by take
-        // as well as moment: two takes of one moment are two uploads.
         let key = "\(code)#\(authorID)#\(day)#\(takeID?.uuidString ?? "1")"
         guard uploading.insert(key).inserted else { return false }
         defer { uploading.remove(key) }
@@ -164,9 +167,6 @@ final class RoomSyncService {
         }
     }
 
-    /// Caption edited after the take. Failure is swallowed the same way a
-    /// reaction's is: the words are already saved on this device, and the next
-    /// upload of that clip carries them.
     @MainActor
     func updateClipCaption(
         code: String, day: Int, authorID: String, overlayText: String?, takeID: UUID? = nil
@@ -176,7 +176,6 @@ final class RoomSyncService {
             takeID: takeID)
     }
 
-    /// Same, with every caption on the take.
     @MainActor
     func updateClipCaption(
         code: String, day: Int, authorID: String, captions: [Caption], takeID: UUID? = nil
@@ -188,31 +187,62 @@ final class RoomSyncService {
         }
     }
 
+    @MainActor
     func setReaction(code: String, day: Int, authorID: String, authorName: String,
                      targetAuthorID: String, emoji: String, on: Bool) async {
-        try? await transport.setReaction(
-            code, day, authorID, authorName, targetAuthorID, emoji, on)
+        reconcileCacheAccount()
+        let generation = roomGenerations[code]
+        let accountID = cacheAccountID()
+        do {
+            try await transport.setReaction(code, day, authorID, authorName, targetAuthorID, emoji, on)
+            guard roomGenerations[code] == generation, cacheAccountID() == accountID, !Task.isCancelled else { return }
+            updateCachedInteractions(code: code, change: .reaction(
+                .init(day: day, emoji: emoji, authorID: authorID, authorName: authorName,
+                      targetAuthorID: targetAuthorID, createdAt: .now), on: on))
+        } catch { return }
     }
 
+    @MainActor
     func postComment(code: String, day: Int, id: String, text: String,
                      authorID: String, authorName: String, targetAuthorID: String) async {
-        try? await transport.postComment(
-            code, day, id, text, authorID, authorName, targetAuthorID)
+        reconcileCacheAccount()
+        let generation = roomGenerations[code]
+        let accountID = cacheAccountID()
+        do {
+            try await transport.postComment(code, day, id, text, authorID, authorName, targetAuthorID)
+            guard roomGenerations[code] == generation, cacheAccountID() == accountID, !Task.isCancelled else { return }
+            updateCachedInteractions(code: code, change: .comment(
+                .init(id: id, day: day, text: text, authorID: authorID, authorName: authorName,
+                      targetAuthorID: targetAuthorID, createdAt: .now)))
+        } catch { return }
     }
 
-    func deleteComment(id: String) async {
-        try? await transport.deleteComment(id)
+    @MainActor
+    func deleteComment(id: String, code: String) async {
+        reconcileCacheAccount()
+        let generation = roomGenerations[code]
+        let accountID = cacheAccountID()
+        do {
+            try await transport.deleteComment(id)
+            guard roomGenerations[code] == generation,
+                  cacheAccountID() == accountID, !Task.isCancelled else { return }
+            updateCachedInteractions(code: code, change: .deletedComment(id: id, at: .now))
+        } catch { return }
     }
 
-    /// The room behind a join code. Errors pass through untouched: they are
-    /// what the join sheet shows.
+    private func updateCachedInteractions(code: String, change: RoomContentCache.ConfirmedChange) {
+        let directory = remoteCacheDir(for: code)
+        let accountID = cacheAccountID()
+        var saved = RoomContentCache.loadInteractions(in: directory, accountID: accountID) ?? .init()
+        saved.confirm(change)
+        try? RoomContentCache.saveInteractions(saved, in: directory, accountID: accountID)
+    }
+
     @MainActor
     func fetchRoom(code: String) async throws -> CloudKitService.RemoteRoom {
         try await transport.fetchRoom(code)
     }
 
-    /// The rooms I'm in according to the cloud, or nil when it can't say —
-    /// signed out of iCloud, offline, or the indexes not deployed yet.
     @MainActor
     func findMyRooms(userID: String) async -> CloudKitService.MyRooms? {
         do {
@@ -223,9 +253,6 @@ final class RoomSyncService {
         }
     }
 
-    /// Leave a `Member` record saying I joined. Failure is logged and
-    /// swallowed: the room is already mine on this device, and the record is
-    /// bookkeeping, not what lets me in.
     @MainActor
     func recordMembership(code: String, authorID: String, displayName: String, joinedAt: Date = .now) async {
         do {
@@ -235,9 +262,6 @@ final class RoomSyncService {
         }
     }
 
-    /// Pull the room's `Member` records — avatars and moods. Failure keeps
-    /// what we had: before the `Member` type is deployed to Production every
-    /// fetch fails, and that must not blank anybody's face.
     @MainActor
     func syncMembers(code: String) async {
         let generation = roomGenerations[code]
@@ -272,8 +296,6 @@ final class RoomSyncService {
         #endif
     }
 
-    /// Where a room's avatars and its saved roster live. Inside the room's
-    /// cache, so `clearRoom` and signing out take the roster with them.
     private func membersDir(_ code: String) -> URL {
         fileStore.remoteCacheDir(roomCode: code).appendingPathComponent("members", isDirectory: true)
     }
@@ -282,9 +304,6 @@ final class RoomSyncService {
         membersDir(code).appendingPathComponent("members.json")
     }
 
-    /// A `RemoteMember` as written to disk. The avatar is kept by file name:
-    /// the app's container path changes across updates, so a saved absolute
-    /// URL would point nowhere.
     private struct CachedMember: Codable {
         var userID: String
         var displayName: String
@@ -295,9 +314,6 @@ final class RoomSyncService {
         var roomTitleAt: Date?
     }
 
-    /// Puts last launch's roster back, so a cold start shows who is in the
-    /// room before CloudKit answers. Does nothing once the room has one.
-    @MainActor
     func restoreCachedMembers(code: String) {
         guard remoteMembers[code] == nil,
               let data = try? Data(contentsOf: cachedMembersFile(code)),
@@ -329,8 +345,6 @@ final class RoomSyncService {
         try? data.write(to: cachedMembersFile(code), options: .atomic)
     }
 
-    /// Who is in a room by user ID — every `Member` record plus the owner,
-    /// who may not have one. Nil when the records can't be read.
     @MainActor
     func peopleInRoom(code: String, ownerID: String) async -> Set<String>? {
         guard let members = try? await transport.fetchMembers(
@@ -341,16 +355,10 @@ final class RoomSyncService {
         return people
     }
 
-    /// What was last written to my `Member` record per room, so the same
-    /// avatar and mood aren't sent again on every foreground. Persisted:
-    /// relaunching isn't a reason to upload the avatar to every room again.
     @ObservationIgnored private var publishedProfiles: [String: String] =
         UserDefaults.standard.dictionary(forKey: RoomSyncService.publishedProfilesKey) as? [String: String] ?? [:]
     static let publishedProfilesKey = "memberProfile.published.v1"
 
-    /// Write my avatar and mood to one room's `Member` record, unless that
-    /// exact `signature` already went up. A failure is logged and remembered as
-    /// not sent, so the next call tries again; nothing waits on it.
     @MainActor
     @discardableResult
     func publishProfile(_ write: CloudKitService.MemberProfileWrite, signature: String) async -> Bool {
@@ -368,23 +376,16 @@ final class RoomSyncService {
         }
     }
 
-    /// What last went up for this room, if anything.
     func publishedProfileSignature(code: String) -> String? {
         publishedProfiles[code]
     }
 
-    /// Joining rewrites the `Member` record from scratch; the next publish
-    /// has to put the avatar and mood back.
     func forgetPublishedProfile(code: String) {
         guard publishedProfiles.removeValue(forKey: code) != nil else { return }
         UserDefaults.standard.set(publishedProfiles, forKey: Self.publishedProfilesKey)
     }
 
-    // MARK: - Leaving
 
-    /// Takes me out of a room for everyone (1.5): my clips, reactions,
-    /// comments and `Member` record are deleted, so my frame and my footage
-    /// leave every friend's copy. True when all of it is confirmed gone.
     @MainActor
     @discardableResult
     func leaveRemotely(code: String, authorID: String) async -> Bool {
@@ -399,11 +400,7 @@ final class RoomSyncService {
         }
     }
 
-    // MARK: - Room name
 
-    /// A rename on this phone that hasn't reached my `Member` record yet,
-    /// per room code. Persisted, and while it's here the room keeps my name
-    /// rather than an older one fetched from someone else's record.
     struct PendingRoomTitle: Codable, Equatable {
         var title: String
         var at: Date
@@ -414,9 +411,6 @@ final class RoomSyncService {
     }()
     static let pendingRoomTitlesKey = "roomTitle.pending.v1"
 
-    /// Sends a new room name, or the one still waiting when `title` is nil.
-    /// A failure (before the `Member` fields are deployed, every one) keeps it
-    /// waiting for the next sync.
     @MainActor
     func publishRoomTitle(code: String, authorID: String, displayName: String, title: String? = nil, at: Date = .now) async {
         let generation = roomGenerations[code]
@@ -431,9 +425,6 @@ final class RoomSyncService {
         }
     }
 
-    /// The room's name as its members last set it: the newest `roomTitle`
-    /// across the room. Nil when nobody has renamed it, or while my own
-    /// rename is still on its way up.
     func latestRoomTitle(code: String) -> String? {
         guard pendingRoomTitles[code] == nil else { return nil }
         return (remoteMembers[code] ?? [:]).values
@@ -448,7 +439,6 @@ final class RoomSyncService {
         }
     }
 
-    /// True once the poke is in the room.
     @discardableResult
     func sendPoke(code: String, authorID: String, authorName: String, targetAuthorID: String) async -> Bool {
         do {
