@@ -72,7 +72,10 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
     }
 
     func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
-        queue.async { [weak self] in
+        // The queue stays busy for the whole export, so GCD never drains its
+        // autorelease pool: each frame's CIImage sources and render buffers piled
+        // up (~19 MB a frame at 1440²) until an iPhone SE ran out of memory.
+        queue.async { [weak self] in autoreleasepool {
             guard let self else {
                 request.finish(with: CompositorError.cancelled)
                 return
@@ -96,7 +99,7 @@ final class FriendsTogetherCompositor: NSObject, AVVideoCompositing {
 
             self.context.render(image, to: buffer)
             request.finish(withComposedVideoFrame: buffer)
-        }
+        } }
     }
 
     private func cell(

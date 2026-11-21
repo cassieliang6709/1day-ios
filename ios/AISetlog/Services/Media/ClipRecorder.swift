@@ -659,13 +659,32 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
     }
 
 
-    static func prepare(_ device: AVCaptureDevice, for session: AVCaptureSession) -> Bool {
+    /// Multi-cam format limit. Older phones (iPhone SE) go over the system
+    /// pressure budget with two 1080p30 cameras, so dual mode steps down.
+    struct CaptureCap: Equatable {
+        var width: Int32 = 1920
+        var height: Int32 = 1080
+        var fps: Int32 = 30
+    }
+
+    static let dualCaps: [(main: CaptureCap, other: CaptureCap)] = [
+        (CaptureCap(), CaptureCap()),
+        (CaptureCap(), CaptureCap(width: 1280, height: 720)),
+        (CaptureCap(width: 1280, height: 720), CaptureCap(width: 1280, height: 720)),
+        (CaptureCap(width: 1280, height: 720, fps: 24), CaptureCap(width: 1280, height: 720, fps: 24)),
+        (CaptureCap(width: 1280, height: 720, fps: 24), CaptureCap(width: 640, height: 480, fps: 24)),
+        (CaptureCap(width: 640, height: 480, fps: 24), CaptureCap(width: 640, height: 480, fps: 24)),
+    ]
+
+    static func prepare(
+        _ device: AVCaptureDevice, for session: AVCaptureSession, cap: CaptureCap = CaptureCap()
+    ) -> Bool {
         guard session is AVCaptureMultiCamSession else { return true }
         let formats = device.formats.filter { format in
             let size = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
             return format.isMultiCamSupported
-                && size.width <= 1920 && size.height <= 1080
-                && format.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 30 }
+                && size.width <= cap.width && size.height <= cap.height
+                && format.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(cap.fps) }
         }
         guard let best = formats.max(by: {
             CMVideoFormatDescriptionGetDimensions($0.formatDescription).width
@@ -674,8 +693,8 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         do {
             try device.lockForConfiguration()
             device.activeFormat = best
-            device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-            device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+            device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: cap.fps)
+            device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: cap.fps)
             device.unlockForConfiguration()
             return true
         } catch {
@@ -730,6 +749,9 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             mediaType: .video,
             position: .unspecified
         ).supportedMultiCamDeviceSets
+        #if DEBUG
+        Self.diag("[dual] multicam sets:", pairs.map { $0.map(Self.diagName) })
+        #endif
 
         let backTypes = position == .back
             ? [primary.device.deviceType] + Self.backCameraTypes
@@ -744,10 +766,18 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             chosen = position == .back ? (back, front) : (front, back)
             break
         }
+        #if DEBUG
+        Self.diag("[dual] chosen:", Self.diagName(chosen?.main), Self.diagName(chosen?.other))
+        #endif
         guard let chosen, Self.prepare(chosen.main, for: session),
               Self.prepare(chosen.other, for: session),
               let otherInput = try? AVCaptureDeviceInput(device: chosen.other)
-        else { return false }
+        else {
+            #if DEBUG
+            Self.diag("[dual] fail: no pair / prepare / input")
+            #endif
+            return false
+        }
 
         session.beginConfiguration()
         if chosen.main != primary.device {
@@ -761,6 +791,10 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             }
         }
         guard session.canAddInput(otherInput), session.canAddOutput(secondaryOutput) else {
+            #if DEBUG
+            Self.diag("[dual] fail: canAddInput", session.canAddInput(otherInput),
+                      "canAddOutput", session.canAddOutput(secondaryOutput))
+            #endif
             session.commitConfiguration()
             return false
         }
@@ -782,8 +816,28 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
             }
         }
         session.commitConfiguration()
+        #if DEBUG
+        Self.diag("[dual] added", added.count, "hardwareCost", multi.hardwareCost,
+                  "pressureCost", multi.systemPressureCost,
+                  Self.diagName(chosen.main), Self.diagName(chosen.other))
+        #endif
 
-        guard !added.isEmpty, multi.hardwareCost <= 1, multi.systemPressureCost <= 1 else {
+        let main = videoInput?.device ?? chosen.main
+        var fits = multi.hardwareCost <= 1 && multi.systemPressureCost <= 1
+        for cap in Self.dualCaps.dropFirst() where !added.isEmpty && !fits {
+            session.beginConfiguration()
+            _ = Self.prepare(main, for: session, cap: cap.main)
+            _ = Self.prepare(chosen.other, for: session, cap: cap.other)
+            session.commitConfiguration()
+            fits = multi.hardwareCost <= 1 && multi.systemPressureCost <= 1
+            #if DEBUG
+            Self.diag("[dual] step down", "hardwareCost", multi.hardwareCost,
+                      "pressureCost", multi.systemPressureCost,
+                      Self.diagName(main), Self.diagName(chosen.other), "fps", cap.main.fps)
+            #endif
+        }
+
+        guard !added.isEmpty, fits else {
             secondaryInput = otherInput
             secondaryConnections = added
             removeSecondaryCamera()
@@ -804,6 +858,7 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         if let secondaryInput { session.removeInput(secondaryInput) }
         secondaryInput = nil
         if session.outputs.contains(secondaryOutput) { session.removeOutput(secondaryOutput) }
+        if let current = videoInput { _ = Self.prepare(current.device, for: session) }
         if position == .back, let current = videoInput,
            let widest = camera(for: .back), widest != current.device,
            Self.prepare(widest, for: session) {
