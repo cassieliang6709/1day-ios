@@ -7,10 +7,8 @@ extension Strings {
 
     static var avatarUploadTitle: String { avatar("给我看看你", "Show me you") }
     static var avatarUploadHeadline: String { avatar("做一个你的头像。", "Make your avatar.") }
-    static var avatarUploadSubtitle: String { avatar("拍一张，或从相册挑。", "Take one, or pick from your photos.") }
     static var avatarTakePhoto: String { avatar("拍一张", "Take one") }
     static var avatarPickPhoto: String { avatar("从相册挑", "Pick from Photos") }
-    static var avatarFrontFacingHint: String { avatar("正面照效果最好", "A front-facing photo works best") }
     static var avatarSkip: String { avatar("先不用头像", "Not now") }
     static var avatarCameraPermission: String {
         avatar("要用相机拍一张你的照片。只用来做头像，不会上传原图。",
@@ -20,7 +18,6 @@ extension Strings {
     static var avatarFailed: String { avatar("这张没做成，换一张", "That one didn't work. Try another photo.") }
 
     static var avatarGeneratingHeadline: String { avatar("正在做你的头像", "Making your avatar.") }
-    static var avatarGeneratingSubtitle: String { avatar("几秒钟。", "A few seconds.") }
 
     static var avatarConfirmHeadline: String { avatar("这是你", "Done. This is you.") }
     static var avatarConfirm: String { avatar("就是这样", "That's me") }

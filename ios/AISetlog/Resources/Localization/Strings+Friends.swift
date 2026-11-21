@@ -17,10 +17,6 @@ extension Strings {
     static var signedOutFrame: String { zh ? "登录后看得到" : "Sign in to see" }
 
     static var inviteSheetTitle: String { zh ? "把邀请码发给朋友" : "Send the code to a friend" }
-    static var inviteSheetBody: String {
-        zh ? "朋友在 1Day 的「房间 ▸ 加入」里输入这串码，就能进到这个房间。"
-            : "Your friend enters this code under Rooms ▸ Join to get into this room."
-    }
     static func defaultRoomName(existingTitles: [String]) -> String {
         let base = zh ? "一起的日常" : "Our everyday"
         let existing = Set(existingTitles.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
@@ -53,7 +49,6 @@ extension Strings {
     static var inviteCardSteps: String {
         zh ? "打开 1Day → 加入房间 → 输入邀请码" : "Open 1Day → Join a room → Enter the code"
     }
-    static var inviteCardFooter: String { zh ? "一天，拍成一部小片" : "One day, one little film" }
     static func inviteCardAccessibility(title: String, code: String, inviter: String?) -> String {
         let spelled = code.map(String.init).joined(separator: " ")
         let head = inviteCardHeadline(inviter: inviter)

@@ -19,9 +19,6 @@ extension Strings {
     static var libraryMakeVlogCTA: String { zh ? "生成 vlog" : "Make vlog" }
 
     static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }
-    static var vlogArrangeHint: String {
-        zh ? "按住右边的横线拖动换顺序，点一段看看。" : "Drag the handle to reorder. Tap a clip to preview it."
-    }
 
     static var todayKeepFilming: String { zh ? "继续拍" : "Film" }
     static var todayWatch: String { zh ? "看成片" : "Watch" }

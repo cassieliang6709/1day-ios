@@ -132,18 +132,8 @@ enum Strings {
     static var eveningReminder: String {
         lang == .chinese ? "晚间拍摄提醒" : "Evening capture reminder"
     }
-    static var eveningReminderFooter: String {
-        lang == .chinese
-            ? "每天最多一条。当天已经拍完就不会提醒。"
-            : "At most one each day. Completed moments are never reminded."
-    }
     static var reminderTime: String { lang == .chinese ? "提醒时间" : "Reminder time" }
     static var friendActivity: String { lang == .chinese ? "好友动态" : "Friend activity" }
-    static var friendActivityFooter: String {
-        lang == .chinese
-            ? "好友上传片段、评论或回应时通知你。相近动态会合并。"
-            : "Get notified for friends’ clips, comments, and reactions. Nearby activity is bundled."
-    }
     static var showFriendNames: String {
         lang == .chinese ? "在通知中显示好友名字" : "Show friend names in notifications"
     }
@@ -151,11 +141,6 @@ enum Strings {
     static var allRoomsOn: String { lang == .chinese ? "都开着" : "All on" }
     static func roomsMuted(_ count: Int) -> String {
         lang == .chinese ? "静音了 \(count) 个" : "\(count) muted"
-    }
-    static var sharedRoomsFooter: String {
-        lang == .chinese
-            ? "关掉某个房间，就不再收到那边的动态，其他房间照常。"
-            : "Turn a room off and it stops writing to you. The others carry on."
     }
     static var notificationPermissionDenied: String {
         lang == .chinese
@@ -165,11 +150,6 @@ enum Strings {
     static var openSettings: String { lang == .chinese ? "打开系统设置" : "Open Settings" }
     static var notificationPrimerTitle: String {
         lang == .chinese ? "留住今天的瞬间？" : "Keep today’s moment?"
-    }
-    static var notificationPrimerBody: String {
-        lang == .chinese
-            ? "每天最多一次，在你选择的时间提醒你。拍完后不会再提醒。"
-            : "Get at most one reminder at your chosen time. Once you record, it stays quiet."
     }
     static var notificationPrimerFootnote: String {
         lang == .chinese
@@ -329,9 +309,6 @@ enum Strings {
     }
     static var firstRunSoloFirst: String {
         lang == .chinese ? "先自己拍拍看" : "Try it on my own first"
-    }
-    static var firstRunSignInNote: String {
-        lang == .chinese ? "和朋友共拍要用到，只用你的名字" : "Needed to film with friends. We only use your name."
     }
     static var signInFailed: String {
         lang == .chinese ? "没登上，再试一次" : "Couldn't sign in. Try again."
@@ -739,11 +716,6 @@ enum Strings {
     static var saveToTemplateLibrary: String {
         lang == .chinese ? "存进我的模板库" : "Save to my template library"
     }
-    static var saveToTemplateLibraryNote: String {
-        lang == .chinese
-            ? "下次开新选题，这套题目还在，直接选就行。"
-            : "Next time you start a story, this set of prompts is still there."
-    }
 
 
     static var recordTogether: String { lang == .chinese ? "一起记录" : "Record together" }
@@ -981,11 +953,6 @@ enum Strings {
     static var timeOnlySetupTitle: String {
         lang == .chinese ? "只记录时间" : "Time only"
     }
-    static var timeOnlySetupBody: String {
-        lang == .chinese
-            ? "拍下当下，1Day 会自动保留拍摄时间；画面上的文字由每个人自己填写。"
-            : "Film the moment and 1Day keeps its time. Everyone can write their own caption."
-    }
     static var timeOnlyMoment: String {
         lang == .chinese ? "拍下这一刻" : "Film this moment"
     }
@@ -1046,9 +1013,6 @@ enum Strings {
     }
 
     static var yourPrompts: String { lang == .chinese ? "想拍的画面" : "Scenes to film" }
-    static var addAnotherPrompt: String {
-        lang == .chinese ? "再加一个题目" : "Add another prompt"
-    }
     static var chooseFromPromptLibrary: String {
         lang == .chinese ? "从提示库里选" : "Choose from the prompt library"
     }
@@ -1223,9 +1187,6 @@ enum Strings {
 
     static var generatingTitle: String {
         lang == .chinese ? "正在做片子" : "Making your film"
-    }
-    static var generatingSubtitle: String {
-        lang == .chinese ? "把今天的片段接起来" : "Putting your clips together"
     }
     static func mergedProgress(_ done: Int, total: Int) -> String {
         lang == .chinese ? "已合成 \(done)/\(total) 个瞬间" : "\(done) of \(total) moments merged"
