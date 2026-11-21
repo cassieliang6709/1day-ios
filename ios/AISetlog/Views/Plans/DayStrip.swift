@@ -1,58 +1,83 @@
 import SwiftUI
 
-struct DayStrip: View {
+/// 月历弹窗：有片段的日子标点，有心情的日子显示表情。选一天就关掉。
+struct DayPickerSheet: View {
     @Binding var selected: Date
     let hasSomething: (Date) -> Bool
     var mood: (Date) -> Mood? = { _ in nil }
 
-    @State private var weekOffset = 0
+    @Environment(\.dismiss) private var dismiss
+    @State private var month = Calendar.current.startOfDay(for: .now)
     private let calendar = Calendar.current
 
+    static var title: String { AppLanguage.effective.resolved == .chinese ? "日历" : "Calendar" }
+    static var backToToday: String { AppLanguage.effective.resolved == .chinese ? "回到今天" : "Back to today" }
+
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(days, id: \.self) { day in
-                cell(day)
+        VStack(spacing: OneDay.Space.m) {
+            HStack {
+                IconBubble(systemName: "chevron.left") { shift(-1) }
+                Spacer()
+                Text(month.formatted(.dateTime.year().month(.wide).locale(AppLanguage.effective.locale)))
+                    .font(OneDay.Font.headline)
+                    .foregroundStyle(OneDay.ink)
+                Spacer()
+                IconBubble(systemName: "chevron.right") { shift(1) }
             }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: OneDay.Space.xs), count: 7),
+                      spacing: OneDay.Space.xs) {
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
+                        .font(OneDay.Font.caption)
+                        .foregroundStyle(OneDay.inkFaint)
+                }
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
+                    if let day { cell(day) } else { Color.clear.frame(height: 1) }
+                }
+            }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 24).onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                withAnimation(OneDay.Motion.soft) { weekOffset += value.translation.width < 0 ? 1 : -1 }
-            })
-        .accessibilityIdentifier("day-strip")
+        .padding(OneDay.Space.xl)
+        .onAppear { month = selected }
     }
 
-    private var days: [Date] {
-        let today = calendar.startOfDay(for: .now)
-        let start = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
-        let first = calendar.date(byAdding: .day, value: weekOffset * 7, to: start) ?? start
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: first) }
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let first = calendar.firstWeekday - 1
+        return Array(symbols[first...] + symbols[..<first])
+    }
+
+    private var cells: [Date?] {
+        guard let interval = calendar.dateInterval(of: .month, for: month) else { return [] }
+        let start = interval.start
+        let lead = (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
+        let count = calendar.range(of: .day, in: .month, for: start)?.count ?? 30
+        return Array(repeating: nil, count: lead)
+            + (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private func shift(_ months: Int) {
+        withAnimation(OneDay.Motion.soft) {
+            month = calendar.date(byAdding: .month, value: months, to: month) ?? month
+        }
     }
 
     private func cell(_ day: Date) -> some View {
         let isSelected = calendar.isDate(day, inSameDayAs: selected)
         let isToday = calendar.isDateInToday(day)
         return Button {
-            withAnimation(OneDay.Motion.soft) { selected = day }
+            selected = calendar.startOfDay(for: day)
+            dismiss()
         } label: {
-            VStack(spacing: 4) {
-                Text(day.formatted(.dateTime.weekday(.narrow).locale(AppLanguage.effective.locale)))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(isSelected ? OneDay.onBrand : OneDay.inkFaint)
+            VStack(spacing: 2) {
                 Text("\(calendar.component(.day, from: day))")
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(OneDay.Font.rounded(.subheadline, weight: .heavy))
                     .monospacedDigit()
                     .foregroundStyle(isSelected ? OneDay.onBrand : (isToday ? OneDay.brandText : OneDay.ink))
-                // The day's mood face, or a dot when something was filmed but no mood was logged.
                 ZStack {
                     if let mood = mood(day) {
-                        Image(mood.imageName)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 30, height: 30)
-                            .accessibilityLabel(mood.label)
+                        // 固定尺寸：月历格子里的心情小图
+                        Image(mood.imageName).resizable().scaledToFit().frame(width: 18, height: 18)
                     } else {
                         Circle()
                             .fill(isSelected ? OneDay.onBrand : Color.oneDayBrand)
@@ -60,18 +85,17 @@ struct DayStrip: View {
                             .opacity(hasSomething(day) ? 1 : 0)
                     }
                 }
-                .frame(height: 30)
+                .frame(height: 18)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.vertical, OneDay.Space.xs)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous)
                     .fill(isSelected ? Color.oneDayBrand : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("day-strip-day")
     }
 }
 

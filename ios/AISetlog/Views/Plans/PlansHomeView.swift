@@ -38,6 +38,7 @@ struct PlansHomeView: View {
     @State private var pickedClips: [LibraryClip] = []
     @State private var vlogRequest: VlogRequest?
     @State private var selectedDay = Calendar.current.startOfDay(for: .now)
+    @State private var showsDayPicker = false
     @State private var planningAhead = false
     @State private var inviteRequest: InviteRequest?
     @State private var debugAlert: DebugAlert?
@@ -260,10 +261,7 @@ struct PlansHomeView: View {
                 }
                 #endif
 
-                DayStrip(
-                    selected: $selectedDay,
-                    hasSomething: { day in store.plan(on: day) != nil || !clips(on: day).isEmpty },
-                    mood: { day in day > .now ? nil : moods?.mood(on: day)?.mood })
+                otherDayChip
                 todayCards
                 todayStrip
 
@@ -596,9 +594,48 @@ struct PlansHomeView: View {
                     .minimumScaleFactor(0.8)
             }
             Spacer(minLength: OneDay.Space.s)
+            // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
+            IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
+                .accessibilityIdentifier("mine-calendar")
             composeButton
         }
         .accessibilityIdentifier("mine-header")
+        .sheet(isPresented: $showsDayPicker) {
+            DayPickerSheet(
+                selected: $selectedDay,
+                hasSomething: { day in store.plan(on: day) != nil || !clips(on: day).isEmpty },
+                mood: { day in day > .now ? nil : moods?.mood(on: day)?.mood })
+                .presentationDetents([.medium])
+                .presentationBackground(OneDay.surface)
+        }
+    }
+
+    /// 看的不是今天时，提示是哪天，点 × 回到今天
+    @ViewBuilder
+    private var otherDayChip: some View {
+        if !Calendar.current.isDateInToday(selectedDay) {
+            Button {
+                withAnimation(OneDay.Motion.soft) { selectedDay = Calendar.current.startOfDay(for: .now) }
+            } label: {
+                HStack(spacing: OneDay.Space.xs) {
+                    Text(selectedDay.formatted(.dateTime.month().day().weekday(.abbreviated)
+                        .locale(AppLanguage.effective.locale)))
+                    Image(systemName: "xmark")
+                        .font(OneDay.Font.rounded(.caption2, weight: .heavy))
+                }
+                .font(OneDay.Font.caption)
+                .foregroundStyle(OneDay.brandText)
+                .padding(.horizontal, OneDay.Space.m)
+                .padding(.vertical, OneDay.Space.xs + 2)
+                .background(Capsule().fill(Color.oneDayBrand.opacity(0.12)))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, OneDay.Space.xl)
+            .accessibilityLabel(DayPickerSheet.backToToday)
+            .accessibilityIdentifier("mine-back-to-today")
+        }
     }
 
     private var mineStatsLine: String {
