@@ -19,6 +19,8 @@ struct StoryTimelineView: View {
     @State private var showSignIn = false
     @AppStorage("roomLayout.v3") private var roomLayout: RoomLayout = .automatic
     @State private var roomDay: Date?
+    @State private var roomMonth = Calendar.current.startOfMonth(for: .now)
+    @State private var roomCalendarHeight: CGFloat = 420
     @State private var roomPerson: String?
     @State private var personPage: String?
     @State private var nudgeShareCode: String?
@@ -82,19 +84,25 @@ struct StoryTimelineView: View {
         }
         .sheet(isPresented: $showRoomCalendar) {
             NavigationStack {
-                DatePicker(
-                    Strings.libraryCalendar,
-                    selection: Binding(
-                        get: { roomDay ?? .now },
-                        set: {
-                            roomDay = Calendar.current.startOfDay(for: $0)
-                            roomPerson = nil
-                            showRoomCalendar = false
-                        }),
-                    in: ...Date.now,
-                    displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .padding(.horizontal)
+                ScrollView {
+                    LibraryCalendar(
+                        month: $roomMonth,
+                        covers: roomCalendarCovers,
+                        selectedDay: Binding(
+                            get: { roomDay },
+                            set: { day in
+                                roomDay = day.map { Calendar.current.startOfDay(for: $0) }
+                                roomPerson = nil
+                                if day != nil { showRoomCalendar = false }
+                            }))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 16)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                            roomCalendarHeight = $0
+                        }
+                }
+                .scrollBounceBehavior(.basedOnSize)
                     .navigationTitle(Strings.libraryCalendar)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -113,7 +121,8 @@ struct StoryTimelineView: View {
                         }
                     }
             }
-            .presentationDetents([.medium])
+            // Sheet fits the calendar (5- or 6-week months) plus the nav bar.
+            .presentationDetents([.height(roomCalendarHeight + 90)])
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
@@ -328,6 +337,15 @@ struct StoryTimelineView: View {
                         showsCalendarControls: false)
                 }
                 .scrollIndicators(.hidden)
+            case .byDay:
+                ScrollView {
+                    RoomDayList(
+                        clips: shownClips,
+                        members: shownMembers.isEmpty ? members : shownMembers,
+                        myID: myID,
+                        onPlay: { clip in sheet = .open(clip) })
+                }
+                .scrollIndicators(.hidden)
             }
         }
         .padding(.horizontal, 20)
@@ -405,42 +423,19 @@ struct StoryTimelineView: View {
     ) -> some View {
         let syncError = store.syncError(for: challengeID)
 
-        return HStack(spacing: 8) {
+        return VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 8) {
             IconBubble(systemName: "chevron.left") { dismiss() }
                 .accessibilityLabel(Text(Strings.back))
                 .accessibilityIdentifier("room-back")
 
-            if challenge.isShared, let code = challenge.roomCode, previewMedia == nil {
-                RoomInviteShareLink(
-                    content: RoomInviteCardContent(
-                        challenge: challenge, inviter: account.account?.displayName),
-                    message: shareText(code: code, challenge: challenge)
-                ) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(OneDay.ink)
-                        .frame(width: 38, height: 38)
-                        .background(.regularMaterial, in: Circle())
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(Text(Strings.inviteLabel))
-                .accessibilityIdentifier("room-invite")
-            }
-
             Spacer(minLength: 4)
 
             if challenge.isShared {
-                TimelineHeader(
-                    challenge: challenge,
-                    isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
-                    onRename: { name in
-                        Task { await store.renameRoom(challengeID, to: name) }
-                    },
-                    fontSize: 17)
-                    .layoutPriority(-1)
-                Spacer(minLength: 4)
                 roomToolCapsule
+                IconBubble(systemName: "film.stack.fill", label: Strings.makeRoomVlog) { showFilm = true }
+                    .disabled(clipCount == 0)
+                    .accessibilityIdentifier("room-make-vlog")
             }
 
             Menu {
@@ -448,21 +443,6 @@ struct StoryTimelineView: View {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
                     }
-                }
-
-                if challenge.isShared {
-                    Button(Strings.makeRoomVlog, systemImage: "film.stack.fill") { showFilm = true }
-                        .disabled(clipCount == 0)
-                        .accessibilityIdentifier("room-make-vlog")
-                    Picker(selection: $roomLayout) {
-                        ForEach(RoomLayout.allCases, id: \.self) { layout in
-                            Label(layout.title, systemImage: layout.systemImage).tag(layout)
-                        }
-                    } label: {
-                        Label(Strings.roomLayoutMenu, systemImage: roomLayout.systemImage)
-                    }
-                    .pickerStyle(.menu)
-                    .accessibilityIdentifier("room-layout")
                 }
 
                 if !challenge.isTimeOnly {
@@ -508,12 +488,72 @@ struct StoryTimelineView: View {
             .accessibilityLabel(Text(syncError ?? Strings.moreLabel))
             .accessibilityIdentifier("room-more")
         }
+        if challenge.isShared {
+            roomTitleRow(challenge)
+        }
+        }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
     }
 
+    /// Second header row: the room name gets the full width (small phones
+    /// squeezed it to one letter next to the tool buttons), with invite beside it.
+    private func roomTitleRow(_ challenge: Challenge) -> some View {
+        HStack(spacing: 8) {
+            TimelineHeader(
+                challenge: challenge,
+                isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
+                onRename: { name in
+                    Task { await store.renameRoom(challengeID, to: name) }
+                },
+                fontSize: 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let code = challenge.roomCode, previewMedia == nil {
+                RoomInviteShareLink(
+                    content: RoomInviteCardContent(
+                        challenge: challenge, inviter: account.account?.displayName),
+                    message: shareText(code: code, challenge: challenge)
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(OneDay.ink)
+                        .frame(width: 38, height: 38)
+                        .background(.regularMaterial, in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text(Strings.inviteLabel))
+                .accessibilityIdentifier("room-invite")
+            }
+        }
+        .padding(.leading, 4)
+    }
+
+    /// Cover thumbnail per day, so the room calendar shows which days have clips.
+    private var roomCalendarCovers: [Date: LibraryClip] {
+        guard let challenge else { return [:] }
+        let myID = account.account?.id ?? "local"
+        let library = ClipLibrary(
+            stories: [(challenge, store.recordedClips(for: challengeID))], drafts: [], myIDs: [myID])
+        return library.coverByDay(library.clips)
+    }
+
     private var roomToolCapsule: some View {
         HStack(spacing: 0) {
+            Menu {
+                Picker(Strings.roomLayoutMenu, selection: $roomLayout) {
+                    ForEach(RoomLayout.allCases, id: \.self) { layout in
+                        Label(layout.title, systemImage: layout.systemImage).tag(layout)
+                    }
+                }
+            } label: {
+                Image(systemName: roomLayout.systemImage)
+                    .foregroundStyle(OneDay.ink)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(Text("\(Strings.roomLayoutMenu): \(roomLayout.title)"))
+            .accessibilityIdentifier("room-layout")
             Button { showRoomCalendar = true } label: {
                 Image(systemName: "calendar")
                     .foregroundStyle(roomDay == nil ? OneDay.ink : Color.oneDayBrand)
@@ -665,12 +705,13 @@ extension EnvironmentValues {
 }
 
 enum RoomLayout: String, CaseIterable {
-    case automatic, columns
+    case automatic, columns, byDay
 
     var title: String {
         switch self {
         case .automatic: Strings.roomLayoutDefault
         case .columns: Strings.roomLayoutWaterfall
+        case .byDay: Strings.roomLayoutByDay
         }
     }
 
@@ -678,6 +719,7 @@ enum RoomLayout: String, CaseIterable {
         switch self {
         case .automatic: "rectangle.grid.1x2"
         case .columns: "rectangle.split.3x1"
+        case .byDay: "square.grid.3x3"
         }
     }
 }

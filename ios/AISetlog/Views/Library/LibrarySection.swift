@@ -322,7 +322,7 @@ struct LibraryCalendar: View {
 
             let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
             LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(OneDay.inkFaint)
