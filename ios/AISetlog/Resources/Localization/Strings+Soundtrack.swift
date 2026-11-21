@@ -30,10 +30,6 @@ extension Strings {
     static var voiceoverRedo: String { sound("重录旁白", "Redo voiceover") }
     static var voiceoverRemove: String { sound("去掉旁白", "Remove voiceover") }
     static var voiceoverTitle: String { sound("边看边说", "Talk over your film") }
-    static var voiceoverHint: String {
-        sound("点开始，片子会从头播放，你说的话会录在片子上。播完自动停。",
-              "Tap start: the film plays from the top and what you say is recorded over it. It stops at the end.")
-    }
     static var voiceoverStart: String { sound("开始录", "Start") }
     static var voiceoverStop: String { sound("停", "Stop") }
     static var voiceoverRetake: String { sound("重录", "Retake") }

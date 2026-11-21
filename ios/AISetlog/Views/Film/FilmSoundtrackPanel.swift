@@ -138,10 +138,12 @@ private struct VoiceoverRecorder: View {
                 Spacer()
                 IconBubble(systemName: "xmark") { close() }
             }
-            Text(denied ? Strings.voiceoverDenied : Strings.voiceoverHint)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if denied {
+                Text(Strings.voiceoverDenied)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(OneDay.inkSoft)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             VideoPlayer(player: player)
                 .allowsHitTesting(false)

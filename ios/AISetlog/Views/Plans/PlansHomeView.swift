@@ -511,16 +511,10 @@ struct PlansHomeView: View {
                 .background(Color.oneDayBrand.opacity(0.12), in: Circle())
                 .padding(.top, 8)
 
-            VStack(spacing: 7) {
-                Text(Strings.friendsEmptyTitle)
-                    .font(.system(size: 19, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                    .multilineTextAlignment(.center)
-                Text(Strings.friendsEmptyBody)
-                    .font(.system(size: 14.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-                    .multilineTextAlignment(.center)
-            }
+            Text(Strings.friendsEmptyTitle)
+                .font(.system(size: 19, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.ink)
+                .multilineTextAlignment(.center)
 
             Button(Strings.inviteFriends) { inviteFriends() }
                 .buttonStyle(.primaryAction)
@@ -943,11 +937,6 @@ struct PlansHomeView: View {
                 Text(Strings.mineEmptyTitle)
                     .font(OneDay.Font.headline)
                     .foregroundStyle(OneDay.ink)
-                Text(Strings.mineEmptyHint)
-                    .font(OneDay.Font.subhead)
-                    .foregroundStyle(OneDay.inkSoft)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(OneDay.Space.l)
             .padding(.vertical, OneDay.Space.s)

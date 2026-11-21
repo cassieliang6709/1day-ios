@@ -114,11 +114,6 @@ struct JoinInviteSheet: View {
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
                 .multilineTextAlignment(.center)
-
-            Text(Strings.inviteHint)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
     }
 

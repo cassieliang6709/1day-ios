@@ -48,9 +48,6 @@ struct MoodTodayCard: View {
                 Text(mood.label)
                     .font(OneDay.Font.callout)
                     .foregroundStyle(OneDay.ink)
-                Text(Strings.moodEditFaceHint)
-                    .font(OneDay.Font.micro)
-                    .foregroundStyle(OneDay.inkSoft)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())

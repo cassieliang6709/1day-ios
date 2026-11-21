@@ -317,9 +317,6 @@ enum Strings {
         lang == .chinese ? "有邀请码？加入朋友" : "Have an invite? Join friends"
     }
     static var quickStartTitle: String { lang == .chinese ? "我的一天" : "My day" }
-    static var inviteHint: String {
-        lang == .chinese ? "向朋友要 6 位邀请码。" : "Ask your friend for the 6-character code."
-    }
     static var inviteCodeFormatHint: String {
         lang == .chinese
             ? "可以直接粘贴整段邀请文字。"
@@ -401,11 +398,6 @@ enum Strings {
     static var surfaceCamera: String { lang == .chinese ? "相机" : "Camera" }
     static var friendsEmptyTitle: String {
         lang == .chinese ? "还没有和朋友一起拍的房间" : "No stories with friends yet"
-    }
-    static var friendsEmptyBody: String {
-        lang == .chinese
-            ? "开一个房间，把邀请码发给朋友。大家拍的片段会剪进同一支片。"
-            : "Start a story together and send your friends the code. Everyone's clips go into one film."
     }
     static var inviteFriends: String { lang == .chinese ? "邀请朋友一起拍" : "Invite friends" }
 
@@ -806,9 +798,6 @@ enum Strings {
     static var mineTodayHeader: String { lang == .chinese ? "今天" : "Today" }
     static var mineMakeTodayVlog: String { lang == .chinese ? "拼成今天的 vlog" : "Make today's vlog" }
     static var mineEmptyTitle: String { lang == .chinese ? "今天还没拍" : "Nothing filmed today" }
-    static var mineEmptyHint: String {
-        lang == .chinese ? "点下面的相机拍几秒，片段会按天出现在这里" : "Tap the camera below and film a few seconds. Clips show up here by day."
-    }
     static var dayMakeVlog: String { lang == .chinese ? "做 vlog" : "Make vlog" }
     static var guideSteps: [String] {
         lang == .chinese
