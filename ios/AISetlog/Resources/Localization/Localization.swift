@@ -790,11 +790,6 @@ enum Strings {
         lang == .chinese ? "今天想拍什么" : "What to film today"
     }
     static var guideTitle: String { lang == .chinese ? "怎么用 1Day" : "How 1Day works" }
-    static func mineStats(days: Int, clips: Int) -> String {
-        lang == .chinese
-            ? "这周拍了 \(days) 天 · 共 \(clips) 段"
-            : "\(days == 1 ? "1 day" : "\(days) days") filmed this week · \(clips == 1 ? "1 clip" : "\(clips) clips")"
-    }
     static var mineTodayHeader: String { lang == .chinese ? "今天" : "Today" }
     static var mineMakeTodayVlog: String { lang == .chinese ? "拼成今天的 vlog" : "Make today's vlog" }
     static var mineEmptyTitle: String { lang == .chinese ? "今天还没拍" : "Nothing filmed today" }

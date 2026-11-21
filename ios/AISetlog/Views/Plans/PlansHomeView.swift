@@ -577,16 +577,9 @@ struct PlansHomeView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(Strings.settings)
 
-            VStack(alignment: .leading, spacing: OneDay.Space.xs) {
-                Text(Strings.surfacePlans)
-                    .font(OneDay.Font.title)
-                    .foregroundStyle(OneDay.ink)
-                Text(mineStatsLine)
-                    .font(OneDay.Font.subhead)
-                    .foregroundStyle(OneDay.inkSoft)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+            Text(Strings.surfacePlans)
+                .font(OneDay.Font.title)
+                .foregroundStyle(OneDay.ink)
             Spacer(minLength: OneDay.Space.s)
             // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
             IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
@@ -632,14 +625,6 @@ struct PlansHomeView: View {
         }
     }
 
-    private var mineStatsLine: String {
-        let mine = library.scoped(includingFriends: false).clips
-        let calendar = Calendar.current
-        let week = calendar.dateInterval(of: .weekOfYear, for: .now)
-        let days = Set(mine.filter { week?.contains($0.recordedAt) ?? false }
-            .map { calendar.startOfDay(for: $0.recordedAt) }).count
-        return Strings.mineStats(days: days, clips: mine.count)
-    }
 
     private var showsTodayStrip: Bool {
         onBackToRooms != nil && Calendar.current.isDateInToday(selectedDay) && !clips(on: .now).isEmpty
