@@ -62,6 +62,66 @@ struct MoodTodayCard: View {
     }
 }
 
+/// 首页右上角的小心情入口：选过显示表情 + 名字，没选显示「今天的心情」，点开弹出 5 个表情。
+struct MoodTodayBadge: View {
+    @Environment(MoodStore.self) private var moods
+    @State private var dayTick = 0
+    @State private var isChoosing = false
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        let _ = dayTick
+        let mood = moods.today?.mood
+        Button { isChoosing = true } label: {
+            HStack(spacing: OneDay.Space.xs) {
+                // 固定尺寸：小图标，同一处只用这一档
+                if let mood {
+                    Image(mood.imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 26, height: 26)
+                } else {
+                    Image(systemName: "face.smiling")
+                        .font(OneDay.Font.rounded(.callout, weight: .semibold))
+                        .foregroundStyle(OneDay.brandText)
+                }
+                Text(mood?.label ?? Strings.moodSectionTitle)
+                    .font(OneDay.Font.caption)
+                    .foregroundStyle(OneDay.ink)
+                    .lineLimit(1)
+            }
+            .fixedSize()
+            .padding(.leading, mood == nil ? OneDay.Space.m : OneDay.Space.xs)
+            .padding(.trailing, OneDay.Space.m)
+            .padding(.vertical, OneDay.Space.xs)
+            .frame(minHeight: 36)
+            .background(Capsule().fill(.regularMaterial))
+            .overlay(Capsule().strokeBorder(OneDay.ink.opacity(0.08), lineWidth: 1))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mood.map { "\(Strings.moodSectionTitle): \($0.label)" } ?? Strings.moodSectionTitle)
+        .accessibilityIdentifier("mood-today-badge")
+        .popover(isPresented: $isChoosing, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: OneDay.Space.m) {
+                Text(Strings.moodPrompt)
+                    .font(OneDay.Font.callout)
+                    .foregroundStyle(OneDay.ink)
+                MoodFaceRow(selected: mood, compact: false) {
+                    moods.setMood($0)
+                    isChoosing = false
+                }
+            }
+            .padding(OneDay.Space.l)
+            .frame(width: 320)
+            .presentationCompactAdaptation(.popover)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in dayTick += 1 }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { dayTick += 1 } }
+    }
+}
+
 private struct MoodFaceRow: View {
     let selected: Mood?
     let compact: Bool

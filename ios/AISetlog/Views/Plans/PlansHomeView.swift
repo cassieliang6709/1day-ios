@@ -329,10 +329,11 @@ struct PlansHomeView: View {
     private var friendsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                greetingRow
-                    .padding(.horizontal, 20)
-                MoodTodayCard()
-                    .padding(.horizontal, 20)
+                HStack(spacing: OneDay.Space.s) {
+                    greetingRow
+                    MoodTodayBadge()
+                }
+                .padding(.horizontal, 20)
                 friendsHeader
                 if !account.isSignedIn, !sharedStories.isEmpty {
                     signedOutBanner

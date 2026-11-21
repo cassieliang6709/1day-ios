@@ -13,44 +13,21 @@ enum AvatarDecorator {
         ctx.scaleBy(x: 1, y: -1)
         ctx.interpolationQuality = .high
 
+        // 动画：白边沿着一圈逐渐画满，最后盖上人像
         let p = min(max(progress, 0), 1)
-
-        let bands = layout.bands
-        for (index, band) in bands.enumerated() {
-            let order = bands.count - 1 - index
-            let start = CGFloat(order) / CGFloat(bands.count) * 0.6
-            let share = Self.ramp(p, from: start, to: start + 0.6 / CGFloat(bands.count))
-            guard share > 0, let silhouette = Self.silhouette(of: head, color: Self.cgColor(band.color))
-            else { continue }
-            let shown = max(1, Int((CGFloat(band.offsets.count) * share).rounded(.up)))
-            for offset in band.offsets.prefix(shown) {
+        let offsets = layout.outlineOffsets
+        let shown = Int((CGFloat(offsets.count) * p).rounded(.up))
+        if shown > 0, let silhouette = Self.silhouette(of: head, color: Self.cgColor(AvatarDecorLayout.white)) {
+            for offset in offsets.prefix(shown) {
                 Self.draw(silhouette, in: layout.headRect.offsetBy(dx: offset.x, dy: offset.y), ctx: ctx)
             }
-            Self.draw(silhouette, in: layout.headRect, ctx: ctx)
         }
 
         Self.draw(head, in: layout.headRect, ctx: ctx)
 
-        let blush = Self.ramp(p, from: 0.6, to: 0.7)
-        if blush > 0 {
-            for cheek in layout.cheeks { Self.drawBlush(cheek, alpha: blush, ctx: ctx) }
-        }
-
-        for (i, sticker) in layout.stickers.enumerated() {
-            let start = 0.7 + 0.3 * CGFloat(i) / CGFloat(max(layout.stickers.count, 1))
-            let grow = Self.ramp(p, from: start, to: start + 0.3 / CGFloat(max(layout.stickers.count, 1)))
-            guard grow > 0 else { continue }
-            Self.drawSticker(sticker, scale: grow, ctx: ctx)
-        }
-
         return ctx.makeImage()
     }
 
-
-    private static func ramp(_ p: CGFloat, from a: CGFloat, to b: CGFloat) -> CGFloat {
-        guard b > a else { return p >= a ? 1 : 0 }
-        return min(max((p - a) / (b - a), 0), 1)
-    }
 
     static func cgColor(_ hex: UInt32, alpha: CGFloat = 1) -> CGColor {
         CGColor(
@@ -81,82 +58,5 @@ enum AvatarDecorator {
         ctx.setFillColor(color)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         return ctx.makeImage()
-    }
-
-    private static func drawBlush(_ cheek: AvatarDecorLayout.Cheek, alpha: CGFloat, ctx: CGContext) {
-        let rect = CGRect(
-            x: cheek.center.x - cheek.radius.width, y: cheek.center.y - cheek.radius.height,
-            width: cheek.radius.width * 2, height: cheek.radius.height * 2)
-        ctx.saveGState()
-        ctx.addEllipse(in: rect)
-        ctx.clip()
-        let colors = [cgColor(AvatarDecorLayout.blush, alpha: 0.55 * alpha),
-                      cgColor(AvatarDecorLayout.blush, alpha: 0)] as CFArray
-        if let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                                     colors: colors, locations: [0, 1]) {
-            ctx.translateBy(x: cheek.center.x, y: cheek.center.y)
-            ctx.scaleBy(x: 1, y: cheek.radius.height / max(cheek.radius.width, 1))
-            ctx.drawRadialGradient(gradient, startCenter: .zero, startRadius: 0,
-                                   endCenter: .zero, endRadius: cheek.radius.width, options: [])
-        }
-        ctx.restoreGState()
-    }
-
-    private static func drawSticker(_ sticker: AvatarDecorLayout.Sticker, scale: CGFloat, ctx: CGContext) {
-        let color = cgColor(AvatarDecorLayout.stickerColors[sticker.colorIndex % AvatarDecorLayout.stickerColors.count])
-        let s = sticker.size * scale
-        ctx.saveGState()
-        ctx.translateBy(x: sticker.center.x, y: sticker.center.y)
-        ctx.rotate(by: sticker.rotation)
-        let path = CGMutablePath()
-        switch sticker.kind {
-        case .star:
-            let outer = s / 2, inner = s * 0.22
-            for i in 0..<10 {
-                let r = i.isMultiple(of: 2) ? outer : inner
-                let a = -CGFloat.pi / 2 + CGFloat(i) * .pi / 5
-                let pt = CGPoint(x: cos(a) * r, y: sin(a) * r)
-                i == 0 ? path.move(to: pt) : path.addLine(to: pt)
-            }
-            path.closeSubpath()
-        case .heart:
-            let w = s / 2
-            path.move(to: CGPoint(x: 0, y: w * 0.9))
-            path.addCurve(to: CGPoint(x: -w, y: -w * 0.25),
-                          control1: CGPoint(x: -w * 0.6, y: w * 0.45),
-                          control2: CGPoint(x: -w, y: w * 0.2))
-            path.addArc(center: CGPoint(x: -w / 2, y: -w * 0.3), radius: w / 2,
-                        startAngle: .pi, endAngle: 0, clockwise: false)
-            path.addArc(center: CGPoint(x: w / 2, y: -w * 0.3), radius: w / 2,
-                        startAngle: .pi, endAngle: 0, clockwise: false)
-            path.addCurve(to: CGPoint(x: 0, y: w * 0.9),
-                          control1: CGPoint(x: w, y: w * 0.2),
-                          control2: CGPoint(x: w * 0.6, y: w * 0.45))
-            path.closeSubpath()
-        case .dots:
-            let dots: [(CGPoint, CGFloat)] = [
-                (CGPoint(x: -s * 0.22, y: -s * 0.12), s * 0.2),
-                (CGPoint(x: s * 0.22, y: -s * 0.2), s * 0.15),
-                (CGPoint(x: s * 0.05, y: s * 0.24), s * 0.17),
-            ]
-            for (i, dot) in dots.enumerated() {
-                let c = cgColor(AvatarDecorLayout.stickerColors[(sticker.colorIndex + i) % AvatarDecorLayout.stickerColors.count])
-                ctx.setFillColor(c)
-                ctx.setStrokeColor(CGColor(gray: 1, alpha: 1))
-                ctx.setLineWidth(max(s * 0.05, 1))
-                let rect = CGRect(x: dot.0.x - dot.1, y: dot.0.y - dot.1, width: dot.1 * 2, height: dot.1 * 2)
-                ctx.addEllipse(in: rect)
-                ctx.drawPath(using: .fillStroke)
-            }
-            ctx.restoreGState()
-            return
-        }
-        ctx.addPath(path)
-        ctx.setFillColor(color)
-        ctx.setStrokeColor(CGColor(gray: 1, alpha: 1))
-        ctx.setLineWidth(max(s * 0.07, 1))
-        ctx.setLineJoin(.round)
-        ctx.drawPath(using: .fillStroke)
-        ctx.restoreGState()
     }
 }

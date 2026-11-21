@@ -13,7 +13,6 @@ struct AvatarSetupFlow: View {
     @State private var step: Step = .upload
     @State private var photo: CGImage?
     @State private var head: AvatarHeadResult?
-    @State private var seed = UInt64.random(in: 1...UInt64.max)
     @State private var result: CGImage?
     @State private var frame: CGImage?
     @State private var error: String?
@@ -21,7 +20,6 @@ struct AvatarSetupFlow: View {
     @State private var showsPicker = false
     @State private var showsCamera = false
     @State private var work: Task<Void, Never>?
-    @State private var showsPlayground = false
     @State private var showsEmojiPlayground = false
     @State private var showsStickerPicker = false
 
@@ -58,6 +56,21 @@ struct AvatarSetupFlow: View {
 
 
     private var upload: some View {
+        // 小屏（iPhone SE）放不下时可以滚动，不然标题和「取消」会被切掉
+        ViewThatFits(in: .vertical) {
+            uploadContent
+            ScrollView { uploadContent }
+                .scrollIndicators(.hidden)
+        }
+        .sheet(isPresented: $showsStickerPicker) {
+            StickerPickerSheet(onPick: useSticker)
+                .presentationDetents([.large])
+        }
+        .modifier(PlaygroundSheet(
+            isPresented: $showsEmojiPlayground, onImage: useEmojiImage))
+    }
+
+    private var uploadContent: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
             Text(Strings.avatarUploadHeadline)
@@ -81,35 +94,26 @@ struct AvatarSetupFlow: View {
             Spacer(minLength: 24)
 
             VStack(spacing: 12) {
-                Button(action: takePhoto) {
-                    Label(Strings.avatarTakePhoto, systemImage: "camera.fill")
-                }
-                .buttonStyle(.primaryAction)
-                .accessibilityIdentifier("avatar-take-photo")
-
-                Button { showsPicker = true } label: {
-                    Label(Strings.avatarPickPhoto, systemImage: "photo.on.rectangle")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OneDay.brandText)
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("avatar-pick-photo")
-
-                HStack(spacing: 10) {
-                    Button { showsStickerPicker = true } label: {
-                        Label(Strings.avatarUseMemoji, systemImage: "face.smiling")
+                // 一排小卡片，三个来源同级（2026-11-21 Cassie：按钮别那么大）
+                HStack(spacing: OneDay.Space.s) {
+                    AvatarSourceTile(title: Strings.avatarTakePhoto, systemImage: "camera.fill", action: takePhoto)
+                        .accessibilityIdentifier("avatar-take-photo")
+                    AvatarSourceTile(title: Strings.avatarUseMemoji, systemImage: "face.smiling") {
+                        showsStickerPicker = true
                     }
-                    .buttonStyle(.softAction)
                     .accessibilityIdentifier("avatar-memoji")
+                    AvatarSourceTile(title: Strings.avatarPickPhoto, systemImage: "photo.on.rectangle") {
+                        showsPicker = true
+                    }
+                    .accessibilityIdentifier("avatar-pick-photo")
                     if Self.playgroundAvailable {
-                        Button { showsEmojiPlayground = true } label: {
-                            Label(Strings.avatarMakeEmoji, systemImage: "sparkles")
+                        AvatarSourceTile(title: Strings.avatarMakeEmoji, systemImage: "sparkles") {
+                            showsEmojiPlayground = true
                         }
-                        .buttonStyle(.softAction)
                         .accessibilityIdentifier("avatar-genmoji")
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)  // 文字折行时几张卡片一样高
 
                 if !AvatarStore.shared.history.isEmpty {
                     Text(Strings.avatarHistory)
@@ -170,12 +174,6 @@ struct AvatarSetupFlow: View {
             .padding(.bottom, 18)
         }
         .padding(.horizontal, 28)
-        .sheet(isPresented: $showsStickerPicker) {
-            StickerPickerSheet(onPick: useSticker)
-                .presentationDetents([.large])
-        }
-        .modifier(PlaygroundSheet(
-            isPresented: $showsEmojiPlayground, photo: nil, emoji: true, onImage: useEmojiImage))
     }
 
     private func restore(_ url: URL) {
@@ -291,14 +289,6 @@ struct AvatarSetupFlow: View {
                 Button(action: accept) { Text(Strings.avatarConfirm) }
                     .buttonStyle(.primaryAction)
                     .accessibilityIdentifier("avatar-confirm")
-                Button(action: redraw) { Text(Strings.avatarRedraw) }
-                    .buttonStyle(.softAction)
-                    .accessibilityIdentifier("avatar-redraw")
-                if Self.playgroundAvailable, photo != nil {
-                    Button { showsPlayground = true } label: { Text(Strings.avatarApplePlayground) }
-                        .buttonStyle(.softAction)
-                        .accessibilityIdentifier("avatar-image-playground")
-                }
                 Button(action: newPhoto) {
                     Text(Strings.avatarNewPhoto)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -311,22 +301,11 @@ struct AvatarSetupFlow: View {
             .padding(.bottom, 18)
         }
         .padding(.horizontal, 28)
-        .modifier(PlaygroundSheet(
-            isPresented: $showsPlayground, photo: photo, emoji: false, onImage: usePlaygroundImage))
     }
 
     static var playgroundAvailable: Bool {
         if #available(iOS 18.1, *) { return ImagePlaygroundViewController.isAvailable }
         return false
-    }
-
-    private func usePlaygroundImage(_ url: URL) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
-              let cut = try? AvatarHeadExtractor.extract(from: image)
-        else { error = Strings.avatarFailed; return }
-        head = AvatarHeadResult(head: cut, path: .imagePlayground)
-        run(minimum: Self.redrawSeconds)
     }
 
     private var done: some View {
@@ -342,8 +321,8 @@ struct AvatarSetupFlow: View {
     }
 
 
-    static let minimumDrawSeconds: Double = 9
-    static let redrawSeconds: Double = 4
+    /// 抠图很快，白边动画至少放这么久，不让人干等
+    static let minimumDrawSeconds: Double = 3
     static let frames = 12
 
     private func start(with image: UIImage) {
@@ -351,12 +330,6 @@ struct AvatarSetupFlow: View {
         photo = AvatarHeadExtractor.downscaled(cg, to: AvatarHeadExtractor.workingSide)
         head = nil
         run(minimum: Self.minimumDrawSeconds)
-    }
-
-    private func redraw() {
-        seed = UInt64.random(in: 1...UInt64.max)
-        if head?.path == .imageCreator { head = nil }
-        run(minimum: head == nil ? Self.minimumDrawSeconds : Self.redrawSeconds)
     }
 
     private func newPhoto() {
@@ -375,23 +348,15 @@ struct AvatarSetupFlow: View {
         frame = nil
         result = nil
         step = .generating
-        let seed = seed
-        let known = head
-        let maker = AvatarMaker(forceFallback: Self.forcesFallback)
         work = Task {
             let started = Date.now
             do {
-                let made: AvatarHeadResult
-                if let known {
-                    made = known
-                } else {
-                    made = try await Task.detached(priority: .userInitiated) {
-                        try await maker.makeHead(from: photo)
-                    }.value
-                }
+                let made = try await Task.detached(priority: .userInitiated) {
+                    try AvatarMaker.makeHead(from: photo)
+                }.value
                 try Task.checkCancellation()
                 head = made
-                let layout = AvatarComposer.layout(for: made.head, seed: seed)
+                let layout = AvatarComposer.layout(for: made.head)
                 let images = await Task.detached(priority: .userInitiated) { () -> [CGImage] in
                     (0...Self.frames).compactMap {
                         AvatarDecorator.render(head: made.head.image, layout: layout,
@@ -440,14 +405,6 @@ struct AvatarSetupFlow: View {
     }
 
 
-    private static var forcesFallback: Bool {
-        #if DEBUG
-        UserDefaults.standard.bool(forKey: "debugAvatarForceFallback")
-        #else
-        false
-        #endif
-    }
-
     private func startDebugSampleIfAsked() {
         #if DEBUG
         guard photo == nil, step == .upload,
@@ -461,10 +418,8 @@ struct AvatarSetupFlow: View {
     #if DEBUG
     static func debugLabel(_ path: AvatarPath) -> String {
         switch path {
-        case .imageCreator: return "ImageCreator"
-        case .imagePlayground: return "Image Playground"
+        case .cutout: return "Vision cut-out"
         case .sticker: return "Memoji / Genmoji sticker"
-        case .visionFallback(let reason): return "Vision fallback: \(reason.rawValue)"
         }
     }
     #endif
@@ -541,19 +496,45 @@ private struct CameraPhotoPicker: UIViewControllerRepresentable {
     }
 }
 
+private struct AvatarSourceTile: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: OneDay.Space.xs) {
+                Image(systemName: systemImage)
+                    .font(OneDay.Font.rounded(.title3, weight: .semibold))
+                    .foregroundStyle(OneDay.brandText)
+                Text(title)
+                    .font(OneDay.Font.caption)
+                    .foregroundStyle(OneDay.ink)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(.vertical, OneDay.Space.m)
+            .padding(.horizontal, OneDay.Space.xs)
+            .frame(maxWidth: .infinity, minHeight: 76, maxHeight: .infinity)
+            .background(
+                Color.oneDayBrand.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OneDay.Radius.chip, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 private struct PlaygroundSheet: ViewModifier {
     @Binding var isPresented: Bool
-    let photo: CGImage?
-    let emoji: Bool
     let onImage: (URL) -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.4, *) {
             sheet(content)
-                .imagePlaygroundGenerationStyle(
-                    emoji ? .emoji : .animation,
-                    in: emoji ? [.emoji] : [.animation, .illustration, .sketch])
+                .imagePlaygroundGenerationStyle(.emoji, in: [.emoji])
                 .imagePlaygroundPersonalizationPolicy(.enabled)
         } else if #available(iOS 18.1, *) {
             sheet(content)
@@ -567,49 +548,76 @@ private struct PlaygroundSheet: ViewModifier {
         content.imagePlaygroundSheet(
             isPresented: $isPresented,
             concepts: [],
-            sourceImage: photo.map { Image(decorative: $0, scale: 1) },
+            sourceImage: nil,
             onCompletion: onImage)
     }
 }
 
+/// 在表情键盘里挑 Memoji 或普通 emoji。挑好后点「用这个」，键盘收起，进确认页。
 private struct StickerPickerSheet: View {
     let onPick: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var picked: UIImage?
+    @State private var focused = true
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(Strings.avatarMemojiHint)
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                ForEach(Array(Strings.avatarMemojiSteps.enumerated()), id: \.offset) { index, step in
-                    HStack(alignment: .top, spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(.system(size: 13, weight: .heavy, design: .rounded))
-                            .foregroundStyle(OneDay.onBrand)
-                            .frame(width: 22, height: 22)
-                            .background(Circle().fill(Color.oneDayBrand))
-                        Text(step)
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                StickerField(onPick: onPick)
-                    .frame(height: 64)
-                    .padding(.horizontal, 12)
-                    .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Text(Strings.avatarMemojiNone)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+        VStack(spacing: 0) {
+            HStack {
+                Button(Strings.cancel) { dismiss() }
                     .foregroundStyle(OneDay.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("sticker-cancel")
+                Spacer()
+                Button(Strings.avatarUseThis) {
+                    focused = false
+                    if let picked { onPick(picked) }
+                }
+                .fontWeight(.heavy)
+                .foregroundStyle(picked == nil ? OneDay.inkFaint : OneDay.brandText)
+                .disabled(picked == nil)
+                .accessibilityIdentifier("sticker-use")
             }
-            .padding(24)
+            .font(OneDay.Font.callout)
+            .frame(minHeight: 44)
+            .padding(.horizontal, OneDay.Space.xl)
+            .padding(.top, OneDay.Space.s)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(Strings.avatarMemojiHint)
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(OneDay.ink)
+                    ForEach(Array(Strings.avatarMemojiSteps.enumerated()), id: \.offset) { index, step in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                .foregroundStyle(OneDay.onBrand)
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(Color.oneDayBrand))
+                            Text(step)
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(OneDay.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    StickerField(focused: $focused) { picked = $0 }
+                        .frame(height: 64)
+                        .padding(.horizontal, 12)
+                        .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    Text(Strings.avatarMemojiNone)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(24)
+            }
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 }
 
 private struct StickerField: UIViewRepresentable {
-    let onPick: (UIImage) -> Void
+    @Binding var focused: Bool
+    let onChange: (UIImage?) -> Void
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
@@ -617,29 +625,71 @@ private struct StickerField: UIViewRepresentable {
         view.backgroundColor = .clear
         if #available(iOS 18.0, *) { view.supportsAdaptiveImageGlyph = true }
         view.delegate = context.coordinator
-        DispatchQueue.main.async { view.becomeFirstResponder() }
         return view
     }
 
-    func updateUIView(_ view: UITextView, context: Context) {}
+    func updateUIView(_ view: UITextView, context: Context) {
+        if focused, !view.isFirstResponder {
+            DispatchQueue.main.async { view.becomeFirstResponder() }
+        } else if !focused, view.isFirstResponder {
+            view.resignFirstResponder()
+        }
+    }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, UITextViewDelegate {
-        let onPick: (UIImage) -> Void
-        init(onPick: @escaping (UIImage) -> Void) { self.onPick = onPick }
+        let parent: StickerField
+        init(_ parent: StickerField) { self.parent = parent }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            if !parent.focused { DispatchQueue.main.async { self.parent.focused = true } }
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            if parent.focused { DispatchQueue.main.async { self.parent.focused = false } }
+        }
 
         func textViewDidChange(_ view: UITextView) {
-            guard #available(iOS 18.0, *) else { return }
-            let text = view.attributedText ?? NSAttributedString()
+            parent.onChange(Self.lastImage(in: view.attributedText ?? NSAttributedString()))
+        }
+
+        /// 取最后放进去的那个：Memoji / Genmoji 贴纸、图片附件，或者普通 emoji（画成图）。
+        static func lastImage(in text: NSAttributedString) -> UIImage? {
             var found: UIImage?
-            text.enumerateAttribute(.adaptiveImageGlyph, in: NSRange(location: 0, length: text.length)) { value, _, stop in
-                if let glyph = value as? NSAdaptiveImageGlyph, let image = UIImage(data: glyph.imageContent) {
-                    found = image
-                    stop.pointee = true
+            let all = NSRange(location: 0, length: text.length)
+            if #available(iOS 18.0, *) {
+                text.enumerateAttribute(.adaptiveImageGlyph, in: all, options: .reverse) { value, _, stop in
+                    if let glyph = value as? NSAdaptiveImageGlyph, let image = UIImage(data: glyph.imageContent) {
+                        found = image
+                        stop.pointee = true
+                    }
                 }
             }
-            if let found { onPick(found) }
+            if found == nil {
+                text.enumerateAttribute(.attachment, in: all, options: .reverse) { value, _, stop in
+                    if let image = (value as? NSTextAttachment)?.image {
+                        found = image
+                        stop.pointee = true
+                    }
+                }
+            }
+            if found == nil, let emoji = text.string.last(where: { $0.unicodeScalars.contains { $0.properties.isEmojiPresentation } || $0.unicodeScalars.count > 1 && $0.unicodeScalars.first?.properties.isEmoji == true }) {
+                found = render(String(emoji))
+            }
+            return found
+        }
+
+        private static func render(_ emoji: String) -> UIImage {
+            let side: CGFloat = 512
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            format.opaque = false
+            let text = NSAttributedString(string: emoji, attributes: [.font: UIFont.systemFont(ofSize: side * 0.8)])
+            let size = text.size()
+            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+                text.draw(at: CGPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))
+            }
         }
     }
 }
