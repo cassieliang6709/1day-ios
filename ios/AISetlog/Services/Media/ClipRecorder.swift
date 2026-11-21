@@ -315,8 +315,11 @@ final class ClipRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, @unche
         connection.videoRotationAngle = angle
     }
 
+    /// The front camera's file is mirrored, so the take looks exactly like the
+    /// viewfinder (Cassie, 2026-11-21). Text filmed with the front camera reads
+    /// backwards; that is the accepted cost. The back camera is never mirrored.
     private static func mirrorsLikePreview(_ preview: AVCaptureConnection?, front: Bool) -> Bool {
-        false
+        front
     }
 
     private static func setFileAngle(
