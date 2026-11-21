@@ -189,7 +189,6 @@ ios/
 │   │   ├── Media/         # Camera capture and AVFoundation renderer
 │   │   └── Persistence/   # Metadata repository and clip file store
 │   └── Views/             # Home, plans, mood, record, film, rooms, avatar, settings
-├── AISetlogTests/          # State, localization, migration, and export tests
 └── project.yml             # XcodeGen project definition
 landing-page/               # React/Vite product site
 workers/api/                # Backend: auth, rooms, clips, chat, push (D1 + R2)
@@ -247,19 +246,8 @@ load lazily and the video waits for playback before loading.
 
 ## Test
 
-```bash
-cd ios
-xcodegen generate --spec project.yml
-xcodebuild test \
-  -project AISetlog.xcodeproj \
-  -scheme AISetlog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  CODE_SIGNING_ALLOWED=NO
-```
-
-The suite covers challenge and card state, localized prompt resolution, legacy
-data decoding, account deletion, room sync and chat, avatars, mood, and playable
-AVFoundation MP4 export with real media fixtures.
+There is no automated test suite (removed on 2026-11-21). Changes are checked by building
+and running the app on a real iPhone.
 
 ## Project status
 

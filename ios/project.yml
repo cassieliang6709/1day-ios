@@ -135,23 +135,3 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
-  AISetlogTests:
-    type: bundle.unit-test
-    platform: iOS
-    sources: [AISetlogTests]
-    settings:
-      base:
-        DEVELOPMENT_TEAM: M7BPQ88622
-        GENERATE_INFOPLIST_FILE: YES
-    dependencies:
-      - target: AISetlog
-  AISetlogUITests:
-    type: bundle.ui-testing
-    platform: iOS
-    sources: [AISetlogUITests]
-    settings:
-      base:
-        DEVELOPMENT_TEAM: M7BPQ88622
-        GENERATE_INFOPLIST_FILE: YES
-    dependencies:
-      - target: AISetlog

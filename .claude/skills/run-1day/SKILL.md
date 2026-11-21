@@ -1,6 +1,6 @@
 ---
 name: run-1day
-description: 编译、安装、启动 1Day iOS App（AISetlog），装到 Cassie 的 iPhone 上截图看效果；手机连不上时退到模拟器。用户说「跑起来」「装到手机上」「截个图」「看看现在什么样」「开模拟器」，或改完代码要确认界面真的渲染出来、不只是编译过时使用。不用于：逐项验证功能并查 D1（用 1day-verify）；只跑单元测试（直接用本文「测试」一节的命令）。
+description: 编译、安装、启动 1Day iOS App（AISetlog），装到 Cassie 的 iPhone 上截图看效果；手机连不上时退到模拟器。用户说「跑起来」「装到手机上」「截个图」「看看现在什么样」「开模拟器」，或改完代码要确认界面真的渲染出来、不只是编译过时使用。不用于：逐项验证功能并查 D1（用 1day-verify）。
 ---
 
 # run-1day
@@ -12,7 +12,7 @@ description: 编译、安装、启动 1Day iOS App（AISetlog），装到 Cassie
 | Bundle ID | `com.cassie.AISetlog` |
 | 最低系统 | iOS 17.0，只支持竖屏、只支持 iPhone（`TARGETED_DEVICE_FAMILY: "1"`） |
 
-**Cassie 的规则（2026-10-30）：在模拟器上做的事（看页面、点流程、截图）都改到她的 iPhone 上，用 `iphone-use` MCP 做。** 按下面「真机（Path B）」第 1～4 步安装，用第 6 步的 `phone_*` 工具操作。手机连不上（调一次 `phone_reconnect` 后 `phone_status` 还没就绪）时，才按 [references/simulator.md](references/simulator.md) 用模拟器（Path A），并告诉用户换成了模拟器，不悄悄换。`xcodebuild test` 单元测试照常在模拟器上跑。
+**Cassie 的规则（2026-10-30）：在模拟器上做的事（看页面、点流程、截图）都改到她的 iPhone 上，用 `iphone-use` MCP 做。** 按下面「真机（Path B）」第 1～4 步安装，用第 6 步的 `phone_*` 工具操作。手机连不上（调一次 `phone_reconnect` 后 `phone_status` 还没就绪）时，才按 [references/simulator.md](references/simulator.md) 用模拟器（Path A），并告诉用户换成了模拟器，不悄悄换。项目没有自动化测试（2026-11-21 全部删除）。
 
 ## 开始前：有没有别人在这个目录里写代码
 
@@ -148,15 +148,3 @@ xcodegen generate --spec ios/project.yml --project ios
 ```
 
 **参数顺序不能换。** `xcodegen --project ios/AISetlog.xcodeproj` 会把 `--project` 当成**输出目录**，生成一个嵌套的 `AISetlog.xcodeproj/AISetlog.xcodeproj/`，真正的工程没变。2026-09-11 02:09 到修复之间，每一次「编译通过」编的都是旧工程（`progress.md` §1）。刚改的东西没效果时，先查有没有这个嵌套目录，再去调别的。
-
-## 测试
-
-```bash
-xcodebuild -project ios/AISetlog.xcodeproj -scheme AISetlog \
-  -destination 'id=<SIM_UDID>' -derivedDataPath /tmp/1day-dd test 2>&1 \
-  | grep -E "error:|failed|Executed .* tests"
-```
-
-`<SIM_UDID>` 怎么查见 [references/simulator.md](references/simulator.md) 第 1 步。
-
-`AISetlogUITests` 的超时是按这台机器调的，在 CI 机器上已知偏紧（commit `98648fb`）。在本机上 UI 测试只因为时间超时失败，通常是机器负载高，不是 App 出了问题。

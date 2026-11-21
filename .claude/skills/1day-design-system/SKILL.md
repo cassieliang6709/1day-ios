@@ -53,13 +53,13 @@ python3 .claude/skills/1day-design-system/scripts/design_lint.py
 8. 旧组件没有任何调用方以后，再删掉它。用 `grep` 确认没人用了。
 9. 更新 `DESIGN.md` 第 6 节：状态改成「已统一」。
 10. 跑 `design_lint.py --baseline …`，确认没有变差，再用 `--write-baseline` 存新基线。
-11. 跑测试第 2 档：编译 + 受影响页面对应的单元测试；有 UI 测试用到被改元素的 identifier 时跑那一个。
+11. 编译通过（项目没有自动化测试）。
 
 ## 规则
 
 - 页面代码只写 `OneDay.xxx`。确实需要写数字的（`DESIGN.md` 第 7 节的例外），在那一行写注释 `// design-lint: allow` 加一句原因。
 - 新组件先在 `DESIGN.md` 第 6 节有一行，再写代码。
-- 不改组件的行为、无障碍标签和 accessibility identifier；UI 测试靠它们找元素。
+- 不改组件的行为、无障碍标签和 accessibility identifier；iphone-use 和 1day-verify 靠它们找元素。
 - 截图看的是用户的 iPhone。手机连不上时才用模拟器，并说明用的是模拟器。
 
 ## 交付时说

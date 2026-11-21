@@ -1,0 +1,22 @@
+name: iOS checks
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios-checks.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios-checks.yml']
+
+jobs:
+  layers:
+    name: Layer boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify layer boundaries
+        run: |
+          if grep -rn "Strings\." ios/AISetlog/Models/; then
+            echo "::error::Models layer references Strings — move display text to ChallengePresenter"
+            exit 1
+          fi
+

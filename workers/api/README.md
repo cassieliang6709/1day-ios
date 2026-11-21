@@ -120,7 +120,6 @@ every Worker, `suggest-prompts` included.
 ## Working on it
 
 ```bash
-npm test
 npm run dev
 ```
 
