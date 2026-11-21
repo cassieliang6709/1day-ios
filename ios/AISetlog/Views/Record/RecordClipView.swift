@@ -15,6 +15,7 @@ struct RecordClipView: View {
     var unfiledGuard: UnfiledClipGuard?
     var onStartStory: (() -> Void)?
     var onCloseFreeform: (() -> Void)?
+    var startsSideways = false
     let onSave: (URL, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -32,6 +33,7 @@ struct RecordClipView: View {
     @State private var showsZoomSlider = false
     @State private var pinchStartZoom: CGFloat?
     @State private var manualSideways = false
+    @State private var tilt = DeviceTiltWatcher(holdSeconds: 0)
     private var deviceTurn: Double { manualSideways ? 90 : 0 }
     private var captureOrientation: Challenge.Orientation {
         manualSideways ? .landscape : effectiveOrientation
@@ -126,7 +128,13 @@ struct RecordClipView: View {
 
     private func withCaptureLifecycle(_ content: some View) -> some View {
         content
+        .onAppear { tilt.start() }
+        .onDisappear { tilt.stop() }
         .task {
+            if startsSideways {
+                manualSideways = true
+                recorder.forcedLandscape = true
+            }
             recorder.orientation = captureOrientation
             if !CameraStyle.selectable.contains(cameraStyle) {
                 cameraStyle = CameraStyle.defaultCamera
@@ -255,7 +263,7 @@ struct RecordClipView: View {
                 }
             }
             .overlay {
-                if isSideways && recorder.state != .recording {
+                if isSideways && recorder.state != .recording && !tilt.isHeldSideways {
                     sidewaysHint.transition(.opacity)
                 }
             }

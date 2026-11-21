@@ -26,6 +26,9 @@ struct RootShellView: View {
     @State private var pendingSurface: Surface?
     @State private var showDrafts = false
     @State private var justKeptADraft = false
+    @State private var tilt = DeviceTiltWatcher()
+    @State private var cameraStartsSideways = false
+    @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -84,7 +87,8 @@ struct RootShellView: View {
                     onOpenDrafts: {
                         guardedSurface.wrappedValue = .plans
                         draftsRequests += 1
-                    })
+                    },
+                    startsSideways: cameraStartsSideways)
             }
 
             if surface != .compose {
@@ -130,7 +134,16 @@ struct RootShellView: View {
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
-        .onAppear { consumeCaptureLaunch() }
+        .onAppear {
+            consumeCaptureLaunch()
+            updateTiltWatching()
+        }
+        .onChange(of: surface) { _, _ in updateTiltWatching() }
+        .onChange(of: scenePhase) { _, _ in updateTiltWatching() }
+        .onChange(of: tilt.isHeldSideways) { _, sideways in
+            guard sideways, canJumpToCamera else { return }
+            openCamera(sideways: true)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .oneDayCaptureRequested)) { _ in
             consumeCaptureLaunch()
         }
@@ -246,7 +259,25 @@ struct RootShellView: View {
             })
     }
 
-    private func openCamera() {
+    private var canJumpToCamera: Bool {
+        guard surface == .plans || surface == .friends, scenePhase == .active,
+              !unfiledGuard.isRecording, !showDrafts else { return false }
+        let root = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+            .first
+        return root?.presentedViewController == nil
+    }
+
+    private func updateTiltWatching() {
+        if (surface == .plans || surface == .friends) && scenePhase == .active {
+            tilt.start()
+        } else {
+            tilt.stop()
+        }
+    }
+
+    private func openCamera(sideways: Bool = false) {
+        cameraStartsSideways = sideways
         if surface == .plans || surface == .friends { returnTab = surface }
         withAnimation(OneDay.Motion.snap) { surface = .camera }
     }
@@ -284,6 +315,7 @@ struct CameraTabView: View {
     var onStartStory: (() -> Void)?
     var onClose: (() -> Void)?
     var onOpenDrafts: (() -> Void)?
+    var startsSideways = false
 
     @Environment(ClipDraftStore.self) private var drafts
     @State private var showDrafts = false
@@ -295,7 +327,8 @@ struct CameraTabView: View {
             isFreeform: true,
             unfiledGuard: unfiledGuard,
             onStartStory: onStartStory,
-            onCloseFreeform: onClose
+            onCloseFreeform: onClose,
+            startsSideways: startsSideways
         ) { _, _ in }
     }
 }
