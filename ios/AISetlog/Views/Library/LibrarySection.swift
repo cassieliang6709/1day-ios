@@ -37,8 +37,6 @@ struct LibrarySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            titleRow
-
             if !scope.clips.isEmpty {
                 if mode == .calendar {
                     LibraryCalendar(
@@ -93,25 +91,6 @@ struct LibrarySection: View {
     }
 
 
-    private var titleRow: some View {
-        HStack(spacing: 10) {
-            SectionLabel(text: Strings.libraryTitle)
-            Spacer(minLength: 6)
-
-            if !scope.clips.isEmpty {
-                Button(isSelecting ? Strings.cancel : Strings.librarySelect) {
-                    withAnimation(OneDay.Motion.snap) { isSelecting.toggle() }
-                }
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.brandText)
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .background(Color.oneDayBrand.opacity(0.1), in: Capsule())
-                .accessibilityIdentifier("library-select")
-            }
-        }
-        .padding(.horizontal, Self.inset)
-    }
 
     private func showDrafts() {
         isSelecting = false

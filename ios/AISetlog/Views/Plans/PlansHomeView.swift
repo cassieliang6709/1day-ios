@@ -584,7 +584,17 @@ struct PlansHomeView: View {
             // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
             IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
                 .accessibilityIdentifier("mine-calendar")
-            composeButton
+            if !library.scoped(includingFriends: false).clips.isEmpty {
+                Button(isSelectingClips ? Strings.cancel : Strings.librarySelect) {
+                    withAnimation(OneDay.Motion.snap) { isSelectingClips.toggle() }
+                }
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(OneDay.brandText)
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(Color.oneDayBrand.opacity(0.1), in: Capsule())
+                .accessibilityIdentifier("library-select")
+            }
         }
         .accessibilityIdentifier("mine-header")
         .sheet(isPresented: $showsDayPicker) {
