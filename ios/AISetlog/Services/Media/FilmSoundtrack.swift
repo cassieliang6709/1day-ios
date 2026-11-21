@@ -86,8 +86,10 @@ enum FilmSoundtrack {
             params.append(p)
         }
 
-        if let voiceover,
-           let audio = try await AVURLAsset(url: voiceover).loadTracks(withMediaType: .audio).first,
+        // asset 要留在变量里：临时对象被释放后，它的音轨就插不进去了（-11800 / -12780）。
+        let voiceAsset = voiceover.map { AVURLAsset(url: $0) }
+        if let voiceAsset,
+           let audio = try await voiceAsset.loadTracks(withMediaType: .audio).first,
            let out = composition.addMutableTrack(
                withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
             let length = try await audio.load(.timeRange).duration
