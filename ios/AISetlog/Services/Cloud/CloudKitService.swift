@@ -252,27 +252,35 @@ enum CloudKitService {
         try Task.checkCancellation()
         let fm = FileManager.default
         try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-        var out: [RemoteMember] = []
-        for m in members {
-            var local: URL?
-            if let key = m.avatarKey {
-                let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: m.userID))
-                let marker = dst.appendingPathExtension("key")
-                if (try? String(contentsOf: marker, encoding: .utf8)) == key, fm.fileExists(atPath: dst.path) {
-                    local = dst
-                } else if (try? await api.download(key: key, to: dst)) != nil {
+        // Avatars download in parallel; one slow avatar used to hold up the whole room.
+        let avatars = await withTaskGroup(of: (String, URL?).self) { group in
+            for m in members {
+                guard let key = m.avatarKey else { continue }
+                group.addTask {
+                    let dst = cacheDir.appendingPathComponent(memberAvatarFileName(userID: m.userID))
+                    let marker = dst.appendingPathExtension("key")
+                    let fm = FileManager.default
+                    if (try? String(contentsOf: marker, encoding: .utf8)) == key, fm.fileExists(atPath: dst.path) {
+                        return (m.userID, dst)
+                    }
+                    guard (try? await api.download(key: key, to: dst)) != nil else { return (m.userID, nil) }
                     try? key.write(to: marker, atomically: true, encoding: .utf8)
-                    local = dst
+                    return (m.userID, dst)
                 }
             }
-            out.append(RemoteMember(
+            var result: [String: URL] = [:]
+            for await (id, url) in group { if let url { result[id] = url } }
+            return result
+        }
+        let out = members.map { m in
+            RemoteMember(
                 userID: m.userID,
                 displayName: m.displayName,
-                avatarURL: local,
+                avatarURL: avatars[m.userID],
                 moodKind: m.moodKind,
                 moodDay: m.moodDay.map(Date.init(apiMillis:)),
                 roomTitle: m.roomTitle,
-                roomTitleAt: m.roomTitleAt.map(Date.init(apiMillis:))))
+                roomTitleAt: m.roomTitleAt.map(Date.init(apiMillis:)))
         }
         return out
     }
@@ -376,7 +384,12 @@ enum CloudKitService {
 
     private static let parallelDownloads = 4
 
-    static func fetchClips(code: String, into cacheDir: URL) async throws -> [RemoteClip] {
+    /// `onProgress` gets the clip list again every time one more video lands on disk,
+    /// so covers show up one by one instead of after the whole room has downloaded.
+    static func fetchClips(
+        code: String, into cacheDir: URL,
+        onProgress: @escaping @MainActor ([RemoteClip]) -> Void = { _ in }
+    ) async throws -> [RemoteClip] {
         try Task.checkCancellation()
         struct Body: Decodable { let clips: [ClipBody] }
         let clips = try await mapped(.networkUnavailable) {
@@ -394,54 +407,83 @@ enum CloudKitService {
             remote: remote, manifest: previous,
             cachedFiles: RoomClipCache.cachedRecordNames(in: cacheDir))
         let keys = Dictionary(clips.map { ($0.id, $0.videoKey) }, uniquingKeysWith: { a, _ in a })
-        let downloaded = try await downloadClipVideos(plan.download, keys: keys, into: cacheDir)
+        let cached = Dictionary(
+            (RoomContentCache.loadClips(in: cacheDir, accountID: AccountStore.persistedUserID) ?? []).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first })
+
+        func list(_ downloaded: Set<String>) -> [RemoteClip] {
+            let available = Set(plan.reuse).union(downloaded)
+            return clips.compactMap { c in
+                guard available.contains(c.id) else { return cached[c.id] }
+                return RemoteClip(
+                    id: c.id,
+                    day: c.day,
+                    authorID: c.authorID,
+                    authorName: c.authorName,
+                    recordedAt: Date(apiMillis: c.recordedAt),
+                    localURL: RoomClipCache.fileURL(recordName: c.id, in: cacheDir),
+                    overlayText: c.overlayText,
+                    captionSticker: c.captionSticker.flatMap(CaptionSticker.init(cloudValue:)),
+                    captionsJSON: c.captionsJSON)
+            }
+        }
+
+        let recordedAt = Dictionary(clips.map { ($0.id, $0.recordedAt) }, uniquingKeysWith: { a, _ in a })
+        let downloaded = try await downloadClipVideos(
+            coverFirst(plan.download, recordedAt: recordedAt), keys: keys, into: cacheDir
+        ) { done in
+            // Save after every file so a quit mid-sync doesn't re-download what already landed.
+            try? RoomClipCache.saveManifest(
+                RoomClipCache.manifest(after: plan, remote: remote, downloaded: done, previous: previous),
+                in: cacheDir)
+            await onProgress(list(done))
+        }
         try Task.checkCancellation()
         RoomClipCache.removeFiles(plan.remove, in: cacheDir)
         try? RoomClipCache.saveManifest(
             RoomClipCache.manifest(
                 after: plan, remote: remote, downloaded: downloaded, previous: previous),
             in: cacheDir)
+        return list(downloaded)
+    }
 
-        let available = Set(plan.reuse).union(downloaded)
-        let cached = Dictionary(
-            (RoomContentCache.loadClips(in: cacheDir, accountID: AccountStore.persistedUserID) ?? []).map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first })
-        return clips.compactMap { c in
-            guard available.contains(c.id) else { return cached[c.id] }
-            return RemoteClip(
-                id: c.id,
-                day: c.day,
-                authorID: c.authorID,
-                authorName: c.authorName,
-                recordedAt: Date(apiMillis: c.recordedAt),
-                localURL: RoomClipCache.fileURL(recordName: c.id, in: cacheDir),
-                overlayText: c.overlayText,
-                captionSticker: c.captionSticker.flatMap(CaptionSticker.init(cloudValue:)),
-                captionsJSON: c.captionsJSON)
-        }
+    /// Room cards use the newest clip as cover, story rows the oldest; fetch those two first,
+    /// then the rest newest-first.
+    static func coverFirst(_ names: [String], recordedAt: [String: Int64]) -> [String] {
+        var ordered = names.sorted { (recordedAt[$0] ?? 0) > (recordedAt[$1] ?? 0) }
+        if ordered.count > 2, let oldest = ordered.popLast() { ordered.insert(oldest, at: 1) }
+        return ordered
     }
 
     private static func downloadClipVideos(
-        _ names: [String], keys: [String: String], into cacheDir: URL
+        _ names: [String], keys: [String: String], into cacheDir: URL,
+        onEach: (Set<String>) async -> Void
     ) async throws -> Set<String> {
         var done = Set<String>()
-        for start in stride(from: 0, to: names.count, by: parallelDownloads) {
-            try Task.checkCancellation()
-            let batch = names[start..<min(start + parallelDownloads, names.count)]
-            await withTaskGroup(of: String?.self) { group in
-                for name in batch {
-                    guard let key = keys[name] else { continue }
-                    group.addTask {
-                        let temp = FileManager.default.temporaryDirectory
-                            .appendingPathComponent("clip-\(UUID().uuidString).mov")
-                        defer { try? FileManager.default.removeItem(at: temp) }
-                        guard (try? await api.download(key: key, to: temp)) != nil, !Task.isCancelled,
-                              (try? RoomClipCache.install(temp, recordName: name, in: cacheDir)) != nil
-                        else { return nil }
-                        return name
-                    }
+        var pending = names.filter { keys[$0] != nil }.makeIterator()
+        try await withThrowingTaskGroup(of: String?.self) { group in
+            func addNext() -> Bool {
+                guard let name = pending.next(), let key = keys[name] else { return false }
+                group.addTask {
+                    let temp = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("clip-\(UUID().uuidString).mov")
+                    defer { try? FileManager.default.removeItem(at: temp) }
+                    guard (try? await api.download(key: key, to: temp)) != nil, !Task.isCancelled,
+                          (try? RoomClipCache.install(temp, recordName: name, in: cacheDir)) != nil
+                    else { return nil }
+                    return name
                 }
-                for await name in group { if let name { done.insert(name) } }
+                return true
+            }
+            // Sliding window: a slow file only holds its own slot, not a whole batch.
+            for _ in 0..<parallelDownloads where !addNext() { break }
+            while let result = try await group.next() {
+                try Task.checkCancellation()
+                if let name = result {
+                    done.insert(name)
+                    await onEach(done)
+                }
+                _ = addNext()
             }
         }
         return done

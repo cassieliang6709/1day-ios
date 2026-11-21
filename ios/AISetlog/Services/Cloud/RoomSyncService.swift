@@ -96,7 +96,11 @@ final class RoomSyncService {
         defer { syncing.remove(code) }
         do {
             var clips = try await transport.fetchClips(
-                code, fileStore.remoteCacheDir(roomCode: code))
+                code, fileStore.remoteCacheDir(roomCode: code)) { [weak self] partial in
+                    guard let self, self.roomGenerations[code] == generation,
+                          self.cacheAccountID() == accountID, !Task.isCancelled else { return }
+                    self.remoteClips[code] = partial
+                }
             #if DEBUG
             clips += await DebugFakeFriends.clips(for: code)
             #endif

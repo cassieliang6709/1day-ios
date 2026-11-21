@@ -1,7 +1,8 @@
 import Foundation
 
 struct RoomSyncTransport {
-    var fetchClips: @MainActor (String, URL) async throws -> [CloudKitService.RemoteClip]
+    /// Third argument receives partial lists while videos are still downloading.
+    var fetchClips: @MainActor (String, URL, @escaping @MainActor ([CloudKitService.RemoteClip]) -> Void) async throws -> [CloudKitService.RemoteClip]
     var fetchInteractions: @MainActor (String) async throws -> (reactions: [CloudKitService.RemoteReaction], comments: [CloudKitService.RemoteComment])
     var uploadClip: @MainActor (String, Int, String, String, URL, [Caption], Date, UUID?) async throws -> Void
     var updateClipCaption: @MainActor (String, Int, String, [Caption], UUID?) async throws -> Void
@@ -38,7 +39,7 @@ struct RoomSyncTransport {
 
     static var live: RoomSyncTransport {
         RoomSyncTransport(
-            fetchClips: { try await CloudKitService.fetchClips(code: $0, into: $1) },
+            fetchClips: { try await CloudKitService.fetchClips(code: $0, into: $1, onProgress: $2) },
             fetchInteractions: { try await CloudKitService.fetchInteractions(code: $0) },
             uploadClip: { try await CloudKitService.uploadClip(code: $0, day: $1, authorID: $2, authorName: $3, fileURL: $4, captions: $5, recordedAt: $6, takeID: $7) },
             updateClipCaption: { try await CloudKitService.updateClipCaption(code: $0, day: $1, authorID: $2, captions: $3, takeID: $4) },
@@ -72,7 +73,7 @@ final class LocalRoomSyncSource {
 
     var transport: RoomSyncTransport {
         RoomSyncTransport(
-            fetchClips: { [self] code, _ in
+            fetchClips: { [self] code, _, _ in
                 try check(code)
                 return clips
             },

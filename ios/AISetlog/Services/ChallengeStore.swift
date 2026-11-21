@@ -317,9 +317,12 @@ final class ChallengeStore {
                 && self.challenge(id)?.roomCode == code && !Task.isCancelled
         }
         roomSync.restoreCachedContent(code: code)
-        await roomSync.syncMembers(code: code)
+        // Members and clips don't depend on each other; fetch them side by side.
+        async let members: Void = roomSync.syncMembers(code: code)
+        let clips = await roomSync.syncClips(code: code)
+        await members
         guard isCurrent() else { return }
-        if let remote = await roomSync.syncClips(code: code) {
+        if let remote = clips {
             guard isCurrent() else { return }
             adoptMyTakes(remote, code: code, into: id)
             if await uploadMissingClips(in: challenge, code: code, remote: remote) {
