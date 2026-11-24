@@ -162,6 +162,7 @@ struct RootShellView: View {
         .onChange(of: scenePhase) { _, phase in
             updateTiltWatching()
             if phase == .active { offerCheckInIfNeeded() }
+            if phase == .background { FilmReminder.refresh(filmedToday: hasFilmedToday) }
         }
         .onChange(of: tilt.isHeldSideways) { _, sideways in
             guard sideways, canJumpToCamera else { return }
