@@ -43,7 +43,7 @@ python3 .claude/skills/1day-design-system/scripts/design_lint.py
 
 一次只统一**一类组件**（例如所有片段小图），不和功能改动混在一起。
 
-1. 在 `DESIGN.md` 第 6 节找到这类组件的合并目标。没有目标时先走路径 A 定下来。
+1. 在 `DESIGN.md` 第 3 节找到这类组件的定值目标。没有目标时先走路径 A 定下来。
 2. 用 `grep` 列出所有用到旧组件或手写样式的文件。
 3. 把要改的文件清单和改法告诉用户。超过 3 个文件或约 100 行时，等用户说「可以」再动。
 4. 先在 `Views/DesignSystem/` 做好目标组件（或确认已有的能用），只用 token。
@@ -51,14 +51,14 @@ python3 .claude/skills/1day-design-system/scripts/design_lint.py
 6. 一页一页把调用方换成目标组件。每换完一页：编译，再到 iPhone 上截同一个画面。
 7. 对比前后截图。除了本来就要统一的地方，其他视觉变化（尺寸跳动、文字截断、颜色变了）都先停下，把两张图给用户看。
 8. 旧组件没有任何调用方以后，再删掉它。用 `grep` 确认没人用了。
-9. 更新 `DESIGN.md` 第 6 节：状态改成「已统一」。
+9. 更新 `DESIGN.md` 第 6 节取舍记录（如涉及方案定稿）。
 10. 跑 `design_lint.py --baseline …`，确认没有变差，再用 `--write-baseline` 存新基线。
 11. 编译通过（项目没有自动化测试）。
 
 ## 规则
 
-- 页面代码只写 `OneDay.xxx`。确实需要写数字的（`DESIGN.md` 第 7 节的例外），在那一行写注释 `// design-lint: allow` 加一句原因。
-- 新组件先在 `DESIGN.md` 第 6 节有一行，再写代码。
+- 页面代码只写 `OneDay.xxx`。确实需要写数字的，只限于 `DESIGN.md` 第 5 节第 10 条列出的例外，且代码里不写注释说明。
+- 新组件先在 `DESIGN.md` 第 3 节写清尺寸和状态，再写代码。
 - 不改组件的行为、无障碍标签和 accessibility identifier；iphone-use 和 1day-verify 靠它们找元素。
 - 截图看的是用户的 iPhone。手机连不上时才用模拟器，并说明用的是模拟器。
 
