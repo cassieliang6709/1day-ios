@@ -2,14 +2,15 @@ import SwiftUI
 
 
 struct FilmReadyCard: View {
-    let momentCount: Int
+    var eyebrow: String = Strings.dayIsFull
+    let momentCount: Int?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) { card }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(Strings.watchTheFilm))
-            .accessibilityHint(Text(Strings.filmFromMoments(momentCount)))
+            .accessibilityHint(Text(momentCount.map(Strings.filmFromMoments) ?? eyebrow))
     }
 
     private var card: some View {
@@ -22,7 +23,7 @@ struct FilmReadyCard: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.34), lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(Strings.dayIsFull)
+                Text(eyebrow)
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .kerning(0.7)
                     .textCase(.uppercase)
@@ -37,11 +38,13 @@ struct FilmReadyCard: View {
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.leading)
 
-                Text(Strings.filmFromMoments(momentCount))
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.onBrand.opacity(0.88))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if let momentCount {
+                    Text(Strings.filmFromMoments(momentCount))
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.onBrand.opacity(0.88))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
             }
 
             Spacer(minLength: 4)

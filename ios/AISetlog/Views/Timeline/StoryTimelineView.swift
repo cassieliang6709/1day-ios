@@ -289,6 +289,10 @@ struct StoryTimelineView: View {
             RoomStoriesRow(columns: dayColumns, selected: roomPerson) { id in
                 withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
             }
+            if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
+                FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
+                    .accessibilityIdentifier("room-everyone-filmed")
+            }
             let shownMembers = roomPerson.map { id in members.filter { $0.id == id } } ?? members
             let shownClips = roomPerson.map { id in dayColumns.first { $0.id == id }?.clips ?? [] } ?? dayClips
             switch roomLayout {
@@ -699,6 +703,12 @@ struct StoryTimelineView: View {
 }
 
 extension StoryTimelineView {
+    static func everyoneFilmedToday(_ columns: [RoomFeed.Column]) -> Bool {
+        columns.count > 1 && columns.allSatisfy { column in
+            column.clips.contains { $0.recordedAt.map(Calendar.current.isDateInToday) ?? false }
+        }
+    }
+
     static func isClip(_ clip: DayClip, on day: Date) -> Bool {
         clip.recordedAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
     }

@@ -21,6 +21,7 @@ enum SharedActivityNotificationService {
         case comment
         case reaction
         case poke
+        case everyone
     }
 
     struct AlertCopy: Codable, Equatable {
@@ -55,6 +56,8 @@ enum SharedActivityNotificationService {
         case .poke:
             return AlertCopy(format: Strings.roomPokeAlertFormat(named: showNames),
                              args: showNames ? ["authorName"] : [])
+        case .everyone:
+            return AlertCopy(format: Strings.roomEveryoneAlert, args: [])
         }
     }
 

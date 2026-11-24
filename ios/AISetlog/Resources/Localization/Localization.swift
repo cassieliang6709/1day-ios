@@ -1034,6 +1034,8 @@ enum Strings {
     }
 
     static var dayIsFull: String { lang == .chinese ? "这一天拍满了" : "The day is full" }
+    static var everyoneFilmedToday: String { lang == .chinese ? "大家今天都拍了" : "Everyone filmed today" }
+    static var roomEveryoneAlert: String { lang == .chinese ? "大家今天都拍了，来看今天的片" : "Everyone filmed today — come watch" }
     static var watchTheFilm: String { lang == .chinese ? "看成片" : "See the film" }
     static func filmFromMoments(_ moments: Int) -> String {
         lang == .chinese
