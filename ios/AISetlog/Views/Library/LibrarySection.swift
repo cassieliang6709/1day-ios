@@ -152,7 +152,9 @@ struct LibrarySection: View {
             Text(Calendar.current.isDateInToday(day) ? Strings.mineTodayHeader : dayTitle(day))
                 .font(OneDay.Font.headline)
                 .foregroundStyle(OneDay.ink)
-            if let mood = moodStore?.mood(on: day)?.mood {
+            if Calendar.current.isDateInToday(day) {
+                MoodTodayBadge()
+            } else if let mood = moodStore?.mood(on: day)?.mood {
                 Image(mood.imageName)
                     .resizable()
                     .scaledToFit()

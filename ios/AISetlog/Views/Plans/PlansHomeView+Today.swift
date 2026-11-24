@@ -7,10 +7,6 @@ extension PlansHomeView {
             otherDayCards
         } else if let plan = store.todaysPlan() {
             HStack(alignment: .top, spacing: 12) {
-                if onBackToRooms == nil {
-                    MoodTodayCard(compact: true)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
                 TodayPlanCard(
                     challenge: plan,
                     progress: cardState(for: plan).progress,
@@ -20,9 +16,6 @@ extension PlansHomeView {
             }
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 20)
-        } else if onBackToRooms == nil {
-            MoodTodayCard()
-                .padding(.horizontal, 20)
         }
     }
 

@@ -1,65 +1,5 @@
 import SwiftUI
 
-struct MoodTodayCard: View {
-    var compact = false
-
-    @Environment(MoodStore.self) private var moods
-    @State private var dayTick = 0
-    @State private var isChoosing = false
-    @Environment(\.scenePhase) private var scenePhase
-
-    var body: some View {
-        let _ = dayTick
-        GlassCard(padding: compact ? 14 : 18) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(Strings.moodSectionTitle)
-                    .font(OneDay.Font.callout)
-                    .foregroundStyle(OneDay.ink)
-                Group {
-                    if let mood = moods.today?.mood, !isChoosing {
-                        selectedMood(mood)
-                    } else {
-                        MoodFaceRow(selected: moods.today?.mood, compact: compact) {
-                            moods.setMood($0)
-                            isChoosing = false
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, minHeight: 112)
-                .animation(OneDay.Motion.soft, value: isChoosing)
-            }
-            .frame(maxHeight: .infinity, alignment: .top)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("mood-today-card")
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in dayTick += 1 }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { dayTick += 1 } }
-    }
-
-    private func selectedMood(_ mood: Mood) -> some View {
-        Button {
-            isChoosing = true
-        } label: {
-            VStack(spacing: 6) {
-                Image(mood.imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 64, height: 64)
-                Text(mood.label)
-                    .font(OneDay.Font.callout)
-                    .foregroundStyle(OneDay.ink)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(mood.label)
-        .accessibilityHint(Strings.moodEditFaceHint)
-        .accessibilityIdentifier("mood-today-selected")
-    }
-}
-
-/// 首页右上角的小心情入口：选过显示表情 + 名字，没选显示「今天的心情」，点开弹出 5 个表情。
 struct MoodTodayBadge: View {
     @Environment(MoodStore.self) private var moods
     @State private var dayTick = 0
@@ -70,31 +10,20 @@ struct MoodTodayBadge: View {
         let _ = dayTick
         let mood = moods.today?.mood
         Button { isChoosing = true } label: {
-            HStack(spacing: OneDay.Space.xs) {
-                // 固定尺寸：小图标，同一处只用这一档
+            Group {
                 if let mood {
                     Image(mood.imageName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 26, height: 26)
                 } else {
-                    Image(systemName: "face.smiling")
-                        .font(OneDay.Font.rounded(.callout, weight: .semibold))
-                        .foregroundStyle(OneDay.brandText)
+                    Image(systemName: "face.dashed")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(OneDay.inkFaint)
                 }
-                Text(mood?.label ?? Strings.moodSectionTitle)
-                    .font(OneDay.Font.caption)
-                    .foregroundStyle(OneDay.ink)
-                    .lineLimit(1)
             }
-            .fixedSize()
-            .padding(.leading, mood == nil ? OneDay.Space.m : OneDay.Space.xs)
-            .padding(.trailing, OneDay.Space.m)
-            .padding(.vertical, OneDay.Space.xs)
-            .frame(minHeight: 36)
-            .background(Capsule().fill(.regularMaterial))
-            .overlay(Capsule().strokeBorder(OneDay.ink.opacity(0.08), lineWidth: 1))
-            .frame(minHeight: 44)
+            .frame(width: 22, height: 22)
+            .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

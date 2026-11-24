@@ -31,11 +31,8 @@ extension PlansHomeView {
     var friendsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: OneDay.Space.s) {
-                    greetingRow
-                    MoodTodayBadge()
-                }
-                .padding(.horizontal, 20)
+                greetingRow
+                    .padding(.horizontal, 20)
                 friendsHeader
                 if !account.isSignedIn, !sharedStories.isEmpty {
                     signedOutBanner
