@@ -7,6 +7,7 @@ struct LibrarySection: View {
     var draftsRequest = 0
     @Binding var isSelecting: Bool
     @Binding var picked: [LibraryClip]
+    var onFilmToday: (() -> Void)? = nil
 
     enum Mode: Hashable { case grid, calendar }
 
@@ -119,6 +120,9 @@ struct LibrarySection: View {
                         ForEach(group.clips) { clip in
                             cell(clip)
                         }
+                        if group.clips.isEmpty, let onFilmToday, !isSelecting {
+                            filmTodayTile(onFilmToday)
+                        }
                     }
                 }
                 .padding(.horizontal, Self.inset)
@@ -142,9 +146,30 @@ struct LibrarySection: View {
 
     private var dayGroups: [(day: Date, clips: [LibraryClip])] {
         let calendar = Calendar.current
-        return Dictionary(grouping: shown) { calendar.startOfDay(for: $0.recordedAt) }
+        var groups = Dictionary(grouping: shown) { calendar.startOfDay(for: $0.recordedAt) }
             .map { (day: $0.key, clips: $0.value.sorted { $0.recordedAt < $1.recordedAt }) }
             .sorted { $0.day > $1.day }
+        if day == nil, onFilmToday != nil, !groups.contains(where: { calendar.isDateInToday($0.day) }) {
+            groups.insert((day: calendar.startOfDay(for: .now), clips: []), at: 0)
+        }
+        return groups
+    }
+
+    private func filmTodayTile(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: OneDay.Space.xs) {
+                Image(systemName: "camera.fill")
+                    .font(OneDay.Font.headline)
+                Text(Strings.libraryFilmToday)
+                    .font(OneDay.Font.caption)
+            }
+            .foregroundStyle(OneDay.brandText)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(3 / 4, contentMode: .fit)
+            .background(Color.oneDayBrand.opacity(0.18), in: RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("library-film-today")
     }
 
     private func dayHeader(_ day: Date, clips: [LibraryClip]) -> some View {
@@ -162,7 +187,7 @@ struct LibrarySection: View {
                     .accessibilityLabel(mood.label)
             }
             Spacer(minLength: 0)
-            if isSelecting {
+            if isSelecting, !clips.isEmpty {
                 let allPicked = clips.allSatisfy(picked.contains)
                 Button(allPicked ? Strings.libraryDeselectDay : Strings.librarySelectDay) {
                     if allPicked {

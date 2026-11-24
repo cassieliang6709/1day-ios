@@ -17,6 +17,7 @@ struct PlansHomeView: View {
     var onOpenPersonal: (() -> Void)? = nil
     var onDetailOpenChange: ((Bool) -> Void)? = nil
     var onSelectingChange: ((Bool) -> Void)? = nil
+    var onOpenCamera: (() -> Void)? = nil
     let onCompose: () -> Void
     @State var path: [UUID] = []
 

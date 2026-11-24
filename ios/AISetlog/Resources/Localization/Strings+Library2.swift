@@ -11,6 +11,7 @@ extension Strings {
     static var libraryCaptionPlaceholder: String { zh ? "这一段想说什么" : "Say something about this clip" }
     static var libraryCaptionSave: String { zh ? "好了" : "Done" }
 
+    static var libraryFilmToday: String { zh ? "拍一段" : "Film a clip" }
     static func libraryMakeVlog(count: Int) -> String {
         zh ? "生成 · \(count) 段" : (count == 1 ? "Make · 1 clip" : "Make · \(count) clips")
     }

@@ -51,6 +51,7 @@ struct RootShellView: View {
                 onBackToRooms: { surface = .friends },
                 onDetailOpenChange: { plansDetailOpen = $0 },
                 onSelectingChange: { plansSelecting = $0 },
+                onOpenCamera: { openCamera() },
                 onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)

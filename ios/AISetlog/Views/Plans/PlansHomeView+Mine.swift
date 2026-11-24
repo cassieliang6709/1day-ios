@@ -68,7 +68,8 @@ extension PlansHomeView {
                     onOpenStory: { path.append($0) },
                     draftsRequest: draftsRequest,
                     isSelecting: $isSelectingClips,
-                    picked: $pickedClips)
+                    picked: $pickedClips,
+                    onFilmToday: onOpenCamera)
                     .id(Self.libraryAnchor)
             }
             .padding(.top, 8)
