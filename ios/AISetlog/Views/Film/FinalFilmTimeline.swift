@@ -71,23 +71,12 @@ struct FinalFilmTimeline: View {
     }
 
     private var heading: some View {
-        VStack(alignment: .leading, spacing: OneDay.Space.xs) {
-            Text(Strings.filmReadyTitle)
-                .font(OneDay.Font.caption)
-                .foregroundStyle(OneDay.brandText)
-            Text(challenge.title)
-                .font(OneDay.Font.title)
-                .foregroundStyle(OneDay.ink)
-                .lineLimit(2)
-            Text(Strings.filmMeta(
-                duration: schedule.filmDuration(),
-                clips: clips.count,
-                people: max(contributors.count, 1)))
-                .font(OneDay.Font.subhead)
-                .foregroundStyle(OneDay.inkSoft)
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text(challenge.title)
+            .font(OneDay.Font.title)
+            .foregroundStyle(OneDay.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("film-heading")
     }

@@ -56,20 +56,11 @@ struct LibraryVlogSheet: View {
                 IconBubble(systemName: "xmark") { dismiss() }
             }
 
-            VStack(alignment: .leading, spacing: OneDay.Space.xs) {
-                if case .done = phase {
-                    Text(Strings.filmReadyTitle)
-                        .font(OneDay.Font.caption)
-                        .foregroundStyle(OneDay.brandText)
-                }
-                Text(title ?? Strings.vlogTitle)
-                    .font(OneDay.Font.title)
-                    .foregroundStyle(OneDay.ink)
-                Text(Strings.libraryClipCount(order.count))
-                    .font(OneDay.Font.subhead)
-                    .foregroundStyle(OneDay.inkSoft)
-            }
-            .accessibilityElement(children: .combine)
+            Text(title ?? Strings.vlogTitle)
+                .font(OneDay.Font.title)
+                .foregroundStyle(OneDay.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
 
             Group {
                 switch phase {

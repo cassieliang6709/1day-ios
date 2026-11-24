@@ -1180,14 +1180,6 @@ enum Strings {
     }
 
 
-    static var filmReadyTitle: String {
-        lang == .chinese ? "片子好了" : "Your film's ready"
-    }
-    static func filmMeta(duration: String, clips: Int, people: Int) -> String {
-        lang == .chinese
-            ? "\(duration) · \(clips) 段 · \(people) 人"
-            : "\(duration) · \(clips == 1 ? "1 clip" : "\(clips) clips") · \(people == 1 ? "1 person" : "\(people) people")"
-    }
     static var filmAdjustTitle: String { lang == .chinese ? "调整成片" : "Adjust the film" }
     static var filmAdjustSummary: String { lang == .chinese ? "声音、谁在里面、画面" : "Sound, who's in it, look" }
     static var filmLookRow: String { lang == .chinese ? "画面：柔和度、亮度、暖度" : "Look: softness, brightness, warmth" }
