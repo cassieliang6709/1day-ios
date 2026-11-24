@@ -77,8 +77,6 @@ targets:
         embed: true
       - package: GoogleSignIn
         product: GoogleSignIn
-      - package: GoogleSignIn
-        product: GoogleSignInSwift
   OneDayLockedCapture:
     type: extensionkit-extension
     platform: iOS
