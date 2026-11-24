@@ -124,10 +124,115 @@ async function hash(value) {
     .join('');
 }
 
+const MAX_PICK_CLIPS = 60;
+const MAX_LABELS = 5;
+const MAX_LABEL_CHARS = 30;
+
+function pickSystemPrompt(targetSeconds, language) {
+  const inChinese = language !== 'en';
+  return [
+    'You pick clips for a short personal vlog in a video diary app. You cannot see the clips; each one comes with its day, time, length, how many faces are in it and a few labels for what is in the frame.',
+    `Pick clips that add up to about ${targetSeconds} seconds.`,
+    'Rules:',
+    '- Prefer variety: different places, times of day and subjects. Skip clips that look like near-duplicates (same labels, a few minutes apart).',
+    '- Prefer clips with people over empty scenes, but do not pick only faces.',
+    '- Keep them in the order they were filmed unless another order clearly tells a better story.',
+    `- Also write a short title in ${inChinese ? 'Simplified Chinese (at most 12 characters)' : 'English (at most 6 words)'} that fits what was picked.`,
+    'Reply with json in exactly this shape: {"title": "…", "ids": ["…", "…"]}',
+  ].join('\n');
+}
+
+export function cleanPickClips(list) {
+  if (!Array.isArray(list) || list.length === 0 || list.length > MAX_PICK_CLIPS) return null;
+  const clips = [];
+  for (const clip of list) {
+    const id = typeof clip?.id === 'string' ? clip.id.trim() : '';
+    if (!id || id.length > 80) return null;
+    const labels = (Array.isArray(clip?.labels) ? clip.labels : [])
+      .filter((l) => typeof l === 'string')
+      .map((l) => [...l.trim()].slice(0, MAX_LABEL_CHARS).join(''))
+      .filter(Boolean)
+      .slice(0, MAX_LABELS);
+    clips.push({
+      id,
+      day: typeof clip?.day === 'string' ? clip.day.slice(0, 10) : '',
+      time: typeof clip?.time === 'string' ? clip.time.slice(0, 5) : '',
+      seconds: clamp(Number(clip?.seconds) || 0, 0, 600),
+      faces: clamp(Number(clip?.faces) || 0, 0, 20),
+      labels,
+    });
+  }
+  return clips;
+}
+
+export function parsePick(text, knownIds) {
+  let parsed;
+  try {
+    parsed = JSON.parse(sliceBetween(text, '{', '}'));
+  } catch {
+    return null;
+  }
+  const known = new Set(knownIds);
+  const ids = [...new Set((Array.isArray(parsed?.ids) ? parsed.ids : []).filter((id) => known.has(id)))];
+  if (ids.length === 0) return null;
+  const title =
+    typeof parsed?.title === 'string' ? [...parsed.title.trim()].slice(0, 80).join('') : '';
+  return title ? { title, ids } : { ids };
+}
+
+async function handlePickClips(body, request, env, key) {
+  const language = body?.language === 'en' ? 'en' : 'zh';
+  const targetSeconds = clamp(Number(body?.targetSeconds) || 30, 10, 180);
+  const device = typeof body?.device === 'string' ? body.device : '';
+  const clips = cleanPickClips(body?.clips);
+  if (!clips) return json({ error: 'bad_request' }, 400);
+
+  const deviceKey = await hash(
+    'pick:' + (device || request.headers.get('cf-connecting-ip') || 'anonymous')
+  );
+  if (overRateLimit(deviceKey, Date.now())) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  try {
+    const upstream = await fetch(DEEPSEEK_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
+        thinking: { type: 'disabled' },
+        max_tokens: 800,
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: pickSystemPrompt(targetSeconds, language) },
+          { role: 'user', content: JSON.stringify(clips) },
+        ],
+      }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    if (!upstream.ok) {
+      console.error('upstream', upstream.status);
+      return json({ error: 'unavailable' }, 502);
+    }
+    const payload = await upstream.json();
+    const pick = parsePick(
+      String(payload?.choices?.[0]?.message?.content ?? ''),
+      clips.map((c) => c.id)
+    );
+    if (!pick) return json({ error: 'unavailable' }, 502);
+    return json(pick);
+  } catch (error) {
+    console.error('failed', error?.name ?? 'error');
+    return json({ error: 'unavailable' }, 502);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/suggest-prompts' && url.pathname !== '/') {
+    const isPick = url.pathname === '/api/pick-clips';
+    if (!isPick && url.pathname !== '/api/suggest-prompts' && url.pathname !== '/') {
       return json({ error: 'not_found' }, 404);
     }
     if (request.method === 'HEAD') {
@@ -148,6 +253,8 @@ export default {
     } catch {
       return json({ error: 'bad_request' }, 400);
     }
+
+    if (isPick) return handlePickClips(body, request, env, key);
 
     const intent = typeof body?.intent === 'string' ? body.intent.trim() : '';
     const language = body?.language === 'en' ? 'en' : 'zh';
