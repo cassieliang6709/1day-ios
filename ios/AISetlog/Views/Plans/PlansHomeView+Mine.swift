@@ -39,13 +39,8 @@ extension PlansHomeView {
     var storiesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                header
-
-                if isSelectingClips {
-                    LibrarySelectionCard(picked: $pickedClips) {
-                        vlogRequest = VlogRequest(clips: pickedClips)
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                if !isSelectingClips {
+                    header
                 }
 
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
@@ -81,6 +76,20 @@ extension PlansHomeView {
             .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if isSelectingClips {
+                VStack(spacing: OneDay.Space.l) {
+                    header
+                    LibrarySelectionCard(picked: $pickedClips) {
+                        vlogRequest = VlogRequest(clips: pickedClips)
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.bottom, OneDay.Space.m)
+                .background { OneDayCanvas().ignoresSafeArea(edges: .top) }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .overlay { joiningOverlay }
     }
 
