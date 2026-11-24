@@ -1,6 +1,6 @@
 import { bad, json, readJson, roomCode, str } from './http.js';
 
-const KINDS = ['clip', 'comment', 'reaction', 'poke'];
+const KINDS = ['clip', 'comment', 'reaction', 'poke', 'everyone'];
 const ARG_FIELDS = new Set(['authorName', 'text']);
 const MAX_ALERT_TEXT = 500;
 

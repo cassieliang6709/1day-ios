@@ -275,7 +275,29 @@ async function putClip(request, env, ctx, { me }, id) {
   ctx.waitUntil(
     notifyRoom(env, { kind: 'clip', code, authorID: me, authorName, day, recordName: id })
   );
+  if (!old) ctx.waitUntil(notifyIfEveryoneFilmed(env, { code, day, me, id, authorName }));
   return json({ ok: true });
+}
+
+export function everyoneJustFilmed({ members, filmed, earlierByMe }) {
+  return members > 1 && !earlierByMe && filmed >= members;
+}
+
+async function notifyIfEveryoneFilmed(env, { code, day, me, id, authorName }) {
+  const [members, filmed, earlier] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM members WHERE room_code = ?1').bind(code).first(),
+    env.DB.prepare(
+      `SELECT COUNT(DISTINCT author_id) AS n FROM clips
+        WHERE room_code = ?1 AND day = ?2 AND author_id IN (SELECT user_id FROM members WHERE room_code = ?1)`
+    ).bind(code, day).first(),
+    env.DB.prepare(
+      'SELECT 1 AS hit FROM clips WHERE room_code = ?1 AND day = ?2 AND author_id = ?3 AND id <> ?4 LIMIT 1'
+    ).bind(code, day, me, id).first(),
+  ]);
+  if (!everyoneJustFilmed({ members: members?.n ?? 0, filmed: filmed?.n ?? 0, earlierByMe: Boolean(earlier) })) return;
+  await notifyRoom(env, {
+    kind: 'everyone', code, authorID: me, authorName, day, recordName: `${code}_everyone_day${day}`,
+  });
 }
 
 async function patchClip(request, env, { me }, id) {
