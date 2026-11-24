@@ -7,6 +7,7 @@ struct LibraryVlogArrange: View {
 
     @State private var previewingID: String?
     @State private var draggingID: String?
+    @State private var stripWidth: CGFloat = 0
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
@@ -68,7 +69,9 @@ struct LibraryVlogArrange: View {
                 }
                 .padding(.horizontal, OneDay.Space.xl)
                 .padding(.vertical, OneDay.Space.xs)
+                .frame(minWidth: stripWidth)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { stripWidth = $0 }
             .scrollIndicators(.hidden)
             .onChange(of: previewingID) { _, id in
                 guard let id else { return }
