@@ -14,8 +14,9 @@ struct PlansHomeView: View {
     var isActive = true
     var onActivate: (() -> Bool)? = nil
     var onBackToRooms: (() -> Void)? = nil
-    var onSelectingChange: ((Bool) -> Void)? = nil
     var onOpenPersonal: (() -> Void)? = nil
+    var onDetailOpenChange: ((Bool) -> Void)? = nil
+    var onSelectingChange: ((Bool) -> Void)? = nil
     let onCompose: () -> Void
 
     @State private var path: [UUID] = []
@@ -56,6 +57,7 @@ struct PlansHomeView: View {
             }
             .accessibilityHidden(!isActive)
             .toolbar(.hidden, for: .navigationBar)
+            .onChange(of: path.isEmpty) { _, empty in onDetailOpenChange?(!empty) }
             .navigationDestination(for: UUID.self) { id in
                 StoryTimelineView(challengeID: id)
                     .onAppear { markSeen(id) }

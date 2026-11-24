@@ -86,7 +86,6 @@ enum FilmSoundtrack {
             params.append(p)
         }
 
-        // asset 要留在变量里：临时对象被释放后，它的音轨就插不进去了（-11800 / -12780）。
         let voiceAsset = voiceover.map { AVURLAsset(url: $0) }
         if let voiceAsset,
            let audio = try await voiceAsset.loadTracks(withMediaType: .audio).first,

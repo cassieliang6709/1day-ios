@@ -28,6 +28,8 @@ struct RootShellView: View {
     @State private var justKeptADraft = false
     @State private var tilt = DeviceTiltWatcher()
     @State private var cameraStartsSideways = false
+    @State private var plansDetailOpen = false
+    @State private var friendsDetailOpen = false
     @State private var plansSelecting = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -47,6 +49,7 @@ struct RootShellView: View {
                 isActive: surface == .plans,
                 onActivate: { activate(.plans) },
                 onBackToRooms: { surface = .friends },
+                onDetailOpenChange: { plansDetailOpen = $0 },
                 onSelectingChange: { plansSelecting = $0 },
                 onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
@@ -61,6 +64,7 @@ struct RootShellView: View {
                 isActive: surface == .friends,
                 onActivate: { activate(.friends) },
                 onOpenPersonal: { surface = .plans },
+                onDetailOpenChange: { friendsDetailOpen = $0 },
                 onCompose: { openCompose(together: true) })
                 .opacity(surface == .friends ? 1 : 0)
                 .allowsHitTesting(surface == .friends)
@@ -263,7 +267,8 @@ struct RootShellView: View {
 
     private var canJumpToCamera: Bool {
         guard surface == .plans || surface == .friends, scenePhase == .active,
-              !unfiledGuard.isRecording, !showDrafts else { return false }
+              !unfiledGuard.isRecording, !showDrafts,
+              !(surface == .plans ? plansDetailOpen : friendsDetailOpen) else { return false }
         let root = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
             .first
