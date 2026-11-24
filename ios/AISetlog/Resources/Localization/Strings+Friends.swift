@@ -4,9 +4,7 @@ extension Strings {
     private static var zh: Bool { AppLanguage.effective.resolved == .chinese }
 
     static var signedOutTitle: String { zh ? "还没登录" : "Not signed in" }
-    static var signedOutSettingsBody: String {
-        zh ? "登录后才能和朋友一起拍、看到他们的片段" : "Sign in to film with friends and see their clips"
-    }
+    static var signInWithGoogle: String { zh ? "通过 Google 登录" : "Sign in with Google" }
     static var signedOutRoomsTitle: String { zh ? "没登录" : "Not signed in" }
     static var signedOutRoomsBody: String {
         zh ? "朋友的新片段不会同步过来" : "Friends' new clips won't come through"

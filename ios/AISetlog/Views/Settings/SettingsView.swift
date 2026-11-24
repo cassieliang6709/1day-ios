@@ -144,17 +144,11 @@ struct SettingsView: View {
             Text(Strings.signedOutTitle)
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.ink)
-                .padding(.bottom, 4)
-            Text(Strings.signedOutSettingsBody)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OneDay.inkSoft)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 14)
             AppleSignInButton(height: 46) { signInError = nil } onError: { signInError = $0 }
                 .clipShape(Capsule())
                 .accessibilityIdentifier("settings-sign-in")
-            GoogleAccountButton { signInError = nil } onError: { signInError = $0 }
+            GoogleAccountButton(height: 46) { signInError = nil } onError: { signInError = $0 }
                 .padding(.top, 10)
             if let signInError {
                 Text(signInError)

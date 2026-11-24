@@ -1,7 +1,6 @@
 import SwiftUI
 import AuthenticationServices
 import GoogleSignIn
-import GoogleSignInSwift
 
 struct SignInView: View {
     @Environment(AccountStore.self) private var account
@@ -44,7 +43,7 @@ struct SignInView: View {
                 dismiss()
             } onError: { errorMessage = $0 }
 
-            GoogleAccountButton {
+            GoogleAccountButton(height: 50) {
                 onSignedIn()
                 dismiss()
             } onError: { errorMessage = $0 }
@@ -94,12 +93,12 @@ struct AppleSignInButton: View {
 
 struct GoogleAccountButton: View {
     @Environment(AccountStore.self) private var account
-    @Environment(\.colorScheme) private var colorScheme
+    var height: CGFloat = 50
     var onSignedIn: () -> Void = {}
     var onError: (String) -> Void = { _ in }
 
     var body: some View {
-        GoogleSignInButton(scheme: colorScheme == .dark ? .dark : .light, style: .wide) {
+        Button {
             Task { @MainActor in
                 do {
                     try await account.signInWithGoogle()
@@ -109,7 +108,24 @@ struct GoogleAccountButton: View {
                     onError(Strings.signInFailure(error))
                 }
             }
+        } label: {
+            HStack(spacing: OneDay.Space.s) {
+                Image("GoogleG")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
+                Text(Strings.signInWithGoogle)
+                    .font(.system(size: height * 0.38, weight: .medium))
+                    .foregroundStyle(Color.black)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .background(Color.white, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
+            .contentShape(Capsule())
         }
+        .buttonStyle(.plain)
         .accessibilityIdentifier("google-sign-in")
     }
 }
