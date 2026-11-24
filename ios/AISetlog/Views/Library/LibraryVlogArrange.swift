@@ -2,105 +2,116 @@ import SwiftUI
 
 struct LibraryVlogArrange: View {
     @Binding var order: [LibraryClip]
-    let onMake: () -> Void
+    let aspectRatio: CGFloat
+    let onDone: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var previewing: LibraryClip?
+    @State private var previewingID: String?
+    @State private var draggingID: String?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
+    private var previewing: LibraryClip? {
+        order.first { $0.id == previewingID } ?? order.first
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: OneDay.Space.l) {
             header
             preview
-            list
-            Button(Strings.libraryMakeVlogCTA, action: onMake)
+            strip
+            Button(Strings.libraryMakeVlogCTA, action: onDone)
                 .buttonStyle(.primaryAction)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, OneDay.Space.xl)
                 .accessibilityIdentifier("vlog-arrange-make")
         }
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .padding(.top, OneDay.Space.xl)
+        .padding(.bottom, OneDay.Space.m)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(Strings.vlogArrangeTitle)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-                Spacer()
-                IconBubble(systemName: "xmark") { dismiss() }
-            }
+        HStack {
+            IconBubble(systemName: "chevron.left", action: onDone)
+            Spacer()
+            Text(Strings.vlogArrangeTitle)
+                .font(OneDay.Font.headline)
+                .foregroundStyle(OneDay.ink)
+            Spacer()
+            Color.clear.frame(width: 38, height: 38)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, OneDay.Space.xl)
     }
 
     @ViewBuilder
     private var preview: some View {
-        if let clip = previewing ?? order.first {
+        if let clip = previewing {
             LoopingClipPlayer(url: clip.url, refreshToken: clip.recordedAt)
                 .id(clip.id)
-                .frame(width: 150, height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: OneDay.Radius.card, style: .continuous))
+                .overlay(alignment: .bottomTrailing) {
+                    ClipTileLabel(text: LibrarySection.clockTime(clip.recordedAt))
+                        .padding(OneDay.Space.m)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, OneDay.Space.xl)
         }
     }
 
-    private var list: some View {
-        List {
-            ForEach(Array(order.enumerated()), id: \.element.id) { index, clip in
-                row(clip, number: index + 1)
-                    .listRowBackground(Color.clear)
-            }
-            .onMove { order.move(fromOffsets: $0, toOffset: $1) }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .environment(\.editMode, .constant(.active))
-    }
-
-    private func row(_ clip: LibraryClip, number: Int) -> some View {
-        let isShown = (previewing ?? order.first)?.id == clip.id
-        return Button {
-            previewing = clip
-        } label: {
-            HStack(spacing: 12) {
-                Text("\(number)")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Color.oneDayBrand, in: Circle())
-                ClipTile(url: clip.url, refreshToken: clip.recordedAt)
-                    .frame(width: 40, height: 56)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(clip.recordedAt.formatted(
-                        .dateTime.month().day().hour().minute()
-                            .locale(AppLanguage.effective.locale)))
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(OneDay.ink)
-                    if let source = sourceName(clip) {
-                        Text(source)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(OneDay.inkSoft)
-                            .lineLimit(1)
+    private var strip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: OneDay.Space.s) {
+                    ForEach(order) { clip in
+                        tile(clip)
+                            .id(clip.id)
                     }
                 }
-                Spacer(minLength: 0)
-                if isShown {
-                    Image(systemName: "play.circle.fill")
-                        .foregroundStyle(OneDay.brandText)
-                }
+                .padding(.horizontal, OneDay.Space.xl)
+                .padding(.vertical, OneDay.Space.xs)
             }
-            .contentShape(Rectangle())
+            .scrollIndicators(.hidden)
+            .onChange(of: previewingID) { _, id in
+                guard let id else { return }
+                withAnimation(OneDay.Motion.soft) { proxy.scrollTo(id, anchor: .center) }
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("vlog-arrange-row-\(number)")
+        .frame(height: 112)
     }
 
-    private func sourceName(_ clip: LibraryClip) -> String? {
-        switch clip.source {
-        case .story(_, let title, _): title
-        case .draft: nil
-        }
+    private func tile(_ clip: LibraryClip) -> some View {
+        let isShown = previewing?.id == clip.id
+        return ClipTile(url: clip.url, refreshToken: clip.recordedAt, isSelected: isShown)
+            .frame(width: 66, height: 104)
+            .overlay(alignment: .bottomTrailing) {
+                ClipTileLabel(text: LibrarySection.clockTime(clip.recordedAt))
+                    .padding(OneDay.Space.xs)
+            }
+            .opacity(draggingID == clip.id ? 0.4 : 1)
+            .onTapGesture { previewingID = clip.id }
+            .draggable(clip.id) {
+                ClipTile(url: clip.url, refreshToken: clip.recordedAt, isSelected: true)
+                    .frame(width: 66, height: 104)
+                    .onAppear { draggingID = clip.id }
+            }
+            .dropDestination(for: String.self) { ids, _ in
+                draggingID = nil
+                guard let id = ids.first else { return false }
+                move(id, to: clip.id)
+                return true
+            } isTargeted: { targeted in
+                guard targeted, let dragging = draggingID else { return }
+                withAnimation(OneDay.Motion.soft) { move(dragging, to: clip.id) }
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(LibrarySection.clockTime(clip.recordedAt))
+            .accessibilityIdentifier("vlog-arrange-tile-\(clip.id)")
+    }
+
+    private func move(_ id: String, to targetID: String) {
+        guard id != targetID,
+              let from = order.firstIndex(where: { $0.id == id }),
+              let to = order.firstIndex(where: { $0.id == targetID })
+        else { return }
+        order.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
     }
 }

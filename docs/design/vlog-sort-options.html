@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day 排顺序页 · 5 个方案</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#8A7550; --faint:#BBA982; --brand:#FFCB45; --brand2:#FFE08A; --line:#EFE3C6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:6px; }
+  .sub { color:var(--soft); font-size:13px; margin-bottom:28px; line-height:1.6; max-width:900px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:300px; }
+  .opt h2 { font-size:16px; margin:14px 0 6px; }
+  .tag { display:inline-block; font-size:11px; font-weight:800; background:var(--brand); color:var(--ink); padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.6; padding-left:16px; }
+  .opt li b { color:var(--ink); }
+  .phone { width:300px; height:640px; border-radius:42px; background:var(--bg); border:8px solid #1d1d1d; overflow:hidden; position:relative; padding:46px 16px 16px; display:flex; flex-direction:column; }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .top b { font-size:19px; font-weight:900; }
+  .x { width:30px; height:30px; border-radius:50%; background:#F3EADB; display:grid; place-items:center; font-size:14px; color:var(--ink); }
+  .cta { margin-top:auto; height:46px; border-radius:99px; background:linear-gradient(90deg,var(--brand),var(--brand2)); display:grid; place-items:center; font-weight:800; font-size:15px; }
+  .img { background-size:cover; background-position:center; border-radius:14px; position:relative; }
+  .time { position:absolute; right:6px; bottom:5px; font-size:10px; font-weight:800; color:#fff; text-shadow:0 1px 3px #0008; font-variant-numeric:tabular-nums; }
+  .play { position:absolute; inset:0; display:grid; place-items:center; }
+  .play i { width:34px; height:34px; border-radius:50%; background:#fff9; display:grid; place-items:center; font-style:normal; font-size:13px; }
+
+  .preview { height:270px; width:100%; border-radius:20px; }
+  .strip { display:flex; gap:8px; margin-top:14px; overflow-x:auto; padding-bottom:4px; }
+  .strip .img { flex:0 0 62px; height:96px; cursor:grab; border:3px solid transparent; transition:transform .15s; }
+  .strip .img.on { border-color:var(--brand); }
+  .strip .img.dragging { opacity:.4; }
+  .bar { height:4px; border-radius:2px; background:var(--line); margin-top:10px; position:relative; }
+  .bar span { position:absolute; left:0; top:0; bottom:0; width:22%; border-radius:2px; background:var(--brand); }
+
+  .film { height:330px; border-radius:20px; }
+  .chips { display:flex; gap:8px; margin:12px 0; }
+  .chip { flex:1; height:38px; border-radius:99px; background:#fff; border:1px solid var(--line); display:grid; place-items:center; font-size:13px; font-weight:700; }
+  .mini { display:flex; gap:5px; margin-top:4px; }
+  .mini .img { flex:1; height:58px; border-radius:9px; }
+  .two { display:flex; gap:8px; margin-bottom:12px; }
+  .two .cta { flex:1; margin-top:0; height:42px; font-size:14px; }
+  .ghost { background:#fff !important; border:1px solid var(--line); }
+
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; overflow:hidden; }
+  .grid .img { height:150px; }
+  .num { position:absolute; left:6px; top:6px; width:22px; height:22px; border-radius:50%; background:var(--brand); font-size:11px; font-weight:900; display:grid; place-items:center; }
+  .off { filter:grayscale(.8) brightness(1.1); opacity:.55; }
+  .off .num { background:#fff; border:1.5px solid #fff; color:transparent; }
+
+  .board { display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+  .card { display:flex; gap:10px; background:#fff; border-radius:16px; padding:8px; border:1px solid var(--line); }
+  .card .img { flex:0 0 74px; height:104px; }
+  .card .meta { display:flex; flex-direction:column; justify-content:space-between; flex:1; padding:2px 0; }
+  .card .meta small { font-size:11px; color:var(--faint); font-weight:700; font-variant-numeric:tabular-nums; }
+  .card .meta div { font-size:13.5px; font-weight:700; }
+  .card .meta .empty { color:var(--faint); font-weight:600; }
+  .card .grip { align-self:center; color:var(--faint); font-size:16px; padding:0 2px; }
+
+  .seg { display:flex; background:#F3EADB; border-radius:99px; padding:3px; margin-bottom:12px; }
+  .seg div { flex:1; text-align:center; font-size:12.5px; font-weight:700; padding:7px 0; border-radius:99px; color:var(--soft); cursor:pointer; }
+  .seg .on { background:#fff; color:var(--ink); box-shadow:0 2px 6px #0001; }
+  .row5 { display:flex; gap:6px; margin-top:12px; }
+  .row5 .img { flex:1; height:84px; border-radius:10px; transition:all .3s; }
+  .len { display:flex; justify-content:space-between; font-size:12px; color:var(--soft); margin-top:12px; font-weight:600; }
+  .len b { color:var(--ink); }
+
+  .verdict { margin-top:40px; max-width:900px; background:#FFF8E8; border-radius:18px; padding:20px 24px; font-size:13.5px; line-height:1.7; }
+  .verdict h3 { font-size:15px; margin-bottom:6px; }
+  table { border-collapse:collapse; margin-top:10px; font-size:13px; }
+  td, th { padding:6px 14px 6px 0; text-align:left; border-bottom:1px solid var(--line); }
+  th { color:var(--soft); font-weight:700; }
+</style>
+</head>
+<body>
+<h1>1Day 排顺序页 · 5 个方案</h1>
+<div class="sub">同一组素材：今天 5 段，08:10 起床、12:45 做饭、15:20 专心、18:05 朋友、21:30 出门。现在的页面每行都是「11月24日 02:33」加 40×56 的小图，看不出哪段是哪段。方案 A 和 E 可以点，A 的缩略图能拖动换位置。</div>
+
+<div class="row">
+
+  <div class="opt">
+    <div class="phone">
+      <div class="top"><b>排顺序</b><span class="x">✕</span></div>
+      <div class="img preview" id="aPreview" style="background-image:url(../../landing-page/public/assets/blue-morning.jpg)"><span class="time" id="aTime" style="font-size:12px;right:12px;bottom:10px">08:10</span></div>
+      <div class="bar"><span></span></div>
+      <div class="strip" id="aStrip"></div>
+      <div class="cta">生成 vlog</div>
+    </div>
+    <h2>A · 时间线<span class="tag">推荐</span></h2>
+    <ul>
+      <li><b>做法</b>：上面大预览，下面一排竖缩略图。点一下预览，按住拖动换位置。</li>
+      <li><b>好</b>：预览变成 4 倍大；时间写在图上，不再重复日期；和剪辑软件的习惯一样。</li>
+      <li><b>不好</b>：超过 6 段要横向滚动，拖到屏幕外不方便。</li>
+      <li><b>改动</b>：只改 LibraryVlogArrange 一个文件，约半天。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="top"><span class="x">‹</span><span class="x">✕</span></div>
+      <div style="font-size:11px;color:#B07A00;font-weight:800">片子好了</div>
+      <div style="font-size:20px;font-weight:900;margin:2px 0 10px">我的 vlog</div>
+      <div class="img film" style="background-image:url(../../landing-page/public/assets/blue-cooking.jpg)"><div class="play"><i>❚❚</i></div></div>
+      <div class="chips"><div class="chip">换顺序</div><div class="chip">音乐</div><div class="chip">调色</div></div>
+      <div class="two"><div class="cta">保存</div><div class="cta ghost">分享</div></div>
+    </div>
+    <h2>B · 跳过这一页</h2>
+    <ul>
+      <li><b>做法</b>：点「拼成今天的 vlog」直接按时间生成。想换顺序，在成片页点「换顺序」。</li>
+      <li><b>好</b>：少一页、少点一次；大多数人一天的片段本来就该按时间放。和 Setlog 一样零决定。</li>
+      <li><b>不好</b>：改顺序要重新生成一次（模拟器上约 8 秒）。</li>
+      <li><b>改动</b>：LibraryVlogSheet 的 stage 默认值从 arrange 改成 film，加一个按钮，约 2 小时。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="top"><b>选片段</b><span class="x">✕</span></div>
+      <div class="grid">
+        <div class="img" style="background-image:url(../../landing-page/public/assets/blue-morning.jpg)"><span class="num">1</span><span class="time">08:10</span></div>
+        <div class="img" style="background-image:url(../../landing-page/public/assets/blue-cooking.jpg)"><span class="num">2</span><span class="time">12:45</span></div>
+        <div class="img off" style="background-image:url(../../landing-page/public/assets/blue-focus.jpg)"><span class="num"></span><span class="time">15:20</span></div>
+        <div class="img" style="background-image:url(../../landing-page/public/assets/blue-friends.jpg)"><span class="num">3</span><span class="time">18:05</span></div>
+        <div class="img" style="background-image:url(../../landing-page/public/assets/blue-adventure.jpg)"><span class="num">4</span><span class="time">21:30</span></div>
+      </div>
+      <div class="cta">生成 vlog · 4 段</div>
+    </div>
+    <h2>C · 大图网格，点选即排序</h2>
+    <ul>
+      <li><b>做法</b>：两列大图。点一下加进片子并给序号，再点一下拿掉。按点的顺序排。</li>
+      <li><b>好</b>：选哪些和排顺序一步做完；不用拖动；能丢掉拍坏的那段。</li>
+      <li><b>不好</b>：想把第 4 段插到第 1 段前面，要全部取消重点。</li>
+      <li><b>改动</b>：重写排序页，约 1 天。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="top"><b>排顺序</b><span class="x">✕</span></div>
+      <div class="board">
+        <div class="card"><div class="img" style="background-image:url(../../landing-page/public/assets/blue-morning.jpg)"></div><div class="meta"><small>08:10</small><div>又是早起的一天</div></div><span class="grip">≡</span></div>
+        <div class="card"><div class="img" style="background-image:url(../../landing-page/public/assets/blue-cooking.jpg)"></div><div class="meta"><small>12:45</small><div>第一次做番茄面</div></div><span class="grip">≡</span></div>
+        <div class="card"><div class="img" style="background-image:url(../../landing-page/public/assets/blue-focus.jpg)"></div><div class="meta"><small>15:20</small><div class="empty">加一句字幕</div></div><span class="grip">≡</span></div>
+        <div class="card"><div class="img" style="background-image:url(../../landing-page/public/assets/blue-friends.jpg)"></div><div class="meta"><small>18:05</small><div>和小王吃饭</div></div><span class="grip">≡</span></div>
+      </div>
+      <div class="cta">生成 vlog</div>
+    </div>
+    <h2>D · 故事板，顺手写字幕</h2>
+    <ul>
+      <li><b>做法</b>：保留现在的竖列表，但每行图变大，右边直接写这一段的字幕，拖 ≡ 换位置。</li>
+      <li><b>好</b>：排序时最需要知道「这段是什么」，字幕正好回答；字幕会进成片，这一页有了实际产出。</li>
+      <li><b>不好</b>：屏幕只放得下 4 段；多一个输入步骤，赶时间的人会嫌烦。</li>
+      <li><b>改动</b>：字幕数据已有（clip caption），改列表行，约 1 天。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="top"><b>排顺序</b><span class="x">✕</span></div>
+      <div class="seg" id="eSeg"><div class="on" data-k="time">按时间</div><div data-k="rev">倒着放</div><div data-k="shuffle">打乱</div></div>
+      <div class="img preview" id="ePreview" style="height:300px;background-image:url(../../landing-page/public/assets/blue-morning.jpg)"><div class="play"><i>▶</i></div></div>
+      <div class="row5" id="eRow"></div>
+      <div class="len"><span>5 段</span><b>共 0:25</b></div>
+      <div class="cta">生成 vlog</div>
+    </div>
+    <h2>E · 一键排法，不拖动</h2>
+    <ul>
+      <li><b>做法</b>：顶部三个排法，点一下整组换顺序，下面的缩略图跟着动。</li>
+      <li><b>好</b>：完全不用拖；「倒着放」做出从晚到早的回忆感，是现在做不到的效果。</li>
+      <li><b>不好</b>：不能单独挪某一段，需要配合 A 的拖动才完整。</li>
+      <li><b>改动</b>：加在 A 上面，多约 2 小时。</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="verdict">
+  <h3>我的推荐：B 打底，成片页里的「换顺序」打开的是 A</h3>
+  默认不出现排序页，点一次就出片；需要调整的人在成片页点「换顺序」，进入 A 的时间线。这样多数人少一步，想调整的人有一个比现在好用的页面。
+  <table>
+    <tr><th>方案</th><th>从点按钮到看到成片</th><th>改动量</th></tr>
+    <tr><td>现在</td><td>点 2 次 + 看一页列表</td><td>—</td></tr>
+    <tr><td>A</td><td>点 2 次</td><td>约半天</td></tr>
+    <tr><td>B</td><td>点 1 次</td><td>约 2 小时</td></tr>
+    <tr><td>B + A</td><td>点 1 次（调整时再进 A）</td><td>约 1 天</td></tr>
+    <tr><td>C / D</td><td>点 1 次 + 选或写</td><td>约 1 天</td></tr>
+  </table>
+</div>
+
+<script>
+  const base = '../../landing-page/public/assets/';
+  const clips = [
+    ['blue-morning.jpg','08:10'], ['blue-cooking.jpg','12:45'], ['blue-focus.jpg','15:20'],
+    ['blue-friends.jpg','18:05'], ['blue-adventure.jpg','21:30'],
+  ];
+
+  const strip = document.getElementById('aStrip');
+  let aOrder = clips.slice();
+  let dragFrom = null;
+  function renderA(active = 0) {
+    strip.innerHTML = '';
+    aOrder.forEach((c, i) => {
+      const d = document.createElement('div');
+      d.className = 'img' + (i === active ? ' on' : '');
+      d.style.backgroundImage = `url(${base}${c[0]})`;
+      d.innerHTML = `<span class="time">${c[1]}</span>`;
+      d.draggable = true;
+      d.onclick = () => {
+        document.getElementById('aPreview').style.backgroundImage = `url(${base}${c[0]})`;
+        document.getElementById('aTime').textContent = c[1];
+        renderA(i);
+      };
+      d.ondragstart = () => { dragFrom = i; d.classList.add('dragging'); };
+      d.ondragover = e => e.preventDefault();
+      d.ondrop = () => {
+        const [m] = aOrder.splice(dragFrom, 1);
+        aOrder.splice(i, 0, m);
+        renderA(i);
+      };
+      strip.appendChild(d);
+    });
+  }
+  renderA();
+
+  const eRow = document.getElementById('eRow');
+  function renderE(order) {
+    eRow.innerHTML = '';
+    order.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'img';
+      d.style.backgroundImage = `url(${base}${c[0]})`;
+      d.innerHTML = `<span class="time">${c[1]}</span>`;
+      eRow.appendChild(d);
+    });
+    document.getElementById('ePreview').style.backgroundImage = `url(${base}${order[0][0]})`;
+  }
+  renderE(clips);
+  document.querySelectorAll('#eSeg div').forEach(btn => btn.onclick = () => {
+    document.querySelectorAll('#eSeg div').forEach(b => b.classList.toggle('on', b === btn));
+    const k = btn.dataset.k;
+    if (k === 'time') renderE(clips);
+    if (k === 'rev') renderE(clips.slice().reverse());
+    if (k === 'shuffle') renderE(clips.slice().sort(() => Math.random() - .5));
+  });
+</script>
+</body>
+</html>

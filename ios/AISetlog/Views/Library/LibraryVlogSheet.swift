@@ -4,7 +4,8 @@ import SwiftUI
 struct LibraryVlogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var order: [LibraryClip]
-    @State private var stage: Stage = .arrange
+    @State private var stage: Stage = .film
+    @State private var renderedKey: String?
     private let layoutRatio: CGFloat
     @State private var phase: Phase = .rendering
     @State private var saveMessage: String?
@@ -32,14 +33,15 @@ struct LibraryVlogSheet: View {
         Group {
             switch stage {
             case .arrange:
-                LibraryVlogArrange(order: $order) { stage = .film }
+                LibraryVlogArrange(order: $order, aspectRatio: layoutRatio) { stage = .film }
             case .film:
                 film
             }
         }
         .background(OneDayCanvas().ignoresSafeArea())
         .task(id: stage) {
-            if stage == .film { await render() }
+            guard stage == .film, renderedKey != orderKey else { return }
+            await render()
         }
     }
 
@@ -47,8 +49,6 @@ struct LibraryVlogSheet: View {
     private var film: some View {
         VStack(alignment: .leading, spacing: OneDay.Space.l) {
             HStack {
-                IconBubble(systemName: "chevron.left") { stage = .arrange }
-                    .accessibilityLabel(Strings.vlogArrangeTitle)
                 Spacer()
                 IconBubble(systemName: "xmark") { dismiss() }
             }
@@ -102,12 +102,22 @@ struct LibraryVlogSheet: View {
                         mood: order.first.flatMap { moodStore?.mood(on: $0.recordedAt)?.mood },
                         mixedURL: $mixedURL)
                 } else {
-                    Button { showsSound = true } label: {
-                        Label(Strings.filmAdjustTitle, systemImage: "slider.horizontal.3")
-                            .frame(maxWidth: .infinity)
+                    HStack(spacing: OneDay.Space.m) {
+                        if order.count > 1 {
+                            Button { stage = .arrange } label: {
+                                Label(Strings.vlogReorderAction, systemImage: "arrow.left.arrow.right")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.softAction)
+                            .accessibilityIdentifier("library-vlog-reorder")
+                        }
+                        Button { showsSound = true } label: {
+                            Label(Strings.filmAdjustTitle, systemImage: "slider.horizontal.3")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.softAction)
+                        .accessibilityIdentifier("library-vlog-adjust")
                     }
-                    .buttonStyle(.softAction)
-                    .accessibilityIdentifier("library-vlog-adjust")
                 }
 
                 HStack(spacing: OneDay.Space.m) {
@@ -144,6 +154,8 @@ struct LibraryVlogSheet: View {
         .animation(OneDay.Motion.soft, value: showsSound)
     }
 
+    private var orderKey: String { order.map(\.id).joined(separator: "|") }
+
     private func render() async {
         phase = .rendering
         saveMessage = nil
@@ -156,6 +168,7 @@ struct LibraryVlogSheet: View {
                 clips: ClipLibrary.stitchable(order), options: options)
             guard !Task.isCancelled else { return }
             phase = .done(url)
+            renderedKey = orderKey
         } catch {
             guard !Task.isCancelled else { return }
             print("[library] vlog failed: \(error)")

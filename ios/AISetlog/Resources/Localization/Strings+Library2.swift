@@ -19,6 +19,7 @@ extension Strings {
     static var libraryMakeVlogCTA: String { zh ? "生成 vlog" : "Make vlog" }
 
     static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }
+    static var vlogReorderAction: String { zh ? "换顺序" : "Reorder" }
 
     static var todayKeepFilming: String { zh ? "继续拍" : "Film" }
     static var todayWatch: String { zh ? "看成片" : "Watch" }
