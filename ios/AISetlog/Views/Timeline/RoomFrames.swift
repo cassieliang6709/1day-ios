@@ -254,6 +254,10 @@ private struct PersonFrame: View {
         return Button(action: onOpenPerson) {
             HStack(spacing: 7) {
                 MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 30, isYou: column.isMine)
+                    .padding(2)
+                    .overlay {
+                        Circle().strokeBorder(Color.oneDayBrand, lineWidth: onVideo ? 2 : 0)
+                    }
                 Text(column.name)
                     .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .foregroundStyle(onVideo ? .white : OneDay.ink)
@@ -330,6 +334,24 @@ private struct PersonFrame: View {
                     .accessibilityIdentifier("room-frame-sign-in")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if !column.isMine {
+            let sent = pokedNow || hasPoked(column.id)
+            Button {
+                onPoke(column.id)
+                pokedNow = true
+            } label: {
+                Label(sent ? Strings.roomTilePoked : Strings.roomTilePoke,
+                      systemImage: sent ? "checkmark" : "hand.tap.fill")
+                    .font(OneDay.Font.callout)
+                    .foregroundStyle(sent ? OneDay.inkSoft : OneDay.brandText)
+                    .padding(.horizontal, OneDay.Space.l)
+                    .frame(minHeight: 44)
+                    .background(Color.oneDayBrand.opacity(sent ? 0.08 : 0.18), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(sent)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("room-frame-poke")
         } else {
             Color.clear
         }
