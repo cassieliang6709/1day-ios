@@ -1,122 +1,158 @@
+---
+name: 1Day
+skins: [cream, blue]
+colors:
+  ink: "OneDay.ink"
+  ink-soft: "OneDay.inkSoft"
+  ink-faint: "OneDay.inkFaint"
+  brand-fill: "Color.oneDayBrand"      # cream #FFCB45
+  brand-text: "OneDay.brandText"       # cream #8A5A00
+  on-brand: "OneDay.onBrand"
+  canvas: "OneDay.canvas"              # cream #FFF8E8
+  surface: "OneDay.surface"
+typography:
+  title: "title2 · rounded · bold"
+  headline: "headline · rounded · bold"
+  body: "body · rounded"
+  callout: "callout · rounded · semibold"
+  subhead: "subheadline · rounded · semibold"
+  caption: "caption · rounded · semibold"
+  micro: "caption2 · rounded · semibold"
+rounded: { tile: 12, chip: 14, card: 24, hero: 32 }
+spacing: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 28 }
+hit-target: 44
+---
+
 # 1Day 设计规范
 
-这份文件是 1Day 界面长什么样的唯一依据。改界面、加组件、评审截图，都对照这里。代码里的落点是 `ios/AISetlog/Resources/Theme.swift`（`OneDay` 里的 token）和 `ios/AISetlog/Views/DesignSystem/`（共用组件）。
+TL;DR：改 1Day 界面时照这份文件做。
 
-以后再有没拍板的条目，标 **【待定】**，拍板前照代码现状写。
+1. 数值：上面 YAML 里的 token 是唯一可用的值，页面代码只写 `OneDay.xxx`。
+2. 组件：§3 每个组件的尺寸和状态都是定值，照抄，不自己调。
+3. 页面：§4 写了每个页面长什么样，§5 是不许做的事，§6 记了每个取舍为什么这样定。
+
+代码位置：token 在 `ios/AISetlog/Resources/Theme.swift`，组件在 `ios/AISetlog/Views/DesignSystem/`。没定的写 **【待定】**。
 
 ## 1. 原则
 
-1. **视频是主角。** 界面元素让位给画面：卡片、按钮、文字都比画面安静。竖拍放进横框时不裁人脸，用并排或模糊铺底补满。
-2. **同一个东西只有一种样子。** 片段小图、房间卡片、按钮、分区标题，全 App 各只有一个组件。新页面先找现成组件，没有才加，加了写进第 6 节。
-3. **用 token，不写数字。** 字号、圆角、间距、颜色在页面代码里只写 `OneDay.xxx`，不写 `.system(size: 13)`、`cornerRadius: 16` 这种数字。例外写在第 7 节。
-4. **以真机为准。** 好不好看、统不统一，看 iPhone 上的截图，不看代码。
+1. 画面：片段画面在屏幕上占的面积最大，按钮、文字、卡片不盖在画面上。竖拍放进横框不裁脸，空处用同一段画面的模糊图补满。
+2. 入口：一个操作只有一个按钮、一个名字；一段片段在一屏里只显示一次。
+3. 文字：砍掉标语、提示文字和次要标签。页面非得靠这些才看得懂，就改布局。能从画面看出来的信息不写成字。
+4. 取舍：每个决定同时提升用户体验（UX）、开发者体验（DX）和智能体体验（AX），而且不弄坏任何东西。
+5. 验收：在 iPhone 上截图看。
 
-## 2. 颜色
+## 2. 颜色和字的用法
 
-只用 `OneDay` 里的语义色，不在页面里直接用 `Color.oneDayNavy` 之类的原始色，更不写十六进制。App 有两套皮肤（奶油黄 / 蓝），语义色会自动跟着换。
+1. 品牌色：黄色只当填充（主按钮、选中描边、序号底）。黄色上的字用 `on-brand`，浅底上的品牌色字用 `brand-text`。
+2. 文字层级：一屏最多三种文字颜色：`ink` 标题和正文，`ink-soft` 次要信息，`ink-faint` 占位图标。
+3. 字号：一屏最多三档字号。页面标题 `title`，日期这类分组标题 `headline`，按钮 `callout`。
 
-| Token | 用途 |
-| --- | --- |
-| `OneDay.ink` | 正文、标题 |
-| `OneDay.inkSoft` | 次要文字、分区标题 |
-| `OneDay.inkFaint` | 时间戳、占位提示这类可以不读的字 |
-| `OneDay.brandText` | 品牌色的**文字**（奶油黄皮肤下是深琥珀色，黄色本身不能当字） |
-| `OneDay.onBrand` | 画在品牌色底上的字和图标 |
-| `Color.oneDayBrand` | 品牌色的**填充**：主按钮、选中的 tab、拍摄键 |
-| `OneDay.canvas` | 页面底色 |
-| `OneDay.surface` / `OneDay.surfaceSoft` | 卡片底 / 小标签底 |
-| `OneDay.hairline` | 玻璃卡片的细边 |
-| `OneDay.scrim` | 视频上方压字用的渐变 |
+## 3. 组件
 
-身份色（每个人头像的颜色）由 `Identity+Color.swift` 按人分配，页面不自己挑。
+所有可点的东西点击区域至少 44 × 44。
 
-## 3. 文字
+### 主按钮 `PrimaryActionStyle`
 
-只用 `OneDay.Font` 的 7 档。它们都是圆体，并且跟着系统字号设置（动态字体）放大缩小。
+- 尺寸：整行宽，上下内边距 17，胶囊形。
+- 样子：品牌色渐变底，`headline` 字，`on-brand` 颜色。
+- 按下：缩到 0.975。禁用：整体透明度 0.4。
+- 数量：一屏最多一个。
 
-| Token | 用途 |
-| --- | --- |
-| `title` | 页面大标题（「房间」） |
-| `headline` | 卡片标题（房间名） |
-| `body` | 正文、聊天内容 |
-| `callout` | 按钮文字 |
-| `subhead` | 卡片副标题（「你 · 12:29」） |
-| `caption` | 小标签、时间、计数 |
-| `micro` | 视频上的角标（时长、REC） |
+### 胶囊小按钮（标题栏里的「做 vlog」「帮我挑」）
 
-需要别的粗细时用 `OneDay.Font.rounded(_:weight:)`，不另起字号。
+- 尺寸：高 38，左右内边距 `m`，胶囊形。
+- 普通：`oneDayBrand` 18% 底，`callout` 字，`ink` 颜色。
+- 强调（「生成 · N 段」）：`oneDayBrand` 实心底，`on-brand` 字。禁用：透明度 0.45。
+- 加载：图标位置换成小号 `ProgressView`，按钮不可点。
 
-### 成片页标题
+### 文字按钮（「取消」「全选」）
 
-成片页（「我的」vlog、房间成片）的标题区只写一行：成片的名字，用 `title`。名字是 AI 起的标题，没有就用房间名或「我的 vlog」。不加「片子好了」这类状态行，也不加段数、时长、人数这种副标题；放不下时缩小字号，不折行。
+- 样子：`callout` 字，`brand-text` 颜色，没有底色。
+- 尺寸：最小高度 44。
 
-## 4. 圆角
+### 圆形图标按钮 `IconBubble`
 
-| Token | 值 | 用途 |
-| --- | --- | --- |
-| `OneDay.Radius.chip` | 14 | 小标签、输入框、小按钮 |
-| `OneDay.Radius.card` | 24 | 卡片、底部弹窗 |
-| `OneDay.Radius.hero` | 32 | 首屏大卡片 |
-| `OneDay.Radius.tile` | 12 | 片段小图：卡片里的小图、「我的」网格的外框、成片条、聊天里引用的片段 |
+- 尺寸：圆 38，点击区域 44。
+- 用在：日历、关闭。图标旁边没有字时必须有 `accessibilityLabel`。
 
-为什么是 12：卡片圆角 24、内边距 12，嵌在里面的东西用 24 − 12 = 12，内外两条弧线平行。以后别的东西嵌进卡片，也按「外圆角 − 内边距」算，算出来不是现有 token 时先来这里加。
+### 片段小图 `ClipTile`
 
-「我的」那种紧挨着的网格，只有整块的四个外角用 `tile`，格子之间不做圆角。
+- 尺寸：宽高比 3:4，圆角 `tile`（12），格子之间 `xs`（4），一行三个。
+- 角标：右下角拍摄时间，`ClipTileLabel`，24 小时制。
+- 选中：内侧 3pt 品牌色描边；右上角直径 24 的圆，品牌色底，里面写序号。
+- 选择中没选：右上角直径 24 的空心白圈，画面不变暗。
+- 空格子「拍一段」：同样 3:4 和 `tile` 圆角，`oneDayBrand` 18% 底，`camera.fill` 加「拍一段」，`brand-text` 颜色。
 
-胶囊形（按钮、tab 栏）用 `Capsule()`，不算圆角 token。
+### 心情表情 `MoodTodayBadge`
 
-## 5. 间距
+- 尺寸：图 22，点击区域 44。
+- 没选：`face.dashed`，`ink-faint`。选了：当天表情。
+- 点开：5 个表情的弹框，选完自动关。
 
-只用这 6 档，padding、`spacing:`、外边距都一样：
+### 登录按钮
 
-| Token | 值 | 用途 |
-| --- | --- | --- |
-| `OneDay.Space.xs` | 4 | 图标和文字之间、紧挨着的网格缝 |
-| `OneDay.Space.s` | 8 | 同一组里的元素之间 |
-| `OneDay.Space.m` | 12 | 卡片内边距、头像和文字之间、标题和下面内容之间 |
-| `OneDay.Space.l` | 16 | 卡片之间、大卡片的内边距 |
-| `OneDay.Space.xl` | 20 | 页面左右边距 |
-| `OneDay.Space.xxl` | 28 | 分区之间 |
+- Apple：系统按钮，黑底。Google：白底，1pt 细边，官方 G 图标 18。
+- 两个同高（设置页 46，登录页 50），都是胶囊形。
 
-旧页面换过来时按这张表对：
+### 底部 tab `FloatingTabBar`
 
-| 旧值 | 换成 |
-| --- | --- |
-| 3、5、6 | `xs`（4）或 `s`（8），看是不是紧挨着的一组 |
-| 9、10、11 | `s`（8）或 `m`（12），同一组里的用 8，隔开两块的用 12 |
-| 14、18 | `m`（12）或 `l`（16），卡片之间一律 16 |
-| 22、24、26 | `xxl`（28），分区之间 |
+- 两个 tab：相机、房间。选中的 tab 是品牌色实心胶囊。
+- 选择模式和全屏弹窗里隐藏。
 
-换的时候会有一两个点的变化，按 1day-design-system 的路径 B 逐页截图对比。
+## 4. 页面
 
-## 6. 组件清单
+### 「我的」·浏览
 
-页面要的东西先在这里找。状态是「已统一」才可以直接用；「待合并」的那几个，新代码只用合并目标，不再用旧的。
+1. 标题栏：头像 48、「我的」（`title`）、日历 `IconBubble`、「做 vlog」胶囊小按钮。
+2. 列表：按天分组，从新到旧。每组是日期（`headline`，今天写「今天」）+ 心情 + 三列 `ClipTile`。组和组之间 `xxl`，不包卡片。
+3. 今天：永远是第一组。没拍时放一个「拍一段」空格子。
+4. 组内顺序：同一天里按拍摄时间从早到晚。
 
-| 组件 | 用途 | 位置 | 状态 |
-| --- | --- | --- | --- |
-| `ClipThumbnail` | 片段第一帧，竖拍放横框时铺模糊底、不裁脸 | `Components/ClipPlayback.swift` | 已统一，是所有片段小图的底层 |
-| `ClipTile` / `ClipTileLabel` | 嵌在卡片、列表行、弹窗、网格里的片段小图：圆角 `tile`、细边、选中时品牌色描边；角上的时间或时长用 `ClipTileLabel`。尺寸由调用方定。贴边放（网格、卡片封面）时用 `edge: .flush`，外角交给容器 | `DesignSystem/ClipTile.swift` | 新建，各页正在换过来（第一批） |
-| 占满页面宽度的大画面 | 房间里每个人的大格、时间线大卡 | `PersonFrame`（22）、`ClipThumb`（16） | **待合并**（第二批）：直接放在页面上的按卡片用 `card` 圆角 |
-| `PortraitTile` | 房间列表和「我的」里的竖版卡片：最新一段做 3:4 封面，下面是名字和一行说明 | `Components/PortraitTile.swift` | 已统一；圆角现在写的是 20，第二批改成 `card` |
-| `GlassCard` / `.glassSurface()` | 普通卡片底 | `DesignSystem/OneDaySurfaces.swift` | 已统一，但多数页面没用它 |
-| `OverVideoGlass` / `.overVideoControl()` | 压在视频上的玻璃底 | `DesignSystem/OneDaySurfaces.swift` | 已统一 |
-| `PrimaryActionStyle` / `SoftActionStyle` | 主按钮 / 次按钮 | `DesignSystem/OneDayControls.swift` | 已统一 |
-| `OneDayChip`、`PillSelector`、`OptionRow`、`SectionLabel`、`IconBubble` | 小标签、分段选择、设置行、分区标题、圆形图标按钮 | `DesignSystem/OneDayControls.swift` | 已统一 |
-| `AvatarDot` / `AvatarStack` | 头像 / 一排头像 | `Avatar/`、`Components/AvatarStack.swift` | 已统一 |
-| `FloatingTabBar` | 底部相机 / 房间两个 tab | `Components/FloatingTabBar.swift` | 已统一 |
-| `EmptyFrame` | 空状态 | `DesignSystem/OneDaySurfaces.swift` | 已统一 |
+### 「我的」·选择
 
-合并一个组件的顺序：先把目标组件做好，再把用到旧组件的页面一个个换过去，每换一页在真机上截图对比，最后旧组件没人用了再删。
+1. 进入：点「做 vlog」，自动勾选今天所有片段。
+2. 标题栏：左「取消」文字按钮；右「帮我挑」胶囊 +「生成 · N 段」强调胶囊。不显示头像和标题。标题栏固定在顶部。
+3. 每组右侧：「全选 / 取消全选」文字按钮。空的一天不显示。
+4. 底部 tab 隐藏，屏幕底部不放任何栏。
 
-## 7. 可以写数字的例外
+### 成片页（「我的」vlog、房间成片）
 
-- **相机取景画面上的叠加层**（倒计时大数字、取景框线条）：跟着画面尺寸算，不跟着系统字号变。
-- **合成进成片里的字**（字幕、水印）：画进视频像素，按视频分辨率算。
-- **头像、图标的固定尺寸**：`frame(width:height:)` 可以写数字，但同一种东西尺寸要一样。
+1. 标题：一行，`title`，放不下缩小、不换行。内容依次取 AI 标题、房间名、「我的 vlog」。
+2. 画面：成片播放器，占标题下方剩余空间。
+3. 按钮：【待定】，见 §6 第 6 条。
 
-例外的地方在代码旁边写一行注释说明为什么。
+### 设置·没登录
 
-## 8. 动效
+1. 卡片：宝宝图 64、「还没登录」（`headline`）、Apple 按钮、Google 按钮，间距 10。
+2. 不写说明句。
 
-只用 `OneDay.Motion` 的 `soft` / `pop` / `snap` 三种弹簧。系统打开「减弱动态效果」时，循环和缩放类动画套 `OneDay.Motion.reduced(_:if:)`，它会让动画直接跳到结果。不加入场飞入动画。
+## 5. 不要做
+
+1. 不在每天的卡片上放「做 vlog」：右上角已经有一个。
+2. 不在顶部再列一遍已选片段：格子上的序号已经说明了。
+3. 不写「· 4 段」「这周拍了 3 天」「今天 2/2 人拍了」这种计数。
+4. 不写「片子好了」这种状态行，也不在标题下写段数、时长、人数。
+5. 不把没选的片段调暗或盖白：看起来像坏了。
+6. 不在卡片里再套卡片，也不给分组包白底卡片。
+7. 不让两条浮动栏叠在一起（选择栏 + tab）。
+8. 不在房间页放心情入口：心情只给自己看。
+9. 不用 Google SDK 自带的方块登录按钮：和 Apple 按钮长得不一样。
+10. 不写 `.system(size:)`、`cornerRadius: 16`、十六进制颜色。例外只有：相机取景叠加层、画进视频的字、头像和图标的固定尺寸、Google 登录按钮的字号。代码里不加注释说明。
+
+## 6. 取舍记录
+
+每条写：定了什么、比过哪些、为什么。
+
+1. 选择模式的生成按钮：放在右上角（方案 A）。比过底部深色托盘（B）和顶部一行小图（C）。A 屏幕全留给片段，也和 iOS 相册的「选择」一样，用户不用学；代价是选择页不能拖动换顺序，换顺序放到成片页。样稿：`docs/design/selection-mode-options.html`。
+2. 已选片段的卡片：删掉。它占了近半屏，片段在卡片和格子里各出现一次。
+3. 心情入口：从房间页挪到「我的」页「今天」旁边。房间页是给朋友看的，心情只给自己看；原来「我的」页的心情卡片因为条件写反，从来没显示过。
+4. AI 帮我挑：只传文字标签，画面不出手机。比过传缩略图（效果好，但要改隐私政策、按图片计费）和不做 AI。方案：`docs/design/ai-pick-options.md`。
+5. 横竖拍：建房间时不再选「怎么拍」，竖拍和横拍都能进同一个房间，成片方向跟多数片段走，少数方向用模糊铺底。比过「改成选成片方向」和「保持不混」。【待做】
+6. 成片页按钮组：【待定】。`feat/app-uncommitted-work` 上定的是「一个主按钮（保存）+ 一行图标按钮（换顺序、调整、分享）」（`2f32016`），还没合进来；当前分支是 2×2 四个胶囊。
+
+## 7. 改界面的步骤
+
+1. 选方案：有两种以上做法时，做 2–3 个 HTML 样稿放 `docs/design/`，用 `mockups` 服务（4321 端口）打开给 Cassie 选，选完记进 §6。
+2. 提交前：跑 `python3 .claude/skills/1day-design-system/scripts/design_lint.py --baseline docs/design/design-lint-baseline.json`，有文件比基线差就不提交。
+3. 基线：按文件记数。拆文件只搬代码时，只更新搬过的那几个文件的条目，不整体重写。
+4. 截图：先用 `phone_status` 看 iPhone 能不能连；连不上就用自己专属的模拟器，并说明截图来自模拟器。
