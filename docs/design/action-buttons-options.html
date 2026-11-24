@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day 按钮组审计 · 3 个通用方案</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#8A7550; --faint:#BBA982; --brand:#FFCB45; --brand2:#FFE08A; --line:#EFE3C6; --text:#8A5A00; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:6px; }
+  h2.sec { font-size:17px; margin:36px 0 12px; }
+  .sub { color:var(--soft); font-size:13px; line-height:1.6; max-width:920px; }
+  .box { background:var(--bg); border-radius:18px; padding:18px 22px; max-width:920px; font-size:13.5px; line-height:1.7; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { padding:7px 12px 7px 0; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--soft); font-weight:700; }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:12px; background:#F3EADB; padding:1px 5px; border-radius:5px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:300px; }
+  .opt h3 { font-size:16px; margin:14px 0 6px; }
+  .tag { display:inline-block; font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.6; padding-left:16px; }
+  .opt li b { color:var(--ink); }
+
+  .phone { width:300px; height:600px; border-radius:42px; background:var(--bg); border:8px solid #1d1d1d; overflow:hidden; padding:44px 18px 18px; display:flex; flex-direction:column; position:relative; }
+  .nav { display:flex; justify-content:flex-end; gap:8px; }
+  .bub { width:32px; height:32px; border-radius:50%; background:#F3EADB; display:grid; place-items:center; font-size:14px; }
+  .eyebrow { font-size:11px; color:#B07A00; font-weight:800; margin-top:6px; }
+  .ttl { font-size:20px; font-weight:900; }
+  .meta { font-size:12px; color:var(--soft); font-weight:600; margin-bottom:10px; }
+  .video { flex:1; border-radius:20px; background:url(../../landing-page/public/assets/blue-cooking.jpg) center/cover; margin:0 18px; min-height:0; }
+
+  .primary { height:48px; border-radius:99px; background:linear-gradient(90deg,var(--brand),var(--brand2)); display:flex; align-items:center; justify-content:center; gap:6px; font-weight:800; font-size:15px; }
+  .soft { height:48px; border-radius:99px; background:#fff; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700; font-size:14px; color:var(--text); padding:0 18px; white-space:nowrap; }
+  .soft.sm { height:36px; font-size:13px; padding:0 14px; }
+  .grow { flex:1; }
+  .bar { display:flex; gap:10px; margin-top:12px; }
+  .tools { display:flex; justify-content:center; gap:34px; margin-top:14px; }
+  .tool { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:var(--text); }
+  .tool i { font-style:normal; font-size:19px; width:40px; height:40px; border-radius:50%; background:#F3EADB; display:grid; place-items:center; }
+  .chips { display:flex; gap:8px; margin-top:12px; }
+  .menu { position:absolute; right:22px; bottom:76px; background:#fff; border-radius:16px; box-shadow:0 10px 30px #0002; padding:6px 0; width:150px; font-size:13.5px; }
+  .menu div { padding:9px 14px; display:flex; gap:8px; }
+
+  .before .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .before .grid2 .soft, .before .grid2 .primary { padding:0; }
+
+  .mini { display:flex; gap:20px; flex-wrap:wrap; }
+  .mcard { width:300px; background:var(--bg); border-radius:18px; padding:14px; }
+  .mcard small { display:block; font-size:11.5px; color:var(--soft); font-weight:700; margin-bottom:8px; }
+  .mcard .lab { font-size:11px; color:var(--faint); font-weight:700; margin:10px 0 4px; }
+</style>
+</head>
+<body>
+<h1>按钮组审计 · 3 个通用方案</h1>
+<div class="sub">问题：好几个页面把 2～4 个按钮排成等宽的格子，主按钮和次按钮一样大，看不出先点哪个。</div>
+
+<h2 class="sec">1. 审计结果</h2>
+<div class="box">
+  <b>根因在组件里。</b><code>PrimaryActionStyle</code> 和 <code>SoftActionStyle</code> 都写死了 <code>.frame(maxWidth: .infinity)</code>（<code>OneDayControls.swift</code> 第 24、46 行）。只要两个放进同一个 <code>HStack</code>，就自动平分宽度。DESIGN.md 只定了按钮长什么样，没定按钮组怎么排。
+  <table style="margin-top:10px">
+    <tr><th>页面</th><th>按钮</th><th>文件</th></tr>
+    <tr><td>我的 vlog 成片页</td><td>换顺序 | 调整成片<br>保存 | 分享（2×2 格子，最严重；上面一行是这次会话里我加的）</td><td><code>Library/LibraryVlogSheet.swift</code> 105、123 行</td></tr>
+    <tr><td>房间成片页</td><td>调整成片（整行）<br>保存 | 分享</td><td><code>Film/FinalFilmTimeline.swift</code> 173 行</td></tr>
+    <tr><td>拍完预览</td><td>完成 | 重拍（手写样式，没用组件，还用了系统灰 <code>systemGray6</code>）</td><td><code>Record/RecordClipView.swift</code> 441 行</td></tr>
+    <tr><td>配音面板</td><td>重录 | 用这段</td><td><code>Film/FilmSoundtrackPanel.swift</code> 166 行</td></tr>
+  </table>
+  <div style="margin-top:8px;color:var(--soft)">另外 14 个用到这两种按钮的文件，没有把它们并排放。</div>
+</div>
+
+<h2 class="sec">2. 成片页（最严重的一页）用三个方案各做一遍</h2>
+<div class="row">
+
+  <div class="opt before">
+    <div class="phone">
+      <div class="nav"><span class="bub">✕</span></div>
+      <div class="eyebrow">片子好了</div><div class="ttl">我的 vlog</div><div class="meta">4 段</div>
+      <div class="video" style="margin:0"></div>
+      <div class="grid2"><div class="soft">⇄ 换顺序</div><div class="soft">☰ 调整成片</div><div class="primary">⤓ 保存</div><div class="soft">➤ 分享</div></div>
+    </div>
+    <h3>现在</h3>
+    <ul><li>4 个一样大的胶囊，主按钮只靠颜色区分。</li><li>按钮区占掉屏幕下方约 1/7（两行，各 48pt 高），视频被压小。</li></ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="nav"><span class="bub">✕</span></div>
+      <div class="eyebrow">片子好了</div><div class="ttl">我的 vlog</div><div class="meta">4 段</div>
+      <div class="video" style="margin:0"></div>
+      <div class="tools"><div class="tool"><i>⇄</i>换顺序</div><div class="tool"><i>♪</i>音乐</div><div class="tool"><i>☀</i>调色</div><div class="tool"><i>➤</i>分享</div></div>
+      <div class="primary" style="margin-top:14px">⤓ 保存</div>
+    </div>
+    <h3>① 工具行 + 一个主按钮<span class="tag">推荐</span></h3>
+    <ul>
+      <li><b>规则</b>：一屏只有一个整行宽的按钮，就是主按钮。其他操作变成「图标在上、字在下」的工具，没有胶囊底，排成一行。</li>
+      <li><b>好</b>：先点哪个一眼就知道；按钮区高度少一半，视频更大；和相册「编辑」的工具栏一样，用户熟。</li>
+      <li><b>不好</b>：工具最多放 4～5 个；要新做一个 <code>ToolButton</code> 组件。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="nav"><span class="bub">✕</span></div>
+      <div class="eyebrow">片子好了</div><div class="ttl">我的 vlog</div><div class="meta">4 段</div>
+      <div class="video" style="margin:0"></div>
+      <div class="chips"><div class="soft sm">⇄ 换顺序</div><div class="soft sm">☰ 调整成片</div></div>
+      <div class="bar"><div class="primary grow">⤓ 保存</div><div class="soft">➤ 分享</div></div>
+    </div>
+    <h3>② 主按钮撑满，次按钮按字宽</h3>
+    <ul>
+      <li><b>规则</b>：主按钮占剩下的宽度；次按钮只有字那么宽，不再平分。</li>
+      <li><b>好</b>：改动最小：把 <code>maxWidth: .infinity</code> 从次按钮里拿掉就行，4 个页面自动变好。</li>
+      <li><b>不好</b>：还是有 4 个胶囊，只是大小不同了；上面那行小胶囊和下面的按钮像两套东西。</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="nav"><span class="bub">✕</span></div>
+      <div class="eyebrow">片子好了</div><div class="ttl">我的 vlog</div><div class="meta">4 段</div>
+      <div class="video" style="margin:0"></div>
+      <div class="menu"><div>⇄ 换顺序</div><div>♪ 音乐</div><div>☀ 调色</div></div>
+      <div class="bar"><div class="primary grow">⤓ 保存</div><div class="soft" style="padding:0;width:48px">···</div><div class="soft" style="padding:0;width:48px">➤</div></div>
+    </div>
+    <h3>③ 主按钮 + 「更多」菜单</h3>
+    <ul>
+      <li><b>规则</b>：底部只留主按钮和分享，其他收进 ··· 菜单。</li>
+      <li><b>好</b>：画面最干净。</li>
+      <li><b>不好</b>：换顺序、调色藏起来，很多人不会发现；「···」和「➤」只有图标，违反「图标配文字」。</li>
+    </ul>
+  </div>
+</div>
+
+<h2 class="sec">3. 推荐方案 ① 放到另外 3 处</h2>
+<div class="mini">
+  <div class="mcard">
+    <small>房间成片页</small>
+    <div class="lab">现在</div>
+    <div class="soft" style="width:100%">☰ 调整成片</div>
+    <div class="bar"><div class="primary grow">⤓ 保存</div><div class="soft grow">➤ 分享</div></div>
+    <div class="lab">改成</div>
+    <div class="tools" style="margin-top:4px"><div class="tool"><i>⇄</i>换顺序</div><div class="tool"><i>☰</i>调整</div><div class="tool"><i>➤</i>分享</div></div>
+    <div class="primary" style="margin-top:10px">⤓ 保存</div>
+  </div>
+  <div class="mcard">
+    <small>拍完预览</small>
+    <div class="lab">现在</div>
+    <div class="bar" style="margin-top:0"><div class="primary grow">✓ 完成</div><div class="soft grow" style="background:#EEE;border:0;color:var(--ink)">↺ 重拍</div></div>
+    <div class="lab">改成</div>
+    <div class="bar" style="margin-top:0;align-items:center"><div class="tool" style="width:56px"><i>↺</i>重拍</div><div class="primary grow">✓ 完成</div></div>
+  </div>
+  <div class="mcard">
+    <small>配音面板</small>
+    <div class="lab">现在</div>
+    <div class="bar" style="margin-top:0"><div class="soft grow">重录</div><div class="primary grow">用这段</div></div>
+    <div class="lab">改成</div>
+    <div class="bar" style="margin-top:0;align-items:center"><div class="tool" style="width:56px"><i>↺</i>重录</div><div class="primary grow">用这段</div></div>
+  </div>
+</div>
+
+<h2 class="sec">4. 选 ① 之后要写进 DESIGN.md 的规则和改动</h2>
+<div class="box">
+  <ol style="padding-left:18px">
+    <li><b>一屏最多一个主按钮</b>，它是唯一整行宽的按钮。</li>
+    <li><b>次要操作用 <code>ToolButton</code></b>：图标 40pt 圆底 + 下面一行字，没有胶囊。一行最多 4 个。</li>
+    <li><b>两个操作时</b>（完成 / 重拍）：次要的放主按钮左边，用 <code>ToolButton</code>。</li>
+    <li><b><code>SoftActionStyle</code> 不再自动撑满</b>：拿掉内置的 <code>maxWidth: .infinity</code>，需要整行宽的调用方自己写。</li>
+  </ol>
+  <table style="margin-top:12px">
+    <tr><th>改动</th><th>文件</th><th>大约</th></tr>
+    <tr><td>新组件 <code>ToolButton</code></td><td><code>DesignSystem/OneDayControls.swift</code></td><td>30 行</td></tr>
+    <tr><td>4 个页面换成新排法</td><td>上表 4 个文件</td><td>每页 20～40 行</td></tr>
+    <tr><td>DESIGN.md 第 6 节加一行，加按钮组规则</td><td><code>DESIGN.md</code></td><td>10 行</td></tr>
+  </table>
+  <div style="margin-top:8px;color:var(--soft)">按规范要求，先改 DESIGN.md 和组件，再一页一页换，每页换完在手机上截图对比。总共约半天。</div>
+</div>
+</body>
+</html>
