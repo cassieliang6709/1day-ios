@@ -637,7 +637,7 @@ struct PlansHomeView: View {
                                 // Fixed tile size: a row of 9:16 previews, like the camera's dated look.
                                 .frame(width: 112, height: 199)
                                 .overlay(alignment: .bottomTrailing) {
-                                    ClipTileLabel(text: clip.recordedAt.formatted(date: .omitted, time: .shortened))
+                                    ClipTileLabel(text: LibrarySection.clockTime(clip.recordedAt))
                                 }
                         }
                     }

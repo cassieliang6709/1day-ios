@@ -203,7 +203,7 @@ struct LibrarySection: View {
             ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true,
                      isSelected: order != nil)
                 .aspectRatio(3 / 4, contentMode: .fit)
-                .overlay(alignment: .bottomTrailing) { ClipTileLabel(text: clockTime(clip.recordedAt)) }
+                .overlay(alignment: .bottomTrailing) { ClipTileLabel(text: Self.clockTime(clip.recordedAt)) }
                 .overlay(alignment: .topTrailing) {
                     if isSelecting { pickMark(order) }
                 }
@@ -213,7 +213,7 @@ struct LibrarySection: View {
         .accessibilityAddTraits(order != nil ? .isSelected : [])
     }
 
-    private func clockTime(_ date: Date) -> String {
+    static func clockTime(_ date: Date) -> String {
         let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     }
