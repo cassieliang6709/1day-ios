@@ -1,0 +1,64 @@
+name: Deploy workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/api/**'
+      - 'workers/suggest-prompts/**'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-workers
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      suggest-prompts: ${{ steps.filter.outputs.suggest-prompts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'workers/api/**'
+            suggest-prompts:
+              - 'workers/suggest-prompts/**'
+
+  deploy:
+    name: Deploy ${{ matrix.worker }}
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [api, suggest-prompts]
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.api == 'true' || needs.changes.outputs.suggest-prompts == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/${{ matrix.worker }}
+    env:
+      CHANGED: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs[matrix.worker] == 'true' }}
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.CHANGED == 'true'
+      - name: Missing Cloudflare token
+        if: env.CHANGED == 'true' && env.HAS_TOKEN != 'true'
+        run: echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping deploy of ${{ matrix.worker }}"
+      - uses: actions/setup-node@v4
+        if: env.CHANGED == 'true' && env.HAS_TOKEN == 'true'
+        with:
+          node-version: '24'
+      - name: Apply D1 migrations
+        if: env.CHANGED == 'true' && env.HAS_TOKEN == 'true' && matrix.worker == 'api'
+        run: npx --yes wrangler@4 d1 migrations apply oneday --remote
+      - name: Deploy
+        if: env.CHANGED == 'true' && env.HAS_TOKEN == 'true'
+        run: npx --yes wrangler@4 deploy

@@ -97,12 +97,12 @@ struct OneDayAPI {
             throw Failure.unavailable
         }
         Self.logResponse(request, response, started: started, bytes: nil)
+        defer { try? FileManager.default.removeItem(at: temp) }
         try check(response)
-        let fm = FileManager.default
-        try? fm.createDirectory(
+        try Task.checkCancellation()
+        try FileManager.default.createDirectory(
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? fm.removeItem(at: destination)
-        try fm.moveItem(at: temp, to: destination)
+        try RoomClipCache.install(temp, to: destination, consumingSource: true)
     }
 
     private func perform(_ request: URLRequest, uploading file: URL? = nil) async throws -> Data {
