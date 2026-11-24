@@ -195,12 +195,33 @@
   "radius": 2,
   "spacing": 6
  },
- "Plans/PlansHomeView.swift": {
-  "font": 26,
+ "Plans/PlansHomeView+Mine.swift": {
+  "font": 7,
   "hex": 0,
-  "padding": 43,
+  "padding": 7,
   "radius": 1,
-  "spacing": 32
+  "spacing": 8
+ },
+ "Plans/PlansHomeView+Rooms.swift": {
+  "font": 9,
+  "hex": 0,
+  "padding": 16,
+  "radius": 0,
+  "spacing": 10
+ },
+ "Plans/PlansHomeView+Today.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 14,
+  "radius": 0,
+  "spacing": 9
+ },
+ "Plans/PlansHomeView.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 0
  },
  "Plans/RoomInviteCard.swift": {
   "font": 7,
