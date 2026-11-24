@@ -438,7 +438,6 @@ enum Strings {
     static func makeVlog(_ count: Int) -> String {
         lang == .chinese ? "用 \(count) 段生成 vlog" : "Make a vlog from \(count)"
     }
-    static var pickClipsHint: String { lang == .chinese ? "点片段来选" : "Tap clips to pick them" }
     static var vlogTitle: String { lang == .chinese ? "我的 vlog" : "My vlog" }
     static var vlogMaking: String { lang == .chinese ? "正在生成 vlog…" : "Making your vlog…" }
     static var vlogFailed: String {

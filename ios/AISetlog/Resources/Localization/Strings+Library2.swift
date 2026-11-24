@@ -11,11 +11,9 @@ extension Strings {
     static var libraryCaptionPlaceholder: String { zh ? "这一段想说什么" : "Say something about this clip" }
     static var libraryCaptionSave: String { zh ? "好了" : "Done" }
 
-    static func libraryMakeVlog(seconds: Int?) -> String {
-        guard let seconds else { return libraryMakeVlogCTA }
-        return zh ? "生成 vlog · \(seconds) 秒" : "Make vlog · \(seconds)s"
+    static func libraryMakeVlog(count: Int) -> String {
+        zh ? "生成 · \(count) 段" : (count == 1 ? "Make · 1 clip" : "Make · \(count) clips")
     }
-    static var libraryRemovePicked: String { zh ? "去掉这段" : "Remove clip" }
     static var libraryMakeVlogCTA: String { zh ? "生成 vlog" : "Make vlog" }
 
     static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }

@@ -195,3 +195,8 @@ struct LibraryVlogSheet: View {
         }
     }
 }
+
+struct VlogRequest: Identifiable {
+    let clips: [LibraryClip]
+    var id: String { clips.map(\.id).joined(separator: "|") }
+}

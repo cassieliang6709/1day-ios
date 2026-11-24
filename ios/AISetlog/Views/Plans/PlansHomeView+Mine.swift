@@ -78,12 +78,7 @@ extension PlansHomeView {
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .top, spacing: .zero) {
             if isSelectingClips {
-                VStack(spacing: OneDay.Space.l) {
-                    header
-                    LibrarySelectionCard(picked: $pickedClips) {
-                        vlogRequest = VlogRequest(clips: pickedClips)
-                    }
-                }
+                header
                 .padding(.top, OneDay.Space.s)
                 .padding(.bottom, OneDay.Space.m)
                 .background { OneDayCanvas().ignoresSafeArea(edges: .top) }
@@ -91,6 +86,83 @@ extension PlansHomeView {
             }
         }
         .overlay { joiningOverlay }
+    }
+
+    @ViewBuilder
+    var browsingHeaderButtons: some View {
+        Button { showSettings = true } label: {
+            AvatarDot(name: account.account?.displayName, size: 48, image: AvatarStore.shared.image)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.settings)
+
+        Text(Strings.surfacePlans)
+            .font(OneDay.Font.title)
+            .foregroundStyle(OneDay.ink)
+        Spacer(minLength: OneDay.Space.s)
+        IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
+            .accessibilityIdentifier("mine-calendar")
+        if !library.scoped(includingFriends: false).clips.isEmpty {
+            Button(Strings.dayMakeVlog) {
+                withAnimation(OneDay.Motion.snap) {
+                    isSelectingClips = true
+                    pickedClips = clips(on: .now).sorted { $0.recordedAt < $1.recordedAt }
+                }
+            }
+            .font(OneDay.Font.callout)
+            .foregroundStyle(OneDay.ink)
+            .padding(.horizontal, OneDay.Space.m)
+            .frame(height: 38)
+            .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
+            .accessibilityIdentifier("library-select")
+        }
+    }
+
+    @ViewBuilder
+    var selectingHeaderButtons: some View {
+        Button(Strings.cancel) {
+            withAnimation(OneDay.Motion.snap) { isSelectingClips = false }
+        }
+        .font(OneDay.Font.callout)
+        .foregroundStyle(OneDay.brandText)
+        .frame(minHeight: 44)
+        .accessibilityIdentifier("library-select")
+        Spacer(minLength: OneDay.Space.s)
+        Button {
+            isPicking = true
+            Task {
+                let picks = await pickForMe()
+                withAnimation(OneDay.Motion.snap) { pickedClips = picks }
+                isPicking = false
+            }
+        } label: {
+            HStack(spacing: OneDay.Space.xs) {
+                if isPicking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "wand.and.sparkles")
+                }
+                Text(Strings.libraryRandomPick)
+            }
+        }
+        .disabled(isPicking)
+        .font(OneDay.Font.callout)
+        .foregroundStyle(OneDay.ink)
+        .padding(.horizontal, OneDay.Space.m)
+        .frame(height: 38)
+        .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
+        .accessibilityIdentifier("library-random-pick")
+        Button(Strings.libraryMakeVlog(count: pickedClips.count)) {
+            vlogRequest = VlogRequest(clips: pickedClips)
+        }
+        .font(OneDay.Font.callout)
+        .foregroundStyle(OneDay.onBrand)
+        .padding(.horizontal, OneDay.Space.m)
+        .frame(height: 38)
+        .background(Color.oneDayBrand, in: Capsule())
+        .opacity(pickedClips.isEmpty ? 0.45 : 1)
+        .disabled(pickedClips.isEmpty)
+        .accessibilityIdentifier("library-make-vlog")
     }
 
     var library: ClipLibrary {
@@ -137,61 +209,10 @@ extension PlansHomeView {
 
     var mineHeader: some View {
         HStack(spacing: OneDay.Space.m) {
-            Button { showSettings = true } label: {
-                AvatarDot(name: account.account?.displayName, size: 48, image: AvatarStore.shared.image)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Strings.settings)
-
-            Text(Strings.surfacePlans)
-                .font(OneDay.Font.title)
-                .foregroundStyle(OneDay.ink)
-            Spacer(minLength: OneDay.Space.s)
-            // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
             if isSelectingClips {
-                Button {
-                    isPicking = true
-                    Task {
-                        let picks = await pickForMe()
-                        withAnimation(OneDay.Motion.snap) { pickedClips = picks }
-                        isPicking = false
-                    }
-                } label: {
-                    HStack(spacing: OneDay.Space.xs) {
-                        if isPicking {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "wand.and.sparkles")
-                        }
-                        Text(Strings.libraryRandomPick)
-                    }
-                }
-                .disabled(isPicking)
-                .font(OneDay.Font.callout)
-                .foregroundStyle(OneDay.ink)
-                .padding(.horizontal, OneDay.Space.m)
-                .frame(height: 38)
-                .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
-                .accessibilityIdentifier("library-random-pick")
+                selectingHeaderButtons
             } else {
-                IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
-                    .accessibilityIdentifier("mine-calendar")
-            }
-            if !library.scoped(includingFriends: false).clips.isEmpty {
-                Button(isSelectingClips ? Strings.cancel : Strings.dayMakeVlog) {
-                    withAnimation(OneDay.Motion.snap) {
-                        isSelectingClips.toggle()
-                        if isSelectingClips {
-                            pickedClips = clips(on: .now).sorted { $0.recordedAt < $1.recordedAt }
-                        }
-                    }
-                }
-                .font(OneDay.Font.callout)
-                .foregroundStyle(OneDay.ink)
-                .padding(.horizontal, OneDay.Space.m)
-                .frame(height: 38)
-                .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
-                .accessibilityIdentifier("library-select")
+                browsingHeaderButtons
             }
         }
         .accessibilityIdentifier("mine-header")

@@ -107,20 +107,17 @@ struct LibrarySection: View {
 
 
     private var grid: some View {
-        // One card per day: date, mood and count on top, that day's clips below, and a shortcut to make that day's vlog.
-        LazyVStack(alignment: .leading, spacing: OneDay.Space.l) {
+        LazyVStack(alignment: .leading, spacing: OneDay.Space.xxl) {
             ForEach(dayGroups, id: \.day) { group in
-                GlassCard(padding: OneDay.Space.m) {
-                    VStack(alignment: .leading, spacing: OneDay.Space.m) {
-                        dayHeader(group.day, clips: group.clips)
+                VStack(alignment: .leading, spacing: OneDay.Space.s) {
+                    dayHeader(group.day, clips: group.clips)
 
-                        LazyVGrid(
-                            columns: Array(repeating: GridItem(.flexible(), spacing: OneDay.Space.xs), count: 3),
-                            spacing: OneDay.Space.xs
-                        ) {
-                            ForEach(group.clips) { clip in
-                                cell(clip)
-                            }
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: OneDay.Space.xs), count: 3),
+                        spacing: OneDay.Space.xs
+                    ) {
+                        ForEach(group.clips) { clip in
+                            cell(clip)
                         }
                     }
                 }
@@ -173,10 +170,8 @@ struct LibrarySection: View {
                     }
                 }
                     .font(OneDay.Font.callout)
-                    .foregroundStyle(OneDay.ink)
-                    .padding(.horizontal, OneDay.Space.m)
-                    .frame(minHeight: 36)
-                    .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
+                    .foregroundStyle(OneDay.brandText)
+                    .frame(minHeight: 44)
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("library-day-select-all")
             }
@@ -202,7 +197,6 @@ struct LibrarySection: View {
             ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true,
                      isSelected: order != nil)
                 .aspectRatio(3 / 4, contentMode: .fit)
-                .opacity(isSelecting && order == nil ? 0.45 : 1)
                 .overlay(alignment: .bottomTrailing) { ClipTileLabel(text: Self.clockTime(clip.recordedAt)) }
                 .overlay(alignment: .topTrailing) {
                     if isSelecting { pickMark(order) }
