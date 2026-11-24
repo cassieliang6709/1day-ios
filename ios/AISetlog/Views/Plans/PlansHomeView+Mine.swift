@@ -346,7 +346,9 @@ extension PlansHomeView {
     }
 
     func aiPick(from pool: [LibraryClip]) async -> [LibraryClip]? {
-        let sent = Array(pool.sorted { $0.recordedAt > $1.recordedAt }.prefix(Self.aiPickMaxClips))
+        let sent = pool.sorted { $0.recordedAt > $1.recordedAt }
+            .prefix(Self.aiPickMaxClips)
+            .sorted { $0.recordedAt < $1.recordedAt }
         var inputs: [ClipPickInput] = []
         for clip in sent {
             let tags = await ClipTags.tags(for: clip.url)
