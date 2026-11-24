@@ -793,7 +793,12 @@ struct PlansHomeView: View {
         let mine = library.scoped(includingFriends: false).clips
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .distantPast
         let recent = mine.filter { $0.recordedAt >= weekAgo }
-        let pool = recent.isEmpty ? mine : recent
+        let candidates = recent.isEmpty ? mine : recent
+        var usable: [LibraryClip] = []
+        for clip in candidates where await ClipQuality.isUsable(clip.url) {
+            usable.append(clip)
+        }
+        let pool = usable.isEmpty ? candidates : usable
         var picks: [LibraryClip] = []
         var total = 0.0
         for clip in pool.shuffled() where total < Self.randomPickSeconds {
