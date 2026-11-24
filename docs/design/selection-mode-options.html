@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1Day「我的」选择模式 · 3 个方案</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#8F7C66; --brand:#FFCB45; --brand2:#FFE08A; --mist:#FFF1CC; --brandText:#8A5A00; --line:#EFE3C6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:24px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:320px; }
+  .opt h2 { font-size:16px; margin:14px 0 6px; }
+  .tag { display:inline-block; font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .phone { width:320px; height:680px; border-radius:44px; background:var(--bg); border:8px solid #1d1d1d; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .status { height:44px; flex:0 0 auto; }
+  .scroll { flex:1; overflow-y:auto; padding:0 16px 90px; }
+  .scroll::-webkit-scrollbar { display:none; }
+  .head { display:flex; align-items:center; gap:8px; padding:0 16px 10px; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:#F6C9A8; border:3px solid #fff; box-shadow:0 0 0 2px #8EC5F0; flex:0 0 auto; }
+  .title { font-size:22px; font-weight:900; flex:1; }
+  .pill { height:34px; padding:0 13px; border-radius:99px; background:#FFE9AE; font-size:13px; font-weight:700; display:flex; align-items:center; gap:5px; white-space:nowrap; cursor:pointer; user-select:none; }
+  .pill.solid { background:var(--brand); font-weight:800; }
+  .pill.ghost { background:transparent; padding:0 4px; color:var(--brandText); }
+  .day { margin-top:18px; }
+  .dayhead { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .dayhead b { font-size:15px; font-weight:800; }
+  .mood { width:18px; height:14px; border-radius:6px; background:#FFCB45; }
+  .mood.g { background:#BFE5C2; }
+  .all { margin-left:auto; font-size:13px; font-weight:700; color:var(--brandText); cursor:pointer; user-select:none; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+  .tile { aspect-ratio:3/4; border-radius:10px; background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; position:relative; cursor:pointer; }
+  .tile .t { position:absolute; right:6px; bottom:5px; font-size:10px; font-weight:800; color:#fff; text-shadow:0 1px 3px #0008; }
+  .tile .mark { position:absolute; right:6px; top:6px; width:24px; height:24px; border-radius:50%; border:2px solid #fff; background:#0003; display:grid; place-items:center; font-size:12px; font-weight:900; color:var(--ink); }
+  .tile.on { box-shadow:0 0 0 3px var(--brand) inset; }
+  .tile.on .mark { background:var(--brand); }
+  .tray { position:absolute; left:12px; right:12px; bottom:14px; height:64px; border-radius:22px; background:var(--ink); display:flex; align-items:center; gap:10px; padding:0 8px 0 12px; box-shadow:0 8px 24px #0003; }
+  .stack { display:flex; }
+  .stack i { width:30px; height:40px; border-radius:7px; background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; border:2px solid var(--ink); margin-left:-10px; }
+  .stack i:first-child { margin-left:0; }
+  .tray .n { color:#FFF1CC; font-size:13px; font-weight:700; flex:1; }
+  .tray .go { height:46px; padding:0 18px; border-radius:99px; background:var(--brand); font-weight:800; font-size:15px; display:grid; place-items:center; }
+  .strip { display:flex; align-items:center; gap:10px; margin:0 16px 4px; padding:8px 8px 8px 10px; border-radius:20px; background:var(--mist); }
+  .strip .stack i { border-color:var(--mist); }
+  .strip .n { font-size:13px; font-weight:700; flex:1; white-space:nowrap; }
+  .strip .go { white-space:nowrap; height:40px; padding:0 16px; border-radius:99px; background:var(--brand); font-weight:800; font-size:14px; display:grid; place-items:center; }
+  .empty { opacity:.5; }
+</style>
+</head>
+<body>
+<h1>「我的」选择模式 · 3 个方案（点片段可以勾选，序号和段数会跟着变）</h1>
+<div class="row" id="row"></div>
+
+<script>
+const days = [
+  { label: '今天', mood: '', clips: ['09:12','11:40','15:05','20:31'] },
+  { label: '11月23日 周一', mood: 'g', clips: ['10:02','18:44'] },
+  { label: '11月21日 周六', mood: '', clips: ['13:20'] },
+];
+const options = [
+  { key: 'A', name: '顶部只留一个按钮', rec: true, notes: [
+      '<b>右上角实心黄「生成 · N 段」</b>，取消挪到左上，选择时不显示「我的」标题',
+      '没有顶部卡片、没有底部栏，屏幕全给片段',
+      '顺序看格子序号，换顺序去下一页',
+      '和 iOS 相册「选择」一样' ] },
+  { key: 'B', name: '底部深色托盘', notes: [
+      '底部一条深色栏：叠起来的小图 + 黄色生成按钮',
+      '深底配黄按钮，很显眼，只占一行',
+      '顶部标题栏不变' ] },
+  { key: 'C', name: '顶部压成一行', notes: [
+      '标题下面一行浅黄条：小图 + 段数时长 + 生成',
+      '只占一行，不占半屏',
+      '不能在这里拖动，换顺序去下一页' ] },
+];
+
+function render(opt) {
+  const wrap = document.createElement('div');
+  wrap.className = 'opt';
+  wrap.innerHTML = `<div class="phone"><div class="status"></div><div class="headwrap"></div><div class="scroll"></div></div>
+    <h2>${opt.key}. ${opt.name}${opt.rec ? '<span class="tag">推荐</span>' : ''}</h2>
+    <ul>${opt.notes.map(n => `<li>${n}</li>`).join('')}</ul>`;
+  const phone = wrap.querySelector('.phone');
+  const headwrap = wrap.querySelector('.headwrap');
+  const scroll = wrap.querySelector('.scroll');
+  const picked = ['0-0','0-1','0-2','0-3'];
+
+  function seconds() { return picked.length * 12; }
+  function stackHTML() { return `<div class="stack">${picked.slice(0,4).map(() => '<i></i>').join('')}</div>`; }
+
+  function draw() {
+    const n = picked.length;
+    if (opt.key === 'A') {
+      headwrap.innerHTML = `<div class="head"><span class="pill ghost">取消</span><span class="title"></span>
+        <span class="pill">✨ 帮我挑</span><span class="pill solid ${n ? '' : 'empty'}">生成 · ${n} 段</span></div>`;
+    } else {
+      headwrap.innerHTML = `<div class="head"><span class="avatar"></span><span class="title">我的</span>
+        <span class="pill">✨ 帮我挑</span><span class="pill">取消</span></div>` +
+        (opt.key === 'C' ? `<div class="strip">${stackHTML()}<span class="n">${n} 段 · ${seconds()} 秒</span><span class="go ${n ? '' : 'empty'}">生成 vlog</span></div>` : '');
+    }
+    scroll.innerHTML = days.map((d, di) => {
+      const ids = d.clips.map((_, ci) => `${di}-${ci}`);
+      const allOn = ids.every(id => picked.includes(id));
+      return `<div class="day"><div class="dayhead"><b>${d.label}</b><span class="mood ${d.mood}"></span>
+        <span class="all" data-day="${di}">${allOn ? '取消全选' : '全选'}</span></div>
+        <div class="grid">${d.clips.map((t, ci) => {
+          const id = `${di}-${ci}`; const k = picked.indexOf(id);
+          return `<div class="tile ${k >= 0 ? 'on' : ''}" data-id="${id}"><span class="mark">${k >= 0 ? k + 1 : ''}</span><span class="t">${t}</span></div>`;
+        }).join('')}</div></div>`;
+    }).join('');
+    phone.querySelector('.tray')?.remove();
+    if (opt.key === 'B') {
+      phone.insertAdjacentHTML('beforeend', `<div class="tray">${stackHTML()}<span class="n">${n} 段</span><span class="go ${n ? '' : 'empty'}">生成 · ${seconds()} 秒</span></div>`);
+    }
+  }
+
+  phone.addEventListener('click', e => {
+    const tile = e.target.closest('.tile');
+    const all = e.target.closest('.all');
+    if (tile) {
+      const id = tile.dataset.id; const k = picked.indexOf(id);
+      if (k >= 0) picked.splice(k, 1); else picked.push(id);
+    } else if (all) {
+      const di = +all.dataset.day; const ids = days[di].clips.map((_, ci) => `${di}-${ci}`);
+      if (ids.every(id => picked.includes(id))) ids.forEach(id => picked.splice(picked.indexOf(id), 1));
+      else ids.forEach(id => { if (!picked.includes(id)) picked.push(id); });
+    } else return;
+    draw();
+  });
+  draw();
+  return wrap;
+}
+options.forEach(o => document.getElementById('row').appendChild(render(o)));
+</script>
+</body>
+</html>
