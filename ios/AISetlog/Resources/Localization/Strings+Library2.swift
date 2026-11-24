@@ -11,11 +11,11 @@ extension Strings {
     static var libraryCaptionPlaceholder: String { zh ? "这一段想说什么" : "Say something about this clip" }
     static var libraryCaptionSave: String { zh ? "好了" : "Done" }
 
-    static func librarySelectedSummary(_ count: Int, seconds: Int?) -> String {
-        let clips = zh ? "\(count) 段" : (count == 1 ? "1 clip" : "\(count) clips")
-        guard let seconds, count > 0 else { return clips }
-        return zh ? "\(clips) · \(seconds) 秒" : "\(clips) · about \(seconds)s"
+    static func libraryMakeVlog(seconds: Int?) -> String {
+        guard let seconds else { return libraryMakeVlogCTA }
+        return zh ? "生成 vlog · \(seconds) 秒" : "Make vlog · \(seconds)s"
     }
+    static var libraryRemovePicked: String { zh ? "去掉这段" : "Remove clip" }
     static var libraryMakeVlogCTA: String { zh ? "生成 vlog" : "Make vlog" }
 
     static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }

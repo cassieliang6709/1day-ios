@@ -200,15 +200,6 @@ struct PlansHomeView: View {
                     }
                 }
         }
-        .overlay(alignment: .bottom) {
-            if isSelectingClips {
-                LibrarySelectionBar(picked: pickedClips) {
-                    vlogRequest = VlogRequest(clips: pickedClips)
-                }
-                .padding(.bottom, 6)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
         .onChange(of: isSelectingClips) { _, selecting in onSelectingChange?(selecting) }
         .sheet(isPresented: $planningAhead) {
             GuidedMomentsView(initialMoments: []) { draft in
@@ -239,6 +230,13 @@ struct PlansHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
+
+                if isSelectingClips {
+                    LibrarySelectionCard(picked: $pickedClips) {
+                        vlogRequest = VlogRequest(clips: pickedClips)
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
                 if DemoEntries.areEnabled {
