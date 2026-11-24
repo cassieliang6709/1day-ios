@@ -12,8 +12,11 @@ struct RootShellView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
     @Environment(AccountStore.self) private var account
+    @Environment(MoodStore.self) private var moods
     @AppStorage("dailyCheckIn.lastShownDay") private var checkInShownDay = ""
+    @AppStorage("dailyCheckIn.afterFilmDay") private var afterFilmAskedDay = ""
     @State private var showsCheckIn = false
+    @State private var checkInOffersFilm = true
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
@@ -144,13 +147,18 @@ struct RootShellView: View {
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
-        .sheet(isPresented: $showsCheckIn) { DailyCheckInSheet(onFilm: { openCamera() }) }
+        .sheet(isPresented: $showsCheckIn) {
+            DailyCheckInSheet(onFilm: checkInOffersFilm ? { openCamera() } : nil)
+        }
         .onAppear {
             consumeCaptureLaunch()
             updateTiltWatching()
             offerCheckInIfNeeded()
         }
-        .onChange(of: surface) { _, _ in updateTiltWatching() }
+        .onChange(of: surface) { old, _ in
+            updateTiltWatching()
+            if old == .camera { askMoodAfterFilmingIfNeeded() }
+        }
         .onChange(of: scenePhase) { _, phase in
             updateTiltWatching()
             if phase == .active { offerCheckInIfNeeded() }
@@ -297,6 +305,16 @@ struct RootShellView: View {
         guard checkInShownDay != today, surface == .plans || surface == .friends,
               !showDrafts, !hasFilmedToday else { return }
         checkInShownDay = today
+        checkInOffersFilm = true
+        showsCheckIn = true
+    }
+
+    private func askMoodAfterFilmingIfNeeded() {
+        let today = Self.dayKey(.now)
+        guard afterFilmAskedDay != today, moods.today == nil, !showDrafts, hasFilmedToday else { return }
+        afterFilmAskedDay = today
+        checkInShownDay = today
+        checkInOffersFilm = false
         showsCheckIn = true
     }
 
