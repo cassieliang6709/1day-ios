@@ -76,7 +76,7 @@ extension PlansHomeView {
             .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .safeAreaInset(edge: .top, spacing: .zero) {
             if isSelectingClips {
                 VStack(spacing: OneDay.Space.l) {
                     header
@@ -84,7 +84,7 @@ extension PlansHomeView {
                         vlogRequest = VlogRequest(clips: pickedClips)
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, OneDay.Space.s)
                 .padding(.bottom, OneDay.Space.m)
                 .background { OneDayCanvas().ignoresSafeArea(edges: .top) }
                 .transition(.move(edge: .top).combined(with: .opacity))
