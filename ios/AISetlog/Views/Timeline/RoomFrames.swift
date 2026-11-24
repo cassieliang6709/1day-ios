@@ -254,7 +254,6 @@ private struct PersonFrame: View {
         return Button(action: onOpenPerson) {
             HStack(spacing: 7) {
                 MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 30, isYou: column.isMine)
-                    .padding(2)
                     .overlay {
                         Circle().strokeBorder(Color.oneDayBrand, lineWidth: onVideo ? 2 : 0)
                     }
