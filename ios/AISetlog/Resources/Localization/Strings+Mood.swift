@@ -15,6 +15,11 @@ extension Strings {
         AppLanguage.effective.resolved == .chinese ? zh : en
     }
 
+    static var moodPromptAfterFilming: String { mood("刚拍完，此刻感觉怎么样？", "Just filmed. How are you feeling?") }
+    static func moodPromptAfterGap(days: Int) -> String {
+        mood("已经 \(days) 天没记生活了，今天怎么样？", "\(days) days since your last clip. How's today?")
+    }
+
     static var moodSaved: String { mood("今天记下了", "Saved for today") }
     static var moodEdit: String { mood("改", "Edit") }
     static var moodDone: String { mood("记下了", "Save") }

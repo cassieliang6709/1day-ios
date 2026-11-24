@@ -17,6 +17,7 @@ struct RootShellView: View {
     @AppStorage("dailyCheckIn.afterFilmDay") private var afterFilmAskedDay = ""
     @State private var showsCheckIn = false
     @State private var checkInOffersFilm = true
+    @State private var checkInPrompt = Strings.moodPrompt
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
@@ -148,7 +149,7 @@ struct RootShellView: View {
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
         .sheet(isPresented: $showsCheckIn) {
-            DailyCheckInSheet(onFilm: checkInOffersFilm ? { openCamera() } : nil)
+            DailyCheckInSheet(prompt: checkInPrompt, onFilm: checkInOffersFilm ? { openCamera() } : nil)
         }
         .onAppear {
             consumeCaptureLaunch()
@@ -307,6 +308,8 @@ struct RootShellView: View {
               !showDrafts, !hasFilmedToday else { return }
         checkInShownDay = today
         checkInOffersFilm = true
+        checkInPrompt = daysSinceLastFilmed.map { $0 >= 2 ? Strings.moodPromptAfterGap(days: $0) : Strings.moodPrompt }
+            ?? Strings.moodPrompt
         showsCheckIn = true
     }
 
@@ -316,7 +319,23 @@ struct RootShellView: View {
         afterFilmAskedDay = today
         checkInShownDay = today
         checkInOffersFilm = false
+        checkInPrompt = Strings.moodPromptAfterFilming
         showsCheckIn = true
+    }
+
+    private var daysSinceLastFilmed: Int? {
+        let mine = Set([account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 })
+        let clipDates = store.challenges.flatMap { challenge in
+            store.recordedClips(for: challenge.id).compactMap { clip -> Date? in
+                guard clip.authorID.map(mine.contains) ?? true else { return nil }
+                return clip.recordedAt
+            }
+        }
+        guard let last = (clipDates + drafts.sortedDrafts.map(\.recordedAt)).max() else { return nil }
+        let calendar = Calendar.current
+        return calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: last), to: calendar.startOfDay(for: .now)
+        ).day
     }
 
     private var hasFilmedToday: Bool {

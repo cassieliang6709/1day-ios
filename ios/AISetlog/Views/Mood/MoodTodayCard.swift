@@ -57,7 +57,7 @@ struct MoodFaceButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .opacity(state == .dimmed ? 0.65 : 1)
+        .opacity(state == .dimmed ? 0.8 : 1)
         .zIndex(state == .selected ? 1 : 0)
         .animation(.spring(duration: 0.25), value: state)
         .accessibilityLabel(mood.label)
@@ -85,6 +85,6 @@ struct MoodFaceButton: View {
                     .overlay(Circle().strokeBorder(OneDay.surface, lineWidth: 2))
                     .opacity(state == .selected ? 1 : 0)
             }
-            .scaleEffect(state == .selected ? 1.16 : 1)
+            .scaleEffect(state == .selected ? 1.08 : 1)
     }
 }
