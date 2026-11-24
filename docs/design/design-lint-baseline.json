@@ -139,12 +139,19 @@
   "radius": 0,
   "spacing": 0
  },
- "Library/LibrarySection.swift": {
-  "font": 12,
+ "Library/LibraryCalendar.swift": {
+  "font": 4,
   "hex": 0,
-  "padding": 9,
+  "padding": 1,
   "radius": 0,
-  "spacing": 12
+  "spacing": 4
+ },
+ "Library/LibrarySection.swift": {
+  "font": 3,
+  "hex": 0,
+  "padding": 2,
+  "radius": 0,
+  "spacing": 1
  },
  "Library/LibraryVlogArrange.swift": {
   "font": 4,
