@@ -315,6 +315,17 @@ struct StoryTimelineView: View {
                             targetAuthorID: clip.authorID ?? myID
                         ).comments.max { $0.createdAt < $1.createdAt }
                     },
+                    reactions: { clip in
+                        store.interactions(
+                            for: challengeID, day: clip.day,
+                            targetAuthorID: clip.authorID ?? myID
+                        ).reactions
+                    },
+                    onReact: { clip, key in
+                        store.toggleReaction(
+                            key, day: clip.day, challengeID: challengeID,
+                            targetAuthorID: clip.authorID ?? myID)
+                    },
                     signedOut: signedOut,
                     onSignIn: { showSignIn = true })
             case .columns:

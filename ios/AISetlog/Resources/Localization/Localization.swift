@@ -627,9 +627,6 @@ enum Strings {
     static var statStories: String { lang == .chinese ? "选题" : "Topics" }
     static var statMoments: String { lang == .chinese ? "瞬间" : "Moments" }
     static var statFinished: String { lang == .chinese ? "拍完了" : "Finished" }
-    static var anyEmojiPlaceholder: String {
-        lang == .chinese ? "或者打任意表情" : "Or type any emoji"
-    }
     static var captionAction: String { lang == .chinese ? "加字幕" : "Caption" }
     static var comments: String { lang == .chinese ? "评论" : "Comments" }
     static var firstComment: String {

@@ -8,23 +8,12 @@ struct ClipReaction: Codable, Identifiable, Equatable {
 
     var id: String { "\(authorID)|\(emoji)" }
 
-    static let palette = ["🩵", "🥹", "😭", "🫶", "✨", "🐣"]
-}
+    static let moodPrefix = "mood:"
+    static let palette = Mood.allCases.map { moodPrefix + $0.rawValue }
 
-enum ClipReactionRecents {
-    static let storageKey = "clip.reaction.recents.v1"
-    static let limit = 8
-
-    static func load(from defaults: UserDefaults = .standard) -> [String] {
-        defaults.stringArray(forKey: storageKey) ?? []
-    }
-
-    static func adding(_ emoji: String, to recents: [String]) -> [String] {
-        ([emoji] + recents.filter { $0 != emoji }).prefix(limit).map { $0 }
-    }
-
-    static func suggestions(recents: [String]) -> [String] {
-        recents + ClipReaction.palette.filter { !recents.contains($0) }
+    static func mood(for key: String) -> Mood? {
+        guard key.hasPrefix(moodPrefix) else { return nil }
+        return Mood(rawValue: String(key.dropFirst(moodPrefix.count)))
     }
 }
 

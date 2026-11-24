@@ -7,11 +7,6 @@ struct ReactionBar: View {
     let onToggle: (String) -> Void
 
     @State private var picking = false
-    @AppStorage(ClipReactionRecents.storageKey) private var recentsData = ""
-
-    private var recents: [String] {
-        recentsData.split(separator: "\n").map(String.init)
-    }
 
     struct Tally: Identifiable {
         let emoji: String
@@ -53,7 +48,7 @@ struct ReactionBar: View {
             toggle(emoji)
         } label: {
             HStack(spacing: 4) {
-                Text(emoji).font(.system(size: 15))
+                ReactionGlyph(key: emoji, size: 18)
                 if count > 1 {
                     Text("\(count)")
                         .font(.system(size: 11.5, weight: .heavy, design: .rounded))
@@ -73,7 +68,7 @@ struct ReactionBar: View {
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.impact(weight: .light), trigger: mine)
-        .accessibilityLabel("\(emoji) \(count)")
+        .accessibilityLabel("\(ClipReaction.mood(for: emoji)?.label ?? emoji) \(count)")
     }
 
     private var addButton: some View {
@@ -93,19 +88,15 @@ struct ReactionBar: View {
     }
 
     private var picker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                ForEach(ClipReactionRecents.suggestions(recents: recents), id: \.self) { emoji in
-                    Button { toggle(emoji) } label: {
-                        Text(emoji)
-                            .font(.system(size: 19))
-                            .frame(width: 33, height: 33)
-                            .background(OneDay.surfaceSoft.opacity(0.85), in: Circle())
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 5) {
+            ForEach(ClipReaction.palette, id: \.self) { key in
+                Button { toggle(key) } label: {
+                    ReactionGlyph(key: key, size: 30)
+                        .frame(width: 40, height: 40)
+                        .background(OneDay.surfaceSoft.opacity(0.85), in: Circle())
                 }
+                .buttonStyle(.plain)
             }
-            AnyEmojiField { toggle($0) }
         }
         .padding(8)
         .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
@@ -117,47 +108,8 @@ struct ReactionBar: View {
     }
 
     private func toggle(_ emoji: String) {
-        recentsData = ClipReactionRecents
-            .adding(emoji, to: recents)
-            .joined(separator: "\n")
         picking = false
         onToggle(emoji)
-    }
-}
-
-private struct AnyEmojiField: View {
-    let onPick: (String) -> Void
-
-    @State private var typed = ""
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "keyboard")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(OneDay.inkFaint)
-            TextField(Strings.anyEmojiPlaceholder, text: $typed)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(OneDay.ink)
-                .tint(Color.oneDayBrand)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .accessibilityIdentifier("any-emoji")
-                .onChange(of: typed) { _, new in
-                    guard let first = new.first else { return }
-                    typed = ""
-                    guard String(first).containsEmoji else { return }
-                    onPick(String(first))
-                }
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(OneDay.surfaceSoft.opacity(0.7), in: Capsule())
-    }
-}
-
-extension String {
-    var containsEmoji: Bool {
-        unicodeScalars.contains { $0.properties.isEmojiPresentation || $0.value > 0x238C }
     }
 }
 

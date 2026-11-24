@@ -13,6 +13,8 @@ struct RoomFrames: View {
     var onPoke: (String) -> Void = { _ in }
     var orientation: Challenge.Orientation = .portrait
     var latestComment: (DayClip) -> ClipComment? = { _ in nil }
+    var reactions: (DayClip) -> [ClipReaction] = { _ in [] }
+    var onReact: (DayClip, String) -> Void = { _, _ in }
     var signedOut = false
     var onSignIn: () -> Void = {}
 
@@ -104,6 +106,9 @@ struct RoomFrames: View {
             hasPoked: hasPoked,
             onPoke: onPoke,
             latestComment: latestComment,
+            myID: myID,
+            reactions: reactions,
+            onReact: onReact,
             signedOut: signedOut,
             onSignIn: onSignIn)
     }
@@ -119,6 +124,9 @@ private struct PersonFrame: View {
     let hasPoked: (String) -> Bool
     let onPoke: (String) -> Void
     let latestComment: (DayClip) -> ClipComment?
+    let myID: String
+    let reactions: (DayClip) -> [ClipReaction]
+    let onReact: (DayClip, String) -> Void
     let signedOut: Bool
     let onSignIn: () -> Void
 
@@ -247,6 +255,11 @@ private struct PersonFrame: View {
              clip.overlayText]
                 .compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier("room-clip-tile")
+        .overlay(alignment: .bottomTrailing) {
+            if !column.isMine, !signedOut {
+                MoodReactButton(reactions: reactions(clip), myID: myID) { onReact(clip, $0) }
+            }
+        }
     }
 
     private var person: some View {
