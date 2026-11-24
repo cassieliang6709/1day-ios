@@ -27,6 +27,20 @@ extension Strings {
     }
     static var pickRoomTitle: String { zh ? "邀请朋友进哪个房间？" : "Which room to invite to?" }
     static var newRoomRow: String { zh ? "新建房间" : "New room" }
+    static var roomsGuideTitle: String { zh ? "和朋友一起拍" : "Film with friends" }
+    static var roomsGuideSteps: [String] {
+        zh ? [
+            "点「新建房间」，把邀请码发给朋友",
+            "朋友点「加入」，输入邀请码",
+            "每个人拍的片段都会出现在房间里",
+            "点「做 vlog」，把大家的片段拼成一支片",
+        ] : [
+            "Tap \u{201C}New room\u{201D} and send the code to friends",
+            "Friends tap \u{201C}Join\u{201D} and enter the code",
+            "Everyone's clips show up in the room",
+            "Tap \u{201C}Make vlog\u{201D} to put them into one film",
+        ]
+    }
     static var roomHasNew: String { zh ? "有新片段" : "New clips" }
     static var roomShapeLabel: String { zh ? "怎么拍" : "Shape" }
     static var roomShapeLandscape: String { zh ? "横拍" : "Landscape" }

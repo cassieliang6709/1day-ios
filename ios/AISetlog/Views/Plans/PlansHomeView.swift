@@ -416,18 +416,6 @@ struct PlansHomeView: View {
         let roomID: UUID?
     }
 
-    private func inviteFriends() {
-        let rooms = sharedStories
-        switch rooms.count {
-        case 0:
-            onCompose()
-        case 1:
-            showInvite(for: rooms[0])
-        default:
-            inviteRequest = InviteRequest(roomID: nil)
-        }
-    }
-
     private func showInvite(for room: Challenge) {
         openRoomForInvite(room)
         inviteRequest = InviteRequest(roomID: room.id)
@@ -503,36 +491,25 @@ struct PlansHomeView: View {
     }
 
     private var friendsEmptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(OneDay.brandText)
-                .frame(width: 68, height: 68)
-                .background(Color.oneDayBrand.opacity(0.12), in: Circle())
-                .padding(.top, 8)
-
-            Text(Strings.friendsEmptyTitle)
-                .font(.system(size: 19, weight: .heavy, design: .rounded))
+        VStack(alignment: .leading, spacing: OneDay.Space.s) {
+            Text(Strings.roomsGuideTitle)
+                .font(OneDay.Font.subhead)
                 .foregroundStyle(OneDay.ink)
-                .multilineTextAlignment(.center)
-
-            Button(Strings.inviteFriends) { inviteFriends() }
-                .buttonStyle(.primaryAction)
-                .padding(.top, 4)
-                .accessibilityIdentifier("friends-invite")
-
-            Button(Strings.haveInviteCode) {
-                joinCode = ""
-                showJoin = true
+            ForEach(Array(Strings.roomsGuideSteps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .firstTextBaseline, spacing: OneDay.Space.s) {
+                    Text("\(index + 1).")
+                        .monospacedDigit()
+                    Text(step)
+                }
+                .font(OneDay.Font.caption)
+                .foregroundStyle(OneDay.inkSoft)
             }
-            .font(.system(size: 13.5, weight: .bold, design: .rounded))
-            .foregroundStyle(OneDay.brandText)
-            .accessibilityIdentifier("friends-join-room")
         }
-        .frame(maxWidth: .infinity)
-        .padding(26)
-        .glassSurface(radius: OneDay.Radius.hero)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
+        .padding(.top, OneDay.Space.s)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("rooms-guide")
     }
 
     private var greetingRow: some View {

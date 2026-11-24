@@ -286,7 +286,6 @@ enum Strings {
         lang == .chinese ? "房间没建起来" : "Couldn't create the room"
     }
     static var joinShort: String { lang == .chinese ? "加入" : "Join" }
-    static var haveInviteCode: String { lang == .chinese ? "我有邀请码" : "I have an invite code" }
     static var firstRunHeadline: String {
         lang == .chinese ? "日日是好日" : "Every day is a good day"
     }
@@ -396,10 +395,6 @@ enum Strings {
     static var surfaceFriends: String { lang == .chinese ? "房间" : "Rooms" }
     static var surfaceCompose: String { lang == .chinese ? "新建" : "New" }
     static var surfaceCamera: String { lang == .chinese ? "相机" : "Camera" }
-    static var friendsEmptyTitle: String {
-        lang == .chinese ? "还没有和朋友一起拍的房间" : "No stories with friends yet"
-    }
-    static var inviteFriends: String { lang == .chinese ? "邀请朋友一起拍" : "Invite friends" }
 
     static var makeRoomVlog: String { lang == .chinese ? "生成 vlog" : "Make vlog" }
     static var roomFeedFilm: String { lang == .chinese ? "拍一段" : "Film a clip" }
