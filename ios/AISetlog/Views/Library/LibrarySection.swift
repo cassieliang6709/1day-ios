@@ -146,7 +146,7 @@ struct LibrarySection: View {
     private var dayGroups: [(day: Date, clips: [LibraryClip])] {
         let calendar = Calendar.current
         return Dictionary(grouping: shown) { calendar.startOfDay(for: $0.recordedAt) }
-            .map { (day: $0.key, clips: $0.value.sorted { $0.recordedAt > $1.recordedAt }) }
+            .map { (day: $0.key, clips: $0.value.sorted { $0.recordedAt < $1.recordedAt }) }
             .sorted { $0.day > $1.day }
     }
 
@@ -202,6 +202,7 @@ struct LibrarySection: View {
             ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true,
                      isSelected: order != nil)
                 .aspectRatio(3 / 4, contentMode: .fit)
+                .opacity(isSelecting && order == nil ? 0.45 : 1)
                 .overlay(alignment: .bottomTrailing) { ClipTileLabel(text: Self.clockTime(clip.recordedAt)) }
                 .overlay(alignment: .topTrailing) {
                     if isSelecting { pickMark(order) }

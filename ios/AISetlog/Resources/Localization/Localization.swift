@@ -786,6 +786,7 @@ enum Strings {
     static var mineTodayHeader: String { lang == .chinese ? "今天" : "Today" }
     static var librarySelectDay: String { lang == .chinese ? "全选" : "Select all" }
     static var libraryDeselectDay: String { lang == .chinese ? "取消全选" : "Deselect all" }
+    static var libraryRandomPick: String { lang == .chinese ? "随机挑" : "Shuffle" }
     static var mineEmptyTitle: String { lang == .chinese ? "今天还没拍" : "Nothing filmed today" }
     static var dayMakeVlog: String { lang == .chinese ? "做 vlog" : "Make vlog" }
     static var guideSteps: [String] {

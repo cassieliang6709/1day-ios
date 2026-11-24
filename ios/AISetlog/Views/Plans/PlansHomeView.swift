@@ -545,8 +545,20 @@ struct PlansHomeView: View {
                 .foregroundStyle(OneDay.ink)
             Spacer(minLength: OneDay.Space.s)
             // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
-            IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
-                .accessibilityIdentifier("mine-calendar")
+            if isSelectingClips {
+                Button(Strings.libraryRandomPick, systemImage: "dice") {
+                    withAnimation(OneDay.Motion.snap) { pickedClips = randomPick() }
+                }
+                .font(OneDay.Font.callout)
+                .foregroundStyle(OneDay.ink)
+                .padding(.horizontal, OneDay.Space.m)
+                .frame(height: 38)
+                .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
+                .accessibilityIdentifier("library-random-pick")
+            } else {
+                IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
+                    .accessibilityIdentifier("mine-calendar")
+            }
             if !library.scoped(includingFriends: false).clips.isEmpty {
                 Button(isSelectingClips ? Strings.cancel : Strings.dayMakeVlog) {
                     withAnimation(OneDay.Motion.snap) {
@@ -773,6 +785,16 @@ struct PlansHomeView: View {
             .padding(.horizontal, 20)
         }
     }
+
+    private func randomPick() -> [LibraryClip] {
+        let mine = library.scoped(includingFriends: false).clips
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .distantPast
+        let recent = mine.filter { $0.recordedAt >= weekAgo }
+        let pool = recent.isEmpty ? mine : recent
+        return Array(pool.shuffled().prefix(Self.randomPickCount)).sorted { $0.recordedAt < $1.recordedAt }
+    }
+
+    private static let randomPickCount = 5
 
     private func clips(on day: Date) -> [LibraryClip] {
         library.scoped(includingFriends: false).clips
