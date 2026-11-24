@@ -12,8 +12,7 @@ struct StoryComposerView: View {
     @State private var entry: ComposerEntry = .byTime
     private let days: Challenge.Mode = .oneDay
     private let clipLength: Challenge.ClipLength = .scene
-    @State private var roomOrientation: Challenge.Orientation = .portrait
-    private var orientation: Challenge.Orientation { withFriends ? roomOrientation : .portrait }
+    private let orientation: Challenge.Orientation = .portrait
     private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
     @State private var title = ""
@@ -72,10 +71,6 @@ struct StoryComposerView: View {
                     .accessibilityIdentifier("composer-question")
                     .padding(.horizontal, ComposerLayout.margin)
                 setup
-                if withFriends {
-                    RoomShapePicker(selection: $roomOrientation)
-                        .padding(.horizontal, ComposerLayout.margin)
-                }
             }
             .padding(.bottom, 16)
         }
@@ -224,64 +219,5 @@ struct StoryComposerView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cleaned.isEmpty ? nil : cleaned
-    }
-}
-
-private struct RoomShapePicker: View {
-    @Binding var selection: Challenge.Orientation
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: Strings.roomShapeLabel)
-            HStack(spacing: 12) {
-                option(.portrait, title: Strings.roomShapePortrait)
-                option(.landscape, title: Strings.roomShapeLandscape)
-            }
-        }
-    }
-
-    private func option(_ orientation: Challenge.Orientation, title: String) -> some View {
-        let picked = selection == orientation
-        return Button {
-            withAnimation(OneDay.Motion.soft) { selection = orientation }
-        } label: {
-            VStack(spacing: 10) {
-                sketch(orientation)
-                    .frame(height: 74)
-                Text(title)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .foregroundStyle(OneDay.ink)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(OneDay.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(picked ? Color.oneDayBrand : OneDay.hairline, lineWidth: picked ? 2.5 : 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(picked ? .isSelected : [])
-        .accessibilityIdentifier("room-shape-\(orientation.rawValue)")
-    }
-
-    @ViewBuilder
-    private func sketch(_ orientation: Challenge.Orientation) -> some View {
-        let fill = (selection == orientation ? Color.oneDayBrand : OneDay.inkFaint).opacity(0.55)
-        if orientation == .landscape {
-            VStack(spacing: 5) {
-                ForEach(0..<2, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(fill)
-                        .aspectRatio(16 / 9, contentMode: .fit)
-                }
-            }
-        } else {
-            HStack(spacing: 5) {
-                ForEach(0..<2, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(fill)
-                        .aspectRatio(3 / 4, contentMode: .fit)
-                }
-            }
-        }
     }
 }

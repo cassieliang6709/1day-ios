@@ -3,7 +3,7 @@ import SwiftUI
 @MainActor
 enum DraftFiler {
     static func candidates(for draft: ClipDraft, in store: ChallengeStore) -> [Challenge] {
-        ClipFiling.rooms(in: store.challenges, orientation: draft.orientation)
+        ClipFiling.rooms(in: store.challenges)
     }
 
     static func blocked(for draft: ClipDraft, in store: ChallengeStore) -> DraftFilingBlocked {

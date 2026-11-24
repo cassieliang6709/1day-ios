@@ -40,9 +40,6 @@ extension Strings {
         ]
     }
     static var roomHasNew: String { zh ? "有新片段" : "New clips" }
-    static var roomShapeLabel: String { zh ? "怎么拍" : "Shape" }
-    static var roomShapeLandscape: String { zh ? "横拍" : "Landscape" }
-    static var roomShapePortrait: String { zh ? "竖拍" : "Portrait" }
     static var roomLayoutFrames: String { zh ? "每人一个框" : "One frame each" }
     static var roomLayoutDefault: String { zh ? "默认" : "Default" }
     static var roomLayoutWaterfall: String { zh ? "瀑布流" : "Waterfall" }

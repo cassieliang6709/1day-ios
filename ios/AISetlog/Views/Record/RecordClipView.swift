@@ -504,12 +504,12 @@ struct RecordClipView: View {
 
 
     private var sendableRooms: [Challenge] {
-        ClipFiling.rooms(in: store.challenges, orientation: filingOrientation)
+        ClipFiling.rooms(in: store.challenges)
             .sorted { $0.startDate > $1.startDate }
     }
 
     private var filingCandidates: [Challenge] {
-        ClipFiling.candidates(in: store.challenges, orientation: filingOrientation)
+        ClipFiling.candidates(in: store.challenges)
     }
 
     private func file(_ url: URL, to challenges: [Challenge]) {

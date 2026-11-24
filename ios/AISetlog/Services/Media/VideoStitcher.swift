@@ -167,7 +167,10 @@ enum VideoStitcher {
         }
         guard !loaded.isEmpty else { throw StitchError.noClips }
 
-        let firstSize = loaded[0].orientedSize
+        let landscapeCount = loaded.filter { $0.orientedSize.width > $0.orientedSize.height }.count
+        let majorityLandscape = landscapeCount * 2 > loaded.count
+        let firstSize = loaded.first { ($0.orientedSize.width > $0.orientedSize.height) == majorityLandscape }?
+            .orientedSize ?? loaded[0].orientedSize
         let sourceAspect = firstSize.height > 0 ? firstSize.width / firstSize.height : 1
         let widestMoment: Int = switch options.layout {
         case .sequential: 1
