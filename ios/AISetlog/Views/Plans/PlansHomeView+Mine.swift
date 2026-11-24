@@ -149,12 +149,24 @@ extension PlansHomeView {
             Spacer(minLength: OneDay.Space.s)
             // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
             if isSelectingClips {
-                Button(Strings.libraryRandomPick, systemImage: "dice") {
+                Button {
+                    isPicking = true
                     Task {
-                        let picks = await randomPick()
+                        let picks = await pickForMe()
                         withAnimation(OneDay.Motion.snap) { pickedClips = picks }
+                        isPicking = false
+                    }
+                } label: {
+                    HStack(spacing: OneDay.Space.xs) {
+                        if isPicking {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "wand.and.sparkles")
+                        }
+                        Text(Strings.libraryRandomPick)
                     }
                 }
+                .disabled(isPicking)
                 .font(OneDay.Font.callout)
                 .foregroundStyle(OneDay.ink)
                 .padding(.horizontal, OneDay.Space.m)
@@ -298,7 +310,7 @@ extension PlansHomeView {
         }
     }
 
-    func randomPick() async -> [LibraryClip] {
+    func pickForMe() async -> [LibraryClip] {
         let mine = library.scoped(includingFriends: false).clips
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .distantPast
         let recent = mine.filter { $0.recordedAt >= weekAgo }
@@ -308,6 +320,35 @@ extension PlansHomeView {
             usable.append(clip)
         }
         let pool = usable.isEmpty ? candidates : usable
+        if let picked = await aiPick(from: pool) { return picked }
+        return await randomFill(from: pool)
+    }
+
+    func aiPick(from pool: [LibraryClip]) async -> [LibraryClip]? {
+        let sent = Array(pool.sorted { $0.recordedAt > $1.recordedAt }.prefix(Self.aiPickMaxClips))
+        var inputs: [ClipPickInput] = []
+        for clip in sent {
+            let tags = await ClipTags.tags(for: clip.url)
+            let parts = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: clip.recordedAt)
+            inputs.append(ClipPickInput(
+                id: clip.id,
+                day: String(format: "%02d-%02d", parts.month ?? 0, parts.day ?? 0),
+                time: String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0),
+                seconds: Int(await ClipDurations.seconds(of: clip.url).rounded()),
+                faces: tags.faces,
+                labels: tags.labels))
+        }
+        guard let ids = try? await RemoteClipPicker().pick(
+            inputs, targetSeconds: Int(Self.randomPickSeconds), language: AppLanguage.effective)
+        else { return nil }
+        let byID = Dictionary(sent.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let picked = ids.compactMap { byID[$0] }
+        return picked.isEmpty ? nil : picked
+    }
+
+    static let aiPickMaxClips = 60
+
+    func randomFill(from pool: [LibraryClip]) async -> [LibraryClip] {
         var picks: [LibraryClip] = []
         var total = 0.0
         for clip in pool.shuffled() where total < Self.randomPickSeconds {
