@@ -424,7 +424,6 @@ enum Strings {
     static var saveToMine: String { lang == .chinese ? "存到我的" : "Save to Mine" }
     static var libraryGrid: String { lang == .chinese ? "网格" : "Grid" }
     static var libraryCalendar: String { lang == .chinese ? "日历" : "Calendar" }
-    static var librarySelect: String { lang == .chinese ? "选择" : "Select" }
     static var libraryToday: String { lang == .chinese ? "今天" : "Today" }
     static var libraryYesterday: String { lang == .chinese ? "昨天" : "Yesterday" }
     static func libraryClipCount(_ n: Int) -> String { lang == .chinese ? "\(n) 段" : (n == 1 ? "1 clip" : "\(n) clips") }
@@ -785,7 +784,8 @@ enum Strings {
     }
     static var guideTitle: String { lang == .chinese ? "怎么用 1Day" : "How 1Day works" }
     static var mineTodayHeader: String { lang == .chinese ? "今天" : "Today" }
-    static var mineMakeTodayVlog: String { lang == .chinese ? "拼成今天的 vlog" : "Make today's vlog" }
+    static var librarySelectDay: String { lang == .chinese ? "全选" : "Select all" }
+    static var libraryDeselectDay: String { lang == .chinese ? "取消全选" : "Deselect all" }
     static var mineEmptyTitle: String { lang == .chinese ? "今天还没拍" : "Nothing filmed today" }
     static var dayMakeVlog: String { lang == .chinese ? "做 vlog" : "Make vlog" }
     static var guideSteps: [String] {

@@ -7,9 +7,6 @@ struct LibrarySection: View {
     var draftsRequest = 0
     @Binding var isSelecting: Bool
     @Binding var picked: [LibraryClip]
-    var onMakeVlog: (([LibraryClip]) -> Void)? = nil
-    /// A day already shown above (Mine's Today strip); its group is left out so clips don't appear twice.
-    var hiddenDay: Date? = nil
 
     enum Mode: Hashable { case grid, calendar }
 
@@ -148,16 +145,14 @@ struct LibrarySection: View {
 
     private var dayGroups: [(day: Date, clips: [LibraryClip])] {
         let calendar = Calendar.current
-        return Dictionary(grouping: shown.filter { clip in
-            hiddenDay.map { !calendar.isDate(clip.recordedAt, inSameDayAs: $0) } ?? true
-        }) { calendar.startOfDay(for: $0.recordedAt) }
+        return Dictionary(grouping: shown) { calendar.startOfDay(for: $0.recordedAt) }
             .map { (day: $0.key, clips: $0.value.sorted { $0.recordedAt > $1.recordedAt }) }
             .sorted { $0.day > $1.day }
     }
 
     private func dayHeader(_ day: Date, clips: [LibraryClip]) -> some View {
         HStack(alignment: .center, spacing: OneDay.Space.s) {
-            Text(dayTitle(day))
+            Text(Calendar.current.isDateInToday(day) ? Strings.mineTodayHeader : dayTitle(day))
                 .font(OneDay.Font.headline)
                 .foregroundStyle(OneDay.ink)
             if let mood = moodStore?.mood(on: day)?.mood {
@@ -167,19 +162,23 @@ struct LibrarySection: View {
                     .frame(width: 20, height: 20)
                     .accessibilityLabel(mood.label)
             }
-            Text("· \(Strings.libraryClipCount(clips.count))")
-                .font(OneDay.Font.caption)
-                .foregroundStyle(OneDay.inkFaint)
             Spacer(minLength: 0)
-            if let onMakeVlog, !isSelecting {
-                Button(Strings.dayMakeVlog, systemImage: "film.stack") { onMakeVlog(clips) }
+            if isSelecting {
+                let allPicked = clips.allSatisfy(picked.contains)
+                Button(allPicked ? Strings.libraryDeselectDay : Strings.librarySelectDay) {
+                    if allPicked {
+                        picked.removeAll(where: clips.contains)
+                    } else {
+                        picked += clips.filter { !picked.contains($0) }.sorted { $0.recordedAt < $1.recordedAt }
+                    }
+                }
                     .font(OneDay.Font.caption)
                     .foregroundStyle(OneDay.brandText)
                     .padding(.horizontal, OneDay.Space.m)
                     .frame(minHeight: 32)
                     .background(Color.oneDayBrand.opacity(0.14), in: Capsule())
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("library-day-vlog")
+                    .accessibilityIdentifier("library-day-select-all")
             }
         }
         .accessibilityElement(children: .contain)

@@ -234,17 +234,6 @@ struct PlansHomeView: View {
     private var storiesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                if let onBackToRooms {
-                    Button(action: onBackToRooms) {
-                        Label(Strings.surfaceFriends, systemImage: "chevron.left")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(OneDay.brandText)
-                            .frame(minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .accessibilityIdentifier("personal-back")
-                }
                 header
 
                 #if DEBUG || LOCAL_ROOM_CHAT_DEMO
@@ -263,7 +252,6 @@ struct PlansHomeView: View {
 
                 otherDayChip
                 todayCards
-                todayStrip
 
                 if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
 
@@ -273,11 +261,7 @@ struct PlansHomeView: View {
                     onOpenStory: { path.append($0) },
                     draftsRequest: draftsRequest,
                     isSelecting: $isSelectingClips,
-                    picked: $pickedClips,
-                    onMakeVlog: { dayClips in
-                        vlogRequest = VlogRequest(clips: dayClips.sorted { $0.recordedAt < $1.recordedAt })
-                    },
-                    hiddenDay: showsTodayStrip ? .now : nil)
+                    picked: $pickedClips)
                     .id(Self.libraryAnchor)
             }
             .padding(.top, 8)
@@ -562,8 +546,13 @@ struct PlansHomeView: View {
             IconBubble(systemName: "calendar", label: DayPickerSheet.title) { showsDayPicker = true }
                 .accessibilityIdentifier("mine-calendar")
             if !library.scoped(includingFriends: false).clips.isEmpty {
-                Button(isSelectingClips ? Strings.cancel : Strings.librarySelect) {
-                    withAnimation(OneDay.Motion.snap) { isSelectingClips.toggle() }
+                Button(isSelectingClips ? Strings.cancel : Strings.dayMakeVlog) {
+                    withAnimation(OneDay.Motion.snap) {
+                        isSelectingClips.toggle()
+                        if isSelectingClips {
+                            pickedClips = clips(on: .now).sorted { $0.recordedAt < $1.recordedAt }
+                        }
+                    }
                 }
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .foregroundStyle(OneDay.brandText)
@@ -612,47 +601,6 @@ struct PlansHomeView: View {
         }
     }
 
-
-    private var showsTodayStrip: Bool {
-        onBackToRooms != nil && Calendar.current.isDateInToday(selectedDay) && !clips(on: .now).isEmpty
-    }
-
-    @ViewBuilder
-    private var todayStrip: some View {
-        let today = clips(on: .now).sorted { $0.recordedAt < $1.recordedAt }
-        if showsTodayStrip {
-            VStack(alignment: .leading, spacing: OneDay.Space.m) {
-                HStack {
-                    SectionLabel(text: Strings.mineTodayHeader)
-                    Spacer(minLength: 0)
-                    Text(Strings.libraryClipCount(today.count))
-                        .font(OneDay.Font.caption)
-                        .foregroundStyle(OneDay.inkFaint)
-                }
-                .padding(.horizontal, OneDay.Space.xl)
-                ScrollView(.horizontal) {
-                    HStack(spacing: OneDay.Space.s) {
-                        ForEach(today) { clip in
-                            ClipTile(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
-                                // Fixed tile size: a row of 9:16 previews, like the camera's dated look.
-                                .frame(width: 112, height: 199)
-                                .overlay(alignment: .bottomTrailing) {
-                                    ClipTileLabel(text: LibrarySection.clockTime(clip.recordedAt))
-                                }
-                        }
-                    }
-                    .padding(.horizontal, OneDay.Space.xl)
-                }
-                .scrollIndicators(.hidden)
-                Button(Strings.mineMakeTodayVlog, systemImage: "film.stack.fill") {
-                    vlogRequest = VlogRequest(clips: today)
-                }
-                .buttonStyle(.primaryAction)
-                .padding(.horizontal, OneDay.Space.xl)
-                .accessibilityIdentifier("mine-make-today-vlog")
-            }
-        }
-    }
 
     private var greetingAndCompose: some View {
         HStack(spacing: 6) {
