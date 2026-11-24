@@ -9,6 +9,11 @@ struct ClipPickInput: Encodable, Sendable {
     var labels: [String]
 }
 
+struct ClipPick: Equatable, Sendable {
+    var ids: [String]
+    var title: String?
+}
+
 enum ClipPickError: Error, Equatable {
     case rateLimited
     case unavailable
@@ -22,7 +27,7 @@ struct RemoteClipPicker: Sendable {
     var endpoint: URL = RemoteClipPicker.defaultEndpoint
     var deviceID: String = DeviceIdentity.installID
 
-    func pick(_ clips: [ClipPickInput], targetSeconds: Int, language: AppLanguage) async throws -> [String] {
+    func pick(_ clips: [ClipPickInput], targetSeconds: Int, language: AppLanguage) async throws -> ClipPick {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = Self.timeout
@@ -49,7 +54,8 @@ struct RemoteClipPicker: Sendable {
         let known = Set(clips.map(\.id))
         let ids = decoded.ids.filter(known.contains)
         guard !ids.isEmpty else { throw ClipPickError.unavailable }
-        return ids
+        let title = decoded.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ClipPick(ids: ids, title: title.flatMap { $0.isEmpty ? nil : String($0.prefix(40)) })
     }
 
     private struct Request: Encodable {
@@ -61,5 +67,6 @@ struct RemoteClipPicker: Sendable {
 
     private struct Response: Decodable {
         var ids: [String]
+        var title: String?
     }
 }

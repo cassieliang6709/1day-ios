@@ -40,6 +40,7 @@ struct PlansHomeView: View {
     @State var isSelectingClips = false
     @State var pickedClips: [LibraryClip] = []
     @State var isPicking = false
+    @State var aiPickResult: ClipPick?
     @State var vlogRequest: VlogRequest?
     @State var selectedDay = Calendar.current.startOfDay(for: .now)
     @State var showsDayPicker = false

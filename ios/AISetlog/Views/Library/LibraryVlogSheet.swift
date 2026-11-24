@@ -24,7 +24,10 @@ struct LibraryVlogSheet: View {
         case failed
     }
 
-    init(clips: [LibraryClip]) {
+    private let title: String?
+
+    init(clips: [LibraryClip], title: String? = nil) {
+        self.title = title
         _order = State(initialValue: clips)
         layoutRatio = ClipLibrary.dominantAspect(of: clips).ratio
     }
@@ -59,7 +62,7 @@ struct LibraryVlogSheet: View {
                         .font(OneDay.Font.caption)
                         .foregroundStyle(OneDay.brandText)
                 }
-                Text(Strings.vlogTitle)
+                Text(title ?? Strings.vlogTitle)
                     .font(OneDay.Font.title)
                     .foregroundStyle(OneDay.ink)
                 Text(Strings.libraryClipCount(order.count))
@@ -198,5 +201,6 @@ struct LibraryVlogSheet: View {
 
 struct VlogRequest: Identifiable {
     let clips: [LibraryClip]
+    var title: String? = nil
     var id: String { clips.map(\.id).joined(separator: "|") }
 }

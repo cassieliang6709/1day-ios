@@ -27,7 +27,7 @@ extension PlansHomeView {
             }
         }
         .sheet(item: $vlogRequest) { request in
-            LibraryVlogSheet(clips: request.clips)
+            LibraryVlogSheet(clips: request.clips, title: request.title)
         }
         #if DEBUG
         .onAppear { LibraryDebugSeed.runIfAsked(store: store, drafts: drafts, moods: moods) }
@@ -153,7 +153,8 @@ extension PlansHomeView {
         .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
         .accessibilityIdentifier("library-random-pick")
         Button(Strings.libraryMakeVlog(count: pickedClips.count)) {
-            vlogRequest = VlogRequest(clips: pickedClips)
+            let title = aiPickResult.flatMap { $0.ids == pickedClips.map(\.id) ? $0.title : nil }
+            vlogRequest = VlogRequest(clips: pickedClips, title: title)
         }
         .font(OneDay.Font.callout)
         .foregroundStyle(OneDay.onBrand)
@@ -341,11 +342,15 @@ extension PlansHomeView {
             usable.append(clip)
         }
         let pool = usable.isEmpty ? candidates : usable
-        if let picked = await aiPick(from: pool) { return picked }
+        if let picked = await aiPick(from: pool) {
+            aiPickResult = ClipPick(ids: picked.clips.map(\.id), title: picked.title)
+            return picked.clips
+        }
+        aiPickResult = nil
         return await randomFill(from: pool)
     }
 
-    func aiPick(from pool: [LibraryClip]) async -> [LibraryClip]? {
+    func aiPick(from pool: [LibraryClip]) async -> (clips: [LibraryClip], title: String?)? {
         let sent = pool.sorted { $0.recordedAt > $1.recordedAt }
             .prefix(Self.aiPickMaxClips)
             .sorted { $0.recordedAt < $1.recordedAt }
@@ -361,12 +366,12 @@ extension PlansHomeView {
                 faces: tags.faces,
                 labels: tags.labels))
         }
-        guard let ids = try? await RemoteClipPicker().pick(
+        guard let result = try? await RemoteClipPicker().pick(
             inputs, targetSeconds: Int(Self.randomPickSeconds), language: AppLanguage.effective)
         else { return nil }
         let byID = Dictionary(sent.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let picked = ids.compactMap { byID[$0] }
-        return picked.isEmpty ? nil : picked
+        let picked = result.ids.compactMap { byID[$0] }
+        return picked.isEmpty ? nil : (picked, result.title)
     }
 
     static let aiPickMaxClips = 60
