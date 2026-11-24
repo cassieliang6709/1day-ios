@@ -172,11 +172,11 @@ struct LibrarySection: View {
                         picked += clips.filter { !picked.contains($0) }.sorted { $0.recordedAt < $1.recordedAt }
                     }
                 }
-                    .font(OneDay.Font.caption)
-                    .foregroundStyle(OneDay.brandText)
+                    .font(OneDay.Font.callout)
+                    .foregroundStyle(OneDay.ink)
                     .padding(.horizontal, OneDay.Space.m)
-                    .frame(minHeight: 32)
-                    .background(Color.oneDayBrand.opacity(0.14), in: Capsule())
+                    .frame(minHeight: 36)
+                    .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("library-day-select-all")
             }

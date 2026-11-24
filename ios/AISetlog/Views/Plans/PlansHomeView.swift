@@ -14,6 +14,7 @@ struct PlansHomeView: View {
     var isActive = true
     var onActivate: (() -> Bool)? = nil
     var onBackToRooms: (() -> Void)? = nil
+    var onSelectingChange: ((Bool) -> Void)? = nil
     var onOpenPersonal: (() -> Void)? = nil
     let onCompose: () -> Void
 
@@ -202,10 +203,11 @@ struct PlansHomeView: View {
                 LibrarySelectionBar(picked: pickedClips) {
                     vlogRequest = VlogRequest(clips: pickedClips)
                 }
-                .padding(.bottom, OneDay.tabBarClearance + 10)
+                .padding(.bottom, 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .onChange(of: isSelectingClips) { _, selecting in onSelectingChange?(selecting) }
         .sheet(isPresented: $planningAhead) {
             GuidedMomentsView(initialMoments: []) { draft in
                 let moments = draft.moments
@@ -554,11 +556,11 @@ struct PlansHomeView: View {
                         }
                     }
                 }
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(OneDay.brandText)
-                .padding(.horizontal, 12)
+                .font(OneDay.Font.callout)
+                .foregroundStyle(OneDay.ink)
+                .padding(.horizontal, OneDay.Space.m)
                 .frame(height: 38)
-                .background(Color.oneDayBrand.opacity(0.1), in: Capsule())
+                .background(Color.oneDayBrand.opacity(0.18), in: Capsule())
                 .accessibilityIdentifier("library-select")
             }
         }

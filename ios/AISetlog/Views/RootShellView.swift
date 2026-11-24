@@ -28,6 +28,7 @@ struct RootShellView: View {
     @State private var justKeptADraft = false
     @State private var tilt = DeviceTiltWatcher()
     @State private var cameraStartsSideways = false
+    @State private var plansSelecting = false
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
@@ -46,6 +47,7 @@ struct RootShellView: View {
                 isActive: surface == .plans,
                 onActivate: { activate(.plans) },
                 onBackToRooms: { surface = .friends },
+                onSelectingChange: { plansSelecting = $0 },
                 onCompose: { openCompose(together: false) })
                 .opacity(surface == .plans ? 1 : 0)
                 .allowsHitTesting(surface == .plans)
@@ -91,7 +93,7 @@ struct RootShellView: View {
                     startsSideways: cameraStartsSideways)
             }
 
-            if surface != .compose {
+            if surface != .compose, !(surface == .plans && plansSelecting) {
                 FloatingTabBar(
                     items: [
                         .init(
