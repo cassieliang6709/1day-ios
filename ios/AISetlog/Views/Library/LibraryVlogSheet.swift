@@ -54,9 +54,11 @@ struct LibraryVlogSheet: View {
             }
 
             VStack(alignment: .leading, spacing: OneDay.Space.xs) {
-                Text(Strings.filmReadyTitle)
-                    .font(OneDay.Font.caption)
-                    .foregroundStyle(OneDay.brandText)
+                if case .done = phase {
+                    Text(Strings.filmReadyTitle)
+                        .font(OneDay.Font.caption)
+                        .foregroundStyle(OneDay.brandText)
+                }
                 Text(Strings.vlogTitle)
                     .font(OneDay.Font.title)
                     .foregroundStyle(OneDay.ink)
