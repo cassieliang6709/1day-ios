@@ -157,16 +157,18 @@ struct LibrarySection: View {
 
     private func filmTodayTile(_ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: OneDay.Space.xs) {
-                Image(systemName: "camera.fill")
-                    .font(OneDay.Font.headline)
-                Text(Strings.libraryFilmToday)
-                    .font(OneDay.Font.caption)
-            }
-            .foregroundStyle(OneDay.brandText)
-            .frame(maxWidth: .infinity)
-            .aspectRatio(3 / 4, contentMode: .fit)
-            .background(Color.oneDayBrand.opacity(0.18), in: RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous))
+            RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous)
+                .fill(Color.oneDayBrand.opacity(0.18))
+                .aspectRatio(3 / 4, contentMode: .fit)
+                .overlay {
+                    VStack(spacing: OneDay.Space.xs) {
+                        Image(systemName: "camera.fill")
+                            .font(OneDay.Font.headline)
+                        Text(Strings.libraryFilmToday)
+                            .font(OneDay.Font.caption)
+                    }
+                    .foregroundStyle(OneDay.brandText)
+                }
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("library-film-today")
