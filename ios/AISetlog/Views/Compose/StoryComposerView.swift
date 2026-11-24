@@ -12,7 +12,7 @@ struct StoryComposerView: View {
     @State private var entry: ComposerEntry = .byTime
     private let days: Challenge.Mode = .oneDay
     private let clipLength: Challenge.ClipLength = .scene
-    @State private var roomOrientation: Challenge.Orientation = .landscape
+    @State private var roomOrientation: Challenge.Orientation = .portrait
     private var orientation: Challenge.Orientation { withFriends ? roomOrientation : .portrait }
     private let cameraStyle = CameraStyle.defaultCamera
     @State private var withFriends = false
@@ -234,8 +234,8 @@ private struct RoomShapePicker: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: Strings.roomShapeLabel)
             HStack(spacing: 12) {
-                option(.landscape, title: Strings.roomShapeLandscape)
                 option(.portrait, title: Strings.roomShapePortrait)
+                option(.landscape, title: Strings.roomShapeLandscape)
             }
         }
     }
