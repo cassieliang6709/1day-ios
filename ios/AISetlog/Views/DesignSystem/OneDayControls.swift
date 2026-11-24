@@ -43,7 +43,7 @@ struct SoftActionStyle: ButtonStyle {
         configuration.label
             .font(OneDay.Font.callout)
             .foregroundStyle(OneDay.brandText)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, OneDay.Space.xl)
             .padding(.vertical, 15)
             .background(OneDay.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(OneDay.hairline, lineWidth: 1))
@@ -59,6 +59,43 @@ extension ButtonStyle where Self == PrimaryActionStyle {
 
 extension ButtonStyle where Self == SoftActionStyle {
     static var softAction: SoftActionStyle { SoftActionStyle() }
+}
+
+struct ToolButtonStyle: ButtonStyle {
+    private static let circle: CGFloat = 44
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .labelStyle(ToolLabelStyle(circle: Self.circle))
+            .foregroundStyle(OneDay.brandText)
+            .opacity(isEnabled ? 1 : 0.4)
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(OneDay.Motion.snap, value: configuration.isPressed)
+            .contentShape(Rectangle())
+    }
+
+    private struct ToolLabelStyle: LabelStyle {
+        let circle: CGFloat
+
+        func makeBody(configuration: Configuration) -> some View {
+            VStack(spacing: OneDay.Space.xs) {
+                configuration.icon
+                    .font(OneDay.Font.headline)
+                    .frame(width: circle, height: circle)
+                    .background(OneDay.surfaceSoft, in: Circle())
+                configuration.title
+                    .font(OneDay.Font.caption)
+                    .lineLimit(1)
+            }
+            .frame(minWidth: circle)
+        }
+    }
+}
+
+extension ButtonStyle where Self == ToolButtonStyle {
+    static var tool: ToolButtonStyle { ToolButtonStyle() }
 }
 
 struct IconBubble: View {

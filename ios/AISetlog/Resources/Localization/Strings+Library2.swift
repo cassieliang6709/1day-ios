@@ -21,6 +21,7 @@ extension Strings {
 
     static var vlogArrangeTitle: String { zh ? "排顺序" : "Order" }
     static var vlogReorderAction: String { zh ? "换顺序" : "Reorder" }
+    static var toolAdjust: String { zh ? "调整" : "Adjust" }
 
     static var todayKeepFilming: String { zh ? "继续拍" : "Film" }
     static var todayWatch: String { zh ? "看成片" : "Watch" }

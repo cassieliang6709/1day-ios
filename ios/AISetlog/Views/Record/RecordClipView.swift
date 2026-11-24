@@ -438,7 +438,16 @@ struct RecordClipView: View {
             Spacer(minLength: 0)
             if isFreeform { RoomSendList(rooms: sendableRooms, picked: $sendTo) }
 
-            HStack(spacing: 10) {
+            HStack(spacing: OneDay.Space.m) {
+                Button {
+                    recorder.retake()
+                    ringProgress = 0
+                } label: {
+                    Label(Strings.retake, systemImage: "arrow.counterclockwise")
+                }
+                .buttonStyle(.tool)
+                .accessibilityIdentifier("camera-retake")
+
                 Button {
                     if isFreeform {
                         finishFreeTake()
@@ -448,31 +457,9 @@ struct RecordClipView: View {
                     }
                 } label: {
                     Label(Strings.done, systemImage: "checkmark")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(OneDay.onBrand)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(OneDay.brandHorizontal, in: Capsule())
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    recorder.retake()
-                    ringProgress = 0
-                } label: {
-                    Label(Strings.retake, systemImage: "arrow.counterclockwise")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color(.systemGray6), in: Capsule())
-                }
-                .accessibilityIdentifier("camera-retake")
-                .buttonStyle(.plain)
+                .buttonStyle(.primaryAction)
             }
         }
         .padding(.horizontal, 12)

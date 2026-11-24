@@ -96,45 +96,37 @@ struct LibraryVlogSheet: View {
                         mood: order.first.flatMap { moodStore?.mood(on: $0.recordedAt)?.mood },
                         mixedURL: $mixedURL)
                 } else {
-                    HStack(spacing: OneDay.Space.m) {
+                    HStack(spacing: OneDay.Space.xxl) {
                         if order.count > 1 {
                             Button { stage = .arrange } label: {
                                 Label(Strings.vlogReorderAction, systemImage: "arrow.left.arrow.right")
-                                    .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.softAction)
                             .accessibilityIdentifier("library-vlog-reorder")
                         }
                         Button { showsSound = true } label: {
-                            Label(Strings.filmAdjustTitle, systemImage: "slider.horizontal.3")
-                                .frame(maxWidth: .infinity)
+                            Label(Strings.toolAdjust, systemImage: "slider.horizontal.3")
                         }
-                        .buttonStyle(.softAction)
                         .accessibilityIdentifier("library-vlog-adjust")
-                    }
-                }
-
-                HStack(spacing: OneDay.Space.m) {
-                    Button {
-                        Task { await save(mixedURL ?? url) }
-                    } label: {
-                        HStack(spacing: OneDay.Space.s) {
-                            if isSaving { ProgressView().tint(OneDay.onBrand) } else { Image(systemName: "square.and.arrow.down") }
-                            Text(Strings.saveAction)
+                        ShareLink(item: mixedURL ?? url) {
+                            Label(Strings.shareAction, systemImage: "paperplane.fill")
                         }
-                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("library-vlog-share")
                     }
-                    .buttonStyle(.primaryAction)
-                    .disabled(isSaving)
-                    .accessibilityIdentifier("library-vlog-save")
-
-                    ShareLink(item: mixedURL ?? url) {
-                        Label(Strings.shareAction, systemImage: "paperplane.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.softAction)
-                    .accessibilityIdentifier("library-vlog-share")
+                    .buttonStyle(.tool)
+                    .frame(maxWidth: .infinity)
                 }
+
+                Button {
+                    Task { await save(mixedURL ?? url) }
+                } label: {
+                    HStack(spacing: OneDay.Space.s) {
+                        if isSaving { ProgressView().tint(OneDay.onBrand) } else { Image(systemName: "square.and.arrow.down") }
+                        Text(Strings.saveAction)
+                    }
+                }
+                .buttonStyle(.primaryAction)
+                .disabled(isSaving)
+                .accessibilityIdentifier("library-vlog-save")
 
                 if let saveMessage {
                     Text(saveMessage)

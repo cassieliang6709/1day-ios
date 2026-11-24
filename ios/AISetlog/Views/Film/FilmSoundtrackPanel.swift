@@ -163,9 +163,11 @@ private struct VoiceoverRecorder: View {
                 Button(Strings.voiceoverStop) { stop() }
                     .buttonStyle(.primaryAction)
             } else if let take {
-                HStack(spacing: 10) {
-                    Button(Strings.voiceoverRetake) { Task { await start() } }
-                        .buttonStyle(.softAction)
+                HStack(spacing: OneDay.Space.m) {
+                    Button { Task { await start() } } label: {
+                        Label(Strings.voiceoverRetake, systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(.tool)
                     Button(Strings.voiceoverUse) {
                         onUse(take)
                         close()

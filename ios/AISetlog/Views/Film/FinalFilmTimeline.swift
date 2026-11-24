@@ -160,6 +160,13 @@ struct FinalFilmTimeline: View {
     private var actions: some View {
         VStack(spacing: OneDay.Space.s) {
             HStack(spacing: OneDay.Space.m) {
+                ShareLink(item: shownURL) {
+                    Label(Strings.shareAction, systemImage: "paperplane.fill")
+                }
+                .buttonStyle(.tool)
+                .disabled(previewMedia != nil)
+                .accessibilityIdentifier("film-share")
+
                 Button {
                     onSave(shownURL)
                 } label: {
@@ -172,20 +179,10 @@ struct FinalFilmTimeline: View {
                         Text(isSaved ? Strings.savedLabel : (isSaving ? Strings.saving : Strings.saveAction))
                             .lineLimit(1)
                     }
-                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.primaryAction)
                 .disabled(previewMedia != nil || isSaved || isSaving)
                 .accessibilityIdentifier("film-save")
-
-                ShareLink(item: shownURL) {
-                    Label(Strings.shareAction, systemImage: "paperplane.fill")
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.softAction)
-                .disabled(previewMedia != nil)
-                .accessibilityIdentifier("film-share")
             }
 
             if previewMedia != nil {

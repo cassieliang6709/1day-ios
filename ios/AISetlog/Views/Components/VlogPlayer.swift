@@ -171,6 +171,8 @@ struct VlogPlayer: View {
             Text("\(VlogPlayback.timecode(playback.current)) / \(VlogPlayback.timecode(playback.duration))")
                 .font(OneDay.Font.micro)
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(.white.opacity(0.85))
                 .accessibilityHidden(true)
 
