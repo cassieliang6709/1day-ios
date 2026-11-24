@@ -13,6 +13,10 @@ enum ClipDurations {
         return max(1, Int(total.rounded()))
     }
 
+    static func seconds(of url: URL) async -> Double {
+        await cache.seconds(for: url)
+    }
+
     private actor Cache {
         var known: [URL: Double] = [:]
 

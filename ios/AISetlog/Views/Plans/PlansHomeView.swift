@@ -547,7 +547,10 @@ struct PlansHomeView: View {
             // 日历收到右上角（2026-11-21 Cassie：整行周日历太乱）
             if isSelectingClips {
                 Button(Strings.libraryRandomPick, systemImage: "dice") {
-                    withAnimation(OneDay.Motion.snap) { pickedClips = randomPick() }
+                    Task {
+                        let picks = await randomPick()
+                        withAnimation(OneDay.Motion.snap) { pickedClips = picks }
+                    }
                 }
                 .font(OneDay.Font.callout)
                 .foregroundStyle(OneDay.ink)
@@ -786,15 +789,21 @@ struct PlansHomeView: View {
         }
     }
 
-    private func randomPick() -> [LibraryClip] {
+    private func randomPick() async -> [LibraryClip] {
         let mine = library.scoped(includingFriends: false).clips
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .distantPast
         let recent = mine.filter { $0.recordedAt >= weekAgo }
         let pool = recent.isEmpty ? mine : recent
-        return Array(pool.shuffled().prefix(Self.randomPickCount)).sorted { $0.recordedAt < $1.recordedAt }
+        var picks: [LibraryClip] = []
+        var total = 0.0
+        for clip in pool.shuffled() where total < Self.randomPickSeconds {
+            picks.append(clip)
+            total += await ClipDurations.seconds(of: clip.url)
+        }
+        return picks.sorted { $0.recordedAt < $1.recordedAt }
     }
 
-    private static let randomPickCount = 5
+    private static let randomPickSeconds = 30.0
 
     private func clips(on day: Date) -> [LibraryClip] {
         library.scoped(includingFriends: false).clips
