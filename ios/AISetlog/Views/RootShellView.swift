@@ -11,6 +11,9 @@ enum HomeLaunchAction: Equatable {
 struct RootShellView: View {
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
+    @Environment(AccountStore.self) private var account
+    @AppStorage("dailyCheckIn.lastShownDay") private var checkInShownDay = ""
+    @State private var showsCheckIn = false
     @Binding var pendingJoinCode: String?
     @Binding var launchAction: HomeLaunchAction?
 
@@ -141,12 +144,17 @@ struct RootShellView: View {
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+        .sheet(isPresented: $showsCheckIn) { DailyCheckInSheet(onFilm: { openCamera() }) }
         .onAppear {
             consumeCaptureLaunch()
             updateTiltWatching()
+            offerCheckInIfNeeded()
         }
         .onChange(of: surface) { _, _ in updateTiltWatching() }
-        .onChange(of: scenePhase) { _, _ in updateTiltWatching() }
+        .onChange(of: scenePhase) { _, phase in
+            updateTiltWatching()
+            if phase == .active { offerCheckInIfNeeded() }
+        }
         .onChange(of: tilt.isHeldSideways) { _, sideways in
             guard sideways, canJumpToCamera else { return }
             openCamera(sideways: true)
@@ -282,6 +290,31 @@ struct RootShellView: View {
         } else {
             tilt.stop()
         }
+    }
+
+    private func offerCheckInIfNeeded() {
+        let today = Self.dayKey(.now)
+        guard checkInShownDay != today, surface == .plans || surface == .friends,
+              !showDrafts, !hasFilmedToday else { return }
+        checkInShownDay = today
+        showsCheckIn = true
+    }
+
+    private var hasFilmedToday: Bool {
+        let calendar = Calendar.current
+        if drafts.sortedDrafts.contains(where: { calendar.isDateInToday($0.recordedAt) }) { return true }
+        let mine = Set([account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 })
+        return store.challenges.contains { challenge in
+            store.recordedClips(for: challenge.id).contains { clip in
+                guard let at = clip.recordedAt, calendar.isDateInToday(at) else { return false }
+                return clip.authorID.map(mine.contains) ?? true
+            }
+        }
+    }
+
+    private static func dayKey(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)"
     }
 
     private func openCamera(sideways: Bool = false) {

@@ -29,49 +29,9 @@ struct MoodTodayBadge: View {
         .buttonStyle(.plain)
         .accessibilityLabel(mood.map { "\(Strings.moodSectionTitle): \($0.label)" } ?? Strings.moodSectionTitle)
         .accessibilityIdentifier("mood-today-badge")
-        .popover(isPresented: $isChoosing, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: OneDay.Space.m) {
-                Text(Strings.moodPrompt)
-                    .font(OneDay.Font.callout)
-                    .foregroundStyle(OneDay.ink)
-                MoodFaceRow(selected: mood, compact: false) {
-                    moods.setMood($0)
-                    isChoosing = false
-                }
-            }
-            .padding(OneDay.Space.l)
-            .frame(width: 320)
-            .presentationCompactAdaptation(.popover)
-        }
+        .sheet(isPresented: $isChoosing) { DailyCheckInSheet() }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in dayTick += 1 }
         .onChange(of: scenePhase) { _, phase in if phase == .active { dayTick += 1 } }
-    }
-}
-
-private struct MoodFaceRow: View {
-    let selected: Mood?
-    let compact: Bool
-    let onPick: (Mood) -> Void
-
-    var body: some View {
-        if compact {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 6) {
-                faces
-            }
-        } else {
-            HStack(spacing: 4) { faces }
-        }
-    }
-
-    private var faces: some View {
-        ForEach(Mood.allCases) { mood in
-            MoodFaceButton(mood: mood, state: state(for: mood), showsLabel: !compact) { onPick(mood) }
-        }
-    }
-
-    private func state(for mood: Mood) -> MoodFaceButton.State {
-        guard let selected else { return .idle }
-        return selected == mood ? .selected : .dimmed
     }
 }
 
