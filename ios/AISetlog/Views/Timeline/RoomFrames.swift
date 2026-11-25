@@ -40,6 +40,7 @@ struct RoomFrames: View {
 
     private var columns: [RoomFeed.Column] {
         Self.filmedFirst(RoomFeed.columns(clips: clips, members: members, myID: myID))
+            .filter { !$0.clips.isEmpty }
     }
 
     var body: some View {
@@ -153,8 +154,6 @@ private struct PersonFrame: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OneDay.surfaceSoft)
         .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
-        .overlay(alignment: .topLeading) { person }
-        .overlay(alignment: .topTrailing) { topTrailing }
         .overlay(alignment: .bottom) { pageDots }
         .contextMenu { pokeMenu }
         .accessibilityElement(children: .contain)
@@ -213,29 +212,8 @@ private struct PersonFrame: View {
                         colors: [.black.opacity(0.35), .clear, .clear, .black.opacity(0.5)],
                         startPoint: .top, endPoint: .bottom)
                 }
-                .overlay {
-                    VStack(spacing: 2) {
-                        if let at = clip.recordedAt, !Calendar.current.isDateInToday(at) {
-                            Text(at.formatted(.dateTime.month().day()
-                                .locale(AppLanguage.effective.locale)))
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .opacity(0.85)
-                        }
-                        if let at = clip.recordedAt {
-                            Text(at.formatted(.roomClock))
-                                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                                .monospacedDigit()
-                        }
-                        if let caption = clip.overlayText ?? title, !caption.isEmpty {
-                            Text(caption)
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                }
                 .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: OneDay.Space.xs) {
                     if let comment = latestComment(clip) {
                         HStack(spacing: 6) {
                             MemberFace(id: comment.authorID, name: comment.authorName, size: 22, showsMood: false)
@@ -247,9 +225,14 @@ private struct PersonFrame: View {
                                 .padding(.vertical, 5)
                                 .background(.white.opacity(0.9), in: Capsule())
                         }
-                        .padding(10)
                         .frame(maxWidth: 260, alignment: .leading)
                     }
+                        Text(Self.metaLine(clip, name: column.name, title: title))
+                            .font(OneDay.Font.caption)
+                            .lineLimit(1)
+                            .padding(.trailing, 52)
+                    }
+                    .padding(OneDay.Space.m)
                 }
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
@@ -269,46 +252,16 @@ private struct PersonFrame: View {
         }
     }
 
-    private var person: some View {
-        let onVideo = !column.clips.isEmpty
-        return Button(action: onOpenPerson) {
-            HStack(spacing: 7) {
-                MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 30, isYou: column.isMine)
-                    .overlay {
-                        Circle().strokeBorder(Color.oneDayBrand, lineWidth: onVideo ? 2 : 0)
-                    }
-                Text(column.name)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .foregroundStyle(onVideo ? .white : OneDay.ink)
-                    .shadow(color: .black.opacity(onVideo ? 0.4 : 0), radius: 3, y: 1)
-                    .lineLimit(1)
-            }
-            .padding(10)
-            .contentShape(Rectangle())
+    static func metaLine(_ clip: DayClip, name: String, title: String?) -> String {
+        var parts: [String] = [name]
+        if let at = clip.recordedAt {
+            parts.append(Calendar.current.isDateInToday(at)
+                ? at.formatted(.roomClock)
+                : at.formatted(.dateTime.month().day().locale(AppLanguage.effective.locale))
+                    + " " + at.formatted(.roomClock))
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("room-frame-person")
-    }
-
-    @ViewBuilder
-    private var topTrailing: some View {
-        HStack(spacing: 8) {
-            if column.isMine, !column.clips.isEmpty, let nextToFilm {
-                Button { onFilm(nextToFilm) } label: {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(OneDay.onBrand)
-                        .frame(width: 36, height: 36)
-                        .background(Color.oneDayBrand, in: Circle())
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Strings.roomFeedFilm)
-                .accessibilityIdentifier("room-feed-film")
-            }
-        }
-        .padding(6)
+        if let caption = clip.overlayText ?? title, !caption.isEmpty { parts.append(caption) }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder

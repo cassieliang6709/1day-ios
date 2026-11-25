@@ -286,9 +286,19 @@ struct StoryTimelineView: View {
 
             if signedOut { signedOutLine }
 
-            RoomStoriesRow(columns: dayColumns, selected: roomPerson) { id in
-                withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
-            }
+            let statusClips = roomDay == nil ? clips.filter { Self.isClip($0, on: .now) } : dayClips
+            let nextToFilm = agenda.suggested ?? agenda.openToMe.first
+            RoomPeopleRow(
+                columns: RoomFeed.columns(clips: statusClips, members: members, myID: myID),
+                selected: roomPerson,
+                canFilm: nextToFilm != nil,
+                signedOut: signedOut,
+                onSelect: { id in
+                    withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
+                },
+                onFilm: { if let nextToFilm { sheet = .record(day: nextToFilm) } },
+                hasPoked: { id in store.hasPokedToday(challengeID: challengeID, targetAuthorID: id) },
+                onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) })
             if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
                 FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
                     .accessibilityIdentifier("room-everyone-filmed")
@@ -336,12 +346,6 @@ struct StoryTimelineView: View {
                         onFilm: { day in sheet = .record(day: day) },
                         reactions: { reactions(for: $0, myID: myID) },
                         onReact: { react($0, $1, myID: myID) },
-                        hasPoked: { id in
-                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                        },
-                        onPoke: { id in
-                            store.poke(challengeID: challengeID, targetAuthorID: id)
-                        },
                         showsCalendarControls: false)
                 }
                 .scrollIndicators(.hidden)
@@ -353,13 +357,7 @@ struct StoryTimelineView: View {
                         myID: myID,
                         onPlay: { clip in sheet = .open(clip) },
                         reactions: { reactions(for: $0, myID: myID) },
-                        onReact: { react($0, $1, myID: myID) },
-                        hasPoked: { id in
-                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
-                        },
-                        onPoke: { id in
-                            store.poke(challengeID: challengeID, targetAuthorID: id)
-                        })
+                        onReact: { react($0, $1, myID: myID) })
                 }
                 .scrollIndicators(.hidden)
             }
@@ -462,6 +460,30 @@ struct StoryTimelineView: View {
             }
 
             Menu {
+                if challenge.isShared {
+                    Section {
+                        Picker(selection: $roomLayout) {
+                            ForEach(RoomLayout.allCases, id: \.self) { layout in
+                                Label(layout.title, systemImage: layout.systemImage).tag(layout)
+                            }
+                        } label: {
+                            Label(Strings.roomLayoutMenu, systemImage: roomLayout.systemImage)
+                        }
+                        .pickerStyle(.menu)
+                        Button(Strings.libraryCalendar, systemImage: "calendar") { showRoomCalendar = true }
+                        Button(Strings.chatLabel, systemImage: "bubble.left") { showRoomChat = true }
+                        if let code = challenge.roomCode, previewMedia == nil {
+                            RoomInviteShareLink(
+                                content: RoomInviteCardContent(
+                                    challenge: challenge, inviter: account.account?.displayName),
+                                message: shareText(code: code, challenge: challenge)
+                            ) {
+                                Label(Strings.inviteLabel, systemImage: "person.badge.plus")
+                            }
+                        }
+                    }
+                }
+
                 if !challenge.isShared, clipCount > 0, !agenda.isComplete {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
@@ -515,7 +537,6 @@ struct StoryTimelineView: View {
         }
         if challenge.isShared {
             roomTitleRow(challenge)
-            roomToolRow(challenge)
         }
         }
         .padding(.horizontal, 20)
@@ -543,40 +564,6 @@ struct StoryTimelineView: View {
         let library = ClipLibrary(
             stories: [(challenge, store.recordedClips(for: challengeID))], drafts: [], myIDs: [myID])
         return library.coverByDay(library.clips)
-    }
-
-    private func roomToolRow(_ challenge: Challenge) -> some View {
-        HStack(spacing: OneDay.Space.xxl) {
-            Menu {
-                Picker(Strings.roomLayoutMenu, selection: $roomLayout) {
-                    ForEach(RoomLayout.allCases, id: \.self) { layout in
-                        Label(layout.title, systemImage: layout.systemImage).tag(layout)
-                    }
-                }
-            } label: {
-                Label(roomLayout.title, systemImage: roomLayout.systemImage)
-            }
-            .menuStyle(.button)
-            .accessibilityLabel(Text("\(Strings.roomLayoutMenu): \(roomLayout.title)"))
-            .accessibilityIdentifier("room-layout")
-            Button(Strings.libraryCalendar, systemImage: "calendar") { showRoomCalendar = true }
-                .accessibilityIdentifier("room-calendar")
-            Button(Strings.chatLabel, systemImage: "bubble.left") { showRoomChat = true }
-                .accessibilityIdentifier("room-chat")
-            if let code = challenge.roomCode, previewMedia == nil {
-                RoomInviteShareLink(
-                    content: RoomInviteCardContent(
-                        challenge: challenge, inviter: account.account?.displayName),
-                    message: shareText(code: code, challenge: challenge)
-                ) {
-                    Label(Strings.inviteLabel, systemImage: "person.badge.plus")
-                }
-                .accessibilityIdentifier("room-invite")
-            }
-        }
-        .buttonStyle(.tool)
-        .frame(maxWidth: .infinity)
-        .padding(.top, OneDay.Space.s)
     }
 
     private var celebration: some View {
