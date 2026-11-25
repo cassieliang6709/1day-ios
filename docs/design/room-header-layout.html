@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间页顶部：常用按钮怎么放 · 3 个方案</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#B9A98E; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:24px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:320px; }
+  .opt h2 { font-size:16px; margin:14px 0 6px; }
+  .tag { font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .phone { width:320px; height:640px; border-radius:42px; background:var(--bg); border:8px solid #1d1d1d; padding:48px 14px 14px; overflow:hidden; position:relative; }
+  .bar { display:flex; align-items:center; gap:8px; }
+  .round { width:38px; height:38px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:15px; flex:0 0 auto; }
+  .pill { height:36px; padding:0 13px; border-radius:99px; background:var(--brand); font-weight:800; font-size:13.5px; display:flex; align-items:center; white-space:nowrap; }
+  .pill.soft { background:var(--chip); color:var(--ink); font-weight:700; }
+  .spacer { flex:1; }
+  .title { font-size:21px; font-weight:900; margin:10px 0 10px; }
+  .people { display:flex; gap:12px; margin:4px 0 12px; }
+  .person { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--soft); width:46px; }
+  .face { width:42px; height:42px; border-radius:50%; background:#22356e; color:#fff; font-size:14px; font-weight:800; display:grid; place-items:center; position:relative; }
+  .face.me { background:#F6C9A8; color:var(--ink); opacity:.45; }
+  .face.off { opacity:.4; }
+  .face.ring { box-shadow:0 0 0 2.5px var(--bg), 0 0 0 5px var(--brand); }
+  .face.add { background:transparent; border:2px dashed var(--faint); color:var(--brandText); font-size:20px; }
+  .plus { position:absolute; right:-3px; bottom:-3px; width:17px; height:17px; border-radius:50%; background:var(--brand); color:var(--ink); font-size:12px; display:grid; place-items:center; border:2px solid var(--bg); }
+  .poke { color:var(--brandText); }
+  .seg { display:flex; background:var(--chip); border-radius:99px; padding:3px; gap:2px; margin-bottom:12px; }
+  .seg span { flex:1; text-align:center; font-size:12.5px; font-weight:700; padding:7px 0; border-radius:99px; color:var(--soft); }
+  .seg span.on { background:#fff; color:var(--ink); }
+  .big { border-radius:20px; height:300px; background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; position:relative; }
+  .big .meta { position:absolute; left:12px; bottom:12px; color:#fff; font-size:12.5px; font-weight:800; text-shadow:0 1px 3px #0008; }
+  .chatbar { position:absolute; left:14px; right:14px; bottom:76px; height:44px; border-radius:99px; background:#fff; display:flex; align-items:center; padding:0 16px; color:var(--faint); font-size:13px; box-shadow:0 2px 10px #0001; gap:8px; }
+  .tab { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; display:flex; background:#fff; border-radius:99px; padding:4px; gap:4px; box-shadow:0 4px 16px #0002; }
+  .tab span { padding:8px 18px; border-radius:99px; font-size:12.5px; font-weight:800; color:var(--soft); }
+  .tab span.on { background:var(--brand); color:var(--ink); }
+</style>
+</head>
+<body>
+<h1>房间页顶部：常用按钮怎么放 · 3 个方案</h1>
+<div class="row">
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill soft">聊天</span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">家里的日常</div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">C</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="seg"><span class="on">默认</span><span>瀑布流</span><span>按天</span><span>日历</span></div>
+      <div class="big"><div class="meta">尼尼 · 16:00 · 晚饭后一起散步</div></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>A. 每个按钮放到它管的东西旁边<span class="tag">推荐</span></h2>
+    <ul>
+      <li>邀请：头像行最后一个「＋」，跟人放一起</li>
+      <li>视图和日历：标题下一条分段切换，一眼看到当前是哪种、点一下就换</li>
+      <li>聊天：顶栏和「做 vlog」并排，带字</li>
+      <li>··· 只剩编辑房间、退出房间这类不常用的</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">家里的日常</div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">C</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="seg"><span class="on">默认</span><span>瀑布流</span><span>按天</span><span>日历</span></div>
+      <div class="big" style="height:240px"><div class="meta">尼尼 · 16:00 · 晚饭后一起散步</div></div>
+      <div class="chatbar">💬 说点什么…</div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>B. 聊天变成底部输入框</h2>
+    <ul>
+      <li>和 A 一样，只是聊天不是按钮，而是贴在底部的一条「说点什么…」</li>
+      <li>好处：随手就能回一句，互动最多</li>
+      <li>代价：常驻占一行，视频再小一点</li>
+    </ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">家里的日常</div>
+      <div class="bar" style="gap:6px;margin-bottom:12px"><span class="pill soft">▤ 默认 ▾</span><span class="pill soft">日历</span><span class="pill soft">聊天</span><span class="pill soft">邀请</span></div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">C</span><span class="poke">拍一拍</span></div>
+      </div>
+      <div class="big"><div class="meta">尼尼 · 16:00 · 晚饭后一起散步</div></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>C. 一行小胶囊</h2>
+    <ul>
+      <li>四个按钮做成一行带字的小胶囊，放在标题下</li>
+      <li>改动最小，四个都露在外面</li>
+      <li>代价：又多一行按钮，和上一版带圆形图标的工具行差不多</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
