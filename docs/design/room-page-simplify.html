@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间页：现在 vs 改后</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#B9A98E; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; --card:#FFF1CC; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:24px; }
+  .row { display:flex; gap:40px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:340px; }
+  .opt h2 { font-size:16px; margin:14px 0 6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .phone { width:340px; height:700px; border-radius:42px; background:var(--bg); border:8px solid #1d1d1d; padding:48px 14px 14px; overflow:hidden; position:relative; }
+  .bar { display:flex; align-items:center; gap:8px; }
+  .round { width:38px; height:38px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:15px; flex:0 0 auto; }
+  .pill { height:36px; padding:0 14px; border-radius:99px; background:var(--brand); font-weight:800; font-size:14px; display:flex; align-items:center; white-space:nowrap; }
+  .spacer { flex:1; }
+  .title { font-size:22px; font-weight:900; margin:10px 0 8px; }
+  .tools { display:flex; justify-content:space-around; margin-bottom:8px; }
+  .tool { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; color:var(--brandText); font-weight:700; }
+  .tool i { width:38px; height:38px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-style:normal; font-size:14px; }
+  .dots { display:flex; justify-content:center; gap:22px; align-items:center; margin:6px 0 10px; }
+  .dots b { width:8px; height:8px; border-radius:50%; background:var(--faint); display:block; }
+  .face { width:30px; height:30px; border-radius:50%; background:#22356e; color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center; flex:0 0 auto; }
+  .face.me { background:#F6C9A8; color:var(--ink); }
+  .ring { box-shadow:0 0 0 2.5px var(--bg), 0 0 0 5px var(--brand); }
+  .card { border-radius:22px; background:var(--card); height:150px; margin-bottom:10px; position:relative; padding:12px; }
+  .card .who { display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; }
+  .card .mid { position:absolute; inset:0; display:grid; place-items:center; color:var(--brandText); font-weight:800; }
+  .card .mid span { background:#FFE7A6; padding:9px 18px; border-radius:99px; }
+  .video { border-radius:22px; height:150px; margin-bottom:10px; position:relative; background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; color:#fff; padding:12px; }
+  .video .center { position:absolute; inset:0; display:grid; place-items:center; text-align:center; font-weight:900; font-size:26px; text-shadow:0 1px 4px #0008; }
+  .video .center small { display:block; font-size:13px; font-weight:700; }
+  .tab { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; display:flex; background:#fff; border-radius:99px; padding:4px; gap:4px; box-shadow:0 4px 16px #0002; }
+  .tab span { padding:9px 20px; border-radius:99px; font-size:13px; font-weight:800; color:var(--soft); }
+  .tab span.on { background:var(--brand); color:var(--ink); }
+  .people { display:flex; gap:16px; margin:4px 0 14px; }
+  .person { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--soft); width:52px; }
+  .person .face { width:46px; height:46px; font-size:15px; position:relative; }
+  .person.off .face { opacity:.4; }
+  .person .plus { position:absolute; right:-3px; bottom:-3px; width:18px; height:18px; border-radius:50%; background:var(--brand); color:var(--ink); font-size:13px; display:grid; place-items:center; border:2px solid var(--bg); }
+  .person .poke { color:var(--brandText); }
+  .big { border-radius:22px; height:360px; position:relative; background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; }
+  .big .meta { position:absolute; left:12px; bottom:12px; display:flex; align-items:center; gap:6px; color:#fff; font-size:13px; font-weight:800; text-shadow:0 1px 3px #0008; }
+  .big .meta .face { width:24px; height:24px; font-size:10px; }
+  .big .react { position:absolute; right:10px; bottom:10px; width:34px; height:34px; border-radius:50%; background:#0004; color:#fff; display:grid; place-items:center; }
+</style>
+</head>
+<body>
+<h1>房间页：现在 vs 改后</h1>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">周末放映室</div>
+      <div class="tools"><div class="tool"><i>▤</i>默认</div><div class="tool"><i>▦</i>日历</div><div class="tool"><i>◌</i>聊天</div><div class="tool"><i>＋</i>邀请</div></div>
+      <div class="dots"><b></b><b></b><span class="face ring">尼</span></div>
+      <div class="card"><div class="who"><span class="face me ring">·</span>你</div><div class="mid">📷</div></div>
+      <div class="video"><div class="who" style="display:flex;gap:8px;align-items:center;font-weight:800"><span class="face ring">尼</span>尼尼</div><div class="center">14:54<small>下班路上的晚霞</small></div></div>
+      <div class="card"><div class="who"><span class="face">C</span>Cassie</div><div class="mid"><span>拍一拍</span></div></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>现在</h2>
+    <ul>
+      <li>人出现两次：小圆点一遍，卡片一遍</li>
+      <li>内容前有 7 个按钮</li>
+      <li>两张空卡片占大半屏，视频只占三分之一</li>
+      <li>时间和说明压在画面正中</li>
+    </ul>
+  </div>
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="title" style="margin:0 0 0 6px;font-size:20px">周末放映室</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="people" style="margin-top:16px">
+        <div class="person off"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person off"><span class="face">C</span><span class="poke">拍一拍</span></div>
+      </div>
+      <div class="big"><div class="meta"><span class="face">尼</span>尼尼 · 14:54 · 下班路上的晚霞</div><div class="react">☺</div></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>改后（推荐）</h2>
+    <ul>
+      <li>一行头像是房间里唯一显示人的地方：亮圈 = 今天拍了，灰 = 没拍</li>
+      <li>点灰头像 = 拍一拍；自己的头像带「＋」= 去拍</li>
+      <li>下面只放今天的片段，大图；名字、时间、说明在左下一行小字</li>
+      <li>顶栏只有：返回、房间名、做 vlog、···（视图、日历、聊天、邀请收进 ···）</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
