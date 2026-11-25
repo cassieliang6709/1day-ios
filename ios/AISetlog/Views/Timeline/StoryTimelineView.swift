@@ -209,7 +209,7 @@ struct StoryTimelineView: View {
             navBar(challenge, agenda: agenda, clipCount: clips.count)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
+            VStack(spacing: .zero) {
                 if challenge.isShared, account.isSignedIn {
                     roomChatBar(target: Self.replyTarget(clips: roomDay.map { day in
                         clips.filter { Self.isClip($0, on: day) } } ?? clips, myID: myID), myID: myID)
@@ -704,7 +704,7 @@ extension StoryTimelineView {
         let mine = target.flatMap { reactions(for: $0, myID: myID).first { $0.authorID == myID }?.emoji }
         return HStack(spacing: OneDay.Space.s) {
             if let target, !chatFocused {
-                HStack(spacing: 2) {
+                HStack(spacing: .zero) {
                     ForEach(ClipReaction.palette, id: \.self) { key in
                         Button { react(target, key, myID: myID) } label: {
                             ReactionGlyph(key: key, size: 26)

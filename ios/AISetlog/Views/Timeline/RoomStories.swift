@@ -72,7 +72,7 @@ struct RoomPeopleRow: View {
                 .foregroundStyle(OneDay.brandText)
                 .frame(width: faceSize, height: faceSize)
                 .overlay(Circle().strokeBorder(OneDay.inkFaint, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-                .padding(3)
+                .padding(OneDay.Space.xs)
             Text(label)
                 .font(OneDay.Font.caption)
                 .foregroundStyle(OneDay.inkSoft)
@@ -91,7 +91,7 @@ struct RoomPeopleRow: View {
             MemberFace(id: column.id, name: column.isMine ? nil : column.name,
                        size: Self.faceSize, isYou: column.isMine, showsMood: false)
                 .opacity(filmed ? 1 : 0.4)
-                .padding(3)
+                .padding(OneDay.Space.xs)
                 .overlay {
                     Circle().strokeBorder(Color.oneDayBrand, lineWidth: filmed ? (isPicked ? 3.5 : 2) : 0)
                 }
