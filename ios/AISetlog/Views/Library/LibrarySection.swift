@@ -5,6 +5,7 @@ struct LibrarySection: View {
     let rooms: [Challenge]
     let onOpenStory: (UUID) -> Void
     var draftsRequest = 0
+    @Binding var day: Date?
     @Binding var isSelecting: Bool
     @Binding var picked: [LibraryClip]
     var onFilmToday: (() -> Void)? = nil
@@ -14,7 +15,6 @@ struct LibrarySection: View {
     private static let inset: CGFloat = OneDay.Space.xl
 
     @State private var mode: Mode = .grid
-    @State private var day: Date?
     @State private var month = Calendar.current.startOfMonth(for: .now)
     @State private var activeDraft: ClipDraft?
     @State private var playing: LibraryClip?

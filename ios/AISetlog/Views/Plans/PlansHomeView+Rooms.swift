@@ -29,27 +29,28 @@ extension PlansHomeView {
     }
 
     var friendsContent: some View {
-        ScrollView {
+        let rooms = sharedStories
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 greetingRow
                     .padding(.horizontal, 20)
                 friendsHeader
-                if !account.isSignedIn, !sharedStories.isEmpty {
+                if !account.isSignedIn, !rooms.isEmpty {
                     signedOutBanner
                 }
 
-                if onOpenPersonal != nil || !sharedStories.isEmpty {
+                if onOpenPersonal != nil || !rooms.isEmpty {
                     LazyVGrid(columns: Self.tileColumns, alignment: .leading, spacing: 14) {
                         if let onOpenPersonal {
                             personalTile(onOpen: onOpenPersonal)
                         }
-                        ForEach(sharedStories) { challenge in
+                        ForEach(rooms) { challenge in
                             storyRow(challenge, membersAsCover: true)
                         }
                     }
                     .padding(.horizontal, 20)
                 }
-                if sharedStories.isEmpty {
+                if rooms.isEmpty {
                     friendsEmptyState
                 }
             }
@@ -93,7 +94,7 @@ extension PlansHomeView {
     static let tileColumns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
     func personalTile(onOpen: @escaping () -> Void) -> some View {
-        let latest = library.clips.filter(\.isMine).max { $0.recordedAt < $1.recordedAt }
+        let latest = makeLibrary().clips.filter(\.isMine).max { $0.recordedAt < $1.recordedAt }
         return Button(action: onOpen) {
             PortraitTile(
                 coverURL: latest?.url, refreshToken: latest?.recordedAt,

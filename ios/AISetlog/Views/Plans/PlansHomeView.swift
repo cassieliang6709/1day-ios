@@ -43,9 +43,9 @@ struct PlansHomeView: View {
     @State var isPicking = false
     @State var aiPickResult: ClipPick?
     @State var vlogRequest: VlogRequest?
-    @State var selectedDay = Calendar.current.startOfDay(for: .now)
+    @State var libraryDay: Date?
+    @State var libraryMemo = LibraryMemo()
     @State var showsDayPicker = false
-    @State var planningAhead = false
     @State var inviteRequest: InviteRequest?
     @State var debugAlert: DebugAlert?
     @AppStorage(AppLanguage.storageKey) var appLanguage: AppLanguage = .system

@@ -11,21 +11,6 @@ extension PlansHomeView {
                 }
         }
         .onChange(of: isSelectingClips) { _, selecting in onSelectingChange?(selecting) }
-        .sheet(isPresented: $planningAhead) {
-            GuidedMomentsView(initialMoments: []) { draft in
-                let moments = draft.moments
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
-                guard !moments.isEmpty else { return }
-                _ = store.create(
-                    title: draft.suggestedName ?? Strings.dayPlanTitle(selectedDay),
-                    mode: .oneDay,
-                    clipLength: .scene,
-                    cameraStyle: CameraStyle.defaultCamera,
-                    momentTitles: moments,
-                    startDate: selectedDay)
-            }
-        }
         .sheet(item: $vlogRequest) { request in
             LibraryVlogSheet(clips: request.clips, title: request.title)
         }
@@ -37,7 +22,8 @@ extension PlansHomeView {
     static let libraryAnchor = "library-section"
 
     var storiesScroll: some View {
-        ScrollView {
+        let _ = libraryMemo.refresh(makeLibrary())
+        return ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 if !isSelectingClips {
                     header
@@ -57,9 +43,6 @@ extension PlansHomeView {
                 }
                 #endif
 
-                otherDayChip
-                todayCards
-
                 if !store.challenges.contains(where: { !$0.isShared }), library.clips.isEmpty { emptyState }
 
                 LibrarySection(
@@ -67,6 +50,7 @@ extension PlansHomeView {
                     rooms: store.challenges.filter(\.isShared),
                     onOpenStory: { path.append($0) },
                     draftsRequest: draftsRequest,
+                    day: $libraryDay,
                     isSelecting: $isSelectingClips,
                     picked: $pickedClips,
                     onFilmToday: onOpenCamera)
@@ -167,7 +151,9 @@ extension PlansHomeView {
         .accessibilityIdentifier("library-make-vlog")
     }
 
-    var library: ClipLibrary {
+    var library: ClipLibrary { libraryMemo.library ?? makeLibrary() }
+
+    func makeLibrary() -> ClipLibrary {
         let mine = [account.account?.id, RoomProgress.soloAuthorID, "local"].compactMap { $0 }
         return ClipLibrary(
             stories: store.challenges.map { ($0, store.recordedClips(for: $0.id)) },
@@ -220,39 +206,18 @@ extension PlansHomeView {
         .accessibilityIdentifier("mine-header")
         .sheet(isPresented: $showsDayPicker) {
             DayPickerSheet(
-                selected: $selectedDay,
-                hasSomething: { day in store.plan(on: day) != nil || !clips(on: day).isEmpty },
+                selected: Binding(
+                    get: { libraryDay ?? Calendar.current.startOfDay(for: .now) },
+                    set: { day in
+                        let today = Calendar.current.isDateInToday(day)
+                        guard today || !clips(on: day).isEmpty else { return }
+                        libraryDay = today ? nil : day
+                        showsDayPicker = false
+                    }),
+                hasSomething: { day in !clips(on: day).isEmpty },
                 mood: { day in day > .now ? nil : moods?.mood(on: day)?.mood })
                 .presentationDetents([.medium])
                 .presentationBackground(OneDay.surface)
-        }
-    }
-
-    /// 看的不是今天时，提示是哪天，点 × 回到今天
-    @ViewBuilder
-    var otherDayChip: some View {
-        if !Calendar.current.isDateInToday(selectedDay) {
-            Button {
-                withAnimation(OneDay.Motion.soft) { selectedDay = Calendar.current.startOfDay(for: .now) }
-            } label: {
-                HStack(spacing: OneDay.Space.xs) {
-                    Text(selectedDay.formatted(.dateTime.month().day().weekday(.abbreviated)
-                        .locale(AppLanguage.effective.locale)))
-                    Image(systemName: "xmark")
-                        .font(OneDay.Font.rounded(.caption2, weight: .heavy))
-                }
-                .font(OneDay.Font.caption)
-                .foregroundStyle(OneDay.brandText)
-                .padding(.horizontal, OneDay.Space.m)
-                .padding(.vertical, OneDay.Space.xs + 2)
-                .background(Capsule().fill(Color.oneDayBrand.opacity(0.12)))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, OneDay.Space.xl)
-            .accessibilityLabel(DayPickerSheet.backToToday)
-            .accessibilityIdentifier("mine-back-to-today")
         }
     }
 
@@ -390,7 +355,23 @@ extension PlansHomeView {
     static let randomPickSeconds = 30.0
 
     func clips(on day: Date) -> [LibraryClip] {
-        library.scoped(includingFriends: false).clips
+        if libraryMemo.library != nil {
+            return libraryMemo.mineByDay[Calendar.current.startOfDay(for: day)] ?? []
+        }
+        return library.scoped(includingFriends: false).clips
             .filter { Calendar.current.isDate($0.recordedAt, inSameDayAs: day) }
+    }
+}
+
+final class LibraryMemo {
+    private(set) var library: ClipLibrary?
+    private(set) var mineByDay: [Date: [LibraryClip]] = [:]
+
+    func refresh(_ library: ClipLibrary) {
+        self.library = library
+        let calendar = Calendar.current
+        mineByDay = Dictionary(grouping: library.scoped(includingFriends: false).clips) {
+            calendar.startOfDay(for: $0.recordedAt)
+        }
     }
 }
