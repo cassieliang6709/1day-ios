@@ -23,6 +23,7 @@ struct StoryTimelineView: View {
     @State var chatDraft = ""
     @FocusState var chatFocused: Bool
     @State var personPage: String?
+    @State var roomPerson: String?
     @State var nudgeShareCode: String?
     @State var celebrate = false
 

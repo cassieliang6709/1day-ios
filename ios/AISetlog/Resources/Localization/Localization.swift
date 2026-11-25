@@ -406,6 +406,11 @@ enum Strings {
         lang == .chinese ? "\(daysAgo) 天没拍了" : "Last filmed \(daysAgo)d ago"
     }
     static var roomTilePoke: String { lang == .chinese ? "拍一拍" : "Poke" }
+    static func roomPersonOnlyDay(today: Bool) -> String {
+        if lang == .chinese { return today ? "只看今天的" : "只看这天的" }
+        return today ? "Only today" : "Only this day"
+    }
+    static var roomPersonSeeAll: String { lang == .chinese ? "看 TA 的全部" : "See all of theirs" }
     static var roomTilePoked: String { lang == .chinese ? "已拍一拍" : "Poked" }
     static var skinTitle: String { lang == .chinese ? "皮肤" : "Theme" }
     static var skinCream: String { lang == .chinese ? "奶油黄" : "Cream" }

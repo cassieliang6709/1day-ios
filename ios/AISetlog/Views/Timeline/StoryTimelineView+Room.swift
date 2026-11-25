@@ -40,7 +40,10 @@ extension StoryTimelineView {
             RoomDateStrip(
                 selected: Binding(
                     get: { roomDay },
-                    set: { roomDay = $0 }),
+                    set: { day in
+                        roomDay = day
+                        roomPerson = nil
+                    }),
                 anchor: $roomAnchor,
                 expanded: $roomMonthOpen,
                 hasClips: { filmedDays.contains(Calendar.current.startOfDay(for: $0)) })
@@ -50,13 +53,25 @@ extension StoryTimelineView {
                 columns: dayColumns,
                 canFilm: isToday && nextToFilm != nil,
                 isToday: isToday,
-                onSelect: { personPage = $0 },
+                selected: roomPerson,
+                signedOut: signedOut,
+                onSelect: { id in
+                    withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
+                },
+                onOpenAll: { personPage = $0 },
                 onFilm: { if let nextToFilm { sheet = .record(day: nextToFilm) } },
+                hasPoked: { id in store.hasPokedToday(challengeID: challengeID, targetAuthorID: id) },
+                onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) },
                 trailing: inviteCell(challenge))
+            if let roomPerson {
+                seeAllLink(roomPerson)
+            }
             if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
                 FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
                     .accessibilityIdentifier("room-everyone-filmed")
             }
+            let shownMembers = roomPerson.map { id in members.filter { $0.id == id } } ?? members
+            let shownClips = roomPerson.map { id in dayColumns.first { $0.id == id }?.clips ?? [] } ?? dayClips
             if dayClips.isEmpty {
                 if isToday, let nextToFilm, !signedOut {
                     filmTodaySlot { sheet = .record(day: nextToFilm) }
@@ -64,8 +79,8 @@ extension StoryTimelineView {
                 Spacer(minLength: 0)
             } else {
                 RoomFrames(
-                    clips: dayClips,
-                    members: members,
+                    clips: shownClips,
+                    members: shownMembers.isEmpty ? members : shownMembers,
                     myID: myID,
                     nextToFilm: nextToFilm,
                     slotTitle: { slotTitle(for: $0) },
@@ -94,6 +109,23 @@ extension StoryTimelineView {
         .padding(.horizontal, 20)
         .padding(.top, 6)
         .padding(.bottom, 12)
+    }
+
+    func seeAllLink(_ id: String) -> some View {
+        Button { personPage = id } label: {
+            HStack(spacing: OneDay.Space.xs) {
+                Text(Strings.roomPersonSeeAll)
+                Image(systemName: "chevron.right")
+                    .font(OneDay.Font.micro)
+            }
+            .font(OneDay.Font.callout)
+            .foregroundStyle(OneDay.brandText)
+            .frame(minHeight: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .accessibilityIdentifier("room-person-see-all")
     }
 
     func roomTitleRow(_ challenge: Challenge) -> some View {
@@ -147,6 +179,7 @@ extension StoryTimelineView {
             roomDay = Calendar.current.startOfDay(for: .now)
             roomAnchor = roomDay
             roomMonthOpen = false
+            roomPerson = nil
         }
     }
 
