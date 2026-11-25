@@ -217,7 +217,7 @@ extension StoryTimelineView {
                 .frame(minHeight: 40)
                 .background(OneDay.surfaceSoft, in: Capsule())
                 .accessibilityIdentifier("room-chat-field")
-            Button(Strings.chatLabel) { showRoomChat = true }
+            Button(Strings.chatLabel) { openRoomChat() }
                 .font(OneDay.Font.caption)
                 .foregroundStyle(OneDay.brandText)
                 .frame(minWidth: 44, minHeight: 44)
@@ -237,12 +237,19 @@ extension StoryTimelineView {
             return
         }
         guard let target else {
-            showRoomChat = true
+            openRoomChat()
             return
         }
         store.addComment(text, day: target.day, challengeID: challengeID, targetAuthorID: target.authorID ?? myID)
         chatDraft = ""
         chatFocused = false
+    }
+
+    func openRoomChat() {
+        chatHandoff = chatDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        chatDraft = ""
+        chatFocused = false
+        showRoomChat = true
     }
 
     func reactions(for clip: DayClip, myID: String) -> [ClipReaction] {

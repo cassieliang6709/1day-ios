@@ -5,6 +5,7 @@ struct RoomChatView: View {
     var moment: Int? = nil
     var onOpenMoment: ((Int) -> Void)?
     var reactionTarget: ReactionTarget?
+    var draft = ""
 
     struct ReactionTarget: Equatable {
         let day: Int
@@ -49,6 +50,7 @@ struct RoomChatView: View {
                     momentTitle: momentTitle),
                 momentTitle: momentTitle,
                 onOpenMoment: onOpenMoment,
+                draft: draft,
                 header: reactionTarget.map { AnyView(reactionRow($0, myID: me.id)) })
                 .id("\(sessionSource.identity):\(me.id):\(code)")
         } else {
@@ -76,6 +78,7 @@ private struct RoomChatConversation: View {
     private let momentTitle: (Int) -> String?
     private let onOpenMoment: ((Int) -> Void)?
     private let header: AnyView?
+    private let draft: String
 
     init(
         scope: RoomChatScope,
@@ -85,9 +88,11 @@ private struct RoomChatConversation: View {
         clips: [RoomChatClipEvent] = [],
         momentTitle: @escaping (Int) -> String?,
         onOpenMoment: ((Int) -> Void)?,
+        draft: String = "",
         header: AnyView? = nil
     ) {
         self.header = header
+        self.draft = draft
         self.authorName = authorName
         self.preview = source.preview
         self.clips = clips
@@ -212,6 +217,9 @@ private struct RoomChatConversation: View {
         .onReceive(NotificationCenter.default.publisher(for: .roomActivityArrived)) { note in
             guard note.userInfo?["roomCode"] as? String == session.state?.scope.roomCode else { return }
             Task { await session.refresh() }
+        }
+        .onAppear {
+            if !draft.isEmpty, session.state?.draft.isEmpty == true { session.setDraft(draft) }
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }

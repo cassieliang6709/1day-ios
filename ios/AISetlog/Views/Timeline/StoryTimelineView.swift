@@ -15,6 +15,7 @@ struct StoryTimelineView: View {
     @State var showEditPlan = false
     @State var askBeforeDeleting = false
     @State var showRoomChat = false
+    @State var chatHandoff = ""
     @State var showSignIn = false
     @State var roomDay = Calendar.current.startOfDay(for: .now)
     @State var roomAnchor = Calendar.current.startOfDay(for: .now)
@@ -73,12 +74,12 @@ struct StoryTimelineView: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showRoomChat) {
-            RoomChatView(challengeID: challengeID) { day in
+            RoomChatView(challengeID: challengeID, onOpenMoment: { day in
                 showRoomChat = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     sheet = .clip(day: day, authorID: nil, takeID: nil)
                 }
-            }
+            }, draft: chatHandoff)
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
