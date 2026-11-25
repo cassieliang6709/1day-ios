@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间页：回表情怎么放</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#C9B99C; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; --input:#FFF1CC; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:8px; }
+  .lead { color:var(--soft); font-size:13.5px; line-height:1.7; max-width:760px; }
+  h3 { font-size:17px; margin:34px 0 14px; }
+  .tag { font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .row { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:300px; }
+  .opt h2 { font-size:14.5px; margin:12px 0 6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .note { font-size:12.5px; color:var(--soft); line-height:1.7; max-width:760px; margin-top:14px; }
+  .note b { color:var(--ink); }
+
+  .phone { width:300px; height:620px; border-radius:40px; background:var(--bg); border:8px solid #1d1d1d; padding:40px 12px 0; overflow:hidden; position:relative; }
+  .bar { display:flex; align-items:center; gap:6px; }
+  .round { width:30px; height:30px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:13px; flex:0 0 auto; }
+  .pill { height:30px; padding:0 12px; border-radius:99px; background:var(--brand); font-weight:800; font-size:12px; display:flex; align-items:center; white-space:nowrap; }
+  .spacer { flex:1; }
+  .title { display:flex; align-items:baseline; justify-content:space-between; margin:8px 2px 6px; }
+  .title b { font-size:19px; font-weight:900; }
+  .title span { font-size:12.5px; font-weight:800; color:var(--brandText); }
+
+  .wk { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:6px; }
+  .wk .d { text-align:center; padding:3px 0 5px; border-radius:12px; }
+  .wk .d small { display:block; font-size:9.5px; color:var(--soft); font-weight:700; }
+  .wk .d b { display:block; font-size:13.5px; font-weight:800; line-height:1.4; }
+  .wk .d i { display:block; width:5px; height:5px; border-radius:50%; margin:1px auto 0; background:transparent; }
+  .wk .d.has i { background:var(--soft); }
+  .wk .d.on { background:var(--brand); }
+  .wk .d.on i { background:var(--ink); }
+  .wk .d.today b { color:var(--brandText); }
+  .wk .d.future b { color:var(--faint); }
+
+  .month { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:6px; }
+  .month .w { font-size:9.5px; color:var(--soft); text-align:center; font-weight:700; padding-bottom:2px; }
+  .month .d { text-align:center; padding:2px 0 4px; border-radius:10px; }
+  .month .d b { display:block; font-size:12.5px; font-weight:800; line-height:1.4; }
+  .month .d i { display:block; width:4px; height:4px; border-radius:50%; margin:0 auto; background:transparent; }
+  .month .d.has i { background:var(--soft); }
+  .month .d.on { background:var(--brand); }
+  .month .d.on i { background:var(--ink); }
+  .month .d.today b { color:var(--brandText); }
+  .month .d.future b { color:var(--faint); }
+
+  .people { display:flex; gap:9px; margin:2px 0 8px; overflow:hidden; }
+  .person { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10px; font-weight:700; color:var(--soft); width:40px; flex:0 0 auto; }
+  .face { width:34px; height:34px; border-radius:50%; background:#22356e; color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center; position:relative; }
+  .face.me { background:#F6C9A8; color:var(--ink); }
+  .face.off { opacity:.4; }
+  .face.ring { box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }
+  .face.add { background:transparent; border:1.5px dashed var(--faint); color:var(--brandText); font-size:16px; }
+  .plus { position:absolute; right:-3px; bottom:-3px; width:14px; height:14px; border-radius:50%; background:var(--brand); color:var(--ink); font-size:10px; display:grid; place-items:center; border:1.5px solid var(--bg); }
+  .poke { color:var(--brandText); }
+
+  .seg { display:flex; background:var(--chip); border-radius:99px; padding:3px; gap:2px; margin:2px 0 8px; }
+  .seg span { flex:1; text-align:center; font-size:11.5px; font-weight:700; padding:5px 0; border-radius:99px; color:var(--soft); }
+  .seg span.on { background:var(--brand); color:var(--ink); }
+
+  .big { border-radius:18px; position:relative; background-size:cover; background-position:center; }
+  .big .meta { position:absolute; left:10px; bottom:10px; right:10px; color:#fff; font-size:10.5px; font-weight:800; text-shadow:0 1px 3px #0009; }
+  .big .bubble { display:inline-flex; align-items:center; gap:5px; margin-bottom:5px; }
+  .big .bubble em { font-style:normal; background:#fffe; color:var(--ink); text-shadow:none; padding:3px 9px; border-radius:99px; font-size:10.5px; }
+  .big .bubble .face { width:20px; height:20px; font-size:8px; border:1.5px solid #fff; }
+  .dots { position:absolute; top:10px; left:0; right:0; display:flex; justify-content:center; gap:4px; }
+  .dots b { width:16px; height:3px; border-radius:2px; background:#fff8; }
+  .dots b.on { background:#fff; }
+
+  .chat { position:absolute; left:0; right:0; bottom:66px; height:44px; padding:0 10px; display:flex; align-items:center; gap:4px; background:#FBF3E3; font-size:14px; letter-spacing:3px; }
+  .chat .in { letter-spacing:0; flex:1; height:30px; border-radius:99px; background:var(--input); color:var(--faint); font-size:11px; display:flex; align-items:center; padding:0 10px; margin-left:4px; }
+  .chat .txt { letter-spacing:0; font-size:11px; font-weight:800; color:var(--brandText); margin-left:6px; }
+  .tab { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; display:flex; background:#fff; border-radius:99px; padding:3px; gap:3px; box-shadow:0 4px 16px #0002; }
+  .tab span { padding:7px 16px; border-radius:99px; font-size:11.5px; font-weight:800; color:var(--soft); }
+  .tab span.on { background:var(--brand); color:var(--ink); }
+
+  .mason { columns:2; column-gap:6px; }
+  .mason .t { break-inside:avoid; border-radius:12px; margin-bottom:6px; position:relative; background-size:cover; background-position:center; }
+  .mason .t .m { position:absolute; left:5px; bottom:5px; display:flex; align-items:center; gap:3px; color:#fff; font-size:9.5px; font-weight:800; text-shadow:0 1px 3px #0009; }
+  .mason .t .face { width:16px; height:16px; font-size:7px; border:1px solid #fff; }
+
+  .sheet { position:absolute; left:6px; right:6px; bottom:6px; height:360px; border-radius:26px; background:#fff; padding:14px 12px; box-shadow:0 -6px 24px #0002; }
+  .sheet .hd { display:flex; justify-content:space-between; font-weight:800; font-size:13px; margin-bottom:10px; }
+  .dim { position:absolute; inset:0; background:#0003; }
+
+  .c1 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg); }
+  .c2 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverCafe.imageset/cover.jpg); }
+  .c3 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverCity.imageset/cover.jpg); }
+  .c4 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverMorning.imageset/cover.jpg); }
+  .c5 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverFood.imageset/cover.jpg); }
+
+  .chat .emo { width:32px; height:32px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:15px; letter-spacing:0; flex:0 0 auto; }
+  .chat .emo.mine { background:var(--brand); }
+  .picker { position:absolute; left:8px; bottom:114px; display:flex; gap:2px; background:#fff; border-radius:99px; padding:5px 8px; box-shadow:0 6px 20px #0003; font-size:19px; }
+  .picker span { width:30px; height:30px; display:grid; place-items:center; border-radius:50%; }
+  .picker span.on { background:var(--input); }
+  .rx { position:absolute; top:10px; right:10px; display:flex; gap:4px; }
+  .rx span { position:relative; width:30px; height:30px; border-radius:50%; background:#0005; backdrop-filter:blur(6px); display:grid; place-items:center; font-size:15px; }
+  .rx span .face { position:absolute; right:-4px; bottom:-4px; width:15px; height:15px; font-size:6.5px; border:1.2px solid #fff; }
+  .under { display:flex; gap:12px; font-size:11px; font-weight:700; color:var(--soft); margin:6px 4px 0; align-items:center; }
+  .under b { font-size:14px; font-weight:400; }
+  .stack { display:flex; gap:3px; margin-bottom:4px; font-size:15px; }
+</style>
+</head>
+<body>
+<h1>房间页：回表情怎么放</h1>
+<p class="lead">底部栏只留一个表情按钮：点开选一个，选完收起，表情出现在片子上一个固定的位置。名字旁边不再放表情。只是样稿，App 代码没改。</p>
+
+<h3>第 1 步：点表情按钮，弹出一排</h3>
+<div class="row">
+  <div class="opt"><div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div><div class="d has"><small>一</small><b>23</b><i></i></div><div class="d"><small>二</small><b>24</b><i></i></div><div class="d has on today"><small>三</small><b>今</b><i></i></div><div class="d future"><small>四</small><b>26</b><i></i></div><div class="d future"><small>五</small><b>27</b><i></i></div><div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:262px"><div class="meta"><div class="bubble"><span class="face me">·</span><em>hello</em></div><div>尼尼 · 16:24 · 晚饭后一起散步</div></div></div><div class="picker"><span class="on">❤️</span><span>😂</span><span>🥹</span><span>👍</span><span>🔥</span><span>😮</span><span>👏</span><span>🎉</span></div>
+      <div class="chat"><span class="emo">☺︎</span><span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>点 ☺︎ 弹出 8 个表情</h2>
+    <ul><li>选一个就收起</li><li>选过之后，按钮变成你选的那个表情（黄底），一眼知道自己回过</li><li>再点同一个 = 撤回</li></ul>
+  </div>
+</div>
+
+<h3>第 2 步：回过的表情放在哪</h3>
+<div class="row">
+  <div class="opt"><div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div><div class="d has"><small>一</small><b>23</b><i></i></div><div class="d"><small>二</small><b>24</b><i></i></div><div class="d has on today"><small>三</small><b>今</b><i></i></div><div class="d future"><small>四</small><b>26</b><i></i></div><div class="d future"><small>五</small><b>27</b><i></i></div><div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:262px"><div class="rx"><span>❤️<span class="face me">·</span></span><span>😂<span class="face" style="background:#5b7a4a">A</span></span></div><div class="meta"><div class="bubble"><span class="face me">·</span><em>hello</em></div><div>尼尼 · 16:24 · 晚饭后一起散步</div></div></div>
+      <div class="chat"><span class="emo mine">❤️</span><span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>1. 片子右上角<span class="tag">推荐</span></h2>
+    <ul><li>每个表情带一个小头像，看得出谁回的</li><li>和左下的名字、留言分开，不会被看成名字的一部分</li><li>每个片子都在同一个位置</li></ul>
+  </div>
+  <div class="opt"><div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div><div class="d has"><small>一</small><b>23</b><i></i></div><div class="d"><small>二</small><b>24</b><i></i></div><div class="d has on today"><small>三</small><b>今</b><i></i></div><div class="d future"><small>四</small><b>26</b><i></i></div><div class="d future"><small>五</small><b>27</b><i></i></div><div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:236px"><div class="meta"><div class="bubble"><span class="face me">·</span><em>hello</em></div><div>尼尼 · 16:24 · 晚饭后一起散步</div></div></div><div class="under"><span><b>❤️</b> 你</span><span><b>😂</b> Ana</span></div>
+      <div class="chat"><span class="emo mine">❤️</span><span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>2. 片子下面一行字</h2>
+    <ul><li>写名字，最清楚</li><li>代价：多占一行，视频变矮</li></ul>
+  </div>
+  <div class="opt"><div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div><div class="d has"><small>一</small><b>23</b><i></i></div><div class="d"><small>二</small><b>24</b><i></i></div><div class="d has on today"><small>三</small><b>今</b><i></i></div><div class="d future"><small>四</small><b>26</b><i></i></div><div class="d future"><small>五</small><b>27</b><i></i></div><div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:262px"><div class="meta"><div class="stack">❤️😂</div><div class="bubble"><span class="face me">·</span><em>hello</em></div><div>尼尼 · 16:24 · 晚饭后一起散步</div></div></div>
+      <div class="chat"><span class="emo mine">❤️</span><span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>3. 左下，留言上面一行</h2>
+    <ul><li>和留言放在一起，都是别人回的</li><li>代价：左下堆三行，看不出谁回的</li></ul>
+  </div>
+</div>
+</body>
+</html>

@@ -227,17 +227,13 @@ private struct PersonFrame: View {
                         }
                         .frame(maxWidth: 260, alignment: .leading)
                     }
-                        HStack(spacing: OneDay.Space.xs) {
-                            ForEach(Self.reactionKeys(reactions(clip)), id: \.self) {
-                                ReactionGlyph(key: $0, size: 18)
-                            }
-                            Text(Self.metaLine(clip, name: column.name, title: title))
-                                .font(OneDay.Font.caption)
-                                .lineLimit(1)
-                        }
+                        Text(Self.metaLine(clip, name: column.name, title: title))
+                            .font(OneDay.Font.caption)
+                            .lineLimit(1)
                     }
                     .padding(OneDay.Space.m)
                 }
+                .overlay(alignment: .topTrailing) { reactionBadges(clip) }
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                 .contentShape(Rectangle())
@@ -251,10 +247,36 @@ private struct PersonFrame: View {
         .accessibilityIdentifier("room-clip-tile")
     }
 
-    static func reactionKeys(_ reactions: [ClipReaction]) -> [String] {
-        var keys: [String] = []
-        for reaction in reactions where !keys.contains(reaction.emoji) { keys.append(reaction.emoji) }
-        return Array(keys.prefix(3))
+    static func shownReactions(_ reactions: [ClipReaction]) -> [ClipReaction] {
+        Array(reactions.sorted { $0.createdAt > $1.createdAt }.prefix(4))
+    }
+
+    @ViewBuilder
+    private func reactionBadges(_ clip: DayClip) -> some View {
+        let shown = Self.shownReactions(reactions(clip))
+        if !shown.isEmpty {
+            HStack(spacing: OneDay.Space.xs) {
+                ForEach(shown) { reaction in
+                    let isMe = reaction.authorID == myID
+                    ReactionGlyph(key: reaction.emoji, size: 18)
+                        .frame(width: 32, height: 32)
+                        .background(.black.opacity(0.28), in: Circle())
+                        .overlay(alignment: .bottomTrailing) {
+                            MemberFace(id: reaction.authorID, name: isMe ? nil : reaction.authorName,
+                                       size: 16, isYou: isMe, showsMood: false)
+                                .overlay(Circle().strokeBorder(.white, lineWidth: 1))
+                                .offset(x: OneDay.Space.xs, y: OneDay.Space.xs)
+                        }
+                }
+            }
+            .padding(OneDay.Space.m)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(shown.map { reaction in
+                let who = reaction.authorID == myID ? Strings.youLabel : reaction.authorName
+                return "\(who) \(reaction.emoji)"
+            }.joined(separator: ", "))
+            .accessibilityIdentifier("room-clip-reactions")
+        }
     }
 
     static func metaLine(_ clip: DayClip, name: String, title: String?) -> String {

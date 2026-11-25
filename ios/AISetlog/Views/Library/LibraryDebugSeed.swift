@@ -66,6 +66,11 @@ enum LibraryDebugSeed {
                     recordedAt: Date.now.addingTimeInterval(-3 * 86_400), localURL: sample,
                     overlayText: captions[count % captions.count]),
             ]
+            if count > 2 {
+                store.roomSync.remoteReactions[code] = [.init(
+                    day: 1, emoji: "😂", authorID: "preview-2", authorName: names[2],
+                    targetAuthorID: "preview-1", createdAt: .now)]
+            }
         }
     }
     #endif

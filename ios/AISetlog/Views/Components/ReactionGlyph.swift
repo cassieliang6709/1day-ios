@@ -14,6 +14,7 @@ struct ReactionGlyph: View {
         } else {
             Text(key)
                 .font(size >= 24 ? OneDay.Font.title : OneDay.Font.headline)
+                .fixedSize()
                 .frame(width: size, height: size)
         }
     }
