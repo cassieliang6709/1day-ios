@@ -4,8 +4,12 @@ struct RoomPersonPage: View {
     let column: RoomFeed.Column
     var slotTitle: (Int) -> String? = { _ in nil }
     let onPlay: (DayClip) -> Void
+    var canPoke = false
+    var hasPoked = false
+    var onPoke: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @State private var pokedNow = false
 
     private static let tileAspect: CGFloat = 3 / 4
 
@@ -21,6 +25,8 @@ struct RoomPersonPage: View {
                             .font(.system(size: 24, weight: .heavy, design: .rounded))
                             .foregroundStyle(OneDay.ink)
                             .lineLimit(1)
+                        Spacer(minLength: OneDay.Space.s)
+                        if canPoke { pokeButton }
                     }
 
                     if !column.clips.isEmpty {
@@ -52,6 +58,26 @@ struct RoomPersonPage: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private var pokeButton: some View {
+        let sent = pokedNow || hasPoked
+        return Button {
+            onPoke()
+            pokedNow = true
+        } label: {
+            Label(sent ? Strings.roomTilePoked : Strings.roomTilePoke,
+                  systemImage: sent ? "checkmark" : "hand.tap.fill")
+                .font(OneDay.Font.callout)
+                .foregroundStyle(sent ? OneDay.inkFaint : OneDay.brandText)
+                .padding(.horizontal, OneDay.Space.m)
+                .frame(minHeight: 40)
+                .background(OneDay.surfaceSoft, in: Capsule())
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(sent)
+        .accessibilityIdentifier("room-person-poke")
     }
 
     private func tile(_ clip: DayClip) -> some View {

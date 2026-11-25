@@ -40,10 +40,7 @@ extension StoryTimelineView {
             RoomDateStrip(
                 selected: Binding(
                     get: { roomDay },
-                    set: { day in
-                        roomDay = day
-                        roomPerson = nil
-                    }),
+                    set: { roomDay = $0 }),
                 anchor: $roomAnchor,
                 expanded: $roomMonthOpen,
                 hasClips: { filmedDays.contains(Calendar.current.startOfDay(for: $0)) })
@@ -51,23 +48,15 @@ extension StoryTimelineView {
             let nextToFilm = agenda.suggested ?? agenda.openToMe.first
             RoomPeopleRow(
                 columns: dayColumns,
-                selected: roomPerson,
                 canFilm: isToday && nextToFilm != nil,
-                signedOut: signedOut,
                 isToday: isToday,
-                onSelect: { id in
-                    withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
-                },
+                onSelect: { personPage = $0 },
                 onFilm: { if let nextToFilm { sheet = .record(day: nextToFilm) } },
-                hasPoked: { id in store.hasPokedToday(challengeID: challengeID, targetAuthorID: id) },
-                onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) },
                 trailing: inviteCell(challenge))
             if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
                 FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
                     .accessibilityIdentifier("room-everyone-filmed")
             }
-            let shownMembers = roomPerson.map { id in members.filter { $0.id == id } } ?? members
-            let shownClips = roomPerson.map { id in dayColumns.first { $0.id == id }?.clips ?? [] } ?? dayClips
             if dayClips.isEmpty {
                 if isToday, let nextToFilm, !signedOut {
                     filmTodaySlot { sheet = .record(day: nextToFilm) }
@@ -75,8 +64,8 @@ extension StoryTimelineView {
                 Spacer(minLength: 0)
             } else {
                 RoomFrames(
-                    clips: shownClips,
-                    members: shownMembers.isEmpty ? members : shownMembers,
+                    clips: dayClips,
+                    members: members,
                     myID: myID,
                     nextToFilm: nextToFilm,
                     slotTitle: { slotTitle(for: $0) },
@@ -158,7 +147,6 @@ extension StoryTimelineView {
             roomDay = Calendar.current.startOfDay(for: .now)
             roomAnchor = roomDay
             roomMonthOpen = false
-            roomPerson = nil
         }
     }
 
@@ -258,6 +246,11 @@ extension StoryTimelineView {
 
     func react(_ clip: DayClip, _ key: String, myID: String) {
         store.toggleReaction(key, day: clip.day, challengeID: challengeID, targetAuthorID: clip.authorID ?? myID)
+    }
+
+    static func canPoke(_ column: RoomFeed.Column, signedIn: Bool) -> Bool {
+        signedIn && !column.isMine
+            && !column.clips.contains { $0.recordedAt.map(Calendar.current.isDateInToday) ?? false }
     }
 
     static func everyoneFilmedToday(_ columns: [RoomFeed.Column]) -> Bool {

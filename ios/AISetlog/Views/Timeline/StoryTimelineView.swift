@@ -22,7 +22,6 @@ struct StoryTimelineView: View {
     @State var roomMonthOpen = false
     @State var chatDraft = ""
     @FocusState var chatFocused: Bool
-    @State var roomPerson: String?
     @State var personPage: String?
     @State var nudgeShareCode: String?
     @State var celebrate = false
@@ -191,7 +190,10 @@ struct StoryTimelineView: View {
                 RoomPersonPage(
                     column: column,
                     slotTitle: { slotTitle(for: $0) },
-                    onPlay: { clip in sheet = .open(clip) })
+                    onPlay: { clip in sheet = .open(clip) },
+                    canPoke: Self.canPoke(column, signedIn: account.isSignedIn),
+                    hasPoked: store.hasPokedToday(challengeID: challengeID, targetAuthorID: column.id),
+                    onPoke: { _ = store.poke(challengeID: challengeID, targetAuthorID: column.id) })
                     .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
         }
