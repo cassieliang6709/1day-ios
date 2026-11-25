@@ -88,7 +88,8 @@ struct CameraShell<Content: View>: View {
                         overlayText: overlayText,
                         clipSeconds: clipSeconds,
                         showsPrompt: showsPrompt,
-                        showsDate: showsDate && cameraStyle == .standard
+                        showsDate: showsDate && cameraStyle == .standard,
+                        showsRecordingBadge: cameraStyle == .standard
                     )
                 }
                 .frame(
@@ -125,6 +126,7 @@ struct MomentStampOverlay: View {
     var clipSeconds: Double = 2
     var showsPrompt = true
     var showsDate = true
+    var showsRecordingBadge = true
 
     private var progress: MomentProgress? {
         MomentProgress(day: day, momentCount: momentCount)
@@ -203,7 +205,7 @@ struct MomentStampOverlay: View {
                     .padding(edgeInset)
                 }
 
-                if mode == .recording {
+                if mode == .recording, showsRecordingBadge {
                     HStack(spacing: 5 * scale) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 8 * scale))
