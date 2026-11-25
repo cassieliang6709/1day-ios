@@ -201,20 +201,12 @@ extension StoryTimelineView {
     }
 
     func roomChatBar(target: DayClip?, myID: String) -> some View {
-        let mine = target.flatMap { reactions(for: $0, myID: myID).first { $0.authorID == myID }?.emoji }
-        return HStack(spacing: OneDay.Space.s) {
+        HStack(spacing: OneDay.Space.s) {
             if let target, !chatFocused {
-                HStack(spacing: .zero) {
-                    ForEach(ClipReaction.palette, id: \.self) { key in
-                        Button { react(target, key, myID: myID) } label: {
-                            ReactionGlyph(key: key, size: 26)
-                                .frame(width: 32, height: 44)
-                                .opacity(mine == nil || mine == key ? 1 : 0.45)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .accessibilityIdentifier("room-chat-faces")
+                MoodReactButton(
+                    reactions: reactions(for: target, myID: myID), myID: myID,
+                    showsOthers: false, onCanvas: true
+                ) { react(target, $0, myID: myID) }
             }
             TextField(Strings.chatSayPlaceholder, text: $chatDraft)
                 .font(OneDay.Font.subhead)

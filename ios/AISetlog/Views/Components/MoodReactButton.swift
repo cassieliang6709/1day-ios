@@ -4,12 +4,24 @@ struct MoodReactButton: View {
     let reactions: [ClipReaction]
     let myID: String
     var showsOthers = true
+    var onCanvas = false
     let onToggle: (String) -> Void
 
     @State private var picking = false
 
     private var mine: String? {
         reactions.first { $0.authorID == myID }?.emoji
+    }
+
+    private var allMine: Set<String> {
+        Set(reactions.filter { $0.authorID == myID }.map(\.emoji))
+    }
+
+    private var iconColor: Color { onCanvas ? OneDay.inkSoft : .white }
+
+    private var bubble: Color {
+        guard onCanvas else { return .clear }
+        return mine == nil ? OneDay.surfaceSoft : Color.oneDayBrand
     }
 
     private var others: [String] {
@@ -32,9 +44,11 @@ struct MoodReactButton: View {
                     } else {
                         Image(systemName: "face.smiling")
                             .font(OneDay.Font.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(iconColor)
                     }
                 }
+                .frame(width: 40, height: 40)
+                .background(bubble, in: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
@@ -51,7 +65,7 @@ struct MoodReactButton: View {
                             ReactionGlyph(key: key, size: 34)
                                 .frame(width: 48, height: 48)
                                 .background(
-                                    Color.oneDayBrand.opacity(key == mine ? 0.18 : 0), in: Circle())
+                                    Color.oneDayBrand.opacity(allMine.contains(key) ? 0.18 : 0), in: Circle())
                         }
                         .buttonStyle(.plain)
                     }
