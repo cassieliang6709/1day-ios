@@ -301,7 +301,7 @@ extension PlansHomeView {
         guard let clip, let date = clip.recordedAt else { return nil }
         let name = isMine(clip) ? Strings.youLabel : (clip.authorName ?? "")
         let when = Calendar.current.isDateInToday(date)
-            ? date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+            ? date.formatted(.roomClock)
             : date.formatted(.dateTime.month().day())
         return name.isEmpty ? when : "\(name) · \(when)"
     }

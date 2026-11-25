@@ -346,11 +346,10 @@ private struct FilmClipPickRow: View {
 
     private var timeLabel: String {
         guard let recordedAt = clip.recordedAt else { return Strings.filmClipNumber(index + 1) }
-        return recordedAt.formatted(
-            Date.FormatStyle()
-                .month(.defaultDigits).day()
-                .hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+        let day = recordedAt.formatted(
+            Date.FormatStyle().month(.defaultDigits).day()
                 .locale(AppLanguage.effective.resolved.locale))
+        return day + " " + recordedAt.formatted(.roomClock)
     }
 }
 
