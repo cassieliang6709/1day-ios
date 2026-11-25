@@ -396,7 +396,6 @@ enum Strings {
     static var surfaceCompose: String { lang == .chinese ? "新建" : "New" }
     static var surfaceCamera: String { lang == .chinese ? "相机" : "Camera" }
 
-    static var makeRoomVlog: String { lang == .chinese ? "生成 vlog" : "Make vlog" }
     static var roomFeedFilm: String { lang == .chinese ? "拍一段" : "Film a clip" }
     static var roomFeedEmpty: String {
         lang == .chinese ? "还没有人拍。你来拍第一段。" : "Nobody's filmed yet. Be the first."

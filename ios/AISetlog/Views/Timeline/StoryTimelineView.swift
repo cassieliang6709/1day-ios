@@ -448,8 +448,15 @@ struct StoryTimelineView: View {
             Spacer(minLength: 4)
 
             if challenge.isShared {
-                roomToolCapsule
-                IconBubble(systemName: "film.stack.fill", label: Strings.makeRoomVlog) { showFilm = true }
+                Button(Strings.dayMakeVlog, systemImage: "film.stack.fill") { showFilm = true }
+                    .font(OneDay.Font.callout)
+                    .foregroundStyle(OneDay.onBrand)
+                    .padding(.horizontal, OneDay.Space.m)
+                    .frame(height: 38)
+                    .background(Color.oneDayBrand, in: Capsule())
+                    .frame(minHeight: 44)
+                    .buttonStyle(.plain)
+                    .opacity(clipCount == 0 ? 0.45 : 1)
                     .disabled(clipCount == 0)
                     .accessibilityIdentifier("room-make-vlog")
             }
@@ -508,14 +515,13 @@ struct StoryTimelineView: View {
         }
         if challenge.isShared {
             roomTitleRow(challenge)
+            roomToolRow(challenge)
         }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
     }
 
-    /// Second header row: the room name gets the full width (small phones
-    /// squeezed it to one letter next to the tool buttons), with invite beside it.
     private func roomTitleRow(_ challenge: Challenge) -> some View {
         HStack(spacing: 8) {
             TimelineHeader(
@@ -526,23 +532,6 @@ struct StoryTimelineView: View {
                 },
                 fontSize: 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if let code = challenge.roomCode, previewMedia == nil {
-                RoomInviteShareLink(
-                    content: RoomInviteCardContent(
-                        challenge: challenge, inviter: account.account?.displayName),
-                    message: shareText(code: code, challenge: challenge)
-                ) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(OneDay.ink)
-                        .frame(width: 38, height: 38)
-                        .background(.regularMaterial, in: Circle())
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(Text(Strings.inviteLabel))
-                .accessibilityIdentifier("room-invite")
-            }
         }
         .padding(.leading, 4)
     }
@@ -556,8 +545,8 @@ struct StoryTimelineView: View {
         return library.coverByDay(library.clips)
     }
 
-    private var roomToolCapsule: some View {
-        HStack(spacing: 0) {
+    private func roomToolRow(_ challenge: Challenge) -> some View {
+        HStack(spacing: OneDay.Space.xxl) {
             Menu {
                 Picker(Strings.roomLayoutMenu, selection: $roomLayout) {
                     ForEach(RoomLayout.allCases, id: \.self) { layout in
@@ -565,34 +554,29 @@ struct StoryTimelineView: View {
                     }
                 }
             } label: {
-                Image(systemName: roomLayout.systemImage)
-                    .foregroundStyle(OneDay.ink)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                Label(roomLayout.title, systemImage: roomLayout.systemImage)
             }
+            .menuStyle(.button)
             .accessibilityLabel(Text("\(Strings.roomLayoutMenu): \(roomLayout.title)"))
             .accessibilityIdentifier("room-layout")
-            Button { showRoomCalendar = true } label: {
-                Image(systemName: "calendar")
-                    .foregroundStyle(roomDay == nil ? OneDay.ink : Color.oneDayBrand)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+            Button(Strings.libraryCalendar, systemImage: "calendar") { showRoomCalendar = true }
+                .accessibilityIdentifier("room-calendar")
+            Button(Strings.chatLabel, systemImage: "bubble.left") { showRoomChat = true }
+                .accessibilityIdentifier("room-chat")
+            if let code = challenge.roomCode, previewMedia == nil {
+                RoomInviteShareLink(
+                    content: RoomInviteCardContent(
+                        challenge: challenge, inviter: account.account?.displayName),
+                    message: shareText(code: code, challenge: challenge)
+                ) {
+                    Label(Strings.inviteLabel, systemImage: "person.badge.plus")
+                }
+                .accessibilityIdentifier("room-invite")
             }
-            .accessibilityLabel(Text(Strings.libraryCalendar))
-            .accessibilityIdentifier("room-calendar")
-            Button { showRoomChat = true } label: {
-                Image(systemName: "bubble.left")
-                    .foregroundStyle(OneDay.ink)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel(Text(Strings.chatLabel))
-            .accessibilityIdentifier("room-chat")
         }
-        .font(.system(size: 15, weight: .semibold))
-        .buttonStyle(.plain)
-        .padding(.horizontal, 4)
-        .background(.regularMaterial, in: Capsule())
+        .buttonStyle(.tool)
+        .frame(maxWidth: .infinity)
+        .padding(.top, OneDay.Space.s)
     }
 
     private var celebration: some View {
