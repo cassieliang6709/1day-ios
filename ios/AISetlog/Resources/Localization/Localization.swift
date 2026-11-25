@@ -632,15 +632,6 @@ enum Strings {
     static var addComment: String { lang == .chinese ? "写评论…" : "Add a comment…" }
 
 
-    static var lookTitle: String { lang == .chinese ? "调色" : "Adjust" }
-    static var lookExposure: String { lang == .chinese ? "亮度" : "Exposure" }
-    static var lookTemperature: String { lang == .chinese ? "色温" : "Warmth" }
-    static var lookContrast: String { lang == .chinese ? "对比" : "Contrast" }
-    static var lookReset: String { lang == .chinese ? "复位" : "Reset" }
-    static var lookHoldToCompare: String {
-        lang == .chinese ? "按住看原片" : "Hold to see the original"
-    }
-    static var lookRemember: String { lang == .chinese ? "每段都用这个" : "Use on every clip" }
 
 
     static var sequence: String { lang == .chinese ? "顺序" : "Sequence" }

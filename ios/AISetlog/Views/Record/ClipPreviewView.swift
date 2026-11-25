@@ -42,8 +42,6 @@ struct ClipPreviewView: View {
     @AppStorage("caption.gestureHintSeen.v1") private var gestureHintSeen = false
     @FocusState private var captionFocused: Bool
     @State private var showComments = false
-    @State private var showLook = false
-    @State private var showingOriginal = false
     @State private var deleted: DeletedCaption?
 
     private struct DeletedCaption: Equatable {
@@ -52,11 +50,6 @@ struct ClipPreviewView: View {
     }
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-
-    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
-    @AppStorage(PersonalEffectParameters.stickyKey) private var lookIsSticky = false
-
-    private var playedLook: PersonalEffectParameters { showingOriginal ? .none : look }
 
     private var myID: String { account.account?.id ?? "local" }
 
@@ -151,7 +144,6 @@ struct ClipPreviewView: View {
             scrims
             if editingCaption { outsideTapCatcher }
             chrome
-            if showLook { lookOverlay }
             if deleted != nil { undoToast }
         }
         .statusBarHidden()
@@ -197,9 +189,7 @@ struct ClipPreviewView: View {
     private var videoStage: some View {
         ZStack {
             if isLive {
-                LoopingClipPlayer(
-                    url: url, refreshToken: recordedAt,
-                    look: showLook ? playedLook : .none)
+                LoopingClipPlayer(url: url, refreshToken: recordedAt)
             } else {
                 Color.black
             }
@@ -552,15 +542,6 @@ struct ClipPreviewView: View {
                     }
                     .accessibilityIdentifier("moment-chat")
                 }
-                if !isMine {
-                    IconBubble(
-                        systemName: look.isIdentity ? "camera.filters" : "sparkles",
-                        overVideo: true
-                    ) {
-                        withAnimation(OneDay.Motion.soft) { showLook = true }
-                    }
-                    .accessibilityLabel(Strings.lookTitle)
-                }
                 let destructive = extraActions.filter(\.isDestructive)
                 if !destructive.isEmpty {
                     Menu {
@@ -582,18 +563,6 @@ struct ClipPreviewView: View {
                 }
             }
         }
-    }
-
-    private var lookOverlay: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            LookPanel(
-                look: $look, sticky: $lookIsSticky, showingOriginal: $showingOriginal
-            ) {
-                withAnimation(OneDay.Motion.soft) { showLook = false }
-            }
-        }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     @ViewBuilder

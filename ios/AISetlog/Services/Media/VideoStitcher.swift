@@ -47,8 +47,6 @@ enum VideoStitcher {
         var titleCard: TitleCard?
         var titleSeconds: Double = 2.2
         var aspect: Aspect?
-        var look: PersonalEffectParameters = .none
-        var lookAuthorID: String?
         var keptClipIDs: Set<String>?
         var freezeFrames: [String: Double] = [:]
         var dayOrder: [Int]?
@@ -138,9 +136,7 @@ enum VideoStitcher {
             cameraStamped.insert(clip.id)
         }
 
-        let (source, scratch) = try await filteredClips(
-            clips, look: options.look, authorID: options.lookAuthorID)
-        defer { discard(scratch) }
+        let source = clips
         progress?(0.2)
 
         var loaded: [LoadedClip] = []
@@ -293,35 +289,6 @@ enum VideoStitcher {
         return outURL
     }
 
-
-    private static func filteredClips(
-        _ clips: [DayClip], look: PersonalEffectParameters, authorID: String?
-    ) async throws -> (clips: [DayClip], scratch: [URL]) {
-        guard !look.isIdentity else { return (clips, []) }
-
-        var out: [DayClip] = []
-        var scratch: [URL] = []
-        for clip in clips {
-            guard authorID == nil || clip.authorID == authorID else {
-                out.append(clip)
-                continue
-            }
-            do {
-                let filtered = try await PersonalEffectFilter.filteredCopy(
-                    of: clip.url, parameters: look)
-                guard filtered != clip.url else { out.append(clip); continue }
-                scratch.append(filtered)
-                out.append(clip.replacingURL(filtered))
-            } catch is CancellationError {
-                discard(scratch)
-                throw CancellationError()
-            } catch {
-                print("[stitch] look pass failed for day \(clip.day): \(error)")
-                out.append(clip)
-            }
-        }
-        return (out, scratch)
-    }
 
     private static func discard(_ urls: [URL]) {
         for url in urls { try? FileManager.default.removeItem(at: url) }

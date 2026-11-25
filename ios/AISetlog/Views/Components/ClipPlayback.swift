@@ -4,18 +4,16 @@ import AVFoundation
 struct LoopingClipPlayer: View {
     let url: URL
     var refreshToken: Date? = nil
-    var look: PersonalEffectParameters = .none
     var muted = false
 
     var body: some View {
-        LoopingPlayerLayerView(url: url, look: look, muted: muted)
+        LoopingPlayerLayerView(url: url, muted: muted)
             .id(refreshToken)
     }
 }
 
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
-    var look: PersonalEffectParameters = .none
     var muted = false
 
     final class PlayerView: UIView {
@@ -24,16 +22,8 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     final class Coordinator {
-        struct Request: Equatable {
-            let url: URL
-            let look: PersonalEffectParameters
-        }
-
         var looper: AVPlayerLooper?
-        var loaded: Request?
-        var building: Task<Void, Never>?
-
-        deinit { building?.cancel() }
+        var loaded: URL?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -46,35 +36,13 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
-        guard context.coordinator.loaded != Coordinator.Request(url: url, look: look) else { return }
+        guard context.coordinator.loaded != url else { return }
         start(in: uiView, coordinator: context.coordinator)
     }
 
     private func start(in view: PlayerView, coordinator: Coordinator) {
-        let request = Coordinator.Request(url: url, look: look)
-        coordinator.loaded = request
-        coordinator.building?.cancel()
-        coordinator.building = nil
-
-        guard !look.isIdentity else {
-            play(request, composition: nil, in: view, coordinator: coordinator)
-            return
-        }
-
-        coordinator.building = Task { @MainActor in
-            let composition = await PersonalEffectFilter.playbackComposition(
-                request.look, for: AVURLAsset(url: request.url))
-            guard !Task.isCancelled, coordinator.loaded == request else { return }
-            play(request, composition: composition, in: view, coordinator: coordinator)
-        }
-    }
-
-    private func play(
-        _ request: Coordinator.Request, composition: AVVideoComposition?,
-        in view: PlayerView, coordinator: Coordinator
-    ) {
-        let item = AVPlayerItem(url: request.url)
-        item.videoComposition = composition
+        coordinator.loaded = url
+        let item = AVPlayerItem(url: url)
         let queuePlayer = AVQueuePlayer()
         queuePlayer.isMuted = muted
         coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
@@ -83,7 +51,6 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
-        coordinator.building?.cancel()
         uiView.playerLayer.player?.pause()
     }
 }

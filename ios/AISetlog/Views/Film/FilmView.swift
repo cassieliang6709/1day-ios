@@ -46,7 +46,6 @@ struct FilmView: View {
     @State private var filterTarget: FilmFilterTarget?
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
-    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
 
     private var presenter: ChallengePresenter { ChallengePresenter(challenge: challenge) }
     private var schedule: StorySchedule { StorySchedule(challenge) }
@@ -157,7 +156,7 @@ struct FilmView: View {
         return filmClips.map(RenderRevision.init) + [
             RenderRevision(
                 options: "\(adjustments.includeTitleCard)-\(adjustments.includeCaptions)"
-                    + "-\(adjustments.fadeSeconds)-\(look.rawValue)-hold[\(holds)]"
+                    + "-\(adjustments.fadeSeconds)-hold[\(holds)]"
                     + "-order[\(selection.dayOrder.map(String.init).joined(separator: ","))]")
         ]
     }
@@ -224,8 +223,6 @@ struct FilmView: View {
             options.showDayCaptions = adjustments.includeCaptions && !challenge.isTimeOnly
             options.layout = challenge.isShared ? .friendsTogether : .sequential
             options.titleCard = adjustments.includeTitleCard ? titleCard : nil
-            options.look = look
-            options.lookAuthorID = challenge.isShared ? (account.account?.id ?? "local") : nil
             if challenge.isShared {
                 options.keptClipIDs = Set(filmClips.map(\.id))
                 options.freezeFrames = selection.freezeFrames(for: clips)

@@ -34,44 +34,6 @@ enum PersonalEffectFilter {
     }
 
 
-    static func playbackComposition(
-        _ parameters: PersonalEffectParameters, for asset: AVAsset
-    ) async -> AVVideoComposition? {
-        guard !parameters.isIdentity else { return nil }
-        return try? await AVMutableVideoComposition.videoComposition(
-            with: asset,
-            applyingCIFiltersWithHandler: { request in
-                request.finish(with: apply(parameters, to: request.sourceImage), context: nil)
-            })
-    }
-
-
-    static func filteredCopy(
-        of url: URL, parameters: PersonalEffectParameters
-    ) async throws -> URL {
-        guard !parameters.isIdentity else { return url }
-
-        let asset = AVURLAsset(url: url)
-        guard let composition = await playbackComposition(parameters, for: asset) else { return url }
-
-        guard let export = AVAssetExportSession(
-            asset: asset, presetName: AVAssetExportPresetHighestQuality)
-        else { throw ExportError.sessionUnavailable }
-
-        let output = FileManager.default.temporaryDirectory
-            .appendingPathComponent("graded-\(UUID().uuidString).mov")
-        export.outputURL = output
-        export.outputFileType = .mov
-        export.videoComposition = composition
-        export.shouldOptimizeForNetworkUse = false
-
-        try await VideoExportSession.run(export)
-        guard export.status == .completed else {
-            throw ExportError.failed(export.error?.localizedDescription ?? "unknown")
-        }
-        return output
-    }
-
     enum ExportError: LocalizedError {
         case sessionUnavailable
         case failed(String)

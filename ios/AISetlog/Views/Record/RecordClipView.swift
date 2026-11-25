@@ -47,7 +47,6 @@ struct RecordClipView: View {
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
-    @AppStorage(PersonalEffectParameters.storageKey) private var look: PersonalEffectParameters = .none
 
     private var myName: String? { account.account?.displayName }
     private var myTint: Color { Color.oneDayBrand }
@@ -416,7 +415,7 @@ struct RecordClipView: View {
                 showsDate: recorder.cameraStyle == .standard
             ) {
                 ZStack {
-                    LoopingClipPlayer(url: url, look: .none)
+                    LoopingClipPlayer(url: url)
                     CaptionOverlayEditor(text: $overlayText, isFocused: $overlayTextFocused)
                 }
             }

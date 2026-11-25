@@ -52,31 +52,3 @@ struct PersonalEffectParameters: Codable, Equatable, Hashable, Sendable {
 
     static let neutralTemperature = 6500.0
 }
-
-
-extension PersonalEffectParameters: RawRepresentable {
-    static let storageKey = "personalEffect.v2"
-
-    static let stickyKey = "personalEffect.sticky.v2"
-
-    static func onLaunch(
-        stored: PersonalEffectParameters, sticky: Bool
-    ) -> PersonalEffectParameters {
-        sticky ? stored : .none
-    }
-
-    var rawValue: String {
-        [exposure, temperature, contrast]
-            .map { String(format: "%.2f", $0) }
-            .joined(separator: ",")
-    }
-
-    init?(rawValue: String) {
-        let parts = rawValue.split(separator: ",", omittingEmptySubsequences: false)
-        guard parts.count == 3 else { return nil }
-        let numbers = parts.map { Double($0) }
-        guard numbers.allSatisfy({ $0 != nil }) else { return nil }
-        self.init(
-            exposure: numbers[0]!, temperature: numbers[1]!, contrast: numbers[2]!)
-    }
-}
