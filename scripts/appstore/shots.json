@@ -1,0 +1,72 @@
+[
+ {
+  "name": "1-dual",
+  "raw": "dual.png",
+  "zh": {
+   "head": "前后同时拍",
+   "sub": "你和你看到的，拍进同一段"
+  },
+  "en": {
+   "head": "Film both sides<br>at once",
+   "sub": "You and what you see, in one clip"
+  }
+ },
+ {
+  "name": "2-friends",
+  "raw": "room.png",
+  "zh": {
+   "head": "和朋友拍同一天",
+   "sub": "每人一段，回个表情、聊两句",
+   "pops": [
+    {
+     "face": "小",
+     "text": "看起来好好吃！",
+     "style": "right:70px; top:1280px"
+    },
+    {
+     "text": "❤️ 你回了小满",
+     "style": "left:70px; top:2380px"
+    }
+   ]
+  },
+  "en": {
+   "head": "Film the same day<br>with friends",
+   "sub": "One clip each. React and chat.",
+   "pops": [
+    {
+     "face": "M",
+     "text": "Looks so good!",
+     "style": "right:70px; top:2240px"
+    },
+    {
+     "text": "❤️ You reacted",
+     "style": "left:70px; top:1380px"
+    }
+   ]
+  }
+ },
+ {
+  "name": "3-mine",
+  "raw": "mine.png",
+  "zh": {
+   "head": "我的每一天",
+   "sub": "片子按天排好，还带着心情"
+  },
+  "en": {
+   "head": "Every day, kept",
+   "sub": "Your clips by day, with your mood"
+  }
+ },
+ {
+  "name": "4-vlog",
+  "raw": "vlog.png",
+  "zh": {
+   "head": "一键成片",
+   "sub": "配乐、旁白、顺序随你换"
+  },
+  "en": {
+   "head": "One tap to a vlog",
+   "sub": "Music, voiceover, any order"
+  }
+ }
+]
