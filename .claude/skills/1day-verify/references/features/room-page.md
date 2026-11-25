@@ -8,7 +8,7 @@
 - 头像行：`room-people`。自己的头像 `room-people-me`（今天点了直接拍）。别人的头像 `room-people-filmed`（这天拍了）/ `room-people-person`（没拍）：单击只看 TA 这天的，没拍就进单人页；双击拍一拍；长按出菜单「只看今天的 / 看 TA 的全部 / 拍一拍」。只看一个人时出现 `room-person-see-all`（「看 TA 的全部 ›」）。
 - 片子：`room-frame`，里面的片子 `room-clip-tile`。格子固定 3:4（横拍房间 4:3），按剩余空间等比缩放，整条视频不裁切。今天还没人拍时是 `room-film-today`（「拍一段」）。
 - 单人页：这个人所有日子的片段，新的在前，`room-person-back` 返回。这个人今天没拍时右上角有 `room-person-poke`（「拍一拍」）。
-- 底部：表情按钮、`room-chat-field`（「说点什么…」）、`room-chat`（「聊天」）。今天没有别人的片子时，在输入框按发送会把字带进聊天页，再点发送。
+- 底部：`room-chat-field`（「说点什么…」）、`room-chat`（「聊天」）。回表情：双击别人的片子 `room-clip-tile` 回 ❤️，长按出一排表情加拍一拍。今天没有别人的片子时，在输入框按发送会把字带进聊天页，再点发送。
 - 改房间名：点标题，出现输入框，输入后确认。
 - 顶部按钮：返回、「做 vlog」、`room-more` 更多。邀请在头像行最后 `room-invite`。
 - 没登录时：`room-sign-in`、`room-frame-sign-in`。

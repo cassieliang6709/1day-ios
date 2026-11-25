@@ -223,12 +223,6 @@ extension StoryTimelineView {
 
     func roomChatBar(target: DayClip?, myID: String) -> some View {
         HStack(spacing: OneDay.Space.s) {
-            if let target, !chatFocused {
-                MoodReactButton(
-                    reactions: reactions(for: target, myID: myID), myID: myID,
-                    showsOthers: false, onCanvas: true
-                ) { react(target, $0, myID: myID) }
-            }
             TextField(Strings.chatSayPlaceholder, text: $chatDraft)
                 .font(OneDay.Font.subhead)
                 .focused($chatFocused)

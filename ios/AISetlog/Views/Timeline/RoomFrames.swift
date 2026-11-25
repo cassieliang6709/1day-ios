@@ -119,6 +119,7 @@ private struct PersonFrame: View {
 
     @State private var page: String?
     @State private var pokedNow = false
+    @State private var heartOn: String?
 
     private static let radius: CGFloat = 22
 
@@ -134,7 +135,17 @@ private struct PersonFrame: View {
         .background(OneDay.surfaceSoft)
         .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
         .overlay(alignment: .bottom) { pageDots }
-        .contextMenu { pokeMenu }
+        .contextMenu {
+            if let clip = onScreenClip, !column.isMine {
+                Picker(Strings.reactLabel, selection: Binding(
+                    get: { myReaction(clip) ?? "" },
+                    set: { if !$0.isEmpty { onReact(clip, $0) } })) {
+                    ForEach(ClipReaction.palette, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.palette)
+            }
+            pokeMenu
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-frame")
     }
@@ -170,13 +181,65 @@ private struct PersonFrame: View {
         .scrollIndicators(.hidden)
     }
 
+    private var onScreenClip: DayClip? {
+        column.clips.first { isOnScreen($0) }
+    }
+
+    private func myReaction(_ clip: DayClip) -> String? {
+        reactions(clip).filter { $0.authorID == myID }.max { $0.createdAt < $1.createdAt }?.emoji
+    }
+
+    private func doubleTap(_ clip: DayClip) {
+        let heart = ClipReaction.palette[0]
+        if !reactions(clip).contains(where: { $0.authorID == myID && $0.emoji == heart }) {
+            onReact(clip, heart)
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) { heartOn = clip.id }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            withAnimation(OneDay.Motion.soft) { if heartOn == clip.id { heartOn = nil } }
+        }
+    }
+
     private func isOnScreen(_ clip: DayClip) -> Bool {
         (page ?? column.clips.first?.id) == clip.id
     }
 
+    @ViewBuilder
     private func clipPage(_ clip: DayClip) -> some View {
         let title = slotTitle(clip.day)
-        return Button { onPlay(clip) } label: {
+        let face = clipFace(clip, title: title)
+            .overlay {
+                if heartOn == clip.id {
+                    Text(ClipReaction.palette[0])
+                        .font(OneDay.Font.rounded(.largeTitle))
+                        .scaleEffect(2.4)
+                        .shadow(color: .black.opacity(0.25), radius: 8)
+                        .transition(.scale(scale: 0.4).combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(
+                [title, column.name,
+                 clip.recordedAt?.formatted(date: .abbreviated, time: .shortened),
+                 clip.overlayText]
+                    .compactMap { $0 }.joined(separator: ", "))
+            .accessibilityIdentifier("room-clip-tile")
+        if column.isMine {
+            face
+                .onTapGesture { onPlay(clip) }
+                .accessibilityAction { onPlay(clip) }
+        } else {
+            face
+                .onTapGesture(count: 2) { doubleTap(clip) }
+                .onTapGesture { onPlay(clip) }
+                .accessibilityAction { onPlay(clip) }
+                .accessibilityAction(named: Text(Strings.reactLabel)) { doubleTap(clip) }
+        }
+    }
+
+    private func clipFace(_ clip: DayClip, title: String?) -> some View {
             Color.clear
                 .overlay {
                     ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
@@ -215,14 +278,6 @@ private struct PersonFrame: View {
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                 .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            [title, column.name,
-             clip.recordedAt?.formatted(date: .abbreviated, time: .shortened),
-             clip.overlayText]
-                .compactMap { $0 }.joined(separator: ", "))
-        .accessibilityIdentifier("room-clip-tile")
     }
 
     static func shownReactions(_ reactions: [ClipReaction]) -> [ClipReaction] {
