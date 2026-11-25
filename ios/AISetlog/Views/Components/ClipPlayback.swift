@@ -5,9 +5,10 @@ struct LoopingClipPlayer: View {
     let url: URL
     var refreshToken: Date? = nil
     var muted = false
+    var fits = false
 
     var body: some View {
-        LoopingPlayerLayerView(url: url, muted: muted)
+        LoopingPlayerLayerView(url: url, muted: muted, fits: fits)
             .id(refreshToken)
     }
 }
@@ -15,6 +16,7 @@ struct LoopingClipPlayer: View {
 private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
     var muted = false
+    var fits = false
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -30,7 +32,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PlayerView {
         let view = PlayerView()
-        view.playerLayer.videoGravity = .resizeAspectFill
+        view.playerLayer.videoGravity = fits ? .resizeAspect : .resizeAspectFill
         start(in: view, coordinator: context.coordinator)
         return view
     }

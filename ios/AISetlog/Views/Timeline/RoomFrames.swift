@@ -28,14 +28,21 @@ struct RoomFrames: View {
         }.map(\.element)
     }
 
-    static func grid(for count: Int) -> (columns: Int, rows: Int) {
-        switch count {
-        case ...1: return (1, 1)
-        case 2: return (2, 1)
-        case 3: return (1, 3)
-        case 4: return (2, 2)
-        default: return (2, (count + 1) / 2)
-        }
+    static func grid(for count: Int, landscape: Bool) -> (columns: Int, rows: Int) {
+        if landscape || count <= 1 { return (1, max(count, 1)) }
+        return (2, (count + 1) / 2)
+    }
+
+    static func cellSize(
+        in space: CGSize, count: Int, aspect: CGFloat, landscape: Bool
+    ) -> CGSize {
+        let grid = grid(for: count, landscape: landscape)
+        let columns = CGFloat(grid.columns)
+        let rows = CGFloat(grid.rows)
+        let byWidth = (space.width - spacing * (columns - 1)) / columns
+        let byHeight = (space.height - spacing * (rows - 1)) / rows
+        let height = max(min(byWidth / aspect, byHeight), minimumFrameHeight)
+        return CGSize(width: min(height * aspect, byWidth), height: height)
     }
 
     private var columns: [RoomFeed.Column] {
@@ -43,63 +50,35 @@ struct RoomFrames: View {
             .filter { !$0.clips.isEmpty }
     }
 
+    private var aspect: CGFloat {
+        CameraStyle.defaultCamera.aspectRatio(for: orientation) ?? 3 / 4
+    }
+
     var body: some View {
-        if orientation == .landscape {
-            stacked
-        } else {
-            portraitGrid
-        }
-    }
-
-    private var stacked: some View {
         let columns = columns
-        return GeometryReader { proxy in
-            let height = proxy.size.width * 9 / 16
-            let total = height * CGFloat(columns.count) + Self.spacing * CGFloat(max(columns.count - 1, 0))
-            ScrollView(.vertical) {
-                VStack(spacing: Self.spacing) {
-                    ForEach(columns) { column in
-                        frame(column).frame(height: height)
-                    }
-                }
-                .frame(minHeight: proxy.size.height)
-            }
-            .scrollIndicators(.hidden)
-            .scrollDisabled(total <= proxy.size.height)
-        }
-    }
-
-    private var portraitGrid: some View {
-        let columns = columns
-        let grid = Self.grid(for: columns.count)
+        let landscape = orientation == .landscape
+        let grid = Self.grid(for: columns.count, landscape: landscape)
         let rows = stride(from: 0, to: columns.count, by: grid.columns).map {
             Array(columns[$0..<min($0 + grid.columns, columns.count)])
         }
         return GeometryReader { proxy in
-            let count = CGFloat(grid.rows)
-            let fit = (proxy.size.height - Self.spacing * (count - 1)) / count
-            let cellWidth = (proxy.size.width - Self.spacing * CGFloat(grid.columns - 1))
-                / CGFloat(grid.columns)
-            let height = columns.count == 2
-                ? min(cellWidth * 4 / 3, proxy.size.height)
-                : max(fit, Self.minimumFrameHeight)
+            let cell = Self.cellSize(
+                in: proxy.size, count: columns.count, aspect: aspect, landscape: landscape)
+            let total = cell.height * CGFloat(grid.rows) + Self.spacing * CGFloat(grid.rows - 1)
             ScrollView(.vertical) {
                 VStack(spacing: Self.spacing) {
                     ForEach(rows.indices, id: \.self) { index in
                         HStack(spacing: Self.spacing) {
                             ForEach(rows[index]) { column in
-                                frame(column)
-                            }
-                            ForEach(0..<(grid.columns - rows[index].count), id: \.self) { _ in
-                                Color.clear.frame(maxWidth: .infinity)
+                                frame(column).frame(width: cell.width, height: cell.height)
                             }
                         }
-                        .frame(height: height)
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
-            .scrollDisabled(fit >= Self.minimumFrameHeight)
+            .scrollDisabled(total <= proxy.size.height + 1)
         }
     }
 
@@ -200,10 +179,9 @@ private struct PersonFrame: View {
         return Button { onPlay(clip) } label: {
             Color.clear
                 .overlay {
+                    ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt, bedsInsteadOfCrops: true)
                     if isOnScreen(clip) {
-                        LoopingClipPlayer(url: clip.url, refreshToken: clip.recordedAt, muted: true)
-                    } else {
-                        ClipThumbnail(url: clip.url, refreshToken: clip.recordedAt)
+                        LoopingClipPlayer(url: clip.url, refreshToken: clip.recordedAt, muted: true, fits: true)
                     }
                 }
                 .clipped()
