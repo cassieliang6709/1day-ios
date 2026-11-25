@@ -391,12 +391,26 @@
   "radius": 0,
   "spacing": 7
  },
- "Timeline/StoryTimelineView.swift": {
-  "font": 7,
+ "Timeline/StoryTimelineView+Room.swift": {
+  "font": 3,
   "hex": 0,
-  "padding": 14,
+  "padding": 8,
   "radius": 0,
-  "spacing": 8
+  "spacing": 2
+ },
+ "Timeline/StoryTimelineView+Sheets.swift": {
+  "font": 0,
+  "hex": 0,
+  "padding": 0,
+  "radius": 0,
+  "spacing": 0
+ },
+ "Timeline/StoryTimelineView.swift": {
+  "font": 2,
+  "hex": 0,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 6
  },
  "Timeline/TimelineHeader.swift": {
   "font": 3,
