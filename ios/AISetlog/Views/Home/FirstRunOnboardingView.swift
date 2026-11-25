@@ -2,7 +2,7 @@ import AuthenticationServices
 import SwiftUI
 
 struct FirstRunOnboardingView: View {
-    let onCreateStory: () -> Void
+    let onFinish: () -> Void
 
     @Environment(AccountStore.self) private var account
     @Environment(\.colorScheme) private var colorScheme
@@ -51,8 +51,16 @@ struct FirstRunOnboardingView: View {
         .fullScreenCover(isPresented: $showsPermissions, onDismiss: afterPermissions) {
             PermissionPrimerView { showsPermissions = false }
         }
-        .fullScreenCover(isPresented: $showsAvatarSetup, onDismiss: onCreateStory) {
+        .fullScreenCover(isPresented: $showsAvatarSetup, onDismiss: onFinish) {
             AvatarSetupFlow { _ in showsAvatarSetup = false }
+        }
+    }
+
+    private func afterSignIn() {
+        if PermissionPrimerView.isNeeded {
+            showsPermissions = true
+        } else {
+            afterPermissions()
         }
     }
 
@@ -60,31 +68,27 @@ struct FirstRunOnboardingView: View {
         if AvatarStore.shared.image == nil {
             showsAvatarSetup = true
         } else {
-            onCreateStory()
+            onFinish()
         }
     }
 
     @ViewBuilder
     private var primaryAction: some View {
         if account.isSignedIn {
-            Button(action: onCreateStory) {
+            Button(action: onFinish) {
                 Text(Strings.firstRunStart)
             }
             .buttonStyle(.primaryAction)
             .accessibilityHint(Strings.firstRunStartHint)
         } else {
             VStack(spacing: 8) {
-                SignInWithAppleButton(.continue) { request in
+                SignInWithAppleButton(.signIn) { request in
                     account.configure(request)
                 } onCompletion: { result in
                     Task { @MainActor in
                         do {
                             try await account.completeSignIn(result)
-                            if PermissionPrimerView.isNeeded {
-                                showsPermissions = true
-                            } else {
-                                afterPermissions()
-                            }
+                            afterSignIn()
                         } catch {
                             if (error as? ASAuthorizationError)?.code == .canceled || error is CancellationError { return }
                             signInError = Strings.signInFailure(error)
@@ -94,6 +98,8 @@ struct FirstRunOnboardingView: View {
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                 .frame(height: 52)
                 .clipShape(Capsule())
+
+                GoogleAccountButton(height: 52) { afterSignIn() } onError: { signInError = $0 }
 
                 if let signInError {
                     Text(signInError)
