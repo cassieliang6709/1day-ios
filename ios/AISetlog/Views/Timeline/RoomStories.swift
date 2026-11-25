@@ -9,17 +9,19 @@ struct RoomPeopleRow: View {
     let onFilm: () -> Void
     let hasPoked: (String) -> Bool
     let onPoke: (String) -> Void
+    var trailing: AnyView? = nil
 
     @State private var pokedNow: Set<String> = []
 
-    private static let faceSize: CGFloat = 46
+    private static let faceSize: CGFloat = 40
 
     var body: some View {
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: OneDay.Space.l) {
+            HStack(alignment: .top, spacing: OneDay.Space.s) {
                 ForEach(columns) { column in
                     person(column)
                 }
+                if let trailing { trailing }
             }
             .padding(.vertical, OneDay.Space.xs)
         }
@@ -63,6 +65,23 @@ struct RoomPeopleRow: View {
         }
     }
 
+    static func addCell(_ label: String) -> some View {
+        VStack(spacing: OneDay.Space.xs) {
+            Image(systemName: "plus")
+                .font(OneDay.Font.headline)
+                .foregroundStyle(OneDay.brandText)
+                .frame(width: faceSize, height: faceSize)
+                .overlay(Circle().strokeBorder(OneDay.inkFaint, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                .padding(3)
+            Text(label)
+                .font(OneDay.Font.caption)
+                .foregroundStyle(OneDay.inkSoft)
+                .lineLimit(1)
+        }
+        .frame(minWidth: 50)
+        .contentShape(Rectangle())
+    }
+
     private func cell(
         _ column: RoomFeed.Column, filmed: Bool, label: String, showsPlus: Bool,
         labelColor: Color = OneDay.inkSoft
@@ -91,7 +110,7 @@ struct RoomPeopleRow: View {
                 .foregroundStyle(labelColor)
                 .lineLimit(1)
         }
-        .frame(minWidth: 56)
+        .frame(minWidth: 50)
         .contentShape(Rectangle())
     }
 }

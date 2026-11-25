@@ -245,11 +245,6 @@ private struct PersonFrame: View {
              clip.overlayText]
                 .compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier("room-clip-tile")
-        .overlay(alignment: .bottomTrailing) {
-            if !column.isMine, !signedOut {
-                MoodReactButton(reactions: reactions(clip), myID: myID) { onReact(clip, $0) }
-            }
-        }
     }
 
     static func metaLine(_ clip: DayClip, name: String, title: String?) -> String {

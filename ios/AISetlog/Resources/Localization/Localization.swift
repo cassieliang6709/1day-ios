@@ -1124,6 +1124,7 @@ enum Strings {
     }
     static var chatRemoveContext: String { lang == .chinese ? "取消引用" : "Remove context" }
     static var chatPlaceholder: String { lang == .chinese ? "发消息…" : "Message…" }
+    static var chatSayPlaceholder: String { lang == .chinese ? "说点什么…" : "Say something…" }
     static var chatSend: String { lang == .chinese ? "发送" : "Send" }
     static var chatErrorStorage: String {
         lang == .chinese ? "聊天记录没存上，再试一次" : "Couldn't save the chat. Try again."

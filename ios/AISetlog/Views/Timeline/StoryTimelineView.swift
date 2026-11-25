@@ -19,6 +19,8 @@ struct StoryTimelineView: View {
     @State private var showSignIn = false
     @AppStorage("roomLayout.v3") private var roomLayout: RoomLayout = .automatic
     @State private var roomDay: Date?
+    @State private var chatDraft = ""
+    @FocusState private var chatFocused: Bool
     @State private var roomMonth = Calendar.current.startOfMonth(for: .now)
     @State private var roomCalendarHeight: CGFloat = 420
     @State private var roomPerson: String?
@@ -207,7 +209,13 @@ struct StoryTimelineView: View {
             navBar(challenge, agenda: agenda, clipCount: clips.count)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: reservesTabBarClearance ? OneDay.tabBarClearance : 0)
+            VStack(spacing: 0) {
+                if challenge.isShared, account.isSignedIn {
+                    roomChatBar(target: Self.replyTarget(clips: roomDay.map { day in
+                        clips.filter { Self.isClip($0, on: day) } } ?? clips, myID: myID), myID: myID)
+                }
+                Color.clear.frame(height: reservesTabBarClearance ? OneDay.tabBarClearance : 0)
+            }
         }
         .sensoryFeedback(.success, trigger: challenge.recordedCount)
         .refreshable {
@@ -298,7 +306,10 @@ struct StoryTimelineView: View {
                 },
                 onFilm: { if let nextToFilm { sheet = .record(day: nextToFilm) } },
                 hasPoked: { id in store.hasPokedToday(challengeID: challengeID, targetAuthorID: id) },
-                onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) })
+                onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) },
+                trailing: inviteCell(challenge))
+            PillSelector(options: Self.roomTabs, selection: roomTabSelection, compact: true)
+                .accessibilityIdentifier("room-tabs")
             if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
                 FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
                     .accessibilityIdentifier("room-everyone-filmed")
@@ -460,30 +471,6 @@ struct StoryTimelineView: View {
             }
 
             Menu {
-                if challenge.isShared {
-                    Section {
-                        Picker(selection: $roomLayout) {
-                            ForEach(RoomLayout.allCases, id: \.self) { layout in
-                                Label(layout.title, systemImage: layout.systemImage).tag(layout)
-                            }
-                        } label: {
-                            Label(Strings.roomLayoutMenu, systemImage: roomLayout.systemImage)
-                        }
-                        .pickerStyle(.menu)
-                        Button(Strings.libraryCalendar, systemImage: "calendar") { showRoomCalendar = true }
-                        Button(Strings.chatLabel, systemImage: "bubble.left") { showRoomChat = true }
-                        if let code = challenge.roomCode, previewMedia == nil {
-                            RoomInviteShareLink(
-                                content: RoomInviteCardContent(
-                                    challenge: challenge, inviter: account.account?.displayName),
-                                message: shareText(code: code, challenge: challenge)
-                            ) {
-                                Label(Strings.inviteLabel, systemImage: "person.badge.plus")
-                            }
-                        }
-                    }
-                }
-
                 if !challenge.isShared, clipCount > 0, !agenda.isComplete {
                     Button(Strings.previewTheFilm(clipCount), systemImage: "film.stack") {
                         showFilm = true
@@ -677,6 +664,92 @@ struct StoryTimelineView: View {
 }
 
 extension StoryTimelineView {
+    private enum RoomTab: Hashable { case layout(RoomLayout), calendar }
+
+    private static let roomTabs: [PillSelector<RoomTab>.Option] =
+        RoomLayout.allCases.map { .init(value: .layout($0), label: $0.title) }
+        + [.init(value: .calendar, label: Strings.libraryCalendar, icon: "calendar")]
+
+    private var roomTabSelection: Binding<RoomTab> {
+        Binding(
+            get: { .layout(roomLayout) },
+            set: { tab in
+                switch tab {
+                case .layout(let layout): roomLayout = layout
+                case .calendar: showRoomCalendar = true
+                }
+            })
+    }
+
+    private func inviteCell(_ challenge: Challenge) -> AnyView? {
+        if let code = challenge.roomCode, previewMedia == nil {
+            return AnyView(RoomInviteShareLink(
+                content: RoomInviteCardContent(challenge: challenge, inviter: account.account?.displayName),
+                message: shareText(code: code, challenge: challenge)
+            ) {
+                RoomPeopleRow.addCell(Strings.inviteLabel)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("room-invite"))
+        }
+        return nil
+    }
+
+    static func replyTarget(clips: [DayClip], myID: String) -> DayClip? {
+        clips.filter { $0.authorID != myID && $0.authorID != RoomProgress.soloAuthorID }
+            .max { ($0.recordedAt ?? .distantPast) < ($1.recordedAt ?? .distantPast) }
+    }
+
+    private func roomChatBar(target: DayClip?, myID: String) -> some View {
+        let mine = target.flatMap { reactions(for: $0, myID: myID).first { $0.authorID == myID }?.emoji }
+        return HStack(spacing: OneDay.Space.s) {
+            if let target, !chatFocused {
+                HStack(spacing: 2) {
+                    ForEach(ClipReaction.palette, id: \.self) { key in
+                        Button { react(target, key, myID: myID) } label: {
+                            ReactionGlyph(key: key, size: 26)
+                                .frame(width: 32, height: 44)
+                                .opacity(mine == nil || mine == key ? 1 : 0.45)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .accessibilityIdentifier("room-chat-faces")
+            }
+            TextField(Strings.chatSayPlaceholder, text: $chatDraft)
+                .font(OneDay.Font.subhead)
+                .focused($chatFocused)
+                .submitLabel(.send)
+                .onSubmit { sendChat(target: target, myID: myID) }
+                .padding(.horizontal, OneDay.Space.m)
+                .frame(minHeight: 40)
+                .background(OneDay.surfaceSoft, in: Capsule())
+                .accessibilityIdentifier("room-chat-field")
+            Button(Strings.chatLabel) { showRoomChat = true }
+                .font(OneDay.Font.caption)
+                .foregroundStyle(OneDay.brandText)
+                .frame(minWidth: 44, minHeight: 44)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("room-chat")
+        }
+        .padding(.horizontal, OneDay.Space.l)
+        .padding(.vertical, OneDay.Space.xs)
+        .background(.regularMaterial)
+        .animation(OneDay.Motion.snap, value: chatFocused)
+    }
+
+    private func sendChat(target: DayClip?, myID: String) {
+        let text = chatDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        guard let target else {
+            showRoomChat = true
+            return
+        }
+        store.addComment(text, day: target.day, challengeID: challengeID, targetAuthorID: target.authorID ?? myID)
+        chatDraft = ""
+        chatFocused = false
+    }
+
     private func reactions(for clip: DayClip, myID: String) -> [ClipReaction] {
         store.interactions(for: challengeID, day: clip.day, targetAuthorID: clip.authorID ?? myID).reactions
     }
