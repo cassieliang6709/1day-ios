@@ -7,9 +7,15 @@ struct LoopingClipPlayer: View {
     var muted = false
     var fits = false
 
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isVisible = false
+
     var body: some View {
-        LoopingPlayerLayerView(url: url, muted: muted, fits: fits)
+        LoopingPlayerLayerView(
+            url: url, muted: muted, fits: fits, isActive: isVisible && scenePhase == .active)
             .id(refreshToken)
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
     }
 }
 
@@ -17,6 +23,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     let url: URL
     var muted = false
     var fits = false
+    var isActive = true
 
     final class PlayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -38,8 +45,15 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
-        guard context.coordinator.loaded != url else { return }
-        start(in: uiView, coordinator: context.coordinator)
+        if context.coordinator.loaded != url {
+            start(in: uiView, coordinator: context.coordinator)
+        }
+        uiView.playerLayer.player?.isMuted = muted
+        if isActive {
+            uiView.playerLayer.player?.play()
+        } else {
+            uiView.playerLayer.player?.pause()
+        }
     }
 
     private func start(in view: PlayerView, coordinator: Coordinator) {
@@ -49,7 +63,7 @@ private struct LoopingPlayerLayerView: UIViewRepresentable {
         queuePlayer.isMuted = muted
         coordinator.looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
         view.playerLayer.player = queuePlayer
-        queuePlayer.play()
+        if isActive { queuePlayer.play() }
     }
 
     static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
