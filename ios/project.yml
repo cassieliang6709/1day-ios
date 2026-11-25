@@ -24,7 +24,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AISetlog/AISetlog.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.6"
-        CURRENT_PROJECT_VERSION: "37"
+        CURRENT_PROJECT_VERSION: "38"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconBlue
         OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "ImagePlayground"]
@@ -90,7 +90,7 @@ targets:
         SKIP_INSTALL: YES
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.6"
-        CURRENT_PROJECT_VERSION: "37"
+        CURRENT_PROJECT_VERSION: "38"
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog.dev.capture
@@ -119,7 +119,7 @@ targets:
         SKIP_INSTALL: YES
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.6"
-        CURRENT_PROJECT_VERSION: "37"
+        CURRENT_PROJECT_VERSION: "38"
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.cassie.AISetlog.dev.controls
