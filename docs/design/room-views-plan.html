@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间页视图规划：瀑布流和日历</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#C9B99C; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:8px; }
+  h3 { font-size:17px; margin:30px 0 14px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:300px; }
+  .opt h2 { font-size:15px; margin:12px 0 6px; }
+  .tag { font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .phone { width:300px; height:600px; border-radius:40px; background:var(--bg); border:8px solid #1d1d1d; padding:44px 12px 12px; overflow:hidden; position:relative; }
+  .seg { display:flex; background:var(--chip); border-radius:99px; padding:3px; gap:2px; margin-bottom:12px; }
+  .seg span { flex:1; text-align:center; font-size:12px; font-weight:700; padding:6px 0; border-radius:99px; color:var(--soft); }
+  .seg span.on { background:var(--brand); color:var(--ink); }
+  .cover { background:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg) center/cover; }
+  .face { width:20px; height:20px; border-radius:50%; background:#22356e; color:#fff; font-size:9px; font-weight:800; display:inline-grid; place-items:center; border:1.5px solid #fff; }
+  .face.me { background:#F6C9A8; color:var(--ink); }
+  /* waterfall now */
+  .cols { display:flex; gap:8px; }
+  .col { width:130px; flex:0 0 auto; }
+  .col .who { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; margin-bottom:6px; }
+  .col .empty { height:170px; border-radius:14px; border:1.5px dashed var(--faint); }
+  .col .tile { height:170px; border-radius:14px; }
+  /* masonry */
+  .mason { columns:2; column-gap:8px; }
+  .mason .t { break-inside:avoid; border-radius:14px; margin-bottom:8px; position:relative; }
+  .mason .t .m { position:absolute; left:6px; bottom:6px; display:flex; align-items:center; gap:4px; color:#fff; font-size:10.5px; font-weight:800; text-shadow:0 1px 3px #0008; }
+  /* calendar now */
+  .sheet { position:absolute; left:6px; right:6px; bottom:6px; height:430px; border-radius:28px; background:#F4EFE4; padding:14px; }
+  .sheet .hd { display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:14px; margin-bottom:10px; }
+  .sheet .card { background:#fff; border-radius:20px; padding:10px; }
+  .grid7 { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .grid7 .d { height:44px; font-size:11px; color:var(--faint); text-align:center; font-weight:700; }
+  .grid7 .d.today { color:var(--brandText); }
+  .grid7 .d i { display:block; width:14px; height:14px; border-radius:4px; margin:3px auto 0; }
+  /* calendar new */
+  .month { display:flex; justify-content:space-between; align-items:center; font-weight:900; font-size:15px; margin:2px 4px 8px; }
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal .w { font-size:10px; color:var(--soft); text-align:center; font-weight:700; padding-bottom:2px; }
+  .cal .c { aspect-ratio:3/4; border-radius:8px; position:relative; font-size:10px; font-weight:800; color:var(--faint); padding:3px 4px; }
+  .cal .c.has { color:#fff; text-shadow:0 1px 2px #0009; }
+  .cal .c.today { box-shadow:0 0 0 2px var(--brand); }
+  .cal .c .n { position:absolute; right:3px; bottom:3px; width:13px; height:13px; border-radius:50%; background:#22356e; border:1px solid #fff; font-size:7px; color:#fff; display:grid; place-items:center; }
+  .daystrip { margin-top:10px; font-size:12.5px; font-weight:800; }
+  .daystrip .tiles { display:flex; gap:6px; margin-top:6px; }
+  .daystrip .tiles div { width:66px; height:88px; border-radius:10px; }
+</style>
+</head>
+<body>
+<h1>房间页视图规划</h1>
+<p style="color:var(--soft);font-size:13px">只是规划，App 代码没改。</p>
+
+<h3>瀑布流</h3>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="seg"><span>默认</span><span class="on">瀑布流</span><span>按天</span><span>日历</span></div>
+      <div class="cols">
+        <div class="col"><div class="who"><span class="face me">·</span>你</div><div class="empty"></div></div>
+        <div class="col"><div class="who"><span class="face">尼</span>尼尼</div><div class="tile cover"></div></div>
+        <div class="col"><div class="who"><span class="face">A</span>Ana</div><div class="empty"></div></div>
+      </div>
+    </div>
+    <h2>现在</h2>
+    <ul><li>每人一竖列，横着滑</li><li>没拍的人留一个空框</li><li>按人看和「默认」、点头像重复</li></ul>
+  </div>
+  <div class="opt">
+    <div class="phone">
+      <div class="seg"><span>今天</span><span class="on">全部</span><span>日历</span></div>
+      <div class="mason">
+        <div class="t cover" style="height:190px"><div class="m"><span class="face">尼</span>16:24</div></div>
+        <div class="t cover" style="height:130px"><div class="m"><span class="face">A</span>昨天 21:10</div></div>
+        <div class="t cover" style="height:150px"><div class="m"><span class="face me">·</span>昨天 08:02</div></div>
+        <div class="t cover" style="height:170px"><div class="m"><span class="face">C</span>11月23日</div></div>
+        <div class="t cover" style="height:120px"><div class="m"><span class="face">尼</span>11月22日</div></div>
+      </div>
+    </div>
+    <h2>改后：所有人混排，按时间往下刷<span class="tag">推荐</span></h2>
+    <ul><li>两列错落，竖片高、横片矮，新的在上</li><li>每张左下一个小头像 + 时间，知道是谁拍的</li><li>没拍的人不占位置（头像行已经显示了）</li><li>要只看一个人：点顶部那个人的头像</li></ul>
+  </div>
+</div>
+
+<h3>日历</h3>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="seg"><span>默认</span><span>瀑布流</span><span>按天</span><span class="on">日历</span></div>
+      <div class="sheet">
+        <div class="hd"><span></span>日历<span style="color:var(--brandText)">完成</span></div>
+        <div class="card">
+          <div class="hd" style="font-size:13px">‹<span>2026年11月</span>›</div>
+          <div class="grid7">
+            <div class="d">1</div><div class="d">2</div><div class="d">3</div><div class="d">4</div><div class="d">5</div><div class="d">6</div><div class="d">7</div>
+            <div class="d">8</div><div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div><div class="d">13</div><div class="d">14</div>
+            <div class="d">15</div><div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d">19</div><div class="d">20</div><div class="d">21</div>
+            <div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d today">25<i class="cover"></i></div><div class="d">26</div><div class="d">27</div><div class="d">28</div>
+            <div class="d">29</div><div class="d">30</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <h2>现在</h2>
+    <ul><li>弹窗里再套一张白卡片</li><li>封面只是日期下一个小方块</li><li>大片空白，也看不出是谁拍的</li><li>只有它是弹窗，其他视图是直接换内容</li></ul>
+  </div>
+  <div class="opt">
+    <div class="phone">
+      <div class="seg"><span>今天</span><span>全部</span><span class="on">日历</span></div>
+      <div class="month"><span>‹</span><span>11月</span><span>›</span></div>
+      <div class="cal">
+        <div class="w">日</div><div class="w">一</div><div class="w">二</div><div class="w">三</div><div class="w">四</div><div class="w">五</div><div class="w">六</div>
+        <div class="c">1</div><div class="c">2</div><div class="c">3</div><div class="c">4</div><div class="c">5</div><div class="c">6</div><div class="c">7</div>
+        <div class="c">8</div><div class="c">9</div><div class="c">10</div><div class="c">11</div><div class="c">12</div><div class="c">13</div><div class="c">14</div>
+        <div class="c">15</div><div class="c">16</div><div class="c has cover">17<span class="n">尼</span></div><div class="c has cover">18</div><div class="c">19</div><div class="c">20</div><div class="c has cover">21</div>
+        <div class="c has cover">22</div><div class="c has cover">23<span class="n">A</span></div><div class="c">24</div><div class="c has cover today">25</div><div class="c">26</div><div class="c">27</div><div class="c">28</div>
+        <div class="c">29</div><div class="c">30</div>
+      </div>
+      <div class="daystrip">11月25日 周三
+        <div class="tiles"><div class="cover"></div><div class="cover"></div></div>
+      </div>
+    </div>
+    <h2>改后：日历直接铺在页面上<span class="tag">推荐</span></h2>
+    <ul><li>不弹窗，和其他视图一样点了就换</li><li>拍过的日子整格是封面，日期写在角上；今天黄框</li><li>点某天，下面直接出现那天的片段</li><li>「按天」并进日历，分段从 4 个变 3 个</li></ul>
+  </div>
+</div>
+</body>
+</html>
