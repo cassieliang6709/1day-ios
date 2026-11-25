@@ -13,7 +13,6 @@ struct RecordClipView: View {
     var orientation: Challenge.Orientation = .portrait
     var lockedCamera: CameraStyle? = nil
     var unfiledGuard: UnfiledClipGuard?
-    var onStartStory: (() -> Void)?
     var onCloseFreeform: (() -> Void)?
     var startsSideways = false
     let onSave: (URL, String?) -> Void
@@ -476,7 +475,6 @@ struct RecordClipView: View {
             titleVisibility: .visible
         ) {
             Button(Strings.saveAsDraft) { keepAsDraft() }
-            Button(Strings.createStoryNow) { keepAsDraft(then: onStartStory) }
         } message: {
             Text(noPlaceMessage)
         }

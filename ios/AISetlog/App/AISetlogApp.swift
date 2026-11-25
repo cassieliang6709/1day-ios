@@ -116,10 +116,7 @@ struct RootView: View {
         Group {
             if needsOnboarding {
                 FirstRunOnboardingView(
-                    onCreateStory: {
-                        hasCompletedOnboarding = true
-                        homeLaunchAction = .quickStart
-                    })
+                    onFinish: { hasCompletedOnboarding = true })
             } else {
                 RootShellView(
                     pendingJoinCode: $pendingJoinCode,

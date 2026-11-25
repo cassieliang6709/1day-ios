@@ -113,26 +113,6 @@ extension PlansHomeView {
         }
     }
 
-    var startTodayCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: Strings.startTodayLabel)
-                .padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text(Strings.startTodayBody)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(OneDay.inkSoft)
-
-                Button(Strings.startTodayCTA) { onCompose() }
-                    .buttonStyle(.primaryAction)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
-            .glassSurface(radius: OneDay.Radius.card)
-            .padding(.horizontal, 20)
-        }
-    }
-
     var emptyState: some View {
         EmptyFrame(radius: OneDay.Radius.card) {
             VStack(spacing: OneDay.Space.m) {
@@ -241,9 +221,6 @@ extension PlansHomeView {
         guard onActivate?() != false else { return }
         launchAction = nil
         switch action {
-        case .quickStart:
-            let challenge = store.createQuickStart()
-            path = [challenge.id]
         case .newStory:
             onCompose()
         case .join:

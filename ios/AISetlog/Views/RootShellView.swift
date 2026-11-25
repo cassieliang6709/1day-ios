@@ -1,7 +1,6 @@
 import SwiftUI
 
 enum HomeLaunchAction: Equatable {
-    case quickStart
     case newStory
     case join
     case record(UUID)
@@ -97,7 +96,6 @@ struct RootShellView: View {
             if surface == .camera {
                 CameraTabView(
                     unfiledGuard: unfiledGuard,
-                    onStartStory: { openCompose(together: false) },
                     onClose: { guardedSurface.wrappedValue = returnTab },
                     onOpenDrafts: {
                         guardedSurface.wrappedValue = .plans
@@ -407,7 +405,6 @@ final class UnfiledClipGuard {
 
 struct CameraTabView: View {
     var unfiledGuard: UnfiledClipGuard?
-    var onStartStory: (() -> Void)?
     var onClose: (() -> Void)?
     var onOpenDrafts: (() -> Void)?
     var startsSideways = false
@@ -421,7 +418,6 @@ struct CameraTabView: View {
             slotTitle: Strings.freeformSlot,
             isFreeform: true,
             unfiledGuard: unfiledGuard,
-            onStartStory: onStartStory,
             onCloseFreeform: onClose,
             startsSideways: startsSideways
         ) { _, _ in }
