@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间详情页顶栏 · 2 个方案</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:24px; }
+  .row { display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:340px; }
+  .opt h2 { font-size:16px; margin:14px 0 6px; }
+  .tag { font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .phone { width:340px; height:300px; border-radius:40px; background:var(--bg); border:8px solid #1d1d1d; padding:48px 16px 16px; overflow:hidden; }
+  .bar { display:flex; align-items:center; gap:8px; }
+  .round { width:40px; height:40px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:16px; flex:0 0 auto; }
+  .title { font-size:24px; font-weight:900; margin:14px 0 12px; }
+  .tools { display:flex; justify-content:space-around; }
+  .tool { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; color:var(--brandText); font-weight:700; }
+  .tool i { width:44px; height:44px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-style:normal; font-size:17px; color:var(--ink); }
+  .pill { height:36px; padding:0 14px; border-radius:99px; background:var(--brand); font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .spacer { flex:1; }
+  .seg { display:flex; background:var(--chip); border-radius:99px; padding:3px; gap:2px; margin-top:6px; }
+  .seg span { flex:1; text-align:center; font-size:13px; font-weight:700; padding:7px 0; border-radius:99px; color:var(--soft); }
+  .seg span.on { background:#fff; color:var(--ink); }
+</style>
+</head>
+<body>
+<h1>房间详情页顶栏 · 2 个方案（现在是 6 个只有图标的按钮）</h1>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">🎬 做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">家里的日常</div>
+      <div class="tools">
+        <div class="tool"><i>▦</i>视图</div>
+        <div class="tool"><i>📅</i>日历</div>
+        <div class="tool"><i>💬</i>聊天</div>
+        <div class="tool"><i>↑</i>邀请</div>
+      </div>
+    </div>
+    <h2>A. 主按钮 + 一行工具<span class="tag">推荐</span></h2>
+    <ul>
+      <li>右上角只留「做 vlog」（和「我的」页同一个词）和 ···</li>
+      <li>标题下一行圆形工具，每个都配字，和成片页的工具行一个样子（DESIGN.md 按钮组规则）</li>
+      <li>「分享」改叫「邀请」：它实际是发邀请码</li>
+    </ul>
+  </div>
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="round">📅</span><span class="round">💬</span><span class="pill">🎬 做 vlog</span><span class="round">⋯</span></div>
+      <div class="title">家里的日常</div>
+      <div class="seg"><span class="on">默认</span><span>瀑布流</span><span>按天</span></div>
+    </div>
+    <h2>B. 视图换成分段切换</h2>
+    <ul>
+      <li>三种视图直接写在标题下面，点一下就切，不用打开菜单</li>
+      <li>日历、聊天仍是图标，邀请收进 ···</li>
+      <li>代价：日历和聊天还是只有图标</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
