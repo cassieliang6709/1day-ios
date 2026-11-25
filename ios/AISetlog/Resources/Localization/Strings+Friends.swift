@@ -40,11 +40,6 @@ extension Strings {
         ]
     }
     static var roomHasNew: String { zh ? "有新片段" : "New clips" }
-    static var roomLayoutFrames: String { zh ? "每人一个框" : "One frame each" }
-    static var roomLayoutDefault: String { zh ? "默认" : "Default" }
-    static var roomLayoutWaterfall: String { zh ? "瀑布流" : "Waterfall" }
-    static var roomLayoutByDay: String { zh ? "按天" : "By day" }
-    static var roomLayoutMenu: String { zh ? "视图" : "View" }
     static var copyCode: String { zh ? "复制邀请码" : "Copy code" }
     static var codeCopied: String { zh ? "已复制" : "Copied" }
     static var shareCode: String { zh ? "发给朋友" : "Share" }

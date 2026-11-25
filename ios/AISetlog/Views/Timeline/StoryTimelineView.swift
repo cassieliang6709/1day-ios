@@ -15,14 +15,12 @@ struct StoryTimelineView: View {
     @State private var showEditPlan = false
     @State private var askBeforeDeleting = false
     @State private var showRoomChat = false
-    @State private var showRoomCalendar = false
     @State private var showSignIn = false
-    @AppStorage("roomLayout.v3") private var roomLayout: RoomLayout = .automatic
-    @State private var roomDay: Date?
+    @State private var roomDay = Calendar.current.startOfDay(for: .now)
+    @State private var roomAnchor = Calendar.current.startOfDay(for: .now)
+    @State private var roomMonthOpen = false
     @State private var chatDraft = ""
     @FocusState private var chatFocused: Bool
-    @State private var roomMonth = Calendar.current.startOfMonth(for: .now)
-    @State private var roomCalendarHeight: CGFloat = 420
     @State private var roomPerson: String?
     @State private var personPage: String?
     @State private var nudgeShareCode: String?
@@ -66,9 +64,7 @@ struct StoryTimelineView: View {
 
         .navigationDestination(isPresented: $showFilm) {
             if let challenge {
-                FilmView(
-                    challenge: challenge,
-                    clips: store.recordedClips(for: challengeID))
+                FilmView(challenge: challenge, clips: filmClips)
                     .environment(\.memberProfiles, store.memberProfiles(for: challengeID))
             }
         }
@@ -83,48 +79,6 @@ struct StoryTimelineView: View {
                     sheet = .clip(day: day, authorID: nil, takeID: nil)
                 }
             }
-        }
-        .sheet(isPresented: $showRoomCalendar) {
-            NavigationStack {
-                ScrollView {
-                    LibraryCalendar(
-                        month: $roomMonth,
-                        covers: roomCalendarCovers,
-                        selectedDay: Binding(
-                            get: { roomDay },
-                            set: { day in
-                                roomDay = day.map { Calendar.current.startOfDay(for: $0) }
-                                roomPerson = nil
-                                if day != nil { showRoomCalendar = false }
-                            }))
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                            roomCalendarHeight = $0
-                        }
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                    .navigationTitle(Strings.libraryCalendar)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(Strings.done) { showRoomCalendar = false }
-                        }
-                        if roomDay != nil {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(Strings.libraryAllDays) {
-                                    roomDay = nil
-                                    roomPerson = nil
-                                    showRoomCalendar = false
-                                }
-                                .accessibilityIdentifier("room-calendar-all")
-                            }
-                        }
-                    }
-            }
-            // Sheet fits the calendar (5- or 6-week months) plus the nav bar.
-            .presentationDetents([.height(roomCalendarHeight + 90)])
         }
         .sheet(isPresented: $showEditPlan) {
             if let challenge {
@@ -206,13 +160,14 @@ struct StoryTimelineView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            navBar(challenge, agenda: agenda, clipCount: clips.count)
+            navBar(challenge, agenda: agenda,
+                   clipCount: challenge.isShared ? filmClips.count : clips.count)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: .zero) {
                 if challenge.isShared, account.isSignedIn {
-                    roomChatBar(target: Self.replyTarget(clips: roomDay.map { day in
-                        clips.filter { Self.isClip($0, on: day) } } ?? clips, myID: myID), myID: myID)
+                    roomChatBar(target: Self.replyTarget(
+                        clips: clips.filter { Self.isClip($0, on: roomDay) }, myID: myID), myID: myID)
                 }
                 Color.clear.frame(height: reservesTabBarClearance ? OneDay.tabBarClearance : 0)
             }
@@ -288,19 +243,32 @@ struct StoryTimelineView: View {
         myID: String, agenda: StoryAgenda
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            let dayClips = roomDay.map { day in clips.filter { Self.isClip($0, on: day) } } ?? clips
+            let dayClips = clips.filter { Self.isClip($0, on: roomDay) }
             let dayColumns = RoomFeed.columns(clips: dayClips, members: members, myID: myID)
             let signedOut = challenge.isShared && !account.isSignedIn
+            let isToday = Calendar.current.isDateInToday(roomDay)
+            let filmedDays = Set(clips.compactMap { $0.recordedAt.map(Calendar.current.startOfDay) })
 
             if signedOut { signedOutLine }
 
-            let statusClips = roomDay == nil ? clips.filter { Self.isClip($0, on: .now) } : dayClips
+            RoomDateStrip(
+                selected: Binding(
+                    get: { roomDay },
+                    set: { day in
+                        roomDay = day
+                        roomPerson = nil
+                    }),
+                anchor: $roomAnchor,
+                expanded: $roomMonthOpen,
+                hasClips: { filmedDays.contains(Calendar.current.startOfDay(for: $0)) })
+
             let nextToFilm = agenda.suggested ?? agenda.openToMe.first
             RoomPeopleRow(
-                columns: RoomFeed.columns(clips: statusClips, members: members, myID: myID),
+                columns: dayColumns,
                 selected: roomPerson,
-                canFilm: nextToFilm != nil,
+                canFilm: isToday && nextToFilm != nil,
                 signedOut: signedOut,
+                isToday: isToday,
                 onSelect: { id in
                     withAnimation(OneDay.Motion.soft) { roomPerson = roomPerson == id ? nil : id }
                 },
@@ -308,21 +276,23 @@ struct StoryTimelineView: View {
                 hasPoked: { id in store.hasPokedToday(challengeID: challengeID, targetAuthorID: id) },
                 onPoke: { id in store.poke(challengeID: challengeID, targetAuthorID: id) },
                 trailing: inviteCell(challenge))
-            PillSelector(options: Self.roomTabs, selection: roomTabSelection, compact: true)
-                .accessibilityIdentifier("room-tabs")
             if Self.everyoneFilmedToday(dayColumns), !agenda.isComplete {
                 FilmReadyCard(eyebrow: Strings.everyoneFilmedToday, momentCount: nil) { showFilm = true }
                     .accessibilityIdentifier("room-everyone-filmed")
             }
             let shownMembers = roomPerson.map { id in members.filter { $0.id == id } } ?? members
             let shownClips = roomPerson.map { id in dayColumns.first { $0.id == id }?.clips ?? [] } ?? dayClips
-            switch roomLayout {
-            case .automatic:
+            if dayClips.isEmpty {
+                if isToday, let nextToFilm, !signedOut {
+                    filmTodaySlot { sheet = .record(day: nextToFilm) }
+                }
+                Spacer(minLength: 0)
+            } else {
                 RoomFrames(
                     clips: shownClips,
                     members: shownMembers.isEmpty ? members : shownMembers,
                     myID: myID,
-                    nextToFilm: agenda.suggested ?? agenda.openToMe.first,
+                    nextToFilm: nextToFilm,
                     slotTitle: { slotTitle(for: $0) },
                     onPlay: { clip in sheet = .open(clip) },
                     onFilm: { day in sheet = .record(day: day) },
@@ -344,33 +314,6 @@ struct StoryTimelineView: View {
                     onReact: { react($0, $1, myID: myID) },
                     signedOut: signedOut,
                     onSignIn: { showSignIn = true })
-            case .columns:
-                ScrollView {
-                    RoomFeed(
-                        challenge: challenge,
-                        clips: shownClips,
-                        members: shownMembers.isEmpty ? members : shownMembers,
-                        myID: myID,
-                        nextToFilm: agenda.suggested ?? agenda.openToMe.first,
-                        slotTitle: { slotTitle(for: $0) },
-                        onPlay: { clip in sheet = .open(clip) },
-                        onFilm: { day in sheet = .record(day: day) },
-                        reactions: { reactions(for: $0, myID: myID) },
-                        onReact: { react($0, $1, myID: myID) },
-                        showsCalendarControls: false)
-                }
-                .scrollIndicators(.hidden)
-            case .byDay:
-                ScrollView {
-                    RoomDayList(
-                        clips: shownClips,
-                        members: shownMembers.isEmpty ? members : shownMembers,
-                        myID: myID,
-                        onPlay: { clip in sheet = .open(clip) },
-                        reactions: { reactions(for: $0, myID: myID) },
-                        onReact: { react($0, $1, myID: myID) })
-                }
-                .scrollIndicators(.hidden)
             }
         }
         .padding(.horizontal, 20)
@@ -531,7 +474,7 @@ struct StoryTimelineView: View {
     }
 
     private func roomTitleRow(_ challenge: Challenge) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: OneDay.Space.s) {
             TimelineHeader(
                 challenge: challenge,
                 isSyncing: store.syncing.contains(challenge.roomCode ?? ""),
@@ -540,17 +483,68 @@ struct StoryTimelineView: View {
                 },
                 fontSize: 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if showsBackToToday {
+                Button(Strings.todayLabel) { backToToday() }
+                    .font(OneDay.Font.caption)
+                    .foregroundStyle(OneDay.brandText)
+                    .padding(.horizontal, OneDay.Space.m)
+                    .frame(minHeight: 30)
+                    .background(OneDay.surfaceSoft, in: Capsule())
+                    .frame(minHeight: 44)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("room-back-to-today")
+            }
+            Button {
+                withAnimation(OneDay.Motion.snap) { roomMonthOpen.toggle() }
+            } label: {
+                HStack(spacing: OneDay.Space.xs) {
+                    Text(RoomDateStrip.monthLabel(roomAnchor))
+                    Image(systemName: roomMonthOpen ? "chevron.up" : "chevron.down")
+                        .font(OneDay.Font.micro)
+                }
+                .font(OneDay.Font.callout)
+                .foregroundStyle(OneDay.brandText)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("room-month")
         }
-        .padding(.leading, 4)
+        .padding(.leading, OneDay.Space.xs)
     }
 
-    /// Cover thumbnail per day, so the room calendar shows which days have clips.
-    private var roomCalendarCovers: [Date: LibraryClip] {
-        guard let challenge else { return [:] }
-        let myID = account.account?.id ?? "local"
-        let library = ClipLibrary(
-            stories: [(challenge, store.recordedClips(for: challengeID))], drafts: [], myIDs: [myID])
-        return library.coverByDay(library.clips)
+    private var showsBackToToday: Bool {
+        let unit: Calendar.Component = roomMonthOpen ? .month : .weekOfYear
+        return !Calendar.current.isDateInToday(roomDay)
+            || !Calendar.current.isDate(roomAnchor, equalTo: .now, toGranularity: unit)
+    }
+
+    private func backToToday() {
+        withAnimation(OneDay.Motion.snap) {
+            roomDay = Calendar.current.startOfDay(for: .now)
+            roomAnchor = roomDay
+            roomMonthOpen = false
+            roomPerson = nil
+        }
+    }
+
+    private var filmClips: [DayClip] {
+        let all = store.recordedClips(for: challengeID)
+        guard challenge?.isShared == true else { return all }
+        return all.filter { Self.isClip($0, on: roomDay) }
+    }
+
+    private func filmTodaySlot(_ onFilm: @escaping () -> Void) -> some View {
+        Button(action: onFilm) {
+            EmptyFrame(radius: OneDay.Radius.card) {
+                Label(Strings.roomFeedFilm, systemImage: "camera.fill")
+                    .font(OneDay.Font.headline)
+                    .foregroundStyle(OneDay.brandText)
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("room-film-today")
     }
 
     private var celebration: some View {
@@ -664,23 +658,6 @@ struct StoryTimelineView: View {
 }
 
 extension StoryTimelineView {
-    private enum RoomTab: Hashable { case layout(RoomLayout), calendar }
-
-    private static let roomTabs: [PillSelector<RoomTab>.Option] =
-        RoomLayout.allCases.map { .init(value: .layout($0), label: $0.title) }
-        + [.init(value: .calendar, label: Strings.libraryCalendar, icon: "calendar")]
-
-    private var roomTabSelection: Binding<RoomTab> {
-        Binding(
-            get: { .layout(roomLayout) },
-            set: { tab in
-                switch tab {
-                case .layout(let layout): roomLayout = layout
-                case .calendar: showRoomCalendar = true
-                }
-            })
-    }
-
     private func inviteCell(_ challenge: Challenge) -> AnyView? {
         if let code = challenge.roomCode, previewMedia == nil {
             return AnyView(RoomInviteShareLink(
@@ -740,7 +717,10 @@ extension StoryTimelineView {
 
     private func sendChat(target: DayClip?, myID: String) {
         let text = chatDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            chatFocused = false
+            return
+        }
         guard let target else {
             showRoomChat = true
             return
@@ -777,25 +757,5 @@ extension EnvironmentValues {
     var reservesTabBarClearance: Bool {
         get { self[ReservesTabBarClearanceKey.self] }
         set { self[ReservesTabBarClearanceKey.self] = newValue }
-    }
-}
-
-enum RoomLayout: String, CaseIterable {
-    case automatic, columns, byDay
-
-    var title: String {
-        switch self {
-        case .automatic: Strings.roomLayoutDefault
-        case .columns: Strings.roomLayoutWaterfall
-        case .byDay: Strings.roomLayoutByDay
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .automatic: "rectangle.grid.1x2"
-        case .columns: "rectangle.split.3x1"
-        case .byDay: "square.grid.3x3"
-        }
     }
 }

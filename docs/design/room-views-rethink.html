@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房间页视图：只留一处看视频</title>
+<style>
+  :root { --bg:#FFF8E8; --ink:#3A2B1B; --soft:#7A6650; --faint:#C9B99C; --brand:#FFCB45; --brandText:#8A5A00; --chip:#F3EADB; --input:#FFF1CC; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#EEE6D3; color:var(--ink); padding:32px; }
+  h1 { font-size:22px; margin-bottom:8px; }
+  .lead { color:var(--soft); font-size:13.5px; line-height:1.7; max-width:760px; }
+  h3 { font-size:17px; margin:34px 0 14px; }
+  .tag { font-size:11px; font-weight:800; background:var(--brand); padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .row { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:300px; }
+  .opt h2 { font-size:14.5px; margin:12px 0 6px; }
+  .opt ul { font-size:12.5px; color:var(--soft); line-height:1.7; padding-left:16px; }
+  .note { font-size:12.5px; color:var(--soft); line-height:1.7; max-width:760px; margin-top:14px; }
+  .note b { color:var(--ink); }
+
+  .phone { width:300px; height:620px; border-radius:40px; background:var(--bg); border:8px solid #1d1d1d; padding:40px 12px 0; overflow:hidden; position:relative; }
+  .bar { display:flex; align-items:center; gap:6px; }
+  .round { width:30px; height:30px; border-radius:50%; background:var(--chip); display:grid; place-items:center; font-size:13px; flex:0 0 auto; }
+  .pill { height:30px; padding:0 12px; border-radius:99px; background:var(--brand); font-weight:800; font-size:12px; display:flex; align-items:center; white-space:nowrap; }
+  .spacer { flex:1; }
+  .title { display:flex; align-items:baseline; justify-content:space-between; margin:8px 2px 6px; }
+  .title b { font-size:19px; font-weight:900; }
+  .title span { font-size:12.5px; font-weight:800; color:var(--brandText); }
+
+  .wk { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:6px; }
+  .wk .d { text-align:center; padding:3px 0 5px; border-radius:12px; }
+  .wk .d small { display:block; font-size:9.5px; color:var(--soft); font-weight:700; }
+  .wk .d b { display:block; font-size:13.5px; font-weight:800; line-height:1.4; }
+  .wk .d i { display:block; width:5px; height:5px; border-radius:50%; margin:1px auto 0; background:transparent; }
+  .wk .d.has i { background:var(--soft); }
+  .wk .d.on { background:var(--brand); }
+  .wk .d.on i { background:var(--ink); }
+  .wk .d.today b { color:var(--brandText); }
+  .wk .d.future b { color:var(--faint); }
+
+  .month { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:6px; }
+  .month .w { font-size:9.5px; color:var(--soft); text-align:center; font-weight:700; padding-bottom:2px; }
+  .month .d { text-align:center; padding:2px 0 4px; border-radius:10px; }
+  .month .d b { display:block; font-size:12.5px; font-weight:800; line-height:1.4; }
+  .month .d i { display:block; width:4px; height:4px; border-radius:50%; margin:0 auto; background:transparent; }
+  .month .d.has i { background:var(--soft); }
+  .month .d.on { background:var(--brand); }
+  .month .d.on i { background:var(--ink); }
+  .month .d.today b { color:var(--brandText); }
+  .month .d.future b { color:var(--faint); }
+
+  .people { display:flex; gap:9px; margin:2px 0 8px; overflow:hidden; }
+  .person { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10px; font-weight:700; color:var(--soft); width:40px; flex:0 0 auto; }
+  .face { width:34px; height:34px; border-radius:50%; background:#22356e; color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center; position:relative; }
+  .face.me { background:#F6C9A8; color:var(--ink); }
+  .face.off { opacity:.4; }
+  .face.ring { box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }
+  .face.add { background:transparent; border:1.5px dashed var(--faint); color:var(--brandText); font-size:16px; }
+  .plus { position:absolute; right:-3px; bottom:-3px; width:14px; height:14px; border-radius:50%; background:var(--brand); color:var(--ink); font-size:10px; display:grid; place-items:center; border:1.5px solid var(--bg); }
+  .poke { color:var(--brandText); }
+
+  .seg { display:flex; background:var(--chip); border-radius:99px; padding:3px; gap:2px; margin:2px 0 8px; }
+  .seg span { flex:1; text-align:center; font-size:11.5px; font-weight:700; padding:5px 0; border-radius:99px; color:var(--soft); }
+  .seg span.on { background:var(--brand); color:var(--ink); }
+
+  .big { border-radius:18px; position:relative; background-size:cover; background-position:center; }
+  .big .meta { position:absolute; left:10px; bottom:10px; right:10px; color:#fff; font-size:10.5px; font-weight:800; text-shadow:0 1px 3px #0009; }
+  .big .bubble { display:inline-flex; align-items:center; gap:5px; margin-bottom:5px; }
+  .big .bubble em { font-style:normal; background:#fffe; color:var(--ink); text-shadow:none; padding:3px 9px; border-radius:99px; font-size:10.5px; }
+  .big .bubble .face { width:20px; height:20px; font-size:8px; border:1.5px solid #fff; }
+  .dots { position:absolute; top:10px; left:0; right:0; display:flex; justify-content:center; gap:4px; }
+  .dots b { width:16px; height:3px; border-radius:2px; background:#fff8; }
+  .dots b.on { background:#fff; }
+
+  .chat { position:absolute; left:0; right:0; bottom:66px; height:44px; padding:0 10px; display:flex; align-items:center; gap:4px; background:#FBF3E3; font-size:14px; letter-spacing:3px; }
+  .chat .in { letter-spacing:0; flex:1; height:30px; border-radius:99px; background:var(--input); color:var(--faint); font-size:11px; display:flex; align-items:center; padding:0 10px; margin-left:4px; }
+  .chat .txt { letter-spacing:0; font-size:11px; font-weight:800; color:var(--brandText); margin-left:6px; }
+  .tab { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; display:flex; background:#fff; border-radius:99px; padding:3px; gap:3px; box-shadow:0 4px 16px #0002; }
+  .tab span { padding:7px 16px; border-radius:99px; font-size:11.5px; font-weight:800; color:var(--soft); }
+  .tab span.on { background:var(--brand); color:var(--ink); }
+
+  .mason { columns:2; column-gap:6px; }
+  .mason .t { break-inside:avoid; border-radius:12px; margin-bottom:6px; position:relative; background-size:cover; background-position:center; }
+  .mason .t .m { position:absolute; left:5px; bottom:5px; display:flex; align-items:center; gap:3px; color:#fff; font-size:9.5px; font-weight:800; text-shadow:0 1px 3px #0009; }
+  .mason .t .face { width:16px; height:16px; font-size:7px; border:1px solid #fff; }
+
+  .sheet { position:absolute; left:6px; right:6px; bottom:6px; height:360px; border-radius:26px; background:#fff; padding:14px 12px; box-shadow:0 -6px 24px #0002; }
+  .sheet .hd { display:flex; justify-content:space-between; font-weight:800; font-size:13px; margin-bottom:10px; }
+  .dim { position:absolute; inset:0; background:#0003; }
+
+  .c1 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverBedtime.imageset/cover.jpg); }
+  .c2 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverCafe.imageset/cover.jpg); }
+  .c3 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverCity.imageset/cover.jpg); }
+  .c4 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverMorning.imageset/cover.jpg); }
+  .c5 { background-image:url(../../ios/AISetlog/Assets.xcassets/PresetCoverFood.imageset/cover.jpg); }
+</style>
+</head>
+<body>
+<h1>房间页视图：只留一处看视频</h1>
+<p class="lead">现在的问题：默认、瀑布流、按天、日历四个分段都是满屏的视频小图，切来切去看到的是同一批片子换了个排法。「我的」页本身也已经是按天排的小图格子。只是样稿，App 代码没改。</p>
+
+<h3>A. 一种看片方式 + 一条日期<span class="tag">推荐</span></h3>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div>
+        <div class="d has"><small>一</small><b>23</b><i></i></div>
+        <div class="d"><small>二</small><b>24</b><i></i></div>
+        <div class="d has on today"><small>三</small><b>今</b><i></i></div>
+        <div class="d future"><small>四</small><b>26</b><i></i></div>
+        <div class="d future"><small>五</small><b>27</b><i></i></div>
+        <div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:262px">
+        <div class="meta"><div class="bubble"><span class="face me">·</span><em>hello</em></div><div>❤️ 尼尼 · 16:24 · 晚饭后一起散步</div></div>
+      </div>
+      <div class="chat">❤️😂🥹👍🔥<span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>打开就是今天</h2>
+    <ul><li>分段条换成一周 7 天，有圆点 = 那天有人拍了</li><li>页面从上往下读：哪天 → 谁拍了 → 片子</li><li>大图是房间里唯一放视频的地方</li></ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌄</span></div>
+      <div class="wk">
+        <div class="d has"><small>日</small><b>22</b><i></i></div>
+        <div class="d has on"><small>一</small><b>23</b><i></i></div>
+        <div class="d"><small>二</small><b>24</b><i></i></div>
+        <div class="d has today"><small>三</small><b>今</b><i></i></div>
+        <div class="d future"><small>四</small><b>26</b><i></i></div>
+        <div class="d future"><small>五</small><b>27</b><i></i></div>
+        <div class="d future"><small>六</small><b>28</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me off">·</span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face ring" style="background:#5b7a4a">A</span>Ana</div>
+        <div class="person"><span class="face off">B</span>Bo</div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c3" style="height:262px">
+        <div class="dots"><b class="on"></b><b></b></div>
+        <div class="meta"><div>Ana · 21:10 · 下班路上</div></div>
+      </div>
+      <div class="chat">❤️😂🥹👍🔥<span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>点 23 号：整页换成那天</h2>
+    <ul><li>头像行跟着换：那天拍了的人亮圈</li><li>过去的日子不显示「拍一拍」，灰头像只写名字</li><li>「做 vlog」做的是选中这天</li><li>点「今」回到今天</li></ul>
+  </div>
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b><span>11月 ⌃</span></div>
+      <div class="month">
+        <div class="w">日</div><div class="w">一</div><div class="w">二</div><div class="w">三</div><div class="w">四</div><div class="w">五</div><div class="w">六</div>
+        <div class="d"><b>1</b><i></i></div><div class="d"><b>2</b><i></i></div><div class="d"><b>3</b><i></i></div><div class="d"><b>4</b><i></i></div><div class="d"><b>5</b><i></i></div><div class="d"><b>6</b><i></i></div><div class="d"><b>7</b><i></i></div>
+        <div class="d"><b>8</b><i></i></div><div class="d"><b>9</b><i></i></div><div class="d"><b>10</b><i></i></div><div class="d"><b>11</b><i></i></div><div class="d"><b>12</b><i></i></div><div class="d"><b>13</b><i></i></div><div class="d"><b>14</b><i></i></div>
+        <div class="d"><b>15</b><i></i></div><div class="d"><b>16</b><i></i></div><div class="d has"><b>17</b><i></i></div><div class="d has"><b>18</b><i></i></div><div class="d"><b>19</b><i></i></div><div class="d"><b>20</b><i></i></div><div class="d has"><b>21</b><i></i></div>
+        <div class="d has"><b>22</b><i></i></div><div class="d has"><b>23</b><i></i></div><div class="d"><b>24</b><i></i></div><div class="d has on today"><b>今</b><i></i></div><div class="d future"><b>26</b><i></i></div><div class="d future"><b>27</b><i></i></div><div class="d future"><b>28</b><i></i></div>
+        <div class="d future"><b>29</b><i></i></div><div class="d future"><b>30</b><i></i></div>
+      </div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="big c1" style="height:120px"></div>
+      <div class="chat">❤️😂🥹👍🔥<span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>点「11月」：原地展开整月</h2>
+    <ul><li>不弹窗，日期条直接变成一个月，点某天自动收回</li><li>格子里只有数字和圆点，不放封面</li><li>左右滑换月份</li></ul>
+  </div>
+</div>
+<p class="note"><b>删掉：</b>分段条、瀑布流、按天、日历弹窗。<b>代价：</b>推翻之前「三种视图都留」的决定；想一次扫完所有人的历史片段，要去成片或一天天点。</p>
+
+<h3>B. 三段，但每段长得不一样</h3>
+<div class="row">
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b></div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="seg"><span>今天</span><span class="on">全部</span><span>日历</span></div>
+      <div class="mason">
+        <div class="t c1" style="height:150px"><div class="m"><span class="face">尼</span>16:24</div></div>
+        <div class="t c3" style="height:100px"><div class="m"><span class="face">A</span>23日</div></div>
+        <div class="t c4" style="height:120px"><div class="m"><span class="face me">·</span>22日</div></div>
+        <div class="t c2" style="height:140px"><div class="m"><span class="face">尼</span>21日</div></div>
+        <div class="t c5" style="height:90px"><div class="m"><span class="face">B</span>18日</div></div>
+      </div>
+      <div class="chat">❤️😂🥹👍🔥<span class="in">说点什么…</span><span class="txt">聊天</span></div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>今天 = 大图，全部 = 小图混排，日历 = 只有数字和圆点</h2>
+    <ul><li>三段各管一件事：看今天、扫历史、挑日子</li><li>瀑布流不再按人分列</li><li>日历点某天，跳回「今天」那段显示那天</li><li>代价：还是要学三种模式；「全部」和「我的」页一样是满屏小图</li></ul>
+  </div>
+</div>
+
+<h3>C. 现在的四段不动，只把日历封面换成圆点</h3>
+<div class="row">
+
+  <div class="opt">
+    <div class="phone">
+      <div class="bar"><span class="round">‹</span><span class="spacer"></span><span class="pill">做 vlog</span><span class="round">⋯</span></div>
+      <div class="title"><b>家里的日常</b></div>
+      <div class="people">
+        <div class="person"><span class="face me">·<span class="plus">＋</span></span>你</div>
+        <div class="person"><span class="face ring">尼</span>尼尼</div>
+        <div class="person"><span class="face off">A</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face off">B</span><span class="poke">拍一拍</span></div>
+        <div class="person"><span class="face add">＋</span>邀请</div>
+      </div>
+      <div class="seg"><span>默认</span><span>瀑布流</span><span>按天</span><span class="on">日历</span></div>
+      <div class="big c1" style="height:200px"></div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="hd"><span></span>日历<span style="color:var(--brandText)">完成</span></div>
+        <div class="month">
+          <div class="w">日</div><div class="w">一</div><div class="w">二</div><div class="w">三</div><div class="w">四</div><div class="w">五</div><div class="w">六</div>
+          <div class="d"><b>1</b><i></i></div><div class="d"><b>2</b><i></i></div><div class="d"><b>3</b><i></i></div><div class="d"><b>4</b><i></i></div><div class="d"><b>5</b><i></i></div><div class="d"><b>6</b><i></i></div><div class="d"><b>7</b><i></i></div>
+          <div class="d"><b>8</b><i></i></div><div class="d"><b>9</b><i></i></div><div class="d"><b>10</b><i></i></div><div class="d"><b>11</b><i></i></div><div class="d"><b>12</b><i></i></div><div class="d"><b>13</b><i></i></div><div class="d"><b>14</b><i></i></div>
+          <div class="d"><b>15</b><i></i></div><div class="d"><b>16</b><i></i></div><div class="d has"><b>17</b><i></i></div><div class="d has"><b>18</b><i></i></div><div class="d"><b>19</b><i></i></div><div class="d"><b>20</b><i></i></div><div class="d has"><b>21</b><i></i></div>
+          <div class="d has"><b>22</b><i></i></div><div class="d has"><b>23</b><i></i></div><div class="d"><b>24</b><i></i></div><div class="d has on today"><b>今</b><i></i></div><div class="d future"><b>26</b><i></i></div><div class="d future"><b>27</b><i></i></div><div class="d future"><b>28</b><i></i></div>
+          <div class="d future"><b>29</b><i></i></div><div class="d future"><b>30</b><i></i></div>
+        </div>
+      </div>
+      <div class="tab"><span>相机</span><span class="on">房间</span></div>
+    </div>
+    <h2>改动最小</h2>
+    <ul><li>约半小时</li><li>四段里还是三段是满屏视频，乱的问题没解决</li></ul>
+  </div>
+</div>
+</body>
+</html>

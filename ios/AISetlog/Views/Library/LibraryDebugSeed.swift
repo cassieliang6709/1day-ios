@@ -51,10 +51,21 @@ enum LibraryDebugSeed {
                     avatarURL: nil, moodKind: nil, moodDay: nil)
             }
             store.roomSync.remoteMembers[code] = Dictionary(uniqueKeysWithValues: members.map { ($0.userID, $0) })
-            store.roomSync.remoteClips[code] = [.init(
-                id: "\(code)-clip", day: 1, authorID: "preview-1", authorName: names[1],
-                recordedAt: Date.now.addingTimeInterval(Double(-count * 60)), localURL: sample,
-                overlayText: captions[count - 2])]
+            let pastAuthor = count > 2 ? 2 : 1
+            store.roomSync.remoteClips[code] = [
+                .init(
+                    id: "\(code)-clip", day: 1, authorID: "preview-1", authorName: names[1],
+                    recordedAt: Date.now.addingTimeInterval(Double(-count * 60)), localURL: sample,
+                    overlayText: captions[count - 2]),
+                .init(
+                    id: "\(code)-clip-1", day: 1, authorID: "preview-1", authorName: names[1],
+                    recordedAt: Date.now.addingTimeInterval(-86_400), localURL: sample,
+                    overlayText: captions[(count - 1) % captions.count]),
+                .init(
+                    id: "\(code)-clip-3", day: 1, authorID: "preview-\(pastAuthor)", authorName: names[pastAuthor],
+                    recordedAt: Date.now.addingTimeInterval(-3 * 86_400), localURL: sample,
+                    overlayText: captions[count % captions.count]),
+            ]
         }
     }
     #endif

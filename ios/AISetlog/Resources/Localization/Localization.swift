@@ -420,7 +420,6 @@ enum Strings {
     static var aiWriteLead: String { lang == .chinese ? "说一句今天干嘛，自动列好" : "Say what today is; get a shot list" }
     static var saveToMine: String { lang == .chinese ? "存到我的" : "Save to Mine" }
     static var libraryGrid: String { lang == .chinese ? "网格" : "Grid" }
-    static var libraryCalendar: String { lang == .chinese ? "日历" : "Calendar" }
     static var libraryToday: String { lang == .chinese ? "今天" : "Today" }
     static var libraryYesterday: String { lang == .chinese ? "昨天" : "Yesterday" }
     static func libraryClipCount(_ n: Int) -> String { lang == .chinese ? "\(n) 段" : (n == 1 ? "1 clip" : "\(n) clips") }

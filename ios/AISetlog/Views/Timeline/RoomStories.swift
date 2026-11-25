@@ -5,6 +5,7 @@ struct RoomPeopleRow: View {
     var selected: String?
     var canFilm = true
     var signedOut = false
+    var isToday = true
     let onSelect: (String) -> Void
     let onFilm: () -> Void
     let hasPoked: (String) -> Bool
@@ -32,7 +33,7 @@ struct RoomPeopleRow: View {
     @ViewBuilder
     private func person(_ column: RoomFeed.Column) -> some View {
         let filmed = !column.clips.isEmpty
-        if column.isMine {
+        if column.isMine, isToday {
             Button(action: onFilm) {
                 cell(column, filmed: filmed, label: column.name, showsPlus: true)
             }
@@ -48,6 +49,9 @@ struct RoomPeopleRow: View {
             .accessibilityLabel(column.name)
             .accessibilityAddTraits(selected == column.id ? .isSelected : [])
             .accessibilityIdentifier("room-people-filmed")
+        } else if column.isMine || !isToday {
+            cell(column, filmed: false, label: column.name, showsPlus: false)
+                .accessibilityElement(children: .combine)
         } else {
             let sent = pokedNow.contains(column.id) || hasPoked(column.id)
             Button {
