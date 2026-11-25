@@ -21,8 +21,12 @@ actor ClipThumbnailCache {
     }
 
     private struct Scope: Hashable {
-        let cacheDirectory: URL
-        let sourceDirectory: URL
+        let cacheDirectory: String
+        let sourceDirectory: String
+        init(cacheDirectory: URL, sourceDirectory: URL) {
+            self.cacheDirectory = cacheDirectory.standardizedFileURL.path
+            self.sourceDirectory = sourceDirectory.standardizedFileURL.path
+        }
     }
 
     private struct Request: Hashable {
@@ -86,7 +90,7 @@ actor ClipThumbnailCache {
         Self.storageLock.withLock {
             let scope = Scope(cacheDirectory: directory.standardizedFileURL, sourceDirectory: sourceDirectory.standardizedFileURL)
             Self.epochs[scope] = UUID()
-            let prefix = Self.hash(scope.sourceDirectory.path) + "_"
+            let prefix = Self.hash(scope.sourceDirectory) + "_"
             let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
             for file in files where file.lastPathComponent.hasPrefix(prefix) { try? FileManager.default.removeItem(at: file) }
         }
