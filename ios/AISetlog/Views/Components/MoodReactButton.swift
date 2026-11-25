@@ -3,6 +3,7 @@ import SwiftUI
 struct MoodReactButton: View {
     let reactions: [ClipReaction]
     let myID: String
+    var showsOthers = true
     let onToggle: (String) -> Void
 
     @State private var picking = false
@@ -21,7 +22,9 @@ struct MoodReactButton: View {
 
     var body: some View {
         HStack(spacing: OneDay.Space.xs) {
-            ForEach(others, id: \.self) { ReactionGlyph(key: $0, size: 22) }
+            if showsOthers {
+                ForEach(others, id: \.self) { ReactionGlyph(key: $0, size: 22) }
+            }
             Button { picking = true } label: {
                 Group {
                     if let mine {

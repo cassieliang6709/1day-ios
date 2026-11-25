@@ -7,11 +7,10 @@ struct RoomFeed: View {
     let myID: String
     let nextToFilm: Int?
     var slotTitle: (Int) -> String? = { _ in nil }
-    var isLiked: (DayClip) -> Bool = { _ in false }
     let onPlay: (DayClip) -> Void
     let onFilm: (Int) -> Void
-    var onLike: (DayClip) -> Void = { _ in }
-    var onReply: (DayClip) -> Void = { _ in }
+    var reactions: (DayClip) -> [ClipReaction] = { _ in [] }
+    var onReact: (DayClip, String) -> Void = { _, _ in }
     var hasPoked: (String) -> Bool = { _ in false }
     var onPoke: (String) -> Void = { _ in }
     var showsCalendarControls = true
@@ -84,15 +83,6 @@ struct RoomFeed: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let nextToFilm {
-                Button { onFilm(nextToFilm) } label: {
-                    Label(Strings.roomFeedFilm, systemImage: "camera.fill")
-                }
-                .buttonStyle(.primaryAction)
-                .padding(.bottom, 22)
-                .accessibilityIdentifier("room-feed-film")
-            }
-
             if clips.isEmpty && members.count <= 1 {
                 Text(Strings.roomFeedEmpty)
                     .font(.system(size: 14.5, weight: .medium, design: .rounded))
@@ -102,7 +92,7 @@ struct RoomFeed: View {
                     .padding(.vertical, 32)
             } else {
                 if !clips.isEmpty, showsCalendarControls { calendarControls }
-                waterfall(Self.columns(clips: shownClips, members: members, myID: myID))
+                waterfall(RoomFrames.filmedFirst(Self.columns(clips: shownClips, members: members, myID: myID)))
             }
         }
     }
@@ -138,7 +128,6 @@ struct RoomFeed: View {
             columnHeader(column)
 
             if column.clips.isEmpty {
-                if !column.isMine, day == nil { pokeButton(column) }
                 emptyTile(column)
             }
 
@@ -158,12 +147,6 @@ struct RoomFeed: View {
                 .foregroundStyle(OneDay.ink)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text(Strings.roomColumnClipCount(column.clips.count))
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(OneDay.inkFaint)
-                .lineLimit(1)
-                .fixedSize()
         }
         .padding(.horizontal, 2)
         .padding(.bottom, 2)
@@ -219,33 +202,10 @@ struct RoomFeed: View {
         .accessibilityLabel(tileLabel(clip, in: column, title: title))
         .accessibilityIdentifier("room-clip-tile")
         .overlay(alignment: .topTrailing) {
-            if !column.isMine { reactions(clip) }
-        }
-    }
-
-    private func reactions(_ clip: DayClip) -> some View {
-        VStack(spacing: 2) {
-            Button { onLike(clip) } label: {
-                Image(systemName: isLiked(clip) ? "heart.fill" : "heart")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(isLiked(clip) ? Color.red : .white)
-                    .frame(width: 38, height: 38)
-                    .contentShape(Rectangle())
+            if !column.isMine {
+                MoodReactButton(reactions: reactions(clip), myID: myID, showsOthers: false) { onReact(clip, $0) }
             }
-            .accessibilityLabel(Strings.roomTileLike)
-            .accessibilityAddTraits(isLiked(clip) ? .isSelected : [])
-            Button { onReply(clip) } label: {
-                Image(systemName: "arrowshape.turn.up.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 38, height: 38)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel(Strings.roomTileReply)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
-        .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
-        .padding(2)
     }
 
     private func tileLabel(_ clip: DayClip, in column: Column, title: String?) -> String {
@@ -257,31 +217,30 @@ struct RoomFeed: View {
 
     private func emptyTile(_ column: Column) -> some View {
         let canFilm = column.isMine && nextToFilm != nil
-        return Button {
-            if canFilm, let nextToFilm { onFilm(nextToFilm) }
-        } label: {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(OneDay.surfaceSoft)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(OneDay.hairline, style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
-                }
-                .aspectRatio(Self.tileAspect, contentMode: .fit)
-                .overlay {
-                    VStack(spacing: 6) {
-                        if canFilm {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 20, weight: .bold))
+        return RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous)
+            .fill(OneDay.surfaceSoft)
+            .overlay {
+                RoundedRectangle(cornerRadius: OneDay.Radius.tile, style: .continuous)
+                    .strokeBorder(OneDay.hairline, style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+            }
+            .aspectRatio(Self.tileAspect, contentMode: .fit)
+            .overlay {
+                if canFilm, let nextToFilm {
+                    Button { onFilm(nextToFilm) } label: {
+                        VStack(spacing: OneDay.Space.xs) {
+                            Image(systemName: "camera.fill").font(OneDay.Font.headline)
+                            Text(Strings.roomFeedFilm).font(OneDay.Font.caption)
                         }
-                        Text(canFilm ? Strings.roomFeedFilm : Strings.roomColumnEmpty)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(OneDay.brandText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
                     }
-                    .foregroundStyle(canFilm ? OneDay.brandText : OneDay.inkFaint)
+                    .buttonStyle(.plain)
+                } else if !column.isMine, day == nil {
+                    pokeButton(column).padding(.horizontal, OneDay.Space.s)
                 }
-        }
-        .buttonStyle(.plain)
-        .disabled(!canFilm)
-        .accessibilityElement(children: .combine)
+            }
+            .accessibilityElement(children: .contain)
     }
 
     private func pokeButton(_ column: Column) -> some View {

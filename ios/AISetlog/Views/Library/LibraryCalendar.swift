@@ -35,7 +35,7 @@ struct LibraryCalendar: View {
                         .foregroundStyle(OneDay.inkFaint)
                 }
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, date in
-                    if let date { dayCell(date) } else { Color.clear.frame(height: 52) }
+                    if let date { dayCell(date) } else { Color.clear.frame(height: 64) }
                 }
             }
         }
@@ -65,7 +65,7 @@ struct LibraryCalendar: View {
                     }
                 dayMark(cover: cover, mood: mood(on: date))
             }
-            .frame(maxWidth: .infinity, minHeight: 52)
+            .frame(maxWidth: .infinity, minHeight: 64)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -83,20 +83,20 @@ struct LibraryCalendar: View {
             Image(mood.imageName)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 19, height: 19)
+                .frame(width: Self.markSize, height: Self.markSize)
                 .accessibilityLabel(mood.label)
         } else if let cover {
             Color.clear
                 .overlay { ClipThumbnail(url: cover.url, refreshToken: cover.recordedAt) }
-                .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
-                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                .frame(width: 14, height: 14)
-                .frame(height: 19)
+                .clipShape(RoundedRectangle(cornerRadius: OneDay.Space.s, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OneDay.Space.s, style: .continuous).strokeBorder(.white, lineWidth: 1.5))
+                .frame(width: Self.markSize, height: Self.markSize)
         } else {
-            Color.clear.frame(width: 14, height: 19)
+            Color.clear.frame(width: Self.markSize, height: Self.markSize)
         }
     }
+
+    private static let markSize: CGFloat = 28
 
     private var cells: [Date?] {
         guard let range = calendar.range(of: .day, in: .month, for: month) else { return [] }

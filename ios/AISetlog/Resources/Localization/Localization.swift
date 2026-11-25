@@ -406,8 +406,6 @@ enum Strings {
     static func roomTileLastFilmed(daysAgo: Int) -> String {
         lang == .chinese ? "\(daysAgo) 天没拍了" : "Last filmed \(daysAgo)d ago"
     }
-    static var roomTileLike: String { lang == .chinese ? "点赞" : "Like" }
-    static var roomTileReply: String { lang == .chinese ? "回复" : "Reply" }
     static var roomTilePoke: String { lang == .chinese ? "拍一拍" : "Poke" }
     static var roomTilePoked: String { lang == .chinese ? "已拍" : "Poked" }
     static var skinTitle: String { lang == .chinese ? "皮肤" : "Theme" }
@@ -688,6 +686,7 @@ enum Strings {
 
     static var roomNamePlaceholder: String { lang == .chinese ? "给房间起个名字" : "Name this room" }
     static var editPlan: String { lang == .chinese ? "编辑计划" : "Edit plan" }
+    static var editRoom: String { lang == .chinese ? "编辑房间" : "Edit room" }
     static var planTitle: String { lang == .chinese ? "计划名称" : "Plan name" }
     static var captureTitles: String { lang == .chinese ? "拍摄标题" : "Capture titles" }
 
@@ -1067,13 +1066,6 @@ enum Strings {
         return lang == .chinese ? "\(count) 人在这个房间" : "\(count) people in this room"
     }
 
-    static func roomColumnClipCount(_ count: Int) -> String {
-        if lang == .chinese { return "\(count) 段" }
-        return count == 1 ? "1 clip" : "\(count) clips"
-    }
-    static var roomColumnEmpty: String {
-        lang == .chinese ? "还没拍过" : "Nothing yet"
-    }
     static func roomReminderBody(prompt: String?) -> String {
         guard let prompt, !prompt.isEmpty else {
             return lang == .chinese ? "房间在等你拍一段" : "Your room is waiting for a clip"

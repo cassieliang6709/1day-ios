@@ -319,17 +319,8 @@ struct StoryTimelineView: View {
                             targetAuthorID: clip.authorID ?? myID
                         ).comments.max { $0.createdAt < $1.createdAt }
                     },
-                    reactions: { clip in
-                        store.interactions(
-                            for: challengeID, day: clip.day,
-                            targetAuthorID: clip.authorID ?? myID
-                        ).reactions
-                    },
-                    onReact: { clip, key in
-                        store.toggleReaction(
-                            key, day: clip.day, challengeID: challengeID,
-                            targetAuthorID: clip.authorID ?? myID)
-                    },
+                    reactions: { reactions(for: $0, myID: myID) },
+                    onReact: { react($0, $1, myID: myID) },
                     signedOut: signedOut,
                     onSignIn: { showSignIn = true })
             case .columns:
@@ -339,10 +330,12 @@ struct StoryTimelineView: View {
                         clips: shownClips,
                         members: shownMembers.isEmpty ? members : shownMembers,
                         myID: myID,
-                        nextToFilm: nil,
+                        nextToFilm: agenda.suggested ?? agenda.openToMe.first,
                         slotTitle: { slotTitle(for: $0) },
                         onPlay: { clip in sheet = .open(clip) },
                         onFilm: { day in sheet = .record(day: day) },
+                        reactions: { reactions(for: $0, myID: myID) },
+                        onReact: { react($0, $1, myID: myID) },
                         hasPoked: { id in
                             store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
                         },
@@ -358,7 +351,15 @@ struct StoryTimelineView: View {
                         clips: shownClips,
                         members: shownMembers.isEmpty ? members : shownMembers,
                         myID: myID,
-                        onPlay: { clip in sheet = .open(clip) })
+                        onPlay: { clip in sheet = .open(clip) },
+                        reactions: { reactions(for: $0, myID: myID) },
+                        onReact: { react($0, $1, myID: myID) },
+                        hasPoked: { id in
+                            store.hasPokedToday(challengeID: challengeID, targetAuthorID: id)
+                        },
+                        onPoke: { id in
+                            store.poke(challengeID: challengeID, targetAuthorID: id)
+                        })
                 }
                 .scrollIndicators(.hidden)
             }
@@ -461,12 +462,14 @@ struct StoryTimelineView: View {
                 }
 
                 if !challenge.isTimeOnly {
-                    Button(Strings.editPlan, systemImage: "pencil") { showEditPlan = true }
+                    Button(challenge.isShared ? Strings.editRoom : Strings.editPlan, systemImage: "pencil") {
+                        showEditPlan = true
+                    }
                 }
 
                 Button(
                     challenge.isShared ? Strings.leaveRoom : Strings.deleteChallenge,
-                    systemImage: "trash",
+                    systemImage: challenge.isShared ? "rectangle.portrait.and.arrow.right" : "trash",
                     role: .destructive
                 ) {
                     askBeforeDeleting = true
@@ -703,6 +706,14 @@ struct StoryTimelineView: View {
 }
 
 extension StoryTimelineView {
+    private func reactions(for clip: DayClip, myID: String) -> [ClipReaction] {
+        store.interactions(for: challengeID, day: clip.day, targetAuthorID: clip.authorID ?? myID).reactions
+    }
+
+    private func react(_ clip: DayClip, _ key: String, myID: String) {
+        store.toggleReaction(key, day: clip.day, challengeID: challengeID, targetAuthorID: clip.authorID ?? myID)
+    }
+
     static func everyoneFilmedToday(_ columns: [RoomFeed.Column]) -> Bool {
         columns.count > 1 && columns.allSatisfy { column in
             column.clips.contains { $0.recordedAt.map(Calendar.current.isDateInToday) ?? false }

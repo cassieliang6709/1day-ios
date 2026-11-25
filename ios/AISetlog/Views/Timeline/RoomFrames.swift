@@ -21,6 +21,13 @@ struct RoomFrames: View {
     private static let minimumFrameHeight: CGFloat = 150
     private static let spacing: CGFloat = 12
 
+    static func filmedFirst(_ columns: [RoomFeed.Column]) -> [RoomFeed.Column] {
+        columns.enumerated().sorted { a, b in
+            let rank: (RoomFeed.Column) -> Int = { $0.isMine ? 0 : ($0.clips.isEmpty ? 2 : 1) }
+            return rank(a.element) != rank(b.element) ? rank(a.element) < rank(b.element) : a.offset < b.offset
+        }.map(\.element)
+    }
+
     static func grid(for count: Int) -> (columns: Int, rows: Int) {
         switch count {
         case ...1: return (1, 1)
@@ -32,7 +39,7 @@ struct RoomFrames: View {
     }
 
     private var columns: [RoomFeed.Column] {
-        RoomFeed.columns(clips: clips, members: members, myID: myID)
+        Self.filmedFirst(RoomFeed.columns(clips: clips, members: members, myID: myID))
     }
 
     var body: some View {
@@ -387,16 +394,10 @@ struct RoomPersonPage: View {
                     HStack(spacing: 10) {
                         MemberFace(id: column.id, name: column.isMine ? nil : column.name, size: 44,
                                    isYou: column.isMine)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(column.name)
-                                .font(.system(size: 24, weight: .heavy, design: .rounded))
-                                .foregroundStyle(OneDay.ink)
-                                .lineLimit(1)
-                            Text(Strings.roomColumnClipCount(column.clips.count))
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(OneDay.inkFaint)
-                        }
+                        Text(column.name)
+                            .font(.system(size: 24, weight: .heavy, design: .rounded))
+                            .foregroundStyle(OneDay.ink)
+                            .lineLimit(1)
                     }
 
                     if !column.clips.isEmpty {
