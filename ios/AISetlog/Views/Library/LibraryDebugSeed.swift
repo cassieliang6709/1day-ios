@@ -10,6 +10,7 @@ enum LibraryDebugSeed {
         seedRoomPreviewsIfAsked(store: store)
         #endif
         let defaults = UserDefaults.standard
+        seedStagedClipsIfAsked(drafts: drafts, moods: moods)
         guard defaults.bool(forKey: "debugSeedLibrary"), !defaults.bool(forKey: doneKey),
               let sample = Bundle.main.url(forResource: "sample-film", withExtension: "mp4")
         else { return }
@@ -28,6 +29,31 @@ enum LibraryDebugSeed {
         moods?.setMood(.happy)
         if let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now) {
             moods?.setMood(.calm, on: yesterday)
+        }
+    }
+
+    private static func seedStagedClipsIfAsked(drafts: ClipDraftStore, moods: MoodStore?) {
+        let defaults = UserDefaults.standard
+        let key = "debugSeedLibraryClips"
+        guard let folder = defaults.string(forKey: key), !folder.isEmpty,
+              defaults.string(forKey: key + ".done") != folder
+        else { return }
+        let clips = DemoRoomStaging(clipFolder: folder, showsChrome: false).clipURLs()
+        guard !clips.isEmpty else { return }
+        defaults.set(folder, forKey: key + ".done")
+        let perDay = 3
+        for (index, url) in clips.enumerated() {
+            let daysAgo = index / perDay
+            let hoursAgo = Double(index % perDay) * 3 + 1
+            let day = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now) ?? .now
+            let at = day.addingTimeInterval(-hoursAgo * 3600)
+            _ = try? drafts.keep(tempURL: copy(url), orientation: .portrait, recordedAt: at)
+        }
+        let faces: [Mood] = [.happy, .calm, .happy, .tired]
+        for (offset, mood) in faces.enumerated() {
+            if let day = Calendar.current.date(byAdding: .day, value: -offset, to: .now) {
+                moods?.setMood(mood, on: day)
+            }
         }
     }
 

@@ -55,6 +55,11 @@ final class AccountStore {
             revalidate(saved.id)
             if !hasSession { restoreGoogleSession(for: saved.id) }
         }
+        #if DEBUG
+        if account == nil, let tester = defaults.string(forKey: "debugTester"), !tester.isEmpty {
+            signInAsTester(named: tester)
+        }
+        #endif
         sessionObserver = NotificationCenter.default.addObserver(
             forName: .oneDaySessionEnded, object: nil, queue: .main
         ) { [weak self] _ in
