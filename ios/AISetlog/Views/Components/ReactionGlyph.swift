@@ -13,7 +13,7 @@ struct ReactionGlyph: View {
                 .accessibilityLabel(mood.label)
         } else {
             Text(key)
-                .font(OneDay.Font.headline)
+                .font(size >= 24 ? OneDay.Font.title : OneDay.Font.headline)
                 .frame(width: size, height: size)
         }
     }

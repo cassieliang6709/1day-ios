@@ -9,7 +9,7 @@ struct ClipReaction: Codable, Identifiable, Equatable {
     var id: String { "\(authorID)|\(emoji)" }
 
     static let moodPrefix = "mood:"
-    static let palette = Mood.allCases.map { moodPrefix + $0.rawValue }
+    static let palette = ["❤️", "😂", "🥹", "👍", "🔥"]
 
     static func mood(for key: String) -> Mood? {
         guard key.hasPrefix(moodPrefix) else { return nil }

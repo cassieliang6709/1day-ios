@@ -227,10 +227,14 @@ private struct PersonFrame: View {
                         }
                         .frame(maxWidth: 260, alignment: .leading)
                     }
-                        Text(Self.metaLine(clip, name: column.name, title: title))
-                            .font(OneDay.Font.caption)
-                            .lineLimit(1)
-                            .padding(.trailing, 52)
+                        HStack(spacing: OneDay.Space.xs) {
+                            ForEach(Self.reactionKeys(reactions(clip)), id: \.self) {
+                                ReactionGlyph(key: $0, size: 18)
+                            }
+                            Text(Self.metaLine(clip, name: column.name, title: title))
+                                .font(OneDay.Font.caption)
+                                .lineLimit(1)
+                        }
                     }
                     .padding(OneDay.Space.m)
                 }
@@ -245,6 +249,12 @@ private struct PersonFrame: View {
              clip.overlayText]
                 .compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier("room-clip-tile")
+    }
+
+    static func reactionKeys(_ reactions: [ClipReaction]) -> [String] {
+        var keys: [String] = []
+        for reaction in reactions where !keys.contains(reaction.emoji) { keys.append(reaction.emoji) }
+        return Array(keys.prefix(3))
     }
 
     static func metaLine(_ clip: DayClip, name: String, title: String?) -> String {
