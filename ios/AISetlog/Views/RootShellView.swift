@@ -25,6 +25,7 @@ struct RootShellView: View {
     @State private var surface: Surface = .friends
     @State private var returnTab: Surface = .friends
     @State private var composeTogether = false
+    @State private var showsRoomComposer = false
     @State private var roomLaunchAction: HomeLaunchAction?
     @State private var draftsRequests = 0
 
@@ -148,6 +149,17 @@ struct RootShellView: View {
             Text(Strings.keepClipFootnote)
         }
         .sheet(isPresented: $showDrafts) { ClipDraftsView() }
+        .sheet(isPresented: $showsRoomComposer) {
+            StoryComposerView(
+                onCreate: { id in
+                    showsRoomComposer = false
+                    surface = .friends
+                    roomLaunchAction = .openStory(id)
+                },
+                onClose: { showsRoomComposer = false },
+                startsWithFriends: true,
+                compact: true)
+        }
         .sheet(isPresented: $showsCheckIn) {
             DailyCheckInSheet(prompt: checkInPrompt, onFilm: checkInOffersFilm ? { openCamera() } : nil)
         }
@@ -366,6 +378,10 @@ struct RootShellView: View {
             returnTab = .plans
             guardedSurface.wrappedValue = .plans
             launchAction = .openStory(plan.id)
+            return
+        }
+        if together {
+            showsRoomComposer = true
             return
         }
         if surface == .plans || surface == .friends { returnTab = surface }

@@ -4,6 +4,7 @@ struct StoryComposerView: View {
     var onCreate: (UUID) -> Void = { _ in }
     var onClose: (() -> Void)? = nil
     var startsWithFriends = false
+    var compact = false
 
     @Environment(ChallengeStore.self) private var store
     @Environment(AccountStore.self) private var account
@@ -22,21 +23,14 @@ struct StoryComposerView: View {
     @State private var creating = false
     @State private var errorText: String?
     @State private var showSignIn = false
+    @State private var compactHeight: CGFloat = 280
 
     @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     private var isTimeOnly: Bool { entry == .byTime }
 
     var body: some View {
-        ZStack {
-            OneDayCanvas(seed: 1)
-
-            VStack(spacing: 0) {
-                topBar
-                page
-                footer
-            }
-        }
+        content
         .sheet(isPresented: $showGuided) {
             GuidedMomentsView(initialMoments: moments, onDone: applyCustomDraft)
         }
@@ -51,6 +45,37 @@ struct StoryComposerView: View {
         }
     }
 
+
+    @ViewBuilder
+    private var content: some View {
+        if compact {
+            VStack(alignment: .leading, spacing: OneDay.Space.l) {
+                Text(withFriends ? Strings.newRoomRow : Strings.todaysPlanTitle)
+                    .font(OneDay.Font.title)
+                    .foregroundStyle(OneDay.ink)
+                    .padding(.horizontal, ComposerLayout.margin)
+                    .accessibilityIdentifier("composer-question")
+                setup
+                footer
+            }
+            .padding(.top, OneDay.Space.xl)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { compactHeight = $0 }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .presentationDetents([.height(compactHeight)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(OneDay.surface)
+        } else {
+            ZStack {
+                OneDayCanvas(seed: 1)
+                VStack(spacing: 0) {
+                    topBar
+                    page
+                    footer
+                }
+            }
+        }
+    }
 
     private var topBar: some View {
         HStack(spacing: 12) {
