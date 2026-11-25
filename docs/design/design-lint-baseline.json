@@ -357,11 +357,18 @@
   "spacing": 8
  },
  "Timeline/RoomFrames.swift": {
-  "font": 14,
+  "font": 4,
   "hex": 0,
-  "padding": 15,
+  "padding": 5,
+  "radius": 0,
+  "spacing": 4
+ },
+ "Timeline/RoomPersonPage.swift": {
+  "font": 4,
+  "hex": 0,
+  "padding": 6,
   "radius": 2,
-  "spacing": 16
+  "spacing": 8
  },
  "Timeline/RoomStories.swift": {
   "font": 0,
