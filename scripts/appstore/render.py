@@ -11,13 +11,13 @@ WIDTH, HEIGHT = 1320, 2868
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><style>
 * {{ box-sizing:border-box; margin:0; padding:0; }}
 html, body {{ width:{w}px; height:{h}px; overflow:hidden; }}
-body {{ background:#FFCB45; font-family:-apple-system,"PingFang SC","SF Pro Rounded",sans-serif; color:#3A2B1B; position:relative; }}
-.head {{ position:absolute; left:110px; right:110px; top:190px; font-size:118px; font-weight:900; line-height:1.18; letter-spacing:2px; }}
-.sub {{ position:absolute; left:114px; right:110px; top:{sub_top}px; font-size:52px; font-weight:700; color:#7A4E00; line-height:1.35; }}
+body {{ background:#FFCB45; font-family:"Arial Rounded MT Bold","Hiragino Sans GB","Hiragino Sans",sans-serif; color:#3A2B1B; position:relative; }}
+.head {{ position:absolute; left:110px; right:110px; top:190px; font-size:124px; font-weight:900; line-height:1.18; letter-spacing:1px; }}
+.sub {{ position:absolute; left:114px; right:110px; top:{sub_top}px; font-size:56px; font-weight:800; color:#6B4300; line-height:1.35; }}
 .phone {{ position:absolute; left:210px; top:{phone_top}px; width:900px; border-radius:128px; overflow:hidden;
   border:26px solid #1d1d1d; background:#000; transform:rotate(-5deg); box-shadow:0 70px 140px rgba(0,0,0,.28); }}
 .phone img {{ display:block; width:100%; }}
-.pop {{ position:absolute; background:#fff; border-radius:56px; padding:30px 42px; font-size:50px; font-weight:800;
+.pop {{ position:absolute; background:#fff; border-radius:56px; padding:30px 42px; font-size:50px; font-weight:900;
   box-shadow:0 30px 70px rgba(0,0,0,.22); display:flex; align-items:center; gap:22px; white-space:nowrap; }}
 .pop .face {{ width:76px; height:76px; border-radius:50%; background:#22356e; color:#fff; font-size:38px; font-weight:900;
   display:grid; place-items:center; flex:0 0 auto; }}
