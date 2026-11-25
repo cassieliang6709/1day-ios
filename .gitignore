@@ -41,3 +41,4 @@ ios/release/*/*App-Store-Kit-*.zip
 
 __pycache__/
 *.pyc
+docs/design/appstore-draft/
