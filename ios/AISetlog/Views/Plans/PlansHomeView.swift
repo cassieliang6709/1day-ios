@@ -127,18 +127,9 @@ struct PlansHomeView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
-        .sheet(isPresented: Binding(
-            get: { afterSignIn != nil },
-            set: { if !$0 { afterSignIn = nil } }
-        )) {
-            SignInView { afterSignIn?() }
-                .presentationDetents([.medium])
-                .onDisappear {
-                    guard afterSignIn == nil, !joinCode.isEmpty,
-                          !account.isSignedIn
-                    else { return }
-                    showJoin = true
-                }
+        .signInGate($afterSignIn) {
+            guard !joinCode.isEmpty, !account.isSignedIn else { return }
+            showJoin = true
         }
         .alert(Strings.couldntJoin, isPresented: Binding(
             get: { errorText != nil }, set: { if !$0 { errorText = nil } }

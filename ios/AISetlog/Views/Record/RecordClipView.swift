@@ -26,6 +26,7 @@ struct RecordClipView: View {
     @State private var overlayText = ""
     @State private var showSavePicker = false
     @State private var sendTo: Set<UUID> = []
+    @State private var afterSignIn: (() -> Void)?
     @State private var showNoPlaceExits = false
     @State private var toast: String?
     @State private var freeformOrientation: Challenge.Orientation = .portrait
@@ -164,6 +165,7 @@ struct RecordClipView: View {
 
     private func observingTake(_ content: some View) -> some View {
         content
+        .signInGate($afterSignIn)
         .onChange(of: effectiveOrientation) { _, newValue in
             recorder.orientation = manualSideways ? .landscape : newValue
         }
@@ -571,6 +573,10 @@ struct RecordClipView: View {
         let rooms = sendTo.intersection(eligible)
         guard !rooms.isEmpty else {
             keepAsDraft(then: next)
+            return
+        }
+        guard account.isSignedIn else {
+            afterSignIn = { finishFreeTake(then: next) }
             return
         }
         let at = recorder.recordedAt ?? .now

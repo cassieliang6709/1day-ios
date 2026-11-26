@@ -65,6 +65,34 @@ struct SignInView: View {
     }
 }
 
+extension View {
+    func signInGate(
+        _ pending: Binding<(() -> Void)?>, onCancel: (() -> Void)? = nil
+    ) -> some View {
+        modifier(SignInGate(pending: pending, onCancel: onCancel))
+    }
+}
+
+private struct SignInGate: ViewModifier {
+    @Binding var pending: (() -> Void)?
+    var onCancel: (() -> Void)?
+    @State private var next: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        content.sheet(
+            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+            onDismiss: {
+                let run = next
+                next = nil
+                if let run { run() } else { onCancel?() }
+            }
+        ) {
+            SignInView { next = pending }
+                .presentationDetents([.medium])
+        }
+    }
+}
+
 struct AppleSignInButton: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.colorScheme) private var colorScheme

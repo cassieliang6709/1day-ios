@@ -4,8 +4,10 @@ struct ClipDraftsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
+    @Environment(AccountStore.self) private var account
 
     @State private var filing: ClipDraft?
+    @State private var afterSignIn: (() -> Void)?
     @State private var pendingDelete: ClipDraft?
     @State private var blocked: DraftFilingBlocked?
     @State private var toast: String?
@@ -58,6 +60,7 @@ struct ClipDraftsView: View {
                 }
                 Button(Strings.cancel, role: .cancel) { pendingDelete = nil }
             }
+            .signInGate($afterSignIn)
             .sheet(item: $filing) { draft in
                 ClipFilingSheet(candidates: candidates(for: draft)) { chosen in
                     archive(draft, to: chosen)
@@ -138,8 +141,10 @@ struct ClipDraftsView: View {
 
             Menu {
                 Button(Strings.archiveDraft, systemImage: "tray.and.arrow.down") {
-                    if canFile {
+                    if canFile, account.isSignedIn {
                         filing = draft
+                    } else if canFile {
+                        afterSignIn = { filing = draft }
                     } else {
                         blocked = filingBlocked(for: draft)
                     }
