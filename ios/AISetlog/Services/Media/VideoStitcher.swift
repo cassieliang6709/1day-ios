@@ -896,9 +896,8 @@ enum VideoStitcher {
         parentLayer.addSublayer(pill)
     }
 
-    private static func addCaption(
-        _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize,
-        showAuthorMark: Bool
+    private static func addDayPill(
+        _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize
     ) {
         let label = caption.label?.uppercased() ?? "DAY \(caption.day)"
         let maxWidth = renderSize.width * 0.82
@@ -955,6 +954,17 @@ enum VideoStitcher {
         pill.add(anim, forKey: "captionWindow")
 
         parentLayer.addSublayer(pill)
+    }
+
+    private static func addCaption(
+        _ caption: CaptionWindow, to parentLayer: CALayer, renderSize: CGSize,
+        showAuthorMark: Bool
+    ) {
+        if caption.label != nil || !caption.hasCameraStamp {
+            addDayPill(caption, to: parentLayer, renderSize: renderSize)
+        }
+        let duration = max(caption.end - caption.start, 0.1)
+        let edge = min(0.2 / duration, 0.15)
         addStampDecor(
             for: caption,
             to: parentLayer,
