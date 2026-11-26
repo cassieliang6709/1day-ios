@@ -42,12 +42,19 @@ enum LibraryDebugSeed {
         guard !clips.isEmpty else { return }
         defaults.set(folder, forKey: key + ".done")
         let perDay = 3
-        for (index, url) in clips.enumerated() {
-            let daysAgo = index / perDay
-            let hoursAgo = Double(index % perDay) * 3 + 1
-            let day = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now) ?? .now
-            let at = day.addingTimeInterval(-hoursAgo * 3600)
-            _ = try? drafts.keep(tempURL: copy(url), orientation: .portrait, recordedAt: at)
+        Task { @MainActor in
+            for (index, url) in clips.enumerated() {
+                let daysAgo = index / perDay
+                let hoursAgo = Double(index % perDay) * 3 + 1
+                let day = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now) ?? .now
+                let at = day.addingTimeInterval(-hoursAgo * 3600)
+                var clip = copy(url)
+                if !(await CameraStyleBaker.hasCameraStamp(clip)) {
+                    clip = await CameraStyleBaker.bake(
+                        clip, style: .camcorder, orientation: .portrait, recordedAt: at)
+                }
+                _ = try? drafts.keep(tempURL: clip, orientation: .portrait, recordedAt: at)
+            }
         }
         let faces: [Mood] = [.happy, .calm, .happy, .tired]
         for (offset, mood) in faces.enumerated() {
