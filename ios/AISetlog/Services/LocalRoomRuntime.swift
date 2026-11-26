@@ -5,6 +5,8 @@ struct DemoRoomNaming {
     var title: String?
     var moments: [String]
     var members: [String]
+    var spreadsDays = false
+    var mineFilmedToday = true
     var orientation: Challenge.Orientation = .portrait
 
     static func fromLaunchArguments(_ defaults: UserDefaults = .standard) -> DemoRoomNaming {
@@ -12,6 +14,10 @@ struct DemoRoomNaming {
             title: trimmed(defaults.string(forKey: "demoRoomTitle")),
             moments: list(defaults.string(forKey: "demoRoomMoments")),
             members: list(defaults.string(forKey: "demoRoomMembers")),
+            spreadsDays: defaults.bool(forKey: "demoRoomSpreadDays"),
+            mineFilmedToday: defaults.object(forKey: "demoRoomMineToday") == nil
+                ? true
+                : defaults.bool(forKey: "demoRoomMineToday"),
             orientation: Challenge.Orientation(
                 rawValue: defaults.string(forKey: "demoRoomOrientation") ?? "") ?? .portrait)
     }
@@ -117,9 +123,17 @@ final class LocalRoomRuntime {
             for (slot, _) in moments.enumerated() {
                 let day = slot + 1
                 var ownFile: String?
-                var ownFilmed = Date()
+                var ownFilmed: Date?
                 for index in 0..<memberCount {
                     try Task.checkCancellation()
+                    let daysBack = moments.count - 1 - slot
+                    let filmed = naming.spreadsDays
+                        ? Calendar.current.date(byAdding: .day, value: -daysBack, to: Date())!
+                            .addingTimeInterval(-Double(index * 7) * 60)
+                        : Date().addingTimeInterval(-Double(daysBack * 95 + index * 7) * 60)
+                    if index == 0, !naming.mineFilmedToday, Calendar.current.isDateInToday(filmed) {
+                        continue
+                    }
                     let authorID = index == 0 ? chat.scope.accountID : "demo-friend-\(index)"
                     let name = naming.member(index)
                         ?? (chinese ? "示例成员 \(index + 1)" : "Sample member \(index + 1)")
@@ -140,8 +154,6 @@ final class LocalRoomRuntime {
                     guard let file = storage.storeClip(from: source, day: day, challengeID: id)
                     else { throw Failure.storage }
                     if index == 0 { ownFile = file }
-                    let filmed = Date().addingTimeInterval(
-                        -Double((moments.count - 1 - slot) * 95 + index * 7) * 60)
                     if index == 0 { ownFilmed = filmed }
                     remote.append(.init(id: "\(id)-\(authorID)-day\(day)", day: day, authorID: authorID,
                                         authorName: name, recordedAt: filmed,
