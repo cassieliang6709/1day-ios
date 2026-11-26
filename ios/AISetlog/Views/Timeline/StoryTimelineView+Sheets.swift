@@ -26,7 +26,7 @@ extension StoryTimelineView {
 
         case .preview(let day, let targetAuthorID):
             let deck = ClipDeck(
-                clips: store.recordedClips(for: challengeID),
+                clips: unlockedClips,
                 momentCount: challenge?.cards.count ?? 0,
                 myID: account.account?.id ?? RoomProgress.soloAuthorID)
             if let start = deck.index(ofDay: day, authorID: targetAuthorID) {
@@ -50,7 +50,7 @@ extension StoryTimelineView {
     @ViewBuilder
     func clipReview(day: Int, authorID: String?, takeID: UUID?) -> some View {
         let deck = ClipDeck(
-            clips: store.recordedClips(for: challengeID),
+            clips: unlockedClips,
             momentCount: challenge?.cards.count ?? 0,
             myID: account.account?.id ?? RoomProgress.soloAuthorID)
         if let start = deck.index(ofDay: day, authorID: authorID, takeID: takeID) {

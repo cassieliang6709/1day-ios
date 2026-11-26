@@ -15,6 +15,8 @@ struct PersonFrame: View {
     let onReact: (DayClip, String) -> Void
     let signedOut: Bool
     let onSignIn: () -> Void
+    let isLocked: (DayClip) -> Bool
+    let onUnlock: () -> Void
 
     @State private var page: String?
     @State private var pokedNow = false
@@ -35,7 +37,7 @@ struct PersonFrame: View {
         .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
         .overlay(alignment: .bottom) { pageDots }
         .contextMenu {
-            if let clip = onScreenClip, !column.isMine {
+            if let clip = onScreenClip, !column.isMine, !isLocked(clip) {
                 Picker(Strings.reactLabel, selection: Binding(
                     get: { myReaction(clip) ?? "" },
                     set: { if !$0.isEmpty { onReact(clip, $0) } })) {
@@ -105,6 +107,19 @@ struct PersonFrame: View {
 
     @ViewBuilder
     private func clipPage(_ clip: DayClip) -> some View {
+        if isLocked(clip) {
+            RoomLockedFace(
+                clip: clip,
+                meta: [column.name, clip.recordedAt?.formatted(.roomClock)]
+                    .compactMap { $0 }.joined(separator: " · "),
+                onUnlock: onUnlock)
+        } else {
+            unlockedPage(clip)
+        }
+    }
+
+    @ViewBuilder
+    private func unlockedPage(_ clip: DayClip) -> some View {
         let title = slotTitle(clip.day)
         let face = clipFace(clip, title: title)
             .overlay {

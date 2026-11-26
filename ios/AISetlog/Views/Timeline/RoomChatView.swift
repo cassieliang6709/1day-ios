@@ -45,7 +45,8 @@ struct RoomChatView: View {
                 moment: moment,
                 source: sessionSource,
                 clips: RoomChatTimeline.clipEvents(
-                    from: store.recordedClips(for: challengeID),
+                    from: RoomPeek(clips: store.recordedClips(for: challengeID), myID: me.id, now: .now)
+                        .visible(store.recordedClips(for: challengeID)),
                     myID: me.id,
                     momentTitle: momentTitle),
                 momentTitle: momentTitle,

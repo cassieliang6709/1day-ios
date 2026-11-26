@@ -186,7 +186,7 @@ struct StoryTimelineView: View {
             }
         }
         .navigationDestination(item: $personPage) { id in
-            if let column = RoomFeed.columns(clips: clips, members: members, myID: myID)
+            if let column = RoomFeed.columns(clips: unlockedClips, members: members, myID: myID)
                 .first(where: { $0.id == id }) {
                 RoomPersonPage(
                     column: column,

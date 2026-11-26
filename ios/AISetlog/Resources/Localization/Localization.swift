@@ -413,6 +413,7 @@ enum Strings {
     static var roomPersonSeeAll: String { lang == .chinese ? "看 TA 的全部" : "See all of theirs" }
     static var reactLabel: String { lang == .chinese ? "回个表情" : "React" }
     static var roomTilePoked: String { lang == .chinese ? "已拍一拍" : "Poked" }
+    static var roomPeekLocked: String { lang == .chinese ? "拍一段就能看" : "Film one to see" }
     static var skinTitle: String { lang == .chinese ? "皮肤" : "Theme" }
     static var skinCream: String { lang == .chinese ? "奶油黄" : "Cream" }
     static var skinBlue: String { lang == .chinese ? "经典蓝" : "Classic blue" }

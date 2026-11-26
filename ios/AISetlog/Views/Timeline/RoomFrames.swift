@@ -17,6 +17,8 @@ struct RoomFrames: View {
     var onReact: (DayClip, String) -> Void = { _, _ in }
     var signedOut = false
     var onSignIn: () -> Void = {}
+    var isLocked: (DayClip) -> Bool = { _ in false }
+    var onUnlock: () -> Void = {}
 
     private static let minimumFrameHeight: CGFloat = 150
     private static let spacing: CGFloat = 12
@@ -97,6 +99,8 @@ struct RoomFrames: View {
             reactions: reactions,
             onReact: onReact,
             signedOut: signedOut,
-            onSignIn: onSignIn)
+            onSignIn: onSignIn,
+            isLocked: isLocked,
+            onUnlock: onUnlock)
     }
 }

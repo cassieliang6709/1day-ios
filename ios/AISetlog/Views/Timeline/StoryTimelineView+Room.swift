@@ -34,6 +34,7 @@ extension StoryTimelineView {
             let signedOut = challenge.isShared && !account.isSignedIn
             let isToday = Calendar.current.isDateInToday(roomDay)
             let filmedDays = Set(clips.compactMap { $0.recordedAt.map(Calendar.current.startOfDay) })
+            let peek = RoomPeek(clips: clips, myID: myID, now: .now)
 
             if signedOut { signedOutLine }
 
@@ -103,7 +104,11 @@ extension StoryTimelineView {
                     reactions: { reactions(for: $0, myID: myID) },
                     onReact: { react($0, $1, myID: myID) },
                     signedOut: signedOut,
-                    onSignIn: { showSignIn = true })
+                    onSignIn: { showSignIn = true },
+                    isLocked: peek.isLocked,
+                    onUnlock: {
+                        filmToUnlock(challenge, nextToFilm: nextToFilm, signedOut: signedOut)
+                    })
             }
         }
         .padding(.horizontal, 20)
@@ -184,9 +189,26 @@ extension StoryTimelineView {
     }
 
     var filmClips: [DayClip] {
-        let all = store.recordedClips(for: challengeID)
+        let all = unlockedClips
         guard challenge?.isShared == true else { return all }
         return all.filter { Self.isClip($0, on: roomDay) }
+    }
+
+    var unlockedClips: [DayClip] {
+        let all = store.recordedClips(for: challengeID)
+        guard challenge?.isShared == true else { return all }
+        let myID = account.account?.id ?? RoomProgress.soloAuthorID
+        return RoomPeek(clips: all, myID: myID, now: .now).visible(all)
+    }
+
+    func filmToUnlock(_ challenge: Challenge, nextToFilm: Int?, signedOut: Bool) {
+        if signedOut {
+            showSignIn = true
+        } else if let nextToFilm {
+            sheet = .record(day: nextToFilm)
+        } else if let last = challenge.cards.last?.day {
+            sheet = .record(day: last, take: .append)
+        }
     }
 
     func filmTodaySlot(_ onFilm: @escaping () -> Void) -> some View {
