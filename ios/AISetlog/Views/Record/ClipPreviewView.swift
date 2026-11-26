@@ -189,6 +189,7 @@ struct ClipPreviewView: View {
     private var videoStage: some View {
         ZStack {
             if isLive {
+                ClipThumbnail(url: url, refreshToken: recordedAt)
                 LoopingClipPlayer(url: url, refreshToken: recordedAt)
             } else {
                 Color.black
