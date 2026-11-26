@@ -1,12 +1,10 @@
-import AuthenticationServices
 import SwiftUI
 
 struct FirstRunOnboardingView: View {
     let onFinish: () -> Void
 
     @Environment(AccountStore.self) private var account
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var signInError: String?
+    @State private var pendingSignIn: (() -> Void)?
     @State private var showsAvatarSetup = false
     @State private var showsPermissions = false
 
@@ -48,6 +46,7 @@ struct FirstRunOnboardingView: View {
             }
         }
         .task { account.offerExistingAccount() }
+        .signInGate($pendingSignIn)
         .fullScreenCover(isPresented: $showsPermissions, onDismiss: afterPermissions) {
             PermissionPrimerView { showsPermissions = false }
         }
@@ -56,7 +55,7 @@ struct FirstRunOnboardingView: View {
         }
     }
 
-    private func afterSignIn() {
+    private func continueSetup() {
         if PermissionPrimerView.isNeeded {
             showsPermissions = true
         } else {
@@ -82,32 +81,22 @@ struct FirstRunOnboardingView: View {
             .accessibilityHint(Strings.firstRunStartHint)
         } else {
             VStack(spacing: 8) {
-                SignInWithAppleButton(.signIn) { request in
-                    account.configure(request)
-                } onCompletion: { result in
-                    Task { @MainActor in
-                        do {
-                            try await account.completeSignIn(result)
-                            afterSignIn()
-                        } catch {
-                            if (error as? ASAuthorizationError)?.code == .canceled || error is CancellationError { return }
-                            signInError = Strings.signInFailure(error)
-                        }
-                    }
+                Button(action: continueSetup) {
+                    Text(Strings.firstRunSoloFirst)
                 }
-                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                .frame(height: 52)
-                .clipShape(Capsule())
+                .buttonStyle(.primaryAction)
+                .accessibilityIdentifier("first-run-try")
 
-                GoogleAccountButton(height: 52) { afterSignIn() } onError: { signInError = $0 }
-
-                if let signInError {
-                    Text(signInError)
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.oneDayEmber)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    pendingSignIn = continueSetup
+                } label: {
+                    Text(Strings.firstRunHaveAccount)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OneDay.inkSoft)
+                        .frame(minHeight: 44)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("first-run-sign-in")
             }
         }
     }

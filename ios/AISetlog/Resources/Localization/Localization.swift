@@ -309,6 +309,9 @@ enum Strings {
     static var firstRunSoloFirst: String {
         lang == .chinese ? "先自己拍拍看" : "Try it on my own first"
     }
+    static var firstRunHaveAccount: String {
+        lang == .chinese ? "已有账号？登录" : "Have an account? Sign in"
+    }
     static var signInFailed: String {
         lang == .chinese ? "没登上，再试一次" : "Couldn't sign in. Try again."
     }

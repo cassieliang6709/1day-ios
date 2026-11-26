@@ -173,7 +173,7 @@ extension PlansHomeView {
     }
 
     var newRoomButton: some View {
-        Button { onCompose() } label: {
+        Button { whenSignedIn(onCompose) } label: {
             HStack(spacing: 5) {
                 Image(systemName: "plus")
                     .font(.system(size: 13, weight: .heavy))
@@ -216,8 +216,10 @@ extension PlansHomeView {
 
     var joinButton: some View {
         Button {
-            joinCode = ""
-            showJoin = true
+            whenSignedIn {
+                joinCode = ""
+                showJoin = true
+            }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "person.2.badge.plus")
@@ -237,6 +239,12 @@ extension PlansHomeView {
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.enterInviteCode)
         .accessibilityIdentifier("home-join-room")
+    }
+
+    func whenSignedIn(_ action: @escaping () -> Void) {
+        if account.isSignedIn { return action() }
+        joinCode = ""
+        afterSignIn = action
     }
 
     func consumePendingJoinCode() {

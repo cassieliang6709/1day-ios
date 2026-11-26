@@ -70,7 +70,9 @@ private struct DraftActionsModifier: ViewModifier {
 
     @Environment(ChallengeStore.self) private var store
     @Environment(ClipDraftStore.self) private var drafts
+    @Environment(AccountStore.self) private var account
     @State private var filing: ClipDraft?
+    @State private var afterSignIn: (() -> Void)?
     @State private var pendingDelete: ClipDraft?
     @State private var blocked: DraftFilingBlocked?
     @State private var toast: String?
@@ -98,6 +100,7 @@ private struct DraftActionsModifier: ViewModifier {
             ) { _ in
                 Button(Strings.ok, role: .cancel) {}
             } message: { Text($0.message) }
+            .signInGate($afterSignIn)
             .overlay(alignment: .top) { toastView }
             .onChange(of: send) { _, draft in
                 guard let draft else { return }
@@ -139,8 +142,10 @@ private struct DraftActionsModifier: ViewModifier {
     private func file(_ draft: ClipDraft) {
         if DraftFiler.candidates(for: draft, in: store).isEmpty {
             blocked = DraftFiler.blocked(for: draft, in: store)
-        } else {
+        } else if account.isSignedIn {
             filing = draft
+        } else {
+            afterSignIn = { filing = draft }
         }
     }
 

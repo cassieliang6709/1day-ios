@@ -61,11 +61,16 @@
 ```text
 1Day records short clips and stitches them into a film on-device.
 
-Sign in: the first screen offers Sign in with Apple and Sign in with Google.
-Your own Apple ID works; no demo account is needed. Sign-in is required because
-clips, rooms and chat sync between friends' devices.
+No sign-in is needed to try the app. On the first screen tap
+"Try it on my own first". Filming, Mine and making a vlog all work without
+an account, and clips stay on the device.
 
-Core loop after signing in:
+Sign-in is asked for only when a feature shares with friends: creating a room,
+joining with an invite code or link, and sending a clip to a room. Sign in with
+Apple and Sign in with Google are offered; your own Apple ID works, and no demo
+account is needed. After signing in, the action you tapped continues.
+
+Core loop, no account:
   1. Tap the Camera tab, tap the shutter once (it films a short clip)
   2. Tap "Done". The clip appears in Mine
   3. In Mine, tap "Make vlog" → "Make" to stitch the day's clips
