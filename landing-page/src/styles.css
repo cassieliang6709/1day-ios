@@ -37,6 +37,8 @@ nav { display: flex; gap: 30px; font-size: 13px; font-weight: 700; }
 .site-footer { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 34px 0 42px; }
 .site-footer > div { display: flex; flex-wrap: wrap; justify-content: end; gap: 19px; color: var(--muted); font-size: 12px; }
 .site-footer a:hover { color: var(--ink); }
+.site-footer { flex-wrap: wrap; row-gap: 18px; }
+.footer-company { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12px; }
 
 .legal-page { min-height: 100vh; color: var(--ink); background: var(--paper); }
 .legal-page .nav { color: var(--ink); }
